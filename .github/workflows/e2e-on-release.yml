@@ -8,6 +8,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  OPENMRS_WAIT_TIMEOUT_SECONDS: 1800
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -36,7 +39,7 @@ jobs:
         run: docker compose -f ./tests/e2e/docker-compose-build.yml up -d
 
       - name: Wait for the backend to start
-        run: while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost/openmrs/login.htm)" != "200" ]]; do sleep 10; done
+        run: bash ./tests/e2e/wait-for-openmrs.sh
 
       - name: Commit and export Containers
         run: sh ./tests/e2e/commit_and_export_images.sh
@@ -104,7 +107,7 @@ jobs:
         working-directory: e2e_repo
 
       - name: Wait for the OpenMRS instance to start
-        run: while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:8080/openmrs/login.htm)" != "200" ]]; do sleep 10; done
+        run: bash ./tests/e2e/wait-for-openmrs.sh http://localhost:8080/openmrs/login.htm
 
       - name: Run E2E tests
         run: yarn playwright test
@@ -164,7 +167,7 @@ jobs:
         working-directory: e2e_repo
 
       - name: Wait for the OpenMRS instance to start
-        run: while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:8080/openmrs/login.htm)" != "200" ]]; do sleep 10; done
+        run: bash ./tests/e2e/wait-for-openmrs.sh http://localhost:8080/openmrs/login.htm
 
       - name: Run E2E tests
         run: yarn playwright test
@@ -224,7 +227,7 @@ jobs:
         working-directory: e2e_repo
 
       - name: Wait for the OpenMRS instance to start
-        run: while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:8080/openmrs/login.htm)" != "200" ]]; do sleep 10; done
+        run: bash ./tests/e2e/wait-for-openmrs.sh http://localhost:8080/openmrs/login.htm
 
       - name: Run E2E tests
         run: yarn playwright test
@@ -284,7 +287,7 @@ jobs:
         working-directory: e2e_repo
 
       - name: Wait for the OpenMRS instance to start
-        run: while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:8080/openmrs/login.htm)" != "200" ]]; do sleep 10; done
+        run: bash ./tests/e2e/wait-for-openmrs.sh http://localhost:8080/openmrs/login.htm
 
       - name: Run E2E tests
         run: yarn playwright test
@@ -344,7 +347,7 @@ jobs:
         working-directory: e2e_repo
 
       - name: Wait for the OpenMRS instance to start
-        run: while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:8080/openmrs/login.htm)" != "200" ]]; do sleep 10; done
+        run: bash ./tests/e2e/wait-for-openmrs.sh http://localhost:8080/openmrs/login.htm
 
       - name: Run E2E tests
         run: yarn playwright test
@@ -404,7 +407,7 @@ jobs:
         working-directory: e2e_repo
 
       - name: Wait for the OpenMRS instance to start
-        run: while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:8080/openmrs/login.htm)" != "200" ]]; do sleep 10; done
+        run: bash ./tests/e2e/wait-for-openmrs.sh http://localhost:8080/openmrs/login.htm
 
       - name: Run E2E tests
         run: yarn playwright test
