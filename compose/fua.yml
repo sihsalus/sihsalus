@@ -1,4 +1,4 @@
-# FUA Generator (Formato Unico de Atencion - MINSA Peru)
+# FUA Generator (Formato Unico de Atencion - MINSA)
 # Profile: fua
 #
 # Requires gateway env vars FUA_CONFIG and FUA_LOCATIONS in .env
