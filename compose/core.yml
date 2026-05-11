@@ -28,7 +28,7 @@ services:
 
   frontend-init:
     container_name: sihsalus-frontend-init
-    image: ghcr.io/sihsalus/sihsalus-esm:${FRONTEND_TAG:-latest}
+    image: ghcr.io/sihsalus/sihsalus-frontend:${FRONTEND_TAG:-latest}
     environment:
       SPA_OUTPUT_DIR: /spa
       SPA_PATH: /openmrs/spa

@@ -12,7 +12,7 @@ services:
       - "80:80"
 
   frontend-init:
-    image: ghcr.io/sihsalus/sihsalus-esm:latest
+    image: ghcr.io/sihsalus/sihsalus-frontend:latest
     container_name: frontend-init
     restart: "no"
     environment:
