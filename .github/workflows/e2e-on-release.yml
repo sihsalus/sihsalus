@@ -1,8 +1,7 @@
 name: Run E2E Tests on Release PRs
 
 on:
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -14,7 +13,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: ${{ startsWith(github.event.pull_request.title, '(release)') }}
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     outputs:
       patient_management_ref: ${{steps.refs.outputs.patient_management}}
       patient_chart_ref: ${{steps.refs.outputs.patient_chart}}
