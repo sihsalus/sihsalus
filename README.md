@@ -52,6 +52,8 @@ docker compose up -d
 # http://localhost/openmrs/spa
 ```
 
+La primera vez, OpenMRS puede tardar unos minutos en quedar listo. La señal de que ya terminó de arrancar es `http://localhost/openmrs/login.htm` respondiendo `200`; después de eso la SPA queda en `http://localhost/openmrs/spa/`.
+
 ## Profiles
 
 La infraestructura se organiza en **profiles** opcionales. Solo los servicios core (gateway, frontend, backend, db) se inician por defecto.
