@@ -5,26 +5,15 @@
 FROM openmrs/openmrs-core:2.8.x-dev-amazoncorretto-21 AS dev
 WORKDIR /openmrs_distro
 
-ARG MVN_ARGS_SETTINGS="-s /root/.m2/settings.xml -U -P backend"
+ARG MVN_ARGS_SETTINGS="-U -P backend"
 ARG MVN_ARGS="install"
 
-ARG CONTENT_VERSION=1.8.23
-
 # Copy build files
-COPY backend/credentials/settings.xml.template /root/.m2/settings.xml
 COPY pom.xml ./
 COPY backend/pom.xml ./backend/
 
 # Pre-download all dependencies into the BuildKit cache.
-# SIHSALUS content is fetched from public GitHub Releases. All module
-# dependencies, including FUA, come from public Maven repositories.
 RUN --mount=type=cache,target=/root/.m2/repository \
-    set -e; \
-    CONTENT_DIR="/root/.m2/repository/org/openmrs/content/sihsalus/${CONTENT_VERSION}"; \
-    mkdir -p "$CONTENT_DIR"; \
-    BASE_CONTENT="https://github.com/sihsalus/sihsalus-content-referenceapplication/releases/download/v${CONTENT_VERSION}"; \
-    curl -fsSL "${BASE_CONTENT}/sihsalus-${CONTENT_VERSION}.zip" -o "${CONTENT_DIR}/sihsalus-${CONTENT_VERSION}.zip"; \
-    curl -fsSL "${BASE_CONTENT}/sihsalus-${CONTENT_VERSION}.pom" -o "${CONTENT_DIR}/sihsalus-${CONTENT_VERSION}.pom"; \
     mvn $MVN_ARGS_SETTINGS dependency:resolve -B || true
 
 COPY backend ./backend/

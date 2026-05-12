@@ -92,7 +92,7 @@ Cada profile requiere sus variables en `.env`. Ver `.env.template` para la lista
 docker-compose.yml              # Entry point (include + profiles + volumes + networks)
 docker-compose-no-volumes.yml   # CI/testing (standalone)
 docker-bake.hcl                 # Build definitions
-backend/                        # Backend (Dockerfile, pom.xml, credentials, config)
+backend/                        # Backend (Dockerfile, pom.xml, config)
 gateway/                        # Nginx gateway
 frontend/                       # SPA frontend
 certbot/                        # SSL certificates
