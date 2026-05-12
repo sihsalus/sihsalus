@@ -77,6 +77,8 @@ services:
       OMRS_CONFIG_CONNECTION_USERNAME: ${OPENMRS_DB_USER:-openmrs}
       OMRS_CONFIG_CONNECTION_PASSWORD: ${MYSQL_OPENMRS_PASSWORD:-openmrs}
       OMRS_OCL_TOKEN: ${OMRS_OCL_TOKEN}
+      OAUTH2_ENABLED: ${OAUTH2_ENABLED:-false}
+      OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:-}
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8080/openmrs/health/started" ]
       interval: 30s
@@ -85,6 +87,7 @@ services:
       start_period: 3600s
     volumes:
       - openmrs-data:/openmrs/data
+      - ./keycloak/oauth2.properties:/openmrs/data/oauth2.properties:ro
 
   db:
     container_name: sihsalus-db-master

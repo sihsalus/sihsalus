@@ -131,7 +131,11 @@ Sistema centralizado de identidad para OpenMRS.
 
 **Activar**:
 ```bash
-docker compose --profile keycloak up -d
+docker compose \
+  -f docker-compose.yml \
+  -f compose/openmrs-keycloak.yml \
+  --profile keycloak \
+  up -d
 ```
 
 **Servicios**:
@@ -142,6 +146,8 @@ docker compose --profile keycloak up -d
 ```env
 KEYCLOAK_ADMIN_PASSWORD=<password_fuerte>
 KC_DB_PASSWORD=<password_bd>
+OAUTH2_ENABLED=true
+OAUTH2_CLIENT_SECRET=<secret_cliente_openmrs>
 KEYCLOAK_PORT=8180        # Opcional (puerto de escucha)
 ```
 
@@ -232,17 +238,22 @@ docker compose up -d
 
 ### Desarrollo con auth
 ```bash
-docker compose --profile keycloak up -d
+docker compose \
+  -f docker-compose.yml \
+  -f compose/openmrs-keycloak.yml \
+  --profile keycloak \
+  up -d
 ```
 
 ### Stack completo de producción
 ```bash
 docker compose \
+  -f docker-compose.yml \
+  -f compose/openmrs-keycloak.yml \
+  -f compose/ssl.yml \
   --profile keycloak \
   --profile monitoring \
   --profile hapi \
-  -f docker-compose.yml \
-  -f compose/ssl.yml \
   --profile ssl \
   up -d
 ```

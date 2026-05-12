@@ -1,0 +1,9 @@
+<config>
+    <globalProperties>
+        <globalProperty>
+            <property>oauth2login.redirectUriAfterLogin</property>
+            <value>/openmrs/spa/home</value>
+            <description>Redirect target after successful OAuth2 login.</description>
+        </globalProperty>
+    </globalProperties>
+</config>

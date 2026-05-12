@@ -42,6 +42,7 @@
     <teleconsultation.version>2.1.0-20250318.154145-1</teleconsultation.version>
     <cohort.version>3.7.3</cohort.version>
     <authentication.version>2.3.0</authentication.version>
+    <oauth2login.version>1.5.0</oauth2login.version>
     <reporting.version>2.1.0</reporting.version>
     <reportingrest.version>2.0.0</reportingrest.version>
     <!-- the next three are required for reporting -->
@@ -60,7 +61,7 @@
     <fua.version>1.0.75</fua.version>
     <!-- <sihsalus-interop.version>1.0.3</sihsalus-interop.version> -->
     <!-- Content Packages -->
-    <sihsalus-content.version>1.8.24</sihsalus-content.version>
+    <sihsalus-content.version>1.8.25</sihsalus-content.version>
     <reference-content.version>1.4.0</reference-content.version>
     <reference-demo-content.version>1.8.0-SNAPSHOT</reference-demo-content.version>
   </properties>
@@ -104,6 +105,12 @@
     </dependency>
     <dependency>
       <groupId>org.openmrs.module</groupId>
+      <artifactId>oauth2login-omod</artifactId>
+      <version>${oauth2login.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.openmrs.module</groupId>
       <artifactId>fhir2-omod</artifactId>
       <version>${fhir2.version}</version>
       <scope>provided</scope>
@@ -132,16 +139,10 @@
       <version>${addresshierarchy.version}</version>
       <scope>provided</scope>
     </dependency>
-      <dependency>
-      <groupId>org.openmrs.module</groupId>
-      <artifactId>patientdocuments-omod</artifactId>
-      <version>${patientdocuments.version}</version>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.openmrs.module</groupId>
-      <artifactId>patientdocuments-omod</artifactId>
-      <version>${patientdocuments.version}</version>
+        <dependency>
+            <groupId>org.openmrs.module</groupId>
+            <artifactId>patientdocuments-omod</artifactId>
+            <version>${patientdocuments.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>

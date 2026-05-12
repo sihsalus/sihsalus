@@ -9,18 +9,24 @@ Keycloak es el servidor de identidad y acceso que proporciona autenticación OAu
 ```env
 # En .env:
 KEYCLOAK_ADMIN_PASSWORD=<password_seguro>      # Password del usuario admin
+KC_DB_PASSWORD=<password_seguro>               # Password de PostgreSQL de Keycloak
+OAUTH2_ENABLED=true                            # Activa oauth2login en OpenMRS
 OAUTH2_CLIENT_SECRET=<secret_aleatorio>        # Secret del cliente OpenMRS
 ```
 
 ### Activa el profile de Keycloak
 
 ```bash
-docker compose --profile keycloak up -d
+docker compose \
+  -f docker-compose.yml \
+  -f compose/openmrs-keycloak.yml \
+  --profile keycloak \
+  up -d
 ```
 
 ### Acceso inicial
 
-- **URL**: `http://localhost:8081`
+- **URL**: `http://localhost:8180`
 - **Usuario**: `admin`
 - **Contraseña**: Valor de `KEYCLOAK_ADMIN_PASSWORD`
 
@@ -64,20 +70,32 @@ El backend OpenMRS obtiene la configuración desde [oauth2.properties](oauth2.pr
 
 ```properties
 # OAuth2 endpoints
-authorizationUri=http://localhost:8081/realms/openmrs/protocol/openid-connect/auth
-tokenUri=http://localhost:8081/realms/openmrs/protocol/openid-connect/token
-userInfoUri=http://localhost:8081/realms/openmrs/protocol/openid-connect/userinfo
+oauth2.enabled=${OAUTH2_ENABLED}
+userAuthorizationUri=http://localhost:8180/realms/openmrs/protocol/openid-connect/auth
+accessTokenUri=http://keycloak:8080/realms/openmrs/protocol/openid-connect/token
+userInfoUri=http://keycloak:8080/realms/openmrs/protocol/openid-connect/userinfo
+keysUrl=http://keycloak:8080/realms/openmrs/protocol/openid-connect/certs
 
 # Client credentials
 clientId=openmrs
-clientSecret=${OAUTH2_CLIENT_SECRET}  # Inyectado desde Docker secret
+clientSecret=${OAUTH2_CLIENT_SECRET}
+scope=openid,profile,email
 
 # Mapeos de claims a atributos de usuario
 openmrs.mapping.user.username=preferred_username
 openmrs.mapping.person.givenName=given_name
 openmrs.mapping.person.familyName=family_name
 openmrs.mapping.user.email=email
+openmrs.mapping.user.systemId=sub
 ```
+
+El frontend O3 recibe la configuración OAuth2 desde
+[frontend-keycloak.json](../frontend/frontend-keycloak.json), agregada por
+`compose/openmrs-keycloak.yml` a `SPA_CONFIG_URLS`.
+
+La global property de redirección post-login se inyecta como configuración
+Initializer desde
+[oauth2login.xml](openmrs_config/globalproperties/oauth2login.xml).
 
 ---
 
@@ -100,7 +118,7 @@ openmrs.mapping.user.email=email
 
 ### 1. Crear un usuario de prueba
 
-1. Accede a `http://localhost:8081` como admin
+1. Accede a `http://localhost:8180` como admin
 2. Ve a **Realm** → **Users** → **Create new user**
 3. Username: `provider1`
 4. Email: `provider@hospital.local`
@@ -142,7 +160,11 @@ Verifica que los redirect URIs en el cliente `openmrs` contengan el hostname cor
 
 Revisa logs:
 ```bash
-docker compose --profile keycloak logs keycloak
+docker compose \
+  -f docker-compose.yml \
+  -f compose/openmrs-keycloak.yml \
+  --profile keycloak \
+  logs keycloak
 ```
 
 ### Usuario no puede loguearse
