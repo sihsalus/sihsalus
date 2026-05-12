@@ -12,7 +12,7 @@ compose/
 ├── imaging.yml    # Stack médico (OHIF + Orthanc + DICOM)
 ├── replica.yml    # Réplica MariaDB para redundancia/backups
 ├── keycloak.yml   # Autenticación OAuth2/OpenID Connect
-├── monitoring.yml # Observabilidad (Grafana + Prometheus + Loki + Alloy)
+├── monitoring.yml # Observabilidad (Grafana + Prometheus + Loki, Alloy opcional)
 └── ssl.yml        # SSL/HTTPS (certificados Let's Encrypt o auto-firmados)
 ```
 
@@ -65,7 +65,7 @@ OMRS_DB_REPL_PASSWORD=<password_fuerte>
 OMRS_DB_REPL_USER=openmrs_repl
 ```
 
-Si el master ya tiene datos clínicos, inicializar `db-replic` desde un backup consistente antes de activar la replicación. El init automático solo es apropiado para despliegues nuevos o réplicas ya preparadas.
+La replicación usa GTID (`MASTER_USE_GTID=slave_pos`). Si el master ya tiene datos clínicos, inicializar `db-replic` desde un backup consistente antes de activar la replicación. El init automático solo es apropiado para despliegues nuevos o réplicas ya preparadas.
 
 ---
 
@@ -193,18 +193,23 @@ Si se accede desde otra maquina o se combina con SSL, ajustar `KC_HOSTNAME` y `K
 
 ### 📊 Monitoring (`monitoring.yml`) - Observabilidad
 
-Stack completo para logs, métricas y dashboards.
+Stack para métricas, dashboards y almacenamiento de logs. La recolección de logs de Docker con Alloy es opcional porque requiere montar el Docker socket.
 
 **Activar**:
 ```bash
 docker compose --profile monitoring up -d
 ```
 
+Para habilitar recolección de logs de contenedores:
+```bash
+docker compose --profile monitoring --profile logs up -d
+```
+
 **Servicios**:
 - `grafana` - Dashboards y alertas (v12.3)
 - `prometheus` - Series de tiempo (v3.2.1)
 - `loki` - Agregador de logs
-- `alloy` - Colector de métricas y logs (reemplazo de Promtail)
+- `alloy` - Colector opcional de logs Docker (profile: `logs`)
 
 **Variables requeridas**:
 ```env

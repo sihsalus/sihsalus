@@ -1,4 +1,4 @@
-# Monitoring Stack (Grafana, Prometheus, Loki, Alloy)
+# Monitoring Stack (Grafana, Prometheus, Loki, optional Alloy log collector)
 # Profile: monitoring
 
 services:
@@ -115,7 +115,7 @@ services:
     container_name: sihsalus-alloy
     image: grafana/alloy:v1.13.1
     restart: "unless-stopped"
-    profiles: [ monitoring ]
+    profiles: [ logs ]
     ports:
       - "127.0.0.1:12345:12345"
     volumes:
