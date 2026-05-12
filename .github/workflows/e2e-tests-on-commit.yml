@@ -16,6 +16,7 @@ env:
 
 jobs:
   build:
+    if: ${{ github.event_name != 'pull_request' || github.head_ref != 'pre-release' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -63,6 +64,7 @@ jobs:
           overwrite: true
 
   run-e2e-tests:
+    if: ${{ github.event_name != 'pull_request' || github.head_ref != 'pre-release' }}
     runs-on: ubuntu-latest
     needs: build
     timeout-minutes: 30
