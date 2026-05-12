@@ -27,6 +27,7 @@ echo "Generando contraseñas..."
 # Keycloak
 echo -n "$(generate_password)" > secrets/keycloak_admin_password.txt
 echo -n "$(generate_password)" > secrets/keycloak_db_password.txt
+echo -n "$(generate_password)" > secrets/oauth2_client_secret.txt
 
 # Grafana
 echo -n "$(generate_password)" > secrets/grafana_admin_password.txt
@@ -58,22 +59,28 @@ ls -lh secrets/
 echo ""
 
 # Crear archivo .env.production como plantilla
-cat > .env.production << 'EOF'
+KEYCLOAK_ADMIN_PASSWORD_VALUE=$(cat secrets/keycloak_admin_password.txt)
+KC_DB_PASSWORD_VALUE=$(cat secrets/keycloak_db_password.txt)
+OAUTH2_CLIENT_SECRET_VALUE=$(cat secrets/oauth2_client_secret.txt)
+cat > .env.production << EOF
 # .env.production
 # IMPORTANTE: Este archivo contiene referencias a secrets
 # Las contraseñas reales están en ./secrets/ (NO en Git)
 
 # Keycloak
 KEYCLOAK_ADMIN=admin
+KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD_VALUE}
 KEYCLOAK_ADMIN_PASSWORD_FILE=/run/secrets/keycloak_admin_password
 KC_DB_DATABASE=keycloak
 KC_DB_USERNAME=keycloak
+KC_DB_PASSWORD=${KC_DB_PASSWORD_VALUE}
 KC_DB_PASSWORD_FILE=/run/secrets/keycloak_db_password
 KC_HOSTNAME=openmrs.hospital.local
 KEYCLOAK_PORT=8180
 KEYCLOAK_REALM=openmrs
 KEYCLOAK_CLIENT_ID=openmrs
-KEYCLOAK_CLIENT_SECRET=433b9e20-549e-42e7-a05a-6f83dfffa8ba
+OAUTH2_ENABLED=true
+OAUTH2_CLIENT_SECRET=${OAUTH2_CLIENT_SECRET_VALUE}
 
 # Grafana
 GRAFANA_ADMIN_USER=admin

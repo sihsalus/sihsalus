@@ -1,0 +1,28 @@
+# Enables OAuth2 Login in OpenMRS when Keycloak is part of the stack.
+
+services:
+  frontend-init:
+    environment:
+      SPA_CONFIG_URLS: /openmrs/spa/frontend.json,/openmrs/spa/frontend-keycloak.json
+    volumes:
+      - ./frontend/frontend-keycloak.json:/app/config/frontend-keycloak.json:ro
+
+  backend:
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    environment:
+      OAUTH2_ENABLED: "true"
+      OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:?OAUTH2_CLIENT_SECRET is required when OpenMRS OAuth2 is enabled}
+    volumes:
+      - ./keycloak/openmrs_config/globalproperties/oauth2login.xml:/openmrs/distribution/openmrs_config/globalproperties/oauth2login.xml:ro
+
+  keycloak:
+    environment:
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required when OpenMRS OAuth2 is enabled}
+      OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:?OAUTH2_CLIENT_SECRET is required when OpenMRS OAuth2 is enabled}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:?KC_DB_PASSWORD is required when OpenMRS OAuth2 is enabled}
+
+  keycloak-db:
+    environment:
+      POSTGRES_PASSWORD: ${KC_DB_PASSWORD:?KC_DB_PASSWORD is required when OpenMRS OAuth2 is enabled}

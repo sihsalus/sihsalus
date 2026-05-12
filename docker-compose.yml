@@ -7,7 +7,7 @@
 #   docker compose --profile fua up -d                          # + FUA Generator
 #   docker compose --profile hapi up -d                         # + HAPI FHIR Server
 #   docker compose --profile imaging up -d                      # + Medical Imaging (OHIF/Orthanc)
-#   docker compose --profile keycloak up -d                     # + Keycloak Auth
+#   docker compose -f docker-compose.yml -f compose/openmrs-keycloak.yml --profile keycloak up -d  # + Keycloak Auth
 #   docker compose --profile monitoring up -d                   # + Observability (Grafana/Prometheus/Loki)
 #   docker compose --profile fua --profile hapi up -d           # Combine profiles
 #

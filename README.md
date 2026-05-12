@@ -72,7 +72,7 @@ docker compose --profile hapi up -d
 docker compose --profile imaging up -d
 
 # Core + Keycloak Auth
-docker compose --profile keycloak up -d
+docker compose -f docker-compose.yml -f compose/openmrs-keycloak.yml --profile keycloak up -d
 
 # Core + Observabilidad (Grafana/Prometheus/Loki)
 docker compose --profile monitoring up -d

@@ -32,7 +32,7 @@
             "name": "OpenMRS",
             "enabled": true,
             "clientAuthenticatorType": "client-secret",
-            "secret": "${KEYCLOAK_CLIENT_SECRET}",
+            "secret": "${OAUTH2_CLIENT_SECRET}",
             "redirectUris": [
                 "http://localhost/openmrs/*",
                 "https://localhost/openmrs/*"
