@@ -14,13 +14,12 @@ ENV KC_HOSTNAME_STRICT=false
 # Import automático de realm
 ENV KEYCLOAK_IMPORT=/opt/keycloak/data/import/realm-export.json
 
-# Copiamos el realm duro y el tema custom
+# Copiamos el realm duro
 COPY realm-export.json /opt/keycloak/data/import/realm-export.json
-COPY themes/ /opt/keycloak/themes/
 
 # Ajustamos permisos para el usuario 1000
 USER root
-RUN chown -R 1000:0 /opt/keycloak/data /opt/keycloak/themes
+RUN chown -R 1000:0 /opt/keycloak/data
 USER 1000
 
 # Pre-compilación para PostgreSQL

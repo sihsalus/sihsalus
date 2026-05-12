@@ -37,7 +37,7 @@ services:
       - spa-data:/usr/share/nginx/html:ro
       - ../../frontend/nginx.conf:/etc/nginx/nginx.conf:ro
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost/" ]
+      test: [ "CMD", "curl", "-f", "http://127.0.0.1/" ]
       timeout: 5s
     depends_on:
       - frontend-init

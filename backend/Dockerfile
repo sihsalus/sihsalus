@@ -9,7 +9,6 @@ ARG MVN_ARGS_SETTINGS="-s /root/.m2/settings.xml -U -P backend"
 ARG MVN_ARGS="install"
 
 ARG CONTENT_VERSION=1.8.23
-ARG FUA_VERSION=1.0.47
 
 # Copy build files
 COPY backend/credentials/settings.xml.template /root/.m2/settings.xml
@@ -17,24 +16,15 @@ COPY pom.xml ./
 COPY backend/pom.xml ./backend/
 
 # Pre-download all dependencies into the BuildKit cache.
-# SIHSALUS artifacts (fua-omod, content) are fetched from public GitHub Releases
-# — no credentials required. All other deps come from public Maven repos.
+# SIHSALUS content is fetched from public GitHub Releases. All module
+# dependencies, including FUA, come from public Maven repositories.
 RUN --mount=type=cache,target=/root/.m2/repository \
     set -e; \
     CONTENT_DIR="/root/.m2/repository/org/openmrs/content/sihsalus/${CONTENT_VERSION}"; \
-    FUA_DIR="/root/.m2/repository/org/openmrs/module/fua/${FUA_VERSION}"; \
-    FUA_API_DIR="/root/.m2/repository/org/openmrs/module/fua-api/${FUA_VERSION}"; \
-    FUA_OMOD_DIR="/root/.m2/repository/org/openmrs/module/fua-omod/${FUA_VERSION}"; \
-    mkdir -p "$CONTENT_DIR" "$FUA_DIR" "$FUA_API_DIR" "$FUA_OMOD_DIR"; \
+    mkdir -p "$CONTENT_DIR"; \
     BASE_CONTENT="https://github.com/sihsalus/sihsalus-content-referenceapplication/releases/download/v${CONTENT_VERSION}"; \
-    BASE_FUA="https://github.com/sihsalus/openmrs-module-FUA/releases/download/v${FUA_VERSION}"; \
     curl -fsSL "${BASE_CONTENT}/sihsalus-${CONTENT_VERSION}.zip" -o "${CONTENT_DIR}/sihsalus-${CONTENT_VERSION}.zip"; \
     curl -fsSL "${BASE_CONTENT}/sihsalus-${CONTENT_VERSION}.pom" -o "${CONTENT_DIR}/sihsalus-${CONTENT_VERSION}.pom"; \
-    curl -fsSL "${BASE_FUA}/fua-${FUA_VERSION}.pom"              -o "${FUA_DIR}/fua-${FUA_VERSION}.pom"; \
-    curl -fsSL "${BASE_FUA}/fua-api-${FUA_VERSION}.jar"          -o "${FUA_API_DIR}/fua-api-${FUA_VERSION}.jar"; \
-    curl -fsSL "${BASE_FUA}/fua-api-${FUA_VERSION}.pom"          -o "${FUA_API_DIR}/fua-api-${FUA_VERSION}.pom"; \
-    curl -fsSL "${BASE_FUA}/fua-omod-${FUA_VERSION}.jar"         -o "${FUA_OMOD_DIR}/fua-omod-${FUA_VERSION}.jar"; \
-    curl -fsSL "${BASE_FUA}/fua-omod-${FUA_VERSION}.pom"         -o "${FUA_OMOD_DIR}/fua-omod-${FUA_VERSION}.pom"; \
     mvn $MVN_ARGS_SETTINGS dependency:resolve -B || true
 
 COPY backend ./backend/
