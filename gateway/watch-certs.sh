@@ -19,11 +19,14 @@ while true; do
     if [ -f "${SIGNAL_FILE}" ]; then
         echo "Certificate reload signal detected, reloading nginx..."
         rm -f "${SIGNAL_FILE}"
-        nginx -s reload
-        if [ $? -eq 0 ]; then
-            echo "Nginx reloaded successfully"
+        if [ -f /var/run/nginx.pid ]; then
+            if nginx -s reload; then
+                echo "Nginx reloaded successfully"
+            else
+                echo "ERROR: Failed to reload nginx"
+            fi
         else
-            echo "ERROR: Failed to reload nginx"
+            echo "Nginx is not ready yet; skipping reload"
         fi
     fi
     sleep "${CHECK_INTERVAL}"
