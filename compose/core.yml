@@ -47,7 +47,7 @@ services:
       - spa-data:/usr/share/nginx/html:ro
       - ./frontend/nginx.conf:/etc/nginx/nginx.conf:ro
     healthcheck:
-      test: [ "CMD", "wget", "-q", "--spider", "http://localhost/" ]
+      test: [ "CMD", "wget", "-q", "--spider", "http://127.0.0.1/" ]
       interval: 15s
       timeout: 5s
       retries: 5

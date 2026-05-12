@@ -23,8 +23,6 @@ services:
       KC_HTTP_ENABLED: "true"
     ports:
       - "${KEYCLOAK_PORT:-8180}:8080"
-    volumes:
-      - ./keycloak/themes:/opt/keycloak/themes:ro
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8080/health/ready" ]
       interval: 30s

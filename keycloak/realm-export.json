@@ -3,18 +3,13 @@
     "enabled": true,
     "sslRequired": "external",
     "registrationAllowed": false,
-    "loginWithEmailAllowed": true,
+    "loginWithEmailAllowed": false,
     "duplicateEmailsAllowed": false,
     "resetPasswordAllowed": true,
     "editUsernameAllowed": false,
     "bruteForceProtected": true,
-    "permanentLockout": false,
-    "maxFailureWaitSeconds": 900,
-    "minimumQuickLoginWaitSeconds": 60,
-    "waitIncrementSeconds": 60,
-    "quickLoginCheckMilliSeconds": 1000,
-    "maxDeltaTimeSeconds": 43200,
-    "failureFactor": 30,
+    "maxFailureWaitSeconds": 300,
+    "failureFactor": 5,
     "roles": {
         "realm": [
             {
@@ -40,16 +35,9 @@
             "secret": "${KEYCLOAK_CLIENT_SECRET}",
             "redirectUris": [
                 "http://localhost/openmrs/*",
-                "http://localhost:8080/openmrs/*",
-                "http://localhost/openmrs/spa/*",
-                "https://localhost/openmrs/*",
-                "https://localhost:8080/openmrs/*"
+                "https://localhost/openmrs/*"
             ],
             "webOrigins": [
-                "http://localhost",
-                "http://localhost:8080",
-                "https://localhost",
-                "https://localhost:8080",
                 "+"
             ],
             "standardFlowEnabled": true,
@@ -59,10 +47,6 @@
             "publicClient": false,
             "frontchannelLogout": true,
             "protocol": "openid-connect",
-            "attributes": {
-                "exclude.session.state.from.auth.response": "false",
-                "tls.client.certificate.bound.access.tokens": "false"
-            },
             "protocolMappers": [
                 {
                     "name": "username",

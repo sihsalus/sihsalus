@@ -57,7 +57,7 @@
     <!-- Stock Management and Billing -->
     <stockmanagement.version>3.0.0</stockmanagement.version>
     <billing.version>2.2.0</billing.version>
-    <fua.version>1.0.47</fua.version>
+    <fua.version>1.0.75</fua.version>
     <!-- <sihsalus-interop.version>1.0.3</sihsalus-interop.version> -->
     <!-- Content Packages -->
     <sihsalus-content.version>1.8.23</sihsalus-content.version>
@@ -74,7 +74,7 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>org.openmrs.module</groupId>
+      <groupId>io.github.proyecto-santaclotilde</groupId>
       <artifactId>fua-omod</artifactId>
       <version>${fua.version}</version>
       <scope>provided</scope>
