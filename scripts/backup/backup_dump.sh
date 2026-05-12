@@ -13,7 +13,7 @@ BACKUP_DIR="${BACKUP_DIR:-/home/${USER}/sihsalus-dumps}"
 MAX_BACKUPS="${MAX_BACKUPS:-10}"
 DB_NAME="openmrs"
 DB_USER="root"
-DB_PASSWORD="${MYSQL_ROOT_PASSWORD:-openmrs}"
+DB_PASSWORD="${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD no definido}"
 TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
 DUMP_FILE="dump_${TIMESTAMP}.sql.gz"
 

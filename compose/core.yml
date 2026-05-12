@@ -79,6 +79,7 @@ services:
       OMRS_OCL_TOKEN: ${OMRS_OCL_TOKEN}
       OAUTH2_ENABLED: ${OAUTH2_ENABLED:-false}
       OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:-}
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8080/openmrs/health/started" ]
       interval: 30s

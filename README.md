@@ -80,11 +80,16 @@ docker compose --profile monitoring up -d
 # Combinar profiles
 docker compose --profile fua --profile hapi --profile monitoring up -d
 
-# Core + SSL/HTTPS (override especial)
-docker compose -f docker-compose.yml -f compose/ssl.yml up -d
+# Core + SSL/HTTPS (override especial; requiere cargar compose/ssl.yml)
+docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d
+
+# Core + Keycloak Auth + SSL/HTTPS
+docker compose -f docker-compose.yml -f compose/openmrs-keycloak.yml -f compose/ssl.yml --profile keycloak --profile ssl up -d
 ```
 
 Cada profile requiere sus variables en `.env`. Ver `.env.template` para la lista completa.
+
+El perfil `ssl` es un caso especial: no basta con pasar `--profile ssl` si solo se usa `docker-compose.yml`, porque la configuración SSL vive en `compose/ssl.yml` y ese archivo modifica el servicio `gateway` para exponer HTTPS.
 
 ### Estructura de archivos
 
@@ -144,10 +149,26 @@ CERT_WEB_DOMAINS=192.168.10.5,localhost,127.0.0.1
 ```
 
 ```bash
-docker compose -f docker-compose.yml -f compose/ssl.yml build
-docker compose -f docker-compose.yml -f compose/ssl.yml up -d
+docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl build
+docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d
 
 # https://192.168.10.5/openmrs/spa
+```
+
+`compose/ssl.yml` debe cargarse con `-f` porque no esta incluido por defecto en `docker-compose.yml`. El flag `--profile ssl` activa el servicio `certbot` definido en ese archivo; sin el `-f compose/ssl.yml`, Compose no ve ese profile ni aplica los cambios de `gateway` para publicar el puerto 443.
+
+### SSL con Keycloak
+
+SSL y Keycloak se pueden usar juntos cargando ambos overrides:
+
+```bash
+docker compose \
+  -f docker-compose.yml \
+  -f compose/openmrs-keycloak.yml \
+  -f compose/ssl.yml \
+  --profile keycloak \
+  --profile ssl \
+  up -d
 ```
 
 ### Variables SSL en `.env`
@@ -157,6 +178,7 @@ docker compose -f docker-compose.yml -f compose/ssl.yml up -d
 | `SSL_MODE` | `dev` (genera una vez y termina) o `prod` (renueva automáticamente) | `dev` |
 | `CERT_WEB_DOMAINS` | Todas las direcciones por las que se accederá al servidor, separadas por coma (IPs y/o nombres) | `localhost,127.0.0.1` |
 | `CERT_WEB_DOMAIN_COMMON_NAME` | La dirección principal del servidor (IP o nombre) | `localhost` |
+| `CERT_RSA_KEY_SIZE` | Tamaño de la clave RSA y de los parámetros DH generados por certbot | `2048` |
 
 ### Ejemplo para despliegue en hospital
 

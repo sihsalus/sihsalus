@@ -9,12 +9,28 @@ services:
     profiles: [ monitoring ]
     ports:
       - "127.0.0.1:3001:3000"
+    entrypoint:
+      - sh
+      - -euc
+      - |
+        if [ -z "$${GF_SECURITY_ADMIN_PASSWORD:-}" ]; then
+          echo "GRAFANA_ADMIN_PASSWORD is required when enabling the monitoring profile." >&2
+          exit 1
+        fi
+        exec /run.sh
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
       GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource,grafana-piechart-panel
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_ALLOW_ORG_CREATE: "false"
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_SECURITY_COOKIE_SAMESITE: strict
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_SNAPSHOTS_EXTERNAL_ENABLED: "false"
       GF_LOG_LEVEL: warn
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/logs-dashboard.json
     volumes:
@@ -104,7 +120,6 @@ services:
       - "127.0.0.1:12345:12345"
     volumes:
       - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
-      - /var/log:/var/log:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - alloy-data:/var/lib/alloy
     command:

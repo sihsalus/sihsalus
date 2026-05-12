@@ -10,6 +10,7 @@ compose/
 ├── fua.yml        # Generador de Formato Único de Atención (MINSA)
 ├── hapi.yml       # Servidor FHIR para interoperabilidad
 ├── imaging.yml    # Stack médico (OHIF + Orthanc + DICOM)
+├── replica.yml    # Réplica MariaDB para redundancia/backups
 ├── keycloak.yml   # Autenticación OAuth2/OpenID Connect
 ├── monitoring.yml # Observabilidad (Grafana + Prometheus + Loki + Alloy)
 └── ssl.yml        # SSL/HTTPS (certificados Let's Encrypt o auto-firmados)
@@ -41,6 +42,30 @@ FRONTEND_TAG=latest
 
 **Puertos**:
 - `80` - Gateway (HTTP)
+
+---
+
+### 🗄️ Replica (`replica.yml`) - Redundancia MariaDB
+
+Réplica MariaDB opcional para backups y contingencia. No publica puertos al host.
+
+**Activar**:
+```bash
+docker compose --profile replica up -d
+```
+
+**Servicios**:
+- `db-replic` - MariaDB 10.11 configurado como réplica read-only
+
+**Variables requeridas**:
+```env
+MYSQL_OPENMRS_PASSWORD=<password_fuerte>
+MYSQL_ROOT_PASSWORD=<password_fuerte>
+OMRS_DB_REPL_PASSWORD=<password_fuerte>
+OMRS_DB_REPL_USER=openmrs_repl
+```
+
+Si el master ya tiene datos clínicos, inicializar `db-replic` desde un backup consistente antes de activar la replicación. El init automático solo es apropiado para despliegues nuevos o réplicas ya preparadas.
 
 ---
 
@@ -149,10 +174,13 @@ KC_DB_PASSWORD=<password_bd>
 OAUTH2_ENABLED=true
 OAUTH2_CLIENT_SECRET=<secret_cliente_openmrs>
 KEYCLOAK_PORT=8180        # Opcional (puerto de escucha)
+KEYCLOAK_PUBLIC_URL=http://localhost:8180
 ```
 
 **Puertos**:
 - `8180` - Keycloak Admin Console (HTTP)
+
+Si se accede desde otra maquina o se combina con SSL, ajustar `KC_HOSTNAME` y `KEYCLOAK_PUBLIC_URL` al host/IP que usaran los navegadores. El realm importado incluye redirects para `localhost`; para una IP o dominio real, agregar ese origen en el cliente `openmrs` de Keycloak.
 
 **Realm preconfigurado**: `openmrs`
 - Cliente: `openmrs` (confidencial)
@@ -203,6 +231,8 @@ GRAFANA_ROOT_URL=...       # Opcional
 
 Certificados y configuración HTTPS (Let's Encrypt o auto-firmados).
 
+`ssl.yml` es un override standalone: debe cargarse con `-f compose/ssl.yml` porque modifica el servicio `gateway` para agregar HTTPS. Usar solo `--profile ssl` con `docker-compose.yml` no es suficiente, ya que ese profile no existe hasta cargar este archivo.
+
 **Activar** (con core):
 ```bash
 # Development (auto-firmados)
@@ -221,6 +251,7 @@ docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d
 SSL_MODE=dev                                                # dev o prod
 CERT_WEB_DOMAINS=localhost,127.0.0.1,192.168.0.200        # Dominios (comma-separated)
 CERT_WEB_DOMAIN_COMMON_NAME=localhost                      # CN del certificado
+CERT_RSA_KEY_SIZE=2048                                     # Tamaño clave RSA y DH params
 CERT_TEMP_CERT_DAYS=365                                    # Validez certs auto-firmados
 ```
 
@@ -242,6 +273,17 @@ docker compose \
   -f docker-compose.yml \
   -f compose/openmrs-keycloak.yml \
   --profile keycloak \
+  up -d
+```
+
+### Auth con SSL
+```bash
+docker compose \
+  -f docker-compose.yml \
+  -f compose/openmrs-keycloak.yml \
+  -f compose/ssl.yml \
+  --profile keycloak \
+  --profile ssl \
   up -d
 ```
 

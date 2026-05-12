@@ -1,0 +1,39 @@
+# MariaDB replica for backup/offline redundancy
+# Profile: replica
+
+services:
+  db-replic:
+    container_name: sihsalus-db-replic
+    image: mariadb:10.11.7
+    restart: "unless-stopped"
+    profiles: [ replica ]
+    entrypoint:
+      - bash
+      - -euc
+      - |
+        : "$${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required when enabling the replica profile}"
+        : "$${MYSQL_PASSWORD:?MYSQL_OPENMRS_PASSWORD is required when enabling the replica profile}"
+        : "$${OMRS_DB_REPL_PASSWORD:?OMRS_DB_REPL_PASSWORD is required when enabling the replica profile}"
+        exec docker-entrypoint.sh "$$@"
+      - --
+    command: "mariadbd --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci --server-id=2 --log-bin=mysql-bin --relay-log=mysql-relay-bin --binlog-format=ROW --sync-binlog=1 --log-slave-updates=1 --read-only=1 --skip-slave-start=1"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "mariadb --user=root --password=$$MYSQL_ROOT_PASSWORD --execute 'SELECT 1;'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    environment:
+      MYSQL_DATABASE: openmrs
+      MYSQL_USER: ${OMRS_DB_USER:-openmrs}
+      MYSQL_PASSWORD: ${MYSQL_OPENMRS_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      OMRS_DB_REPL_USER: ${OMRS_DB_REPL_USER:-openmrs_repl}
+      OMRS_DB_REPL_PASSWORD: ${OMRS_DB_REPL_PASSWORD}
+    volumes:
+      - ./scripts/database/db_init_slave.sh:/docker-entrypoint-initdb.d/db_init_slave.sh:ro
+      - db-replica-data:/var/lib/mysql
+      - db-replica-backup:/backup
