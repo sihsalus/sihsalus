@@ -29,11 +29,11 @@ jobs:
       - name: Check for release updates
         id: releases
         run: |
-          mvn -f distro/pom.xml versions:update-properties \
+          mvn -f backend/pom.xml versions:update-properties \
             -DgenerateBackupPoms=false \
-            "-Dmaven.version.rules=file:///$PWD/distro/version-rules.xml"
+            "-Dmaven.version.rules=file:///$PWD/backend/version-rules.xml"
 
-          if git diff --quiet distro/pom.xml; then
+          if git diff --quiet backend/pom.xml; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -44,7 +44,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add distro/pom.xml
+          git add backend/pom.xml
           git commit -m "chore: update OpenMRS module versions"
           git push
 
