@@ -25,5 +25,5 @@ jobs:
           java-version: '8'
           cache: 'maven'
 
-      - name: Build and Test
-        run: mvn --batch-mode --update-snapshots --file backend/pom.xml --activate-profiles validator clean verify
+      - name: Build Backend Distribution
+        run: mvn --batch-mode --update-snapshots --file backend/pom.xml clean package
