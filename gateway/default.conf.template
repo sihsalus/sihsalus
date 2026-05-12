@@ -77,6 +77,20 @@ server {
     proxy_pass $frontend;
   }
 
+  location = /keycloak {
+    return 301 /keycloak/;
+  }
+
+  location /keycloak/ {
+    set $keycloak http://keycloak:8080;
+    rewrite ^/keycloak/(.*) /$1 break;
+    proxy_set_header HOST $host;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto $forwarded_proto;
+    proxy_set_header X-Forwarded-Port $server_port;
+    proxy_pass $keycloak;
+  }
+
   location /openmrs {
     set $backend http://backend:8080;
     proxy_read_timeout 300s;
