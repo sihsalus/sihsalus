@@ -52,6 +52,13 @@ El archivo [realm-export.json](realm-export.json) contiene la configuración imp
 - **Usuarios iniciales**:
   - `admin` - Usuario administrador del realm
 
+- **Politica de password**:
+  - Minimo 8 caracteres
+  - Al menos 1 digito
+  - Al menos 1 minuscula y 1 mayuscula
+  - No puede coincidir con el username
+  - Alineada con las global properties actuales de OpenMRS
+
 ### Mapeadores de Claims
 
 Los claims OIDC se mapean automáticamente a atributos de OpenMRS:
@@ -146,12 +153,14 @@ El cliente `openmrs` importado en Keycloak trae redirects para `localhost`. Si s
 
 ### 1. Crear un usuario de prueba
 
-1. Accede a `http://localhost:8180` como admin
-2. Ve a **Realm** → **Users** → **Create new user**
-3. Username: `provider1`
-4. Email: `provider@hospital.local`
-5. Assign roles: `Provider`
-6. Set password temporal y marcar como "Not temporary"
+OpenMRS solo acepta usuarios que existan en su propia tabla de usuarios. Crear
+un usuario solo en Keycloak permite autenticar, pero OpenMRS rechazara el login.
+
+1. Crear primero la persona/usuario en OpenMRS y asignar roles/permisos.
+2. Crear en Keycloak un usuario con el mismo `username` exacto.
+3. Asignar roles del realm segun corresponda.
+4. Definir password temporal.
+5. Agregar required actions: `UPDATE_PASSWORD` y `CONFIGURE_TOTP`.
 
 ### 2. Probar login en OpenMRS
 
@@ -168,11 +177,20 @@ El cliente `openmrs` importado en Keycloak trae redirects para `localhost`. Si s
 
 1. Realm → Users → Selecciona usuario
 2. Credentials → Reset Password
+3. Marcar password como temporal para obligar cambio en el siguiente login
 
-### Por usuario final
+### Recuperacion operativa
 
-1. En login de OpenMRS
-2. Click **Forgot Password?** → Keycloak maneja el reset por email
+El reset por email requiere SMTP configurado en Keycloak. Si `smtpServer` esta
+vacio, el flujo de **Forgot Password?** no debe considerarse operativo.
+
+Para entornos con conectividad limitada, usar reset por administrador:
+
+1. Validar identidad del usuario por mesa de ayuda o presencialmente.
+2. Resetear password temporal en Keycloak.
+3. Mantener `UPDATE_PASSWORD` para obligar cambio al ingresar.
+4. Si perdio el celular/TOTP, eliminar la credencial OTP y exigir
+   `CONFIGURE_TOTP` nuevamente.
 
 ---
 
