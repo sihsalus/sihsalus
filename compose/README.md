@@ -224,9 +224,9 @@ GRAFANA_ROOT_URL=...       # Opcional
 - `3100` - Loki (HTTP, solo localhost)
 
 **Dashboards preconfigurados**:
-- Docker Overview
-- OpenMRS Overview
-- Logs aggregation
+- Docker Overview: estado de scrape y volumen/logs por contenedor
+- OpenMRS Overview: disponibilidad real por `probe_success`, status HTTP y latencia
+- Logs aggregation: búsqueda por `service_name`, `level` y texto libre (requiere profile `logs`)
 
 **Documentación**: [monitoring/README.md](../monitoring/README.md)
 
