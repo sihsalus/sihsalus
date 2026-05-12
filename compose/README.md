@@ -59,7 +59,6 @@ docker compose --profile replica up -d
 
 **Variables requeridas**:
 ```env
-MYSQL_OPENMRS_PASSWORD=<password_fuerte>
 MYSQL_ROOT_PASSWORD=<password_fuerte>
 OMRS_DB_REPL_PASSWORD=<password_fuerte>
 OMRS_DB_REPL_USER=openmrs_repl

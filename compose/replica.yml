@@ -8,7 +8,7 @@ services:
     restart: "unless-stopped"
     profiles: [ replica ]
     entrypoint: [ "bash", "/usr/local/bin/sihsalus-db-replica-entrypoint.sh" ]
-    command: "mariadbd --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci --server-id=2 --log-bin=mysql-bin --relay-log=mysql-relay-bin --binlog-format=ROW --sync-binlog=1 --log-slave-updates=1 --read-only=1 --skip-slave-start=1"
+    command: "mariadbd --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci --server-id=2 --log-bin=mysql-bin --relay-log=mysql-relay-bin --binlog-format=ROW --sync-binlog=1 --log-slave-updates=1 --read-only=1"
     depends_on:
       db:
         condition: service_healthy
@@ -19,9 +19,6 @@ services:
       retries: 5
       start_period: 30s
     environment:
-      MYSQL_DATABASE: openmrs
-      MYSQL_USER: ${OMRS_DB_USER:-openmrs}
-      MYSQL_PASSWORD: ${MYSQL_OPENMRS_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       OMRS_DB_REPL_USER: ${OMRS_DB_REPL_USER:-openmrs_repl}
       OMRS_DB_REPL_PASSWORD: ${OMRS_DB_REPL_PASSWORD}

@@ -1,4 +1,3 @@
-
 #!/bin/bash
 # ------------------------------------------------------------------------------
 # Script: backup_incremental.sh
@@ -57,10 +56,9 @@ done
 # Rotación de logs: mantener solo los últimos 5 logs
 LOG_FILE="$FULL_BACKUP_DIR/incrementalBackup_log.txt"
 mkdir -p "$FULL_BACKUP_DIR"
-LOG_PATTERN="$FULL_BACKUP_DIR/incrementalBackup_log.txt*"
-LOG_COUNT=$(ls -1 $LOG_PATTERN 2>/dev/null | wc -l)
-if [ "$LOG_COUNT" -ge 5 ]; then
-    ls -1t $LOG_PATTERN | tail -n +6 | xargs rm -f
+mapfile -t LOG_FILES < <(find "$FULL_BACKUP_DIR" -maxdepth 1 -type f -name 'incrementalBackup_log.txt*' -printf '%T@ %p\n' | sort -rn | cut -d' ' -f2-)
+if [ "${#LOG_FILES[@]}" -gt 5 ]; then
+    printf '%s\0' "${LOG_FILES[@]:5}" | xargs -0 rm -f
 fi
 # Renombrar log anterior si existe
 if [ -f "$LOG_FILE" ]; then
@@ -120,4 +118,3 @@ if [ "$BACKUP_COUNT" -gt "$MAX_BACKUPS" ]; then
 fi
 
 echo "[OK] Backup incremental realizado en '$FULL_BACKUP_DIR/$BACKUP_NAME.tar.gz.enc'"
-
