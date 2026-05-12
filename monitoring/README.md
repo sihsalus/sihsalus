@@ -1,13 +1,13 @@
 # Monitoring - Observabilidad (Grafana, Prometheus, Loki, Alloy)
 
-Stack completo de observabilidad: métricas, logs, alertas y dashboards.
+Stack de observabilidad para disponibilidad HTTP, métricas del propio stack y logs de contenedores. No incluye métricas de CPU/memoria por contenedor hasta agregar cAdvisor/node-exporter.
 
 ## Stack
 
 - **Grafana** - Dashboards y alertas (v12.3)
 - **Prometheus** - Series de tiempo (métricas) - v3.2.1
 - **Loki** - Agregador de logs (búsqueda rápida)
-- **Alloy** - Colector de métricas y logs (distribuido)
+- **Alloy** - Colector opcional de logs Docker
 - **Blackbox Exporter** - Probes de disponibilidad (health checks)
 
 ---
@@ -49,12 +49,7 @@ docker compose --profile monitoring up -d
 - Alertas via webhooks, email, etc.
 - Usuarios y permisos
 
-**Plugins instalados**:
-```
-grafana-clock-panel
-grafana-simple-json-datasource
-grafana-piechart-panel
-```
+**Plugins instalados**: no se instalan plugins externos por defecto. Los dashboards incluidos usan paneles nativos de Grafana.
 
 **Variables de entorno**:
 ```env
@@ -113,10 +108,10 @@ curl http://localhost:9090/api/v1/targets
 
 **Configuración**: [loki-config.yaml](loki/loki-config.yml)
 
-**Retención**: Configurable (default: 168 horas / 7 días)
+**Retención**: Configurable (default actual: 720 horas / 30 días)
 
 **Fuentes de logs**:
-- Docker daemon (via Alloy)
+- Docker daemon (via Alloy; requiere `--profile logs`)
 - OpenMRS backend
 - Nginx gateway
 - Demás servicios
@@ -127,27 +122,27 @@ curl http://localhost:9090/api/v1/targets
 {job="docker"}
 
 # Logs ERROR en OpenMRS
-{job="docker"} |= "ERROR" | json | service="backend"
+{job="docker", service_name="backend", level="error"}
 
 # Tasa de errores (logs)
-rate({job="docker"} |= "ERROR" [5m])
+sum(rate({job="docker", level="error"}[5m]))
 ```
 
 ---
 
 ### Alloy (antes Grafana Agent)
 
-**Rol**: Recolector de métricas y logs distribuido (corre en cada nodo/contenedor).
+**Rol**: Colector opcional de logs Docker. Requiere montar `/var/run/docker.sock` en modo read-only, por eso está separado en el profile `logs`.
 
 **Imagen**: Integrada en compose
 
 **Configuración**: [config.alloy](alloy/config.alloy)
 
 **Funciones**:
-1. Scrape de métricas Prometheus
+1. Descubrimiento de contenedores Docker
 2. Recolección de logs de Docker
-3. Transformación de datos
-4. Envío a Prometheus y Loki
+3. Normalización de labels (`service_name`, `container_name`, `level`)
+4. Envío de logs a Loki
 
 ---
 
@@ -168,19 +163,18 @@ rate({job="docker"} |= "ERROR" [5m])
 
 ### Docker Overview
 
-Métricas de:
-- CPU y memoria por contenedor
-- Tráfico de red
-- I/O de disco
-- Uptime/restarts
+Muestra:
+- Estado de scrape de Prometheus
+- Volumen de logs Docker por servicio y nivel
+- Logs recientes de contenedores
 
 ### OpenMRS Overview
 
-Métricas de:
-- Respuesta de API
-- Errores HTTP
-- Disponibilidad de endpoints
-- Latencia
+Muestra:
+- Disponibilidad real de endpoints mediante `probe_success`
+- Status HTTP reportado por blackbox
+- Latencia de endpoints mediante `probe_duration_seconds`
+- Logs y errores del backend/gateway cuando Alloy está habilitado
 
 ### Logs Dashboard
 
@@ -197,13 +191,13 @@ Agregación y búsqueda de:
 
 Ubicación: [monitoring/prometheus/alerts/](prometheus/alerts/)
 
-**Ejemplo**: Contenedor en estado crítico
+**Ejemplo**: endpoint SIHSALUS no responde correctamente
 ```yaml
-alert: ContainerDown
-expr: up{job="docker"} == 0
-for: 5m
+alert: SihsalusEndpointProbeFailing
+expr: probe_success{job="blackbox-http-prod"} == 0
+for: 2m
 annotations:
-  summary: "Contenedor {{ $labels.name }} no está disponible"
+  summary: "SIHSALUS endpoint probe failed for {{ $labels.instance }}"
 ```
 
 ### Configurar notificaciones
@@ -220,30 +214,30 @@ En Grafana:
 ### PromQL (Prometheus)
 
 ```promql
-# Tasa de requests exitosos en gateway
-rate(http_requests_total{job="gateway", status="200"}[5m])
+# Disponibilidad real de endpoints HTTP
+probe_success{job="blackbox-http-prod"}
 
-# CPU por contenedor
-container_cpu_usage_seconds_total
+# Status HTTP devuelto por los probes
+probe_http_status_code{job="blackbox-http-prod"}
 
-# Memoria disponible
-container_memory_limit_bytes - container_memory_usage_bytes
+# Latencia por endpoint
+probe_duration_seconds{job="blackbox-http-prod"}
 
-# Uptime de servicios
-up{job="docker"}
+# Estado de targets scrapeados
+up
 ```
 
 ### LogQL (Loki)
 
 ```logql
 # Logs ERROR en el backend
-{job="docker", service="backend"} |= "ERROR"
+{job="docker", service_name="backend", level="error"}
 
 # Tasa de logs por segundo
 sum(rate({job="docker"}[5m]))
 
-# Logs de OpenMRS últimas 2 horas
-{job="docker", service="backend"} | since(2h)
+# Logs de gateway y backend
+{job="docker", service_name=~"backend|gateway"}
 ```
 
 ---
@@ -255,7 +249,7 @@ sum(rate({job="docker"}[5m]))
 | Servicio | Volumen | Uso | Tamaño típico |
 |----------|---------|-----|---|
 | Prometheus | `prometheus-data` | TSDB (30 días) | 1-5 GB |
-| Loki | `loki-data` | Índices y logs (7 días) | 2-10 GB |
+| Loki | `loki-data` | Índices y logs (30 días) | 2-10 GB |
 | Grafana | `grafana-data` | Config, dashboards, usuarios | 100-500 MB |
 
 ### Limpieza de datos antiguos
@@ -266,7 +260,7 @@ sum(rate({job="docker"}[5m]))
 
 # Loki: configurado en loki-config.yaml
 # retention_enabled: true
-# retention_days: 7
+# retention_period: 720h
 
 # Manual: eliminar volumen
 docker volume rm sihsalus_prometheus-data
@@ -290,14 +284,14 @@ docker volume rm sihsalus_prometheus-data
 
 3. Verifica conectividad:
    ```bash
-   docker compose --profile monitoring exec prometheus curl http://grafana:3000/metrics
+   curl http://localhost:9090/api/v1/targets
    ```
 
 ### "No logs in Loki"
 
-1. Revisa que Alloy esté recolectando:
+1. Revisa que Alloy esté habilitado y recolectando:
    ```bash
-   docker compose --profile monitoring logs alloy | grep -i loki
+   docker compose --profile monitoring --profile logs logs alloy
    ```
 
 2. Verifica configuración Alloy: [config.alloy](alloy/config.alloy)
@@ -421,12 +415,12 @@ Para activar:
 # Health check de todos los servicios
 docker compose --profile monitoring exec grafana curl -f http://grafana:3000/api/health
 docker compose --profile monitoring exec prometheus curl -f http://localhost:9090/-/healthy
-docker compose --profile monitoring exec loki curl -f http://localhost:3100/ready
+curl -f http://localhost:3100/ready
 ```
 
 ### Dashboard de salud
 
 Crear dashboard personalizado con:
-- `up{job="..."}` - Disponibilidad de servicios
-- `rate(http_requests_total{status=~"5.."}[5m])` - Tasa de errores
+- `probe_success{job="blackbox-http-prod"}` - Disponibilidad real de endpoints
+- `probe_duration_seconds{job="blackbox-http-prod"}` - Latencia por endpoint
 - Count de eventos de alertas últimas 24h

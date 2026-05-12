@@ -1,5 +1,5 @@
 {
-  "@openmrs/esm-login-app": {
+  "@sihsalus/esm-login-app": {
     "provider": {
       "type": "oauth2",
       "loginUrl": "/openmrs/oauth2login",

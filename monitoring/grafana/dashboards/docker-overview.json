@@ -85,7 +85,7 @@
           "legendFormat": "{{job}} - {{instance}}"
         }
       ],
-      "title": "Services Status",
+      "title": "Scrape Targets",
       "type": "timeseries"
     },
     {

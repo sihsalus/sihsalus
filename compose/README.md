@@ -208,6 +208,7 @@ docker compose --profile monitoring --profile logs up -d
 - `grafana` - Dashboards y alertas (v12.3)
 - `prometheus` - Series de tiempo (v3.2.1)
 - `loki` - Agregador de logs
+- `blackbox` - Probes HTTP internos para endpoints del gateway
 - `alloy` - Colector opcional de logs Docker (profile: `logs`)
 
 **Variables requeridas**:
