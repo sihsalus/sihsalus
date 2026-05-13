@@ -1,11 +1,10 @@
 # Enables OAuth2 Login in OpenMRS when Keycloak is part of the stack.
 
 services:
-  frontend-init:
-    environment:
-      SPA_CONFIG_URLS: /openmrs/spa/frontend.json,/openmrs/spa/frontend-keycloak.json
-    volumes:
-      - ./frontend/frontend-keycloak.json:/app/config/frontend-keycloak.json:ro
+  frontend:
+    build:
+      args:
+        SPA_CONFIG_URLS: /openmrs/spa/frontend.json,/openmrs/spa/frontend-keycloak.json
 
   backend:
     depends_on:

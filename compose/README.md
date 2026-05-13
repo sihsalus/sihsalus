@@ -26,8 +26,7 @@ Servicios base necesarios para OpenMRS. Se incluye automáticamente.
 
 **Servicios**:
 - `gateway` - Reverse proxy Nginx
-- `frontend-init` - Inicializador de SPA
-- `frontend` - Nginx con SPA compilado
+- `frontend` - Imagen Nginx versionada con SPA compilada
 - `backend` - OpenMRS 3.6.0
 - `db` - MariaDB 10.11 (master)
 
@@ -37,7 +36,8 @@ MYSQL_OPENMRS_PASSWORD=<password_fuerte>
 MYSQL_ROOT_PASSWORD=<password_fuerte>
 OMRS_OCL_TOKEN=<token_ocl>
 BACKEND_TAG=latest
-FRONTEND_TAG=latest
+FRONTEND_SOURCE_TAG=latest
+FRONTEND_RUNTIME_TAG=latest
 ```
 
 **Puertos**:
@@ -323,7 +323,7 @@ Cada profile define volúmenes persistentes para datos:
 
 | Profile | Volúmenes |
 |---------|-----------|
-| core | `openmrs-data`, `spa-data`, mariadb data |
+| core | `openmrs-data`, mariadb data |
 | fua | `db-fua-generator` (PostgreSQL) |
 | hapi | `hapi_pgdata` (PostgreSQL) |
 | imaging | `orthanc-data` (DICOM files) |

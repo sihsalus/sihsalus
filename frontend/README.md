@@ -8,7 +8,7 @@ El frontend es una Single Page Application (SPA) moderna construida con React y 
 - **Bundler**: Webpack Module Federation (micro-frontends)
 - **Servidor web**: Nginx 1.28 Alpine
 - **Locale**: Español (es) por defecto
-- **Build output**: Artefacto estático servido desde `/spa`
+- **Build output**: Artefacto estático dentro de la imagen runtime, servido por gateway en `/openmrs/spa`
 
 ---
 
@@ -16,45 +16,27 @@ El frontend es una Single Page Application (SPA) moderna construida con React y 
 
 ```
 frontend/
+├── Dockerfile         # Construye la imagen runtime versionada
 ├── nginx.conf         # Configuración Nginx para SPA
-└── (otros archivos)   # Configuración adicional si existe
+├── patch-config-urls.js
+└── frontend-keycloak.json
 ```
 
 ## Componentes
 
-### `frontend-init` (Inicializador)
+### `frontend` (Imagen runtime versionada)
 
-Imagen: `ghcr.io/sihsalus/sihsalus-frontend:latest`
+Imagen: `${FRONTEND_RUNTIME_IMAGE:-sihsalus-frontend-runtime}:${FRONTEND_RUNTIME_TAG:-latest}`
 
-**Rol**: Construye/compila la SPA y guarda artefactos en volumen compartido `spa-data`.
+**Rol**: Servidor HTTP ligero que ya contiene los archivos estáticos de la SPA en `/usr/share/nginx/html`.
 
-**Variables de entorno**:
-```env
-SPA_OUTPUT_DIR=/spa                         # Directorio de salida
-SPA_PATH=/openmrs/spa                       # Path de la SPA en gateway
-API_URL=/openmrs                            # URL base de API
-SPA_CONFIG_URLS=/openmrs/spa/frontend.json  # URL de configuración
-SPA_DEFAULT_LOCALE=es                       # Idioma por defecto (español)
-```
-
-**Ciclo de vida**: 
-- Corre **una sola vez** al inicio (`restart: "no"`)
-- `gateway` espera a que termine para servir el contenido
-- No requiere salud constante
-
-### `frontend` (Servidor web)
-
-Imagen: `nginx:1.28-alpine`
-
-**Rol**: Servidor HTTP ligero que sirve archivos estáticos de la SPA.
-
-**Volúmenes**:
-- `spa-data:/usr/share/nginx/html:ro` - Artefactos compilados (solo lectura)
-- `./frontend/nginx.conf:/etc/nginx/nginx.conf:ro` - Configuración nginx
+**Build**:
+- Etapa `assemble`: usa `ghcr.io/sihsalus/sihsalus-frontend:${FRONTEND_SOURCE_TAG:-latest}` para generar app shell, importmap, rutas, config y assets.
+- Etapa runtime: copia el resultado a `nginx:1.28-alpine`.
 
 **Puertos**: 80 (interno, accesible solo desde gateway)
 
-**Health check**: Verifica que Nginx responda a `GET /`
+**Health check**: verifica que el HTML servido contenga `initializeSpa`, no solo que Nginx responda.
 
 ---
 
@@ -104,11 +86,11 @@ sendfile on;                        # Zero-copy para archivos estáticos
 
 ## Configuración de la SPA
 
-### Variables de Entorno para Inicializador
+### Build Args
 
 | Variable | Ejemplo | Descripción |
 |----------|---------|-------------|
-| `SPA_OUTPUT_DIR` | `/spa` | Donde guardar los archivos compilados |
+| `FRONTEND_SOURCE_IMAGE` | `ghcr.io/sihsalus/sihsalus-frontend:latest` | Imagen fuente con bundles y ensamblador |
 | `SPA_PATH` | `/openmrs/spa` | Path en el que está disponible la SPA |
 | `API_URL` | `/openmrs` | URL base para llamadas a API backend |
 | `SPA_CONFIG_URLS` | `/openmrs/spa/frontend.json` | Ubicación del config JSON |
@@ -130,22 +112,29 @@ Define:
 
 ## Build y Deployment
 
-### Build local (desarrollo)
+### Build local
 
 ```bash
-# La imagen frontend-init automatiza esto
-docker compose build frontend-init
-
-# O manual (si lo necesitas):
-npm install
-npm run build
+docker compose build frontend
 ```
 
-### Volumen compartido `spa-data`
+Con Docker Bake:
 
-- **frontend-init** escribe: artefactos compilados
-- **frontend** lee: archivos HTML, JS, CSS, etc.
-- **gateway** sirve: en `http://localhost/openmrs/spa`
+```bash
+TAG=2026-05-13 FRONTEND_SOURCE_TAG=latest docker buildx bake frontend
+```
+
+### Deploy y rollback
+
+```bash
+FRONTEND_RUNTIME_TAG=2026-05-13 docker compose up -d frontend gateway
+```
+
+Rollback:
+
+```bash
+FRONTEND_RUNTIME_TAG=tag-anterior docker compose up -d frontend gateway
+```
 
 ---
 
@@ -153,14 +142,13 @@ npm run build
 
 ### "404 not found en /openmrs/spa"
 
-1. Verifica que `frontend-init` completó exitosamente:
+1. Verifica que `frontend` esté healthy:
    ```bash
-   docker compose logs frontend-init
+   docker compose ps frontend
    ```
-2. Verifica que el volumen `spa-data` contiene archivos:
+2. Revisa que la imagen tenga el shell correcto:
    ```bash
-   docker volume inspect sihsalus_spa-data
-   docker run -it --rm -v sihsalus_spa-data:/data busybox ls -la /data
+   docker compose exec frontend wget -q -O - http://127.0.0.1/ | grep initializeSpa
    ```
 3. Revisa logs del gateway:
    ```bash
@@ -170,10 +158,11 @@ npm run build
 ### Cambios en configuración no aparecen
 
 - **Assets versionados** (`.js`, `.css`): Limpiar caché del navegador (Ctrl+Shift+Delete)
-- **frontend.json**: Reconstruir frontend-init o hacer hard refresh (Ctrl+F5)
-- **nginx.conf**: Reiniciar contenedor frontend
+- **frontend.json**: reconstruir la imagen `frontend` o hacer hard refresh (Ctrl+F5)
+- **nginx.conf**: reconstruir la imagen `frontend`
   ```bash
-  docker compose restart frontend
+  docker compose build frontend
+  docker compose up -d frontend gateway
   ```
 
 ### Errores JavaScript en SPA
@@ -185,8 +174,8 @@ npm run build
 # Revisar que los micro-frontends se cargan
 # F12 → Network → Type: script
 
-# Log de inicialización
-docker compose logs frontend-init
+# Log de Nginx frontend
+docker compose logs frontend
 ```
 
 ### Rendimiento lento

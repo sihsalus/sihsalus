@@ -1,4 +1,4 @@
-# Core services: gateway, frontend-init, backend, db
+# Core services: gateway, frontend, backend, db
 
 services:
   gateway:
@@ -7,14 +7,12 @@ services:
       context: ./gateway
     restart: "unless-stopped"
     depends_on:
-      frontend-init:
-        condition: service_completed_successfully
+      frontend:
+        condition: service_healthy
       backend:
         condition: service_healthy
     ports:
       - "80:80"
-    volumes:
-      - spa-data:/spa:ro
     environment:
       FRAME_ANCESTORS: ${FRAME_ANCESTORS:-}
       FUA_CONFIG: ${FUA_CONFIG:-}
@@ -26,38 +24,26 @@ services:
       retries: 3
       start_period: 30s
 
-  frontend-init:
-    container_name: sihsalus-frontend-init
-    image: ghcr.io/sihsalus/sihsalus-frontend:${FRONTEND_TAG:-latest}
-    user: "0:0"
-    command: sh -c "rm -f /spa/index.html && node packages/tooling/scripts/assemble-importmap.js && node /app/patch-config-urls.js"
-    environment:
-      SPA_OUTPUT_DIR: /spa
-      SPA_PATH: /openmrs/spa
-      API_URL: /openmrs
-      SPA_CONFIG_URLS: /openmrs/spa/frontend.json
-      SPA_DEFAULT_LOCALE: es
-    volumes:
-      - spa-data:/spa
-      - ./frontend/patch-config-urls.js:/app/patch-config-urls.js:ro
-    restart: "no"
-
   frontend:
     container_name: sihsalus-frontend
-    image: nginx:1.28-alpine
+    image: ${FRONTEND_RUNTIME_IMAGE:-sihsalus-frontend-runtime}:${FRONTEND_RUNTIME_TAG:-latest}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        FRONTEND_SOURCE_IMAGE: ghcr.io/sihsalus/sihsalus-frontend:${FRONTEND_SOURCE_TAG:-latest}
+        SPA_PATH: /openmrs/spa
+        API_URL: /openmrs
+        SPA_CONFIG_URLS: /openmrs/spa/frontend.json
+        SPA_DEFAULT_LOCALE: es
     restart: "unless-stopped"
-    volumes:
-      - spa-data:/usr/share/nginx/html:ro
-      - ./frontend/nginx.conf:/etc/nginx/nginx.conf:ro
     healthcheck:
-      test: [ "CMD", "wget", "-q", "--spider", "http://127.0.0.1/" ]
+      test: [ "CMD-SHELL", "wget -q -O - http://127.0.0.1/ | grep -q 'initializeSpa'" ]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 60s
     depends_on:
-      frontend-init:
-        condition: service_completed_successfully
       backend:
         condition: service_started
 

@@ -16,6 +16,10 @@ variable "REGISTRY" {
   default = ""
 }
 
+variable "FRONTEND_SOURCE_TAG" {
+  default = "latest"
+}
+
 // ---- Shared base ----
 
 target "_base" {
@@ -25,11 +29,11 @@ target "_base" {
 // ---- Groups ----
 
 group "default" {
-  targets = ["backend", "gateway"]
+  targets = ["backend", "gateway", "frontend"]
 }
 
 group "all" {
-  targets = ["backend", "gateway", "keycloak", "certbot"]
+  targets = ["backend", "gateway", "frontend", "keycloak", "certbot"]
 }
 
 // ---- Core Targets ----
@@ -46,6 +50,20 @@ target "gateway" {
   context    = "./gateway"
   dockerfile = "Dockerfile"
   tags       = ["${REGISTRY}sihsalus-gateway:${TAG}"]
+}
+
+target "frontend" {
+  inherits   = ["_base"]
+  context    = "./frontend"
+  dockerfile = "Dockerfile"
+  args = {
+    FRONTEND_SOURCE_IMAGE = "ghcr.io/sihsalus/sihsalus-frontend:${FRONTEND_SOURCE_TAG}"
+    SPA_PATH              = "/openmrs/spa"
+    API_URL               = "/openmrs"
+    SPA_CONFIG_URLS       = "/openmrs/spa/frontend.json"
+    SPA_DEFAULT_LOCALE    = "es"
+  }
+  tags       = ["${REGISTRY}sihsalus-frontend-runtime:${TAG}"]
 }
 
 // ---- Optional Targets ----
