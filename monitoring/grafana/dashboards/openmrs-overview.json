@@ -105,13 +105,13 @@
                         "uid": "${DS_PROMETHEUS}"
                     },
                     "editorMode": "code",
-                    "expr": "up",
-                    "legendFormat": "{{job}}",
+                    "expr": "probe_success{job=\"blackbox-http-prod\"}",
+                    "legendFormat": "{{instance}}",
                     "range": true,
                     "refId": "A"
                 }
             ],
-            "title": "Services Status (UP/DOWN)",
+            "title": "Endpoint Availability",
             "type": "timeseries"
         },
         {
@@ -177,22 +177,22 @@
                 {
                     "datasource": {
                         "type": "prometheus",
-                        "uid": "PBFA97CFB590B2093"
+                        "uid": "${DS_PROMETHEUS}"
                     },
                     "editorMode": "code",
-                    "expr": "up",
-                    "legendFormat": "{{job}}",
+                    "expr": "probe_http_status_code{job=\"blackbox-http-prod\"}",
+                    "legendFormat": "{{instance}}",
                     "range": true,
                     "refId": "A"
                 }
             ],
-            "title": "Service Health",
+            "title": "HTTP Status",
             "type": "gauge"
         },
         {
             "datasource": {
                 "type": "loki",
-                "uid": "P8E80F9AEF21F6940"
+                "uid": "${DS_LOKI}"
             },
             "gridPos": {
                 "h": 10,
@@ -218,12 +218,12 @@
                         "uid": "${DS_LOKI}"
                     },
                     "editorMode": "code",
-                    "expr": "{job=\"docker\"}",
+                    "expr": "{job=\"docker\", service_name=~\"backend|gateway\"}",
                     "queryType": "range",
                     "refId": "A"
                 }
             ],
-            "title": "Docker Logs (All Containers)",
+            "title": "OpenMRS/Gateway Logs",
             "type": "logs"
         },
         {
@@ -305,12 +305,12 @@
                         "uid": "${DS_LOKI}"
                     },
                     "editorMode": "code",
-                    "expr": "sum by (level) (count_over_time({job=\"docker\"}[5m]))",
+                    "expr": "sum by (service_name, level) (count_over_time({job=\"docker\", service_name=~\"backend|gateway\"}[5m]))",
                     "queryType": "range",
                     "refId": "A"
                 }
             ],
-            "title": "Logs by Level (Last 5min)",
+            "title": "OpenMRS/Gateway Logs by Level",
             "type": "timeseries"
         },
         {
@@ -342,12 +342,12 @@
                         "uid": "${DS_LOKI}"
                     },
                     "editorMode": "code",
-                    "expr": "{job=\"docker\"} |= \"ERROR\"",
+                    "expr": "{job=\"docker\", service_name=~\"backend|gateway\", level=~\"error\"}",
                     "queryType": "range",
                     "refId": "A"
                 }
             ],
-            "title": "Error Logs",
+            "title": "OpenMRS/Gateway Error Logs",
             "type": "logs"
         }
     ],

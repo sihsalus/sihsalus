@@ -9,10 +9,15 @@
 #   docker compose --profile imaging up -d                      # + Medical Imaging (OHIF/Orthanc)
 #   docker compose -f docker-compose.yml -f compose/openmrs-keycloak.yml --profile keycloak up -d  # + Keycloak Auth
 #   docker compose --profile monitoring up -d                   # + Observability (Grafana/Prometheus/Loki)
+#   docker compose --profile monitoring --profile logs up -d    # + Docker log collection (Alloy; mounts Docker socket)
+#   docker compose --profile replica up -d                      # + MariaDB Replica
 #   docker compose --profile fua --profile hapi up -d           # Combine profiles
 #
-# SSL/HTTPS (override adicional):
+# SSL/HTTPS (override adicional; requiere cargar compose/ssl.yml porque modifica gateway):
 #   docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d
+#
+# SSL/HTTPS + Keycloak:
+#   docker compose -f docker-compose.yml -f compose/openmrs-keycloak.yml -f compose/ssl.yml --profile keycloak --profile ssl up -d
 #
 # BUILD (con Docker Bake):
 #   docker buildx bake                    # Build core images (backend, gateway, frontend)
@@ -30,6 +35,8 @@ include:
     project_directory: .
   - path: compose/imaging.yml
     project_directory: .
+  - path: compose/replica.yml
+    project_directory: .
   - path: compose/keycloak.yml
     project_directory: .
   - path: compose/monitoring.yml
@@ -41,6 +48,9 @@ volumes:
   openmrs-data:
   db-data:
   db-backup:
+  # MariaDB replica (profile: replica)
+  db-replica-data:
+  db-replica-backup:
   # FUA (profile: fua)
   db-fua-generator:
   # HAPI FHIR (profile: hapi)

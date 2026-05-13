@@ -1,53 +1,30 @@
 groups:
-  - name: sihsalus_basic_alerts
+  - name: sihsalus_monitoring_alerts
     interval: 30s
     rules:
-      # Instance down alert
-      - alert: InstanceDown
+      - alert: PrometheusTargetDown
         expr: up == 0
         for: 5m
         labels:
           severity: critical
         annotations:
-          summary: "Instance {{ $labels.instance }} down"
-          description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 5 minutes."
+          summary: "Prometheus target {{ $labels.instance }} is down"
+          description: "{{ $labels.instance }} from job {{ $labels.job }} has not been scrapeable for more than 5 minutes."
 
-      # High memory usage
-      - alert: HighMemoryUsage
-        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+      - alert: SihsalusEndpointProbeFailing
+        expr: probe_success{job="blackbox-http-prod"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SIHSALUS endpoint probe failed for {{ $labels.instance }}"
+          description: "Blackbox exporter has not received a successful response from {{ $labels.instance }} for more than 2 minutes."
+
+      - alert: SihsalusEndpointSlow
+        expr: probe_duration_seconds{job="blackbox-http-prod"} > 2
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "High memory usage on {{ $labels.instance }}"
-          description: "Memory usage is above 90% (current value: {{ $value }}%)"
-
-      # High CPU usage
-      - alert: HighCPUUsage
-        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High CPU usage on {{ $labels.instance }}"
-          description: "CPU usage is above 80% (current value: {{ $value }}%)"
-
-      # Disk space running out
-      - alert: DiskSpaceLow
-        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Disk space low on {{ $labels.instance }}"
-          description: "Disk space is below 10% on {{ $labels.mountpoint }} (current value: {{ $value }}%)"
-
-      # Container restarting frequently
-      - alert: ContainerRestarting
-        expr: rate(container_last_seen{name!=""}[5m]) > 0
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Container {{ $labels.name }} is restarting frequently"
-          description: "Container {{ $labels.name }} has restarted {{ $value }} times in the last 5 minutes"
+          summary: "SIHSALUS endpoint is slow: {{ $labels.instance }}"
+          description: "Blackbox probe duration for {{ $labels.instance }} has been above 2 seconds for more than 5 minutes."

@@ -19,6 +19,21 @@
   "links": [],
   "panels": [
     {
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "content": "Los paneles de logs requieren iniciar Alloy con `docker compose --profile monitoring --profile logs up -d`. Sin ese profile, Prometheus seguira mostrando targets, pero Loki no recibira logs de contenedores.",
+        "mode": "markdown"
+      },
+      "title": "Logs Profile",
+      "type": "text"
+    },
+    {
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
@@ -64,7 +79,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 0
+        "y": 3
       },
       "id": 1,
       "options": {
@@ -85,16 +100,59 @@
           "legendFormat": "{{job}} - {{instance}}"
         }
       ],
-      "title": "Services Status",
+      "title": "Scrape Targets",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Loki",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 3
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (service_name, level) (count_over_time({job=\"docker\"}[$__interval]))",
+          "legendFormat": "{{service_name}} {{level}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Docker Log Volume",
       "type": "timeseries"
     },
     {
       "datasource": "Loki",
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 11
       },
       "id": 2,
       "options": {
@@ -111,7 +169,7 @@
           "refId": "A"
         }
       ],
-      "title": "Container Logs",
+      "title": "Recent Container Logs",
       "type": "logs"
     }
   ],

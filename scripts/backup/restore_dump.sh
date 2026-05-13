@@ -18,7 +18,7 @@ BACKUP_DIR="${BACKUP_DIR:-/home/${USER}/sihsalus-dumps}"
 BACKUP_FILE=""
 DB_NAME="openmrs"
 DB_USER="root"
-DB_PASSWORD="${MYSQL_ROOT_PASSWORD:-openmrs}"
+DB_PASSWORD="${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD no definido}"
 TEMP_DIR="/tmp/sihsalus-restore-dump-$$"
 
 # Leer credenciales desde Docker secrets si existen

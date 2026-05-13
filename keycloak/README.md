@@ -12,6 +12,7 @@ KEYCLOAK_ADMIN_PASSWORD=<password_seguro>      # Password del usuario admin
 KC_DB_PASSWORD=<password_seguro>               # Password de PostgreSQL de Keycloak
 OAUTH2_ENABLED=true                            # Activa oauth2login en OpenMRS
 OAUTH2_CLIENT_SECRET=<secret_aleatorio>        # Secret del cliente OpenMRS
+KEYCLOAK_PUBLIC_URL=http://localhost:8180      # URL que usaran los navegadores
 ```
 
 ### Activa el profile de Keycloak
@@ -51,6 +52,13 @@ El archivo [realm-export.json](realm-export.json) contiene la configuración imp
 - **Usuarios iniciales**:
   - `admin` - Usuario administrador del realm
 
+- **Politica de password**:
+  - Minimo 8 caracteres
+  - Al menos 1 digito
+  - Al menos 1 minuscula y 1 mayuscula
+  - No puede coincidir con el username
+  - Alineada con las global properties actuales de OpenMRS
+
 ### Mapeadores de Claims
 
 Los claims OIDC se mapean automáticamente a atributos de OpenMRS:
@@ -71,7 +79,7 @@ El backend OpenMRS obtiene la configuración desde [oauth2.properties](oauth2.pr
 ```properties
 # OAuth2 endpoints
 oauth2.enabled=${OAUTH2_ENABLED}
-userAuthorizationUri=http://localhost:8180/realms/openmrs/protocol/openid-connect/auth
+userAuthorizationUri=${KEYCLOAK_PUBLIC_URL}/realms/openmrs/protocol/openid-connect/auth
 accessTokenUri=http://keycloak:8080/realms/openmrs/protocol/openid-connect/token
 userInfoUri=http://keycloak:8080/realms/openmrs/protocol/openid-connect/userinfo
 keysUrl=http://keycloak:8080/realms/openmrs/protocol/openid-connect/certs
@@ -93,6 +101,8 @@ El frontend O3 recibe la configuración OAuth2 desde
 [frontend-keycloak.json](../frontend/frontend-keycloak.json), agregada por
 `compose/openmrs-keycloak.yml` a `SPA_CONFIG_URLS`.
 
+`KEYCLOAK_PUBLIC_URL` controla la URL publica usada por el navegador para iniciar sesion. Para acceso local puede quedar en `http://localhost:8180`; para SSL o acceso desde otra maquina debe apuntar al host/IP visible para los clientes, por ejemplo `http://192.168.10.5:8180`.
+
 La global property de redirección post-login se inyecta como configuración
 Initializer desde
 [oauth2login.xml](openmrs_config/globalproperties/oauth2login.xml).
@@ -112,18 +122,45 @@ Initializer desde
 - Usa Docker Secrets para credenciales en producción
 - SSL requerido en modo producción
 
+### Uso con SSL
+
+OpenMRS puede servirse por HTTPS mientras Keycloak sigue expuesto por `KEYCLOAK_PORT`:
+
+```bash
+docker compose \
+  -f docker-compose.yml \
+  -f compose/openmrs-keycloak.yml \
+  -f compose/ssl.yml \
+  --profile keycloak \
+  --profile ssl \
+  up -d
+```
+
+Para un servidor accesible por IP o dominio, configurar:
+
+```env
+KC_HOSTNAME=192.168.10.5
+KEYCLOAK_PUBLIC_URL=http://192.168.10.5:8180
+CERT_WEB_DOMAIN_COMMON_NAME=192.168.10.5
+CERT_WEB_DOMAINS=192.168.10.5,localhost,127.0.0.1
+```
+
+El cliente `openmrs` importado en Keycloak trae redirects para `localhost`. Si se usa otra IP o dominio, agregar `https://<host>/openmrs/*` en **Clients -> openmrs -> Valid redirect URIs**.
+
 ---
 
 ## Primeros pasos
 
 ### 1. Crear un usuario de prueba
 
-1. Accede a `http://localhost:8180` como admin
-2. Ve a **Realm** → **Users** → **Create new user**
-3. Username: `provider1`
-4. Email: `provider@hospital.local`
-5. Assign roles: `Provider`
-6. Set password temporal y marcar como "Not temporary"
+OpenMRS solo acepta usuarios que existan en su propia tabla de usuarios. Crear
+un usuario solo en Keycloak permite autenticar, pero OpenMRS rechazara el login.
+
+1. Crear primero la persona/usuario en OpenMRS y asignar roles/permisos.
+2. Crear en Keycloak un usuario con el mismo `username` exacto.
+3. Asignar roles del realm segun corresponda.
+4. Definir password temporal.
+5. Agregar required actions: `UPDATE_PASSWORD` y `CONFIGURE_TOTP`.
 
 ### 2. Probar login en OpenMRS
 
@@ -140,11 +177,20 @@ Initializer desde
 
 1. Realm → Users → Selecciona usuario
 2. Credentials → Reset Password
+3. Marcar password como temporal para obligar cambio en el siguiente login
 
-### Por usuario final
+### Recuperacion operativa
 
-1. En login de OpenMRS
-2. Click **Forgot Password?** → Keycloak maneja el reset por email
+El reset por email requiere SMTP configurado en Keycloak. Si `smtpServer` esta
+vacio, el flujo de **Forgot Password?** no debe considerarse operativo.
+
+Para entornos con conectividad limitada, usar reset por administrador:
+
+1. Validar identidad del usuario por mesa de ayuda o presencialmente.
+2. Resetear password temporal en Keycloak.
+3. Mantener `UPDATE_PASSWORD` para obligar cambio al ingresar.
+4. Si perdio el celular/TOTP, eliminar la credencial OTP y exigir
+   `CONFIGURE_TOTP` nuevamente.
 
 ---
 
