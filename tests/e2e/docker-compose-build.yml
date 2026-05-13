@@ -14,6 +14,7 @@ services:
   frontend-init:
     image: ghcr.io/sihsalus/sihsalus-frontend:latest
     container_name: frontend-init
+    user: "0:0"
     restart: "no"
     environment:
       SPA_OUTPUT_DIR: /spa

@@ -29,7 +29,8 @@ services:
   frontend-init:
     container_name: sihsalus-frontend-init
     image: ghcr.io/sihsalus/sihsalus-frontend:${FRONTEND_TAG:-latest}
-    command: sh -c "node packages/tooling/scripts/assemble-importmap.js && node /app/patch-config-urls.js"
+    user: "0:0"
+    command: sh -c "rm -f /spa/index.html && node packages/tooling/scripts/assemble-importmap.js && node /app/patch-config-urls.js"
     environment:
       SPA_OUTPUT_DIR: /spa
       SPA_PATH: /openmrs/spa
