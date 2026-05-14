@@ -1,5 +1,5 @@
 window.config = {
-  routerBasename: "/",
+  routerBasename: window.location.pathname.startsWith("/imaging") ? "/imaging" : "/",
   // Internationalization / locale settings
   i18n: {
     defaultLocale: "es",
