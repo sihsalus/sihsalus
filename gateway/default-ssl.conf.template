@@ -136,10 +136,18 @@ server {
   }
 
   # Orthanc DICOMweb endpoints for OHIF
+  location = /dicom-web {
+    return 301 /dicom-web/studies;
+  }
+
   location /dicom-web/ {
     set $orthanc_proxy http://orthanc-proxy;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
+  }
+
+  location = /wado {
+    return 301 /dicom-web/studies;
   }
 
   location /wado {
