@@ -123,6 +123,31 @@ server {
     proxy_pass $backend;
   }
 
+  # OHIF Imaging Viewer
+  location = /imaging {
+    return 301 /imaging/;
+  }
+
+  location /imaging/ {
+    set $ohif http://ohif;
+    rewrite ^/imaging/(.*) /$1 break;
+    proxy_read_timeout 300s;
+    proxy_pass $ohif;
+  }
+
+  # Orthanc DICOMweb endpoints for OHIF
+  location /dicom-web/ {
+    set $orthanc_proxy http://orthanc-proxy;
+    proxy_read_timeout 300s;
+    proxy_pass $orthanc_proxy;
+  }
+
+  location /wado {
+    set $orthanc_proxy http://orthanc-proxy;
+    proxy_read_timeout 300s;
+    proxy_pass $orthanc_proxy;
+  }
+
   # FUA Generator Service
   location = /services/fua-generator {
     return 301 /services/fua-generator/;
