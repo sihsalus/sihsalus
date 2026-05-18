@@ -60,6 +60,7 @@
     <billing.version>2.2.0</billing.version>
     <fua.version>1.0.75</fua.version>
     <imaging.version>1.2.2</imaging.version>
+    <coststructure.version>1.0.0</coststructure.version>
     <!-- <sihsalus-interop.version>1.0.3</sihsalus-interop.version> -->
     <!-- Content Packages -->
     <sihsalus-content.version>1.8.30</sihsalus-content.version>
@@ -85,6 +86,12 @@
       <groupId>io.github.proyecto-santaclotilde</groupId>
       <artifactId>imaging-omod</artifactId>
       <version>${imaging.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.github.proyecto-santaclotilde</groupId>
+      <artifactId>coststructure-omod</artifactId>
+      <version>${coststructure.version}</version>
       <scope>provided</scope>
     </dependency>
     
