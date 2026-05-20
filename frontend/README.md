@@ -118,6 +118,36 @@ Define:
 docker compose build frontend
 ```
 
+### Actualizar frontend en QA
+
+En QA se puede usar `latest` para tomar la imagen fuente mas reciente publicada en GitHub Container Registry:
+
+```bash
+cd ~/sihsalus
+git pull
+docker compose build --pull frontend
+docker compose up -d --no-deps --no-build frontend
+docker compose restart gateway
+docker compose ps frontend gateway
+```
+
+Este flujo reconstruye la imagen runtime local `sihsalus-frontend-runtime:latest` usando como base
+`ghcr.io/sihsalus/sihsalus-frontend:latest`.
+`--no-deps --no-build` evita que Compose intente levantar o reconstruir dependencias como `backend`.
+
+Si necesitas validar una version especifica o hacer rollback, usa el tag SHA publicado en GHCR:
+
+```bash
+FRONTEND_SOURCE_TAG=sha-3b5b82f7b6eb78ac805df8103a932e6e9f47eaba \
+FRONTEND_RUNTIME_TAG=sha-3b5b82f7b6eb78ac805df8103a932e6e9f47eaba \
+docker compose build --pull frontend
+
+FRONTEND_RUNTIME_TAG=sha-3b5b82f7b6eb78ac805df8103a932e6e9f47eaba \
+docker compose up -d frontend gateway
+```
+
+Regla practica: `latest` es aceptable para QA; en produccion usa un tag SHA o digest para trazabilidad.
+
 Con Docker Bake:
 
 ```bash
