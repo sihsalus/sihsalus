@@ -149,6 +149,7 @@ server {
 
   location /imaging/dicom-web/ {
     set $orthanc_proxy http://orthanc-proxy;
+    client_max_body_size 0;
     rewrite ^/imaging/(.*)$ /$1 break;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
@@ -156,6 +157,7 @@ server {
 
   location /imaging/wado {
     set $orthanc_proxy http://orthanc-proxy;
+    client_max_body_size 0;
     rewrite ^/imaging/(.*)$ /$1 break;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;

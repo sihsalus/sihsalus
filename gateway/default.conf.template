@@ -137,6 +137,7 @@ server {
   # OHIF runtime sometimes requests lazy chunks from root (/3900.bundle...)
   location ~ ^/[0-9]+(?:\.bundle\.[A-Za-z0-9]+\.js|\.css)$ {
     set $ohif http://ohif;
+    client_max_body_size 0;
     proxy_read_timeout 300s;
     proxy_pass $ohif;
   }
