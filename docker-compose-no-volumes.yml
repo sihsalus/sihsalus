@@ -6,7 +6,7 @@
 
 services:
   backend:
-    image: openmrs/openmrs-reference-application-3-backend:${TAG:-qa}
+    image: ${SIHSALUS_BACKEND_IMAGE:-ghcr.io/sihsalus/sihsalus-core:latest}
     depends_on:
       db:
         condition: service_healthy
@@ -20,7 +20,7 @@ services:
       OMRS_CONFIG_CONNECTION_PASSWORD: ${MYSQL_OPENMRS_PASSWORD:-openmrs}
       OMRS_OCL_TOKEN: ${OMRS_OCL_TOKEN}
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/openmrs" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/openmrs/health/started" ]
       timeout: 5s
     ports:
       - "8080:8080"

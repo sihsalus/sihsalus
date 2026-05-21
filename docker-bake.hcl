@@ -3,9 +3,8 @@
 // ===========================================
 //
 // USAGE:
-//   docker buildx bake                 # Build core (backend, gateway)
+//   docker buildx bake                 # Build core runtime wrappers (gateway, frontend)
 //   docker buildx bake all             # Build all targets
-//   docker buildx bake backend         # Build single target
 //   docker buildx bake --print         # Show resolved build config (dry-run)
 
 variable "TAG" {
@@ -29,21 +28,14 @@ target "_base" {
 // ---- Groups ----
 
 group "default" {
-  targets = ["backend", "gateway", "frontend"]
+  targets = ["gateway", "frontend"]
 }
 
 group "all" {
-  targets = ["backend", "gateway", "frontend", "keycloak", "certbot"]
+  targets = ["gateway", "frontend", "keycloak", "certbot"]
 }
 
 // ---- Core Targets ----
-
-target "backend" {
-  inherits   = ["_base"]
-  context    = "."
-  dockerfile = "backend/Dockerfile"
-  tags       = ["${REGISTRY}openmrs/openmrs-reference-application-3-backend:${TAG}"]
-}
 
 target "gateway" {
   inherits   = ["_base"]

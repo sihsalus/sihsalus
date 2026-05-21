@@ -3,7 +3,6 @@ name: Deploy to qlty
 on:
   workflow_run:
     workflows:
-      - Build Backend
       - Build Gateway
       - Build Certbot
       - Build Monitoring

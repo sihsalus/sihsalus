@@ -27,7 +27,7 @@ Servicios base necesarios para OpenMRS. Se incluye automáticamente.
 **Servicios**:
 - `gateway` - Reverse proxy Nginx
 - `frontend` - Imagen Nginx versionada con SPA compilada
-- `backend` - OpenMRS 3.6.0
+- `backend` - Imagen `sihsalus-core` publicada en GHCR
 - `db` - MariaDB 10.11 (master)
 
 **Variables requeridas**:
@@ -35,7 +35,7 @@ Servicios base necesarios para OpenMRS. Se incluye automáticamente.
 MYSQL_OPENMRS_PASSWORD=<password_fuerte>
 MYSQL_ROOT_PASSWORD=<password_fuerte>
 OMRS_OCL_TOKEN=<token_ocl>
-BACKEND_TAG=latest
+SIHSALUS_BACKEND_IMAGE=ghcr.io/sihsalus/sihsalus-core:latest
 FRONTEND_SOURCE_TAG=latest
 FRONTEND_RUNTIME_TAG=latest
 ```

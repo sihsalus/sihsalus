@@ -97,7 +97,7 @@ El perfil `ssl` es un caso especial: no basta con pasar `--profile ssl` si solo 
 docker-compose.yml              # Entry point (include + profiles + volumes + networks)
 docker-compose-no-volumes.yml   # CI/testing (standalone)
 docker-bake.hcl                 # Build definitions
-backend/                        # Backend (Dockerfile, pom.xml, config)
+backend/                        # Backend clasico (legacy; no usado por defecto)
 gateway/                        # Nginx gateway
 frontend/                       # SPA frontend
 certbot/                        # SSL certificates
@@ -115,14 +115,15 @@ compose/
 
 ## Docker Bake (Build)
 
-Para construir imágenes se puede usar `docker buildx bake`, que paraleliza y cachea builds:
+El backend se consume desde `SIHSALUS_BACKEND_IMAGE` y por defecto apunta a `ghcr.io/sihsalus/sihsalus-core:latest`.
+Para construir las imagenes runtime del repo se puede usar `docker buildx bake`, que paraleliza y cachea builds:
 
 ```bash
-# Build core (backend, gateway, frontend) en paralelo
+# Build core runtime (gateway, frontend) en paralelo
 docker buildx bake
 
 # Build un target específico
-docker buildx bake backend
+docker buildx bake gateway
 
 # Build todos (+ keycloak, certbot)
 docker buildx bake all
@@ -131,7 +132,7 @@ docker buildx bake all
 docker buildx bake --print
 ```
 
-Alternativamente, `docker compose build` sigue funcionando.
+Alternativamente, `docker compose build` sigue funcionando para los servicios que conservan `build`.
 
 ## Configuración SSL/HTTPS
 

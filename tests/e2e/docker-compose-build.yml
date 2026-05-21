@@ -45,9 +45,7 @@ services:
       - backend
 
   backend:
-    build:
-      context: ../../
-      dockerfile: backend/Dockerfile
+    image: ${SIHSALUS_BACKEND_IMAGE:-ghcr.io/sihsalus/sihsalus-core:latest}
     container_name: backend
     depends_on:
       - db
@@ -60,7 +58,7 @@ services:
       OMRS_CONFIG_CONNECTION_USERNAME: ${OPENMRS_DB_USER:-openmrs}
       OMRS_CONFIG_CONNECTION_PASSWORD: ${OPENMRS_DB_PASSWORD:-openmrs}
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/openmrs" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/openmrs/health/started" ]
       timeout: 5s
 
   # MariaDB
