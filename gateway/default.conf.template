@@ -25,6 +25,7 @@ server {
   listen [::]:80;
   listen       80;
   server_name localhost;
+  client_max_body_size 0;
 
   add_header X-Frame-Options "SAMEORIGIN" always;
   add_header X-Content-Type-Options "nosniff" always;
@@ -108,6 +109,7 @@ server {
 
   location /orthanc/ {
     set $orthanc_proxy http://orthanc-proxy;
+    client_max_body_size 0;
     rewrite ^/orthanc/(.*)$ /$1 break;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
@@ -163,12 +165,14 @@ server {
 
   location /dicom-web/ {
     set $orthanc_proxy http://orthanc-proxy;
+    client_max_body_size 0;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
   }
 
   location /wado {
     set $orthanc_proxy http://orthanc-proxy;
+    client_max_body_size 0;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
   }
