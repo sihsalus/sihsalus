@@ -194,12 +194,14 @@ server {
 
   location /dicom-web/ {
     set $orthanc_proxy http://orthanc-proxy;
+    client_max_body_size 0;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
   }
 
   location /wado {
     set $orthanc_proxy http://orthanc-proxy;
+    client_max_body_size 0;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
   }
