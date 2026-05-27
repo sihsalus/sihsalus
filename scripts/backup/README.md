@@ -1,59 +1,55 @@
 # Backup y Restore
 
-Scripts para respaldar y restaurar la base de datos MariaDB de sihsalus.
+Scripts para respaldar y restaurar la base **PostgreSQL** del backend `sihsalus-core`.
 
 ## Scripts disponibles
 
 | Script | Tipo | Downtime | Descripcion |
 |--------|------|----------|-------------|
-| `backup_dump.sh` | SQL (caliente) | No | Dump SQL con `--single-transaction` |
-| `restore_dump.sh` | SQL (caliente) | Solo backend | Restaura dump `.sql.gz` sin detener DB |
-| `backup_full.sh` | Binario (frio) | No | Backup con `mariadb-backup` |
-| `restore_full.sh` | Binario (frio) | Si | Restaura backup binario, con snapshot de seguridad |
+| `backup_dump.sh` | Lógico (caliente) | No | `pg_dump` en formato custom (`.dump`, comprimido) |
+| `restore_dump.sh` | Lógico (caliente) | Solo backend | Restaura un `.dump` con `pg_restore --clean` |
+| `backup_all.sh` | Sistema completo | No | DB + Keycloak + Orthanc + Prometheus + Grafana + configs |
 
 ## Uso rapido
 
-### Dump SQL (en caliente, sin downtime)
-
 ```bash
-# Backup
+# Backup del backend
 ./scripts/backup/backup_dump.sh
 
 # Restore interactivo (lista dumps disponibles)
 ./scripts/backup/restore_dump.sh
 
 # Restore directo
-./scripts/backup/restore_dump.sh --file ~/sihsalus-dumps/dump_2026-03-09.sql.gz
-```
-
-### Backup binario (en frio, mas rapido)
-
-```bash
-# Backup
-./scripts/backup/backup_full.sh
-
-# Restore interactivo
-./scripts/backup/restore_full.sh
-
-# Restore directo
-./scripts/backup/restore_full.sh --file ~/sihsalus-fullBackups/backup_2026-03-01.tar.gz.enc
+./scripts/backup/restore_dump.sh --file ~/sihsalus-dumps/dump_2026-05-27.dump
 ```
 
 ## Opciones comunes
 
 ```
---container NOMBRE    Contenedor DB (default: sihsalus-db-master)
---dir DIRECTORIO      Directorio de backups
+--container NOMBRE    Contenedor PostgreSQL (default: sihsalus-postgres)
+--dir DIRECTORIO      Directorio de backups (default: ~/sihsalus-dumps)
 --file ARCHIVO        Archivo especifico (omitir para seleccion interactiva)
---max N               Maximo de backups a retener (solo backup scripts)
+--max N               Maximo de backups a retener (solo backup_dump.sh)
+```
+
+## Variables de entorno
+
+Los scripts toman la conexión del mismo `.env` del stack:
+
+```env
+SIHSALUS_POSTGRES_DB=sihsalus
+SIHSALUS_POSTGRES_USER=sihsalus
+SIHSALUS_POSTGRES_PASSWORD=<password>   # obligatorio
 ```
 
 ## Cifrado
 
-Los backups se cifran con AES-256 si la variable `BACKUP_ENCRYPTION_PASSWORD` esta definida.
-El restore descifra automaticamente archivos `.enc` (pide clave si no esta en env).
+Los backups se cifran con AES-256 si la variable `BACKUP_ENCRYPTION_PASSWORD` está definida.
+El restore descifra automáticamente archivos `.enc` (pide la clave si no está en el entorno).
 
-## Seguridad del restore
+## Notas
 
-- `restore_dump.sh`: idempotente, solo detiene el backend
-- `restore_full.sh`: crea un snapshot del volumen antes de limpiar. Si el restore falla, restaura automaticamente el snapshot anterior
+- `pg_dump --format=custom` produce un dump consistente por snapshot (sin bloquear
+  escrituras) y ya comprimido; no necesita `gzip`.
+- `restore_dump.sh` usa `pg_restore --clean --if-exists`, por lo que es idempotente
+  sobre una base existente. Detiene el backend durante la carga para evitar conflictos.

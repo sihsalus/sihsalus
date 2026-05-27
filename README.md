@@ -208,12 +208,20 @@ Al ser un certificado auto-firmado, los navegadores mostrarán una advertencia d
 
 ## Backup y Restore
 
-El core actual usa PostgreSQL para el backend `sihsalus-core`. Los scripts en
-`scripts/backup/` todavía pertenecen al runtime MariaDB anterior y no deben
-usarse para este backend hasta que exista un runbook PostgreSQL equivalente.
+El core usa PostgreSQL para el backend `sihsalus-core`. Los scripts en
+`scripts/backup/` operan sobre el servicio `db` con `pg_dump`/`pg_restore`
+(backup lógico en caliente, sin downtime):
 
-Para respaldos operativos temporales, usar `pg_dump`/`pg_restore` contra el
-servicio `db` y documentar el procedimiento del entorno donde se despliegue.
+```bash
+# Backup del backend (genera ~/sihsalus-dumps/dump_<fecha>.dump)
+./scripts/backup/backup_dump.sh
+
+# Restore interactivo (lista los dumps disponibles)
+./scripts/backup/restore_dump.sh
+```
+
+Detalle de opciones, cifrado y backup de todo el sistema en
+[scripts/backup/README.md](scripts/backup/README.md).
 
 ## Políticas de Seguridad: Cifrado de Backups y Retención de Logs
 

@@ -47,8 +47,7 @@ echo "1. Verificando contenedores críticos..."
 echo "----------------------------------------"
 
 critical_containers=(
-    "sihsalus-db-master"
-    "sihsalus-db-replic"
+    "sihsalus-postgres"
     "sihsalus-backend"
     "sihsalus-frontend"
     "sihsalus-gateway"
@@ -69,42 +68,23 @@ echo ""
 echo "2. Verificando conectividad a base de datos..."
 echo "-----------------------------------------------"
 
-# Verificar que el secreto tiene la contraseña correcta
-secret_password=$(cat secrets/mysql_openmrs_password.txt 2>/dev/null || echo "FILE_NOT_FOUND")
-if [ "$secret_password" = "openmrs" ]; then
-    echo -e "${GREEN}✓${NC} Secreto mysql_openmrs_password configurado correctamente"
+DB_NAME="${SIHSALUS_POSTGRES_DB:-sihsalus}"
+DB_USER="${SIHSALUS_POSTGRES_USER:-sihsalus}"
+
+# Verificar que PostgreSQL acepta conexiones
+if docker exec sihsalus-postgres pg_isready -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1; then
+    echo -e "${GREEN}✓${NC} PostgreSQL acepta conexiones ($DB_USER@$DB_NAME)"
 else
-    echo -e "${RED}✗${NC} ADVERTENCIA: El secreto debería contener 'openmrs', tiene: '$secret_password'"
+    echo -e "${RED}✗${NC} PostgreSQL no acepta conexiones (verificar contenedor/credenciales)"
     all_ok=false
 fi
 
-# Verificar conexión desde el backend
-if docker exec sihsalus-backend test -f /openmrs/openmrs-server.properties 2>/dev/null; then
-    backend_password=$(docker exec sihsalus-backend grep "connection.password=" /openmrs/openmrs-server.properties | cut -d'=' -f2)
-    if [ "$backend_password" = "openmrs" ]; then
-        echo -e "${GREEN}✓${NC} Configuración del backend correcta"
-    else
-        echo -e "${RED}✗${NC} Backend tiene contraseña: '$backend_password' (debería ser 'openmrs')"
-        all_ok=false
-    fi
+# Verificar que la base del backend existe y es consultable
+if docker exec -e PGPASSWORD="${SIHSALUS_POSTGRES_PASSWORD:-}" sihsalus-postgres \
+    psql -U "$DB_USER" -d "$DB_NAME" -tAc "SELECT 1;" 2>/dev/null | grep -q 1; then
+    echo -e "${GREEN}✓${NC} Base '$DB_NAME' consultable por '$DB_USER'"
 else
-    echo -e "${YELLOW}⚠${NC} Backend aún no ha generado openmrs-server.properties"
-fi
-
-# Verificar usuario en MySQL
-if docker exec sihsalus-db-master mysql -uroot -p$(cat secrets/mysql_root_password.txt) -e "SELECT User, Host FROM mysql.user WHERE User='openmrs';" 2>/dev/null | grep -q openmrs; then
-    echo -e "${GREEN}✓${NC} Usuario 'openmrs' existe en MySQL"
-
-    # Verificar que puede conectar con la contraseña
-    if docker exec sihsalus-db-master mysql -uopenmrs -popenmrs -e "SELECT 1;" >/dev/null 2>&1; then
-        echo -e "${GREEN}✓${NC} Usuario 'openmrs' puede conectarse a MySQL"
-    else
-        echo -e "${RED}✗${NC} Usuario 'openmrs' NO puede conectarse (verificar contraseña)"
-        all_ok=false
-    fi
-else
-    echo -e "${RED}✗${NC} Usuario 'openmrs' NO existe en MySQL"
-    all_ok=false
+    echo -e "${YELLOW}⚠${NC} No se pudo consultar '$DB_NAME' (define SIHSALUS_POSTGRES_PASSWORD para esta verificación)"
 fi
 echo ""
 
@@ -115,8 +95,7 @@ ports_to_check=(
     "443:Gateway HTTPS"
     "8080:Backend OpenMRS"
     "8180:Keycloak"
-    "3307:MySQL Master"
-    "3308:MySQL Replica"
+    "5432:PostgreSQL"
 )
 
 for port_info in "${ports_to_check[@]}"; do

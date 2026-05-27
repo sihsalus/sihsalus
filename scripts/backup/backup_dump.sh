@@ -1,21 +1,22 @@
 #!/bin/bash
 # ------------------------------------------------------------------------------
 # Script: backup_dump.sh
-# Descripcion: Backup SQL logico en caliente (sin detener la DB).
-#              Genera un .sql.gz que se puede restaurar con restore_dump.sh
+# Descripcion: Backup logico en caliente de la base PostgreSQL del backend
+#              sihsalus-core (sin downtime). Genera un .dump (formato custom de
+#              pg_dump, ya comprimido) restaurable con restore_dump.sh.
 # Uso: ./backup_dump.sh [--container NOMBRE] [--dir DIRECTORIO] [--max N]
 # ------------------------------------------------------------------------------
 
 set -euo pipefail
 
-CONTAINER_NAME="${CONTAINER_NAME:-sihsalus-db-master}"
+CONTAINER_NAME="${CONTAINER_NAME:-sihsalus-postgres}"
 BACKUP_DIR="${BACKUP_DIR:-/home/${USER}/sihsalus-dumps}"
 MAX_BACKUPS="${MAX_BACKUPS:-10}"
-DB_NAME="openmrs"
-DB_USER="root"
-DB_PASSWORD="${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD no definido}"
+DB_NAME="${SIHSALUS_POSTGRES_DB:-sihsalus}"
+DB_USER="${SIHSALUS_POSTGRES_USER:-sihsalus}"
+DB_PASSWORD="${SIHSALUS_POSTGRES_PASSWORD:?SIHSALUS_POSTGRES_PASSWORD no definido}"
 TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
-DUMP_FILE="dump_${TIMESTAMP}.sql.gz"
+DUMP_FILE="dump_${TIMESTAMP}.dump"
 
 # Parseo de argumentos
 while [[ $# -gt 0 ]]; do
@@ -32,20 +33,18 @@ done
 
 mkdir -p "$BACKUP_DIR"
 
-echo "[INFO] Iniciando dump SQL en caliente de '$DB_NAME' ($TIMESTAMP)"
+echo "[INFO] Iniciando dump PostgreSQL en caliente de '$DB_NAME' ($TIMESTAMP)"
 
-# Dump en caliente con --single-transaction (consistente, sin bloqueo)
-docker exec "$CONTAINER_NAME" \
-    mariadb-dump \
-    --user="$DB_USER" \
-    --password="$DB_PASSWORD" \
-    --single-transaction \
-    --routines \
-    --triggers \
-    --events \
-    --quick \
-    --lock-tables=false \
-    "$DB_NAME" | gzip > "$BACKUP_DIR/$DUMP_FILE"
+# pg_dump en formato custom (-Fc): consistente por snapshot, sin bloqueos,
+# ya comprimido y restaurable selectivamente con pg_restore.
+docker exec -e PGPASSWORD="$DB_PASSWORD" "$CONTAINER_NAME" \
+    pg_dump \
+    --username="$DB_USER" \
+    --dbname="$DB_NAME" \
+    --format=custom \
+    --no-owner \
+    --no-privileges \
+    > "$BACKUP_DIR/$DUMP_FILE"
 
 DUMP_SIZE=$(du -h "$BACKUP_DIR/$DUMP_FILE" | cut -f1)
 echo "[OK] Dump creado: $BACKUP_DIR/$DUMP_FILE ($DUMP_SIZE)"
@@ -62,10 +61,10 @@ if [ -n "${BACKUP_ENCRYPTION_PASSWORD:-}" ]; then
 fi
 
 # Rotar backups antiguos
-BACKUP_COUNT=$(ls -1 "$BACKUP_DIR"/dump_*.sql.gz* 2>/dev/null | wc -l)
+BACKUP_COUNT=$(ls -1 "$BACKUP_DIR"/dump_*.dump* 2>/dev/null | wc -l)
 if [ "$BACKUP_COUNT" -gt "$MAX_BACKUPS" ]; then
-    ls -1t "$BACKUP_DIR"/dump_*.sql.gz* | tail -n +$((MAX_BACKUPS+1)) | xargs rm -f
+    ls -1t "$BACKUP_DIR"/dump_*.dump* | tail -n +$((MAX_BACKUPS+1)) | xargs rm -f
     echo "[INFO] Rotados, manteniendo los ultimos $MAX_BACKUPS"
 fi
 
-echo "[OK] Backup SQL completado sin downtime"
+echo "[OK] Backup PostgreSQL completado sin downtime"
