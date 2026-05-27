@@ -22,7 +22,7 @@ DB_USER="${SIHSALUS_POSTGRES_USER:-sihsalus}"
 DB_PASSWORD="${SIHSALUS_POSTGRES_PASSWORD:?SIHSALUS_POSTGRES_PASSWORD no definido}"
 TEMP_DIR="/tmp/sihsalus-restore-dump-$$"
 
-# Leer credenciales desde Docker secrets si existen
+# Leer clave desde /run/secrets si el entorno la inyecta ahi
 if [ -f /run/secrets/BACKUP_ENCRYPTION_PASSWORD ]; then
     export BACKUP_ENCRYPTION_PASSWORD="$(cat /run/secrets/BACKUP_ENCRYPTION_PASSWORD)"
 fi

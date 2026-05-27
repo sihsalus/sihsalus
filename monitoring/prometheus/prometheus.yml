@@ -70,10 +70,10 @@ scrape_configs:
   #   static_configs:
   #     - targets: ['backend:8080']
 
-  # MariaDB Exporter (if configured)
-  # - job_name: 'mariadb-master'
+  # PostgreSQL Exporter (if configured)
+  # - job_name: 'postgres'
   #   static_configs:
-  #     - targets: ['mariadb-exporter:9104']
+  #     - targets: ['postgres-exporter:9187']
 
   # Keycloak metrics
   # - job_name: 'keycloak'

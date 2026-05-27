@@ -123,12 +123,12 @@ Reemplaza todas las variables `${VAR_NAME}` en archivos `.properties` con sus va
 **Ejemplo**:
 ```properties
 # Entrada (globalproperties.template)
-openmrs.db.username=${OMRS_DB_USER}
-openmrs.db.password=${MYSQL_OPENMRS_PASSWORD}
+openmrs.db.username=${SIHSALUS_POSTGRES_USER}
+openmrs.db.password=${SIHSALUS_POSTGRES_PASSWORD}
 oauth2.clientSecret=${OAUTH2_CLIENT_SECRET}
 
 # Salida (globalproperties)
-openmrs.db.username=openmrs
+openmrs.db.username=sihsalus
 openmrs.db.password=SecurePass123!
 oauth2.clientSecret=AbcDef123456789
 ```
@@ -259,7 +259,7 @@ docker compose restart gateway
 
 ```bash
 # Verificar variables cargadas
-env | grep -i omrs
+env | grep -E 'SIHSALUS|OAUTH2|KEYCLOAK'
 
 # Ejecutar template engine
 ./scripts/utils/globalproperties_envsubst.sh
@@ -276,23 +276,20 @@ Para que los scripts funcionen correctamente, asegúrate de que `.env` contiene:
 
 ```env
 # Database
-MYSQL_ROOT_PASSWORD=<password>
-MYSQL_OPENMRS_PASSWORD=<password>
+SIHSALUS_POSTGRES_DB=sihsalus
+SIHSALUS_POSTGRES_USER=sihsalus
+SIHSALUS_POSTGRES_PASSWORD=<password>
 
 # OpenMRS
-OMRS_CONFIG_CONNECTION_USERNAME=openmrs
-OMRS_CONFIG_CONNECTION_DATABASE=openmrs
-OMRS_OCL_TOKEN=<token>
+SIHSALUS_ADMIN_USERNAME=admin
+SIHSALUS_ADMIN_PASSWORD=<password>
+SIHSALUS_OCL_STATIC_IMPORT_ENABLED=true
+SIHSALUS_OCL_STATIC_IMPORT_FAIL_ON_ERRORS=true
 
 # OAuth2/Keycloak (si usas auth)
 OAUTH2_CLIENT_SECRET=<secret>
 KEYCLOAK_ADMIN_PASSWORD=<password>
-
-# Replicación (si usas HA)
-OMRS_DB_REPL_USER=repl_user
-OMRS_DB_REPL_PASSWORD=<password>
-OMRS_DB_BACKUP_USER=backup_user
-OMRS_DB_BACKUP_PASSWORD=<password>
+KC_DB_PASSWORD=<password>
 
 # Grafana (si usas monitoring)
 GRAFANA_ADMIN_PASSWORD=<password>
@@ -308,4 +305,3 @@ Ver [.env.template](../../.env.template) para la lista completa.
 - [Security Scripts](../security/README.md)
 - [Backup Scripts](../backup/README.md)
 - [Systemd Manual](https://www.freedesktop.org/software/systemd/man/systemd.service.html)
-

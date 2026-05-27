@@ -39,7 +39,7 @@ Scripts de utilidades generales:
 ## Políticas de Seguridad y Cumplimiento
 
 ### Cifrado de Backups
-Todos los scripts de backup generan archivos cifrados automáticamente usando AES-256 (openssl). La clave de cifrado debe ser provista mediante la variable de entorno `BACKUP_ENCRYPTION_PASSWORD` (recomendado: usar Docker secrets). El archivo .tar.gz sin cifrar se elimina tras el cifrado exitoso. El backup final tiene extensión `.tar.gz.enc`.
+Todos los scripts de backup generan archivos cifrados automáticamente usando AES-256 (openssl). La clave de cifrado debe ser provista mediante la variable de entorno `BACKUP_ENCRYPTION_PASSWORD` o inyectada por el gestor de secretos del entorno. El archivo .tar.gz sin cifrar se elimina tras el cifrado exitoso. El backup final tiene extensión `.tar.gz.enc`.
 
 **Ejemplo de uso:**
 ```bash
@@ -50,7 +50,7 @@ export BACKUP_ENCRYPTION_PASSWORD="<clave-segura>"
 ### Rotación y Retención de Logs
 Cada script de backup mantiene solo los últimos 5 archivos de log (por ejemplo, `fullBackup_log.txt`, `fullBackup_log.txt.20240501120000`, ...). Los logs más antiguos se eliminan automáticamente para limitar el almacenamiento y cumplir políticas de retención.
 
-**Importante:** Nunca almacenes la clave de cifrado en el código ni en archivos versionados. Usa Docker secrets o variables de entorno seguras.
+**Importante:** Nunca almacenes la clave de cifrado en el código ni en archivos versionados. Usa un gestor de secretos o variables de entorno seguras.
 
 ---
 ## Uso
