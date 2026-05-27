@@ -30,6 +30,8 @@ Servicios base necesarios para OpenMRS. Se incluye automáticamente.
 - `backend` - Imagen `sihsalus-core` publicada en GHCR
 - `db` - MariaDB 10.11 (master)
 
+El codigo fuente y la publicacion de la imagen del backend se mantienen en `https://github.com/sihsalus/sihsalus-core`.
+
 **Variables requeridas**:
 ```env
 MYSQL_OPENMRS_PASSWORD=<password_fuerte>
