@@ -92,6 +92,22 @@ server {
     proxy_pass $keycloak;
   }
 
+  location = /openmrs {
+    return 301 /openmrs/spa/home$is_args$args;
+  }
+
+  location = /openmrs/ {
+    return 301 /openmrs/spa/home$is_args$args;
+  }
+
+  location = /openmrs/login {
+    return 301 /openmrs/spa/login$is_args$args;
+  }
+
+  location = /openmrs/login.htm {
+    return 301 /openmrs/spa/login$is_args$args;
+  }
+
   location /openmrs {
     set $backend http://backend:8080;
     proxy_read_timeout 300s;
