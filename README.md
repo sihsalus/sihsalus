@@ -3,7 +3,7 @@
 
 ![OpenMRS 3.x](https://img.shields.io/badge/OpenMRS-3.6.0-f26522?style=flat-square)
 ![Docker](https://img.shields.io/badge/Docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white)
-![MariaDB](https://img.shields.io/badge/MariaDB-10.11-003545?style=flat-square&logo=mariadb&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white)
 ![Nginx](https://img.shields.io/badge/Nginx-SSL-009639?style=flat-square&logo=nginx&logoColor=white)
 ![License](https://img.shields.io/badge/MPL_2.0-brightgreen?style=flat-square&label=License)
 
@@ -35,12 +35,11 @@ cp .env.template .env
 Variables obligatorias en `.env`:
 
 ```env
-# Base de datos OpenMRS
-MYSQL_OPENMRS_PASSWORD=<password_seguro>
-MYSQL_ROOT_PASSWORD=<password_seguro>
+# Base de datos del backend
+SIHSALUS_POSTGRES_PASSWORD=<password_seguro>
 
-# Token OCL para importar conceptos médicos
-OMRS_OCL_TOKEN=<tu_token_de_ocl>
+# Usuario administrador inicial
+SIHSALUS_ADMIN_PASSWORD=<password_seguro>
 ```
 
 ### 2. Construir e iniciar
@@ -52,7 +51,7 @@ docker compose up -d
 # http://localhost/openmrs/spa
 ```
 
-La primera vez, OpenMRS puede tardar unos minutos en quedar listo. La señal de que ya terminó de arrancar es `http://localhost/openmrs/login.htm` respondiendo `200`; después de eso la SPA queda en `http://localhost/openmrs/spa/`.
+La primera vez, el backend puede tardar unos minutos en quedar listo porque aplica migraciones e importa contenido estático. La señal de arranque es `http://localhost/openmrs/actuator/health` respondiendo `200`; después de eso la SPA queda en `http://localhost/openmrs/spa/`.
 
 ## Profiles
 
@@ -209,40 +208,12 @@ Al ser un certificado auto-firmado, los navegadores mostrarán una advertencia d
 
 ## Backup y Restore
 
-Los scripts se encuentran en `scripts/backup/`. Hay dos métodos:
+El core actual usa PostgreSQL para el backend `sihsalus-core`. Los scripts en
+`scripts/backup/` todavía pertenecen al runtime MariaDB anterior y no deben
+usarse para este backend hasta que exista un runbook PostgreSQL equivalente.
 
-### Dump SQL (en caliente, sin downtime)
-
-```bash
-# Backup - DB sigue corriendo, sin interrupciones
-./scripts/backup/backup_dump.sh
-
-# Restore - solo detiene el backend, DB sigue corriendo
-./scripts/backup/restore_dump.sh
-```
-
-### Backup binario (en frío, más rápido)
-
-```bash
-# Backup con mariadb-backup
-./scripts/backup/backup_full.sh
-
-# Restore - detiene DB, crea snapshot de seguridad, restaura
-./scripts/backup/restore_full.sh
-
-# Especificar archivo directamente
-./scripts/backup/restore_full.sh --file ~/sihsalus-fullBackups/backup_2026-03-01.tar.gz.enc
-```
-
-| | Dump SQL (caliente) | Binario (frío) |
-|---|---|---|
-| Downtime | No (solo backend) | Sí (detiene DB) |
-| Velocidad | Más lento | Rápido |
-| Formato | `.sql.gz` | `.tar.gz` (mariadb-backup) |
-| Cifrado | Opcional (AES-256) | Obligatorio (AES-256) |
-| Idempotente | Sí | Sí (snapshot pre-restore) |
-
-> Los backups cifrados requieren la variable `BACKUP_ENCRYPTION_PASSWORD`.
+Para respaldos operativos temporales, usar `pg_dump`/`pg_restore` contra el
+servicio `db` y documentar el procedimiento del entorno donde se despliegue.
 
 ## Políticas de Seguridad: Cifrado de Backups y Retención de Logs
 
