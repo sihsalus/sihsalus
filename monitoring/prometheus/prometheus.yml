@@ -50,6 +50,20 @@ scrape_configs:
         labels:
           service: 'loki'
 
+  # Host metrics: CPU, memory, filesystem, load
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'node-exporter'
+
+  # Docker container metrics: CPU, memory, restarts, network, filesystem
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: 'cadvisor'
+
   # OpenMRS Backend metrics (JMX exporter - requires configuration)
   # - job_name: 'openmrs-backend'
   #   metrics_path: '/openmrs/metrics'

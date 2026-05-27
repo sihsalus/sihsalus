@@ -28,3 +28,76 @@ groups:
         annotations:
           summary: "SIHSALUS endpoint is slow: {{ $labels.instance }}"
           description: "Blackbox probe duration for {{ $labels.instance }} has been above 2 seconds for more than 5 minutes."
+
+      - alert: SihsalusHostDiskSpaceLow
+        expr: |
+          (
+            node_filesystem_avail_bytes{job="node-exporter", fstype!~"tmpfs|overlay"} /
+            node_filesystem_size_bytes{job="node-exporter", fstype!~"tmpfs|overlay"}
+          ) < 0.15
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space on {{ $labels.mountpoint }}"
+          description: "Filesystem {{ $labels.device }} mounted at {{ $labels.mountpoint }} has less than 15% free space for more than 10 minutes."
+
+      - alert: SihsalusHostMemoryHigh
+        expr: |
+          1 - (
+            node_memory_MemAvailable_bytes{job="node-exporter"} /
+            node_memory_MemTotal_bytes{job="node-exporter"}
+          ) > 0.90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High host memory usage"
+          description: "Host memory usage has been above 90% for more than 10 minutes."
+
+      - alert: SihsalusHostCpuHigh
+        expr: |
+          1 - avg by (instance) (
+            rate(node_cpu_seconds_total{job="node-exporter", mode="idle"}[5m])
+          ) > 0.90
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High host CPU usage"
+          description: "Host CPU usage has been above 90% for more than 15 minutes."
+
+      - alert: SihsalusContainerDown
+        expr: |
+          time() - container_last_seen{job="cadvisor", name=~"sihsalus-.+"} > 60
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} is not reporting metrics"
+          description: "cAdvisor has not seen {{ $labels.name }} for more than 2 minutes."
+
+      - alert: SihsalusContainerMemoryHigh
+        expr: |
+          (
+            container_memory_working_set_bytes{job="cadvisor", name=~"sihsalus-.+", image!=""} /
+            (container_spec_memory_limit_bytes{job="cadvisor", name=~"sihsalus-.+", image!=""} > 0)
+          ) > 0.90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High container memory usage: {{ $labels.name }}"
+          description: "Container {{ $labels.name }} has used more than 90% of its configured memory limit for more than 10 minutes."
+
+      - alert: SihsalusContainerCpuHigh
+        expr: |
+          sum by (name) (
+            rate(container_cpu_usage_seconds_total{job="cadvisor", name=~"sihsalus-.+", image!=""}[5m])
+          ) > 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High container CPU usage: {{ $labels.name }}"
+          description: "Container {{ $labels.name }} has consumed more than one CPU core for more than 15 minutes."
