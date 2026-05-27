@@ -20,7 +20,7 @@
 #   docker compose -f docker-compose.yml -f compose/openmrs-keycloak.yml -f compose/ssl.yml --profile keycloak --profile ssl up -d
 #
 # BUILD (con Docker Bake):
-#   docker buildx bake                    # Build core images (backend, gateway, frontend)
+#   docker buildx bake                    # Build runtime wrappers (gateway, frontend)
 #   docker buildx bake all                # Build all targets (+ keycloak, certbot)
 #
 # CI/TESTING (sin volumenes):

@@ -97,7 +97,6 @@ El perfil `ssl` es un caso especial: no basta con pasar `--profile ssl` si solo 
 docker-compose.yml              # Entry point (include + profiles + volumes + networks)
 docker-compose-no-volumes.yml   # CI/testing (standalone)
 docker-bake.hcl                 # Build definitions
-backend/                        # Backend clasico (legacy; no usado por defecto)
 gateway/                        # Nginx gateway
 frontend/                       # SPA frontend
 certbot/                        # SSL certificates
@@ -116,6 +115,7 @@ compose/
 ## Docker Bake (Build)
 
 El backend se consume desde `SIHSALUS_BACKEND_IMAGE` y por defecto apunta a `ghcr.io/sihsalus/sihsalus-core:latest`.
+El codigo fuente, build y publicacion del backend viven en `https://github.com/sihsalus/sihsalus-core`.
 Para construir las imagenes runtime del repo se puede usar `docker buildx bake`, que paraleliza y cachea builds:
 
 ```bash
