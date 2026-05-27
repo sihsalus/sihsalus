@@ -45,7 +45,7 @@ echo "✅ Keycloak DB backup completed"
 # 4. Backup de Orthanc DICOM Data
 echo "[3/6] Backing up Orthanc DICOM data..."
 docker run --rm \
-  -v sihsalus-distro-referenceapplication_orthanc-data:/data \
+  -v sihsalus-orthanc-data:/data \
   -v "$CURRENT_BACKUP":/backup \
   alpine tar czf /backup/orthanc-data.tar.gz -C /data .
 echo "✅ Orthanc backup completed"
@@ -53,7 +53,7 @@ echo "✅ Orthanc backup completed"
 # 5. Backup de Prometheus Data
 echo "[4/6] Backing up Prometheus metrics..."
 docker run --rm \
-  -v sihsalus-distro-referenceapplication_prometheus-data:/data \
+  -v sihsalus-prometheus-data:/data \
   -v "$CURRENT_BACKUP":/backup \
   alpine tar czf /backup/prometheus-data.tar.gz -C /data .
 echo "✅ Prometheus backup completed"
@@ -61,7 +61,7 @@ echo "✅ Prometheus backup completed"
 # 6. Backup de Grafana Data
 echo "[5/6] Backing up Grafana dashboards..."
 docker run --rm \
-  -v sihsalus-distro-referenceapplication_grafana-data:/data \
+  -v sihsalus-grafana-data:/data \
   -v "$CURRENT_BACKUP":/backup \
   alpine tar czf /backup/grafana-data.tar.gz -C /data .
 echo "✅ Grafana backup completed"
@@ -71,7 +71,7 @@ echo "[6/6] Backing up configurations..."
 tar czf "$CURRENT_BACKUP/configs.tar.gz" \
   docker-compose.yml \
   .env \
-  dns/ \
+  compose/ \
   monitoring/ \
   scripts/ \
   keycloak/realm-export.json \
