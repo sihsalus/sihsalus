@@ -1,5 +1,9 @@
-# MariaDB replica for backup/offline redundancy
-# Profile: replica
+# Legacy MariaDB replica profile.
+#
+# This file is intentionally not included by docker-compose.yml. The current
+# backend runtime uses PostgreSQL through sihsalus-core, so this MariaDB replica
+# profile is kept only as historical reference until a PostgreSQL replication
+# profile is defined.
 
 services:
   db-replic:

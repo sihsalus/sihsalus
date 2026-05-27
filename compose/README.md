@@ -10,7 +10,6 @@ compose/
 ├── fua.yml        # Generador de Formato Único de Atención (MINSA)
 ├── hapi.yml       # Servidor FHIR para interoperabilidad
 ├── imaging.yml    # Stack médico (OHIF + Orthanc + DICOM)
-├── replica.yml    # Réplica MariaDB para redundancia/backups
 ├── keycloak.yml   # Autenticación OAuth2/OpenID Connect
 ├── monitoring.yml # Observabilidad (Grafana + Prometheus + Loki, Alloy opcional)
 └── ssl.yml        # SSL/HTTPS (certificados Let's Encrypt o auto-firmados)
@@ -28,15 +27,14 @@ Servicios base necesarios para OpenMRS. Se incluye automáticamente.
 - `gateway` - Reverse proxy Nginx
 - `frontend` - Imagen Nginx versionada con SPA compilada
 - `backend` - Imagen `sihsalus-core` publicada en GHCR
-- `db` - MariaDB 10.11 (master)
+- `db` - PostgreSQL 16 para el backend `sihsalus-core`
 
 El codigo fuente y la publicacion de la imagen del backend se mantienen en `https://github.com/sihsalus/sihsalus-core`.
 
 **Variables requeridas**:
 ```env
-MYSQL_OPENMRS_PASSWORD=<password_fuerte>
-MYSQL_ROOT_PASSWORD=<password_fuerte>
-OMRS_OCL_TOKEN=<token_ocl>
+SIHSALUS_POSTGRES_PASSWORD=<password_fuerte>
+SIHSALUS_ADMIN_PASSWORD=<password_fuerte>
 SIHSALUS_BACKEND_IMAGE=ghcr.io/sihsalus/sihsalus-core:latest
 FRONTEND_SOURCE_TAG=latest
 FRONTEND_RUNTIME_TAG=latest
@@ -44,29 +42,6 @@ FRONTEND_RUNTIME_TAG=latest
 
 **Puertos**:
 - `80` - Gateway (HTTP)
-
----
-
-### 🗄️ Replica (`replica.yml`) - Redundancia MariaDB
-
-Réplica MariaDB opcional para backups y contingencia. No publica puertos al host.
-
-**Activar**:
-```bash
-docker compose --profile replica up -d
-```
-
-**Servicios**:
-- `db-replic` - MariaDB 10.11 configurado como réplica read-only
-
-**Variables requeridas**:
-```env
-MYSQL_ROOT_PASSWORD=<password_fuerte>
-OMRS_DB_REPL_PASSWORD=<password_fuerte>
-OMRS_DB_REPL_USER=openmrs_repl
-```
-
-La replicación usa GTID (`MASTER_USE_GTID=slave_pos`). Si el master ya tiene datos clínicos, inicializar `db-replic` desde un backup consistente antes de activar la replicación. El init automático solo es apropiado para despliegues nuevos o réplicas ya preparadas.
 
 ---
 
@@ -326,7 +301,7 @@ Cada profile define volúmenes persistentes para datos:
 
 | Profile | Volúmenes |
 |---------|-----------|
-| core | `openmrs-data`, mariadb data |
+| core | `openmrs-data`, `postgres-data` |
 | fua | `db-fua-generator` (PostgreSQL) |
 | hapi | `hapi_pgdata` (PostgreSQL) |
 | imaging | `orthanc-data` (DICOM files) |

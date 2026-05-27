@@ -1,7 +1,5 @@
 # Docker Compose file WITHOUT persistent volumes (for testing/CI)
-# Based on: https://github.com/openmrs/openmrs-distro-referenceapplication/blob/main/docker-compose-no-volumes.yml
-#
-# This provides a minimal OpenMRS setup without data persistence
+# This provides a minimal SIH Salus setup without data persistence
 # Useful for quick testing and CI/CD pipelines
 
 services:
@@ -11,30 +9,28 @@ services:
       db:
         condition: service_healthy
     environment:
-      OMRS_CONFIG_MODULE_WEB_ADMIN: "true"
-      OMRS_CONFIG_AUTO_UPDATE_DATABASE: "true"
-      OMRS_CONFIG_CREATE_TABLES: "true"
-      OMRS_CONFIG_CONNECTION_SERVER: db
-      OMRS_CONFIG_CONNECTION_DATABASE: openmrs
-      OMRS_CONFIG_CONNECTION_USERNAME: ${OPENMRS_DB_USER:-openmrs}
-      OMRS_CONFIG_CONNECTION_PASSWORD: ${MYSQL_OPENMRS_PASSWORD:-openmrs}
-      OMRS_OCL_TOKEN: ${OMRS_OCL_TOKEN}
+      OPENMRS_APPLICATION_DATA_DIRECTORY: /openmrs/data
+      SERVER_SERVLET_CONTEXT_PATH: /openmrs
+      SIHSALUS_DATASOURCE_URL: jdbc:postgresql://db:5432/${SIHSALUS_POSTGRES_DB:-sihsalus}
+      SIHSALUS_DATASOURCE_USERNAME: ${SIHSALUS_POSTGRES_USER:-sihsalus}
+      SIHSALUS_DATASOURCE_PASSWORD: ${SIHSALUS_POSTGRES_PASSWORD:-sihsalus}
+      SIHSALUS_ADMIN_USERNAME: ${SIHSALUS_ADMIN_USERNAME:-admin}
+      SIHSALUS_ADMIN_PASSWORD: ${SIHSALUS_ADMIN_PASSWORD:-Admin123}
+      SIHSALUS_OCL_STATIC_IMPORT_ENABLED: ${SIHSALUS_OCL_STATIC_IMPORT_ENABLED:-false}
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/openmrs/health/started" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/openmrs/actuator/health" ]
       timeout: 5s
     ports:
       - "8080:8080"
 
   db:
-    image: mariadb:10.11.7
-    command: "mariadbd --character-set-server=utf8mb4 --collation-server=utf8mb4_bin"
+    image: postgres:16-alpine
     environment:
-      MYSQL_DATABASE: openmrs
-      MYSQL_USER: ${OPENMRS_DB_USER:-openmrs}
-      MYSQL_PASSWORD: ${MYSQL_OPENMRS_PASSWORD:-openmrs}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      POSTGRES_DB: ${SIHSALUS_POSTGRES_DB:-sihsalus}
+      POSTGRES_USER: ${SIHSALUS_POSTGRES_USER:-sihsalus}
+      POSTGRES_PASSWORD: ${SIHSALUS_POSTGRES_PASSWORD:-sihsalus}
     healthcheck:
-      test: [ "CMD-SHELL", "mysql --user=${OPENMRS_DB_USER:-openmrs} --password=${MYSQL_OPENMRS_PASSWORD:-openmrs} --execute 'SHOW DATABASES;'" ]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
       interval: 10s
       timeout: 5s
       retries: 5
