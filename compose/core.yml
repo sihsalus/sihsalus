@@ -49,10 +49,7 @@ services:
 
   backend:
     container_name: sihsalus-backend
-    image: ghcr.io/sihsalus/sihsalus-backend:${BACKEND_TAG:-latest}
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
+    image: ${SIHSALUS_BACKEND_IMAGE:-ghcr.io/sihsalus/sihsalus-core:latest}
     restart: "unless-stopped"
     depends_on:
       db:
