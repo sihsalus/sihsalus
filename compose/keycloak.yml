@@ -9,8 +9,6 @@ services:
       dockerfile: Dockerfile
     restart: "unless-stopped"
     profiles: [ keycloak ]
-    env_file:
-      - ./.env
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-}
@@ -44,8 +42,6 @@ services:
     image: postgres:17
     restart: "unless-stopped"
     profiles: [ keycloak ]
-    env_file:
-      - ./.env
     environment:
       POSTGRES_DB: ${KC_DB_DATABASE:-keycloak}
       POSTGRES_USER: ${KC_DB_USERNAME:-keycloak}

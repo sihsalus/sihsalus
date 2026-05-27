@@ -119,7 +119,7 @@ Initializer desde
 ### Permisos y Seguridad
 
 - Corre como usuario no-root (UID 1000)
-- Usa Docker Secrets para credenciales en producción
+- Usa variables de entorno desde `.env`/`--env-file` o desde el gestor de secretos del entorno
 - SSL requerido en modo producción
 
 ### Uso con SSL

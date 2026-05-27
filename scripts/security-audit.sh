@@ -72,8 +72,8 @@ else
 fi
 
 echo ""
-echo "2. Verificando secrets de Docker..."
-echo "------------------------------------"
+echo "2. Verificando secretos locales y variables de entorno..."
+echo "----------------------------------------------------------"
 
 # Verificar que secrets existan y no estén vacíos
 check_secret() {
@@ -93,13 +93,43 @@ check_secret() {
 }
 
 if [ -d "secrets" ]; then
-    check_secret "secrets/mysql_root_password.txt"
-    check_secret "secrets/mysql_openmrs_password.txt"
+    check_secret "secrets/sihsalus_postgres_password.txt"
+    check_secret "secrets/sihsalus_admin_password.txt"
     check_secret "secrets/keycloak_admin_password.txt"
     check_secret "secrets/keycloak_db_password.txt"
-    check_secret "secrets/pihole_password.txt"
+    check_secret "secrets/grafana_admin_password.txt"
 else
     report_issue "Directorio secrets/ no existe"
+fi
+
+check_env_var() {
+    local env_file=$1
+    local var_name=$2
+
+    if [ ! -f "$env_file" ]; then
+        report_warning "Archivo de entorno no existe: $env_file"
+        return
+    fi
+
+    local value
+    value=$(grep -E "^${var_name}=" "$env_file" | tail -n 1 | cut -d= -f2- || true)
+    if [ -z "$value" ]; then
+        report_issue "Variable requerida vacía o ausente en $env_file: $var_name"
+    elif [ "$value" = "changeme" ] || [ "$value" = "password" ] || [ "$value" = "admin" ] || [ "$value" = "Admin123" ] || [ "$value" = "sihsalus" ]; then
+        report_warning "Variable usa valor por defecto inseguro en $env_file: $var_name"
+    else
+        report_ok "$env_file:$var_name"
+    fi
+}
+
+if [ -f ".env.production" ]; then
+    check_env_var ".env.production" "SIHSALUS_POSTGRES_PASSWORD"
+    check_env_var ".env.production" "SIHSALUS_ADMIN_PASSWORD"
+elif [ -f ".env" ]; then
+    check_env_var ".env" "SIHSALUS_POSTGRES_PASSWORD"
+    check_env_var ".env" "SIHSALUS_ADMIN_PASSWORD"
+else
+    report_warning "No se encontró .env.production ni .env para auditar variables requeridas"
 fi
 
 echo ""

@@ -1,214 +1,194 @@
-# Scripts/Security - Gestión de Secretos
+# Scripts/Security - Gestion de Secretos
 
-Scripts para generar y gestionar secretos de seguridad (contraseñas, tokens, etc.).
+Scripts para generar y gestionar credenciales locales de SIHSALUS.
+
+El stack actual de Docker Compose consume variables de entorno planas desde `.env` o `--env-file`. No usa Docker secrets ni variables `*_FILE`.
 
 ---
 
 ## Scripts
 
-### `secrets_generate.sh` - Generación de Secretos Seguros
+### `secrets_generate.sh` - Generacion de Secretos Seguros
 
-**Propósito**: Genera contraseñas aleatorias criptográficamente seguras para todos los servicios.
-
-⚠️ **IMPORTANTE**: Ejecutar **ANTES** de `docker compose up` en producción.
+**Proposito**: genera contrasenas y tokens aleatorios para el core y los profiles opcionales, y crea un `.env.production` listo para Docker Compose.
 
 **Uso**:
+
 ```bash
-./secrets_generate.sh
+./scripts/security/secrets_generate.sh
 ```
 
-**Salida**: Crea directorio `secrets/` con archivos de texto conteniendo contraseñas:
+**Salida**:
 
-```
+```text
 secrets/
+├── sihsalus_postgres_password.txt
+├── sihsalus_admin_password.txt
 ├── keycloak_admin_password.txt
 ├── keycloak_db_password.txt
+├── oauth2_client_secret.txt
 ├── grafana_admin_password.txt
-├── mysql_root_password.txt
-├── mysql_openmrs_password.txt
-├── mysql_repl_password.txt
-├── mysql_backup_password.txt
 ├── fua_db_password.txt
 ├── fua_token.txt
-└── pihole_password.txt
+└── hapi_db_password.txt
+
+.env.production
 ```
 
 **Seguridad**:
-- Permisos restrictivos: `600` (solo lectura para el propietario)
-- Directorio protegido: `700` (solo propietario puede acceder)
-- Generadas con OpenSSL (cryptographically secure)
-- 32 caracteres alfanuméricos
+
+- Directorio `secrets/` con permisos `700`.
+- Archivos de secretos con permisos `600`.
+- Valores generados con `openssl rand`.
+- `.env.production` contiene secretos en texto plano y no debe commitearse.
 
 **Requisitos**:
-- `openssl` instalado
-- Permisos de escritura en directorio actual
+
+- `openssl` instalado.
+- Permisos de escritura en el directorio raiz del proyecto.
 
 ---
 
-## Flujo de inicialización segura (Producción)
+## Flujo de inicializacion segura
 
 ### Paso 1: Generar secretos
 
 ```bash
-# En el directorio raíz del proyecto
 ./scripts/security/secrets_generate.sh
-
-# Verificar que se crearon
-ls -la secrets/
 ```
 
-### Paso 2: Cargar secretos en .env
+### Paso 2: Revisar `.env.production`
 
-```bash
-# Crear .env desde template
-cp .env.template .env
+El archivo generado usa los nombres que consume el compose actual:
 
-# Cargar secretos en .env
-cat secrets/mysql_root_password.txt > MYSQL_ROOT_PASSWORD_VALUE
-cat secrets/mysql_openmrs_password.txt > MYSQL_OPENMRS_PASSWORD_VALUE
-# ... etc para todos
-
-# Editar .env manualmente
-nano .env
-
-# Agregar:
-MYSQL_ROOT_PASSWORD=$(cat secrets/mysql_root_password.txt)
-MYSQL_OPENMRS_PASSWORD=$(cat secrets/mysql_openmrs_password.txt)
-KEYCLOAK_ADMIN_PASSWORD=$(cat secrets/keycloak_admin_password.txt)
-KEYCLOAK_DB_PASSWORD=$(cat secrets/keycloak_db_password.txt)
-GRAFANA_ADMIN_PASSWORD=$(cat secrets/grafana_admin_password.txt)
-# ... etc
+```env
+SIHSALUS_POSTGRES_DB=sihsalus
+SIHSALUS_POSTGRES_USER=sihsalus
+SIHSALUS_POSTGRES_PASSWORD=<generado>
+SIHSALUS_ADMIN_USERNAME=admin
+SIHSALUS_ADMIN_PASSWORD=<generado>
 ```
 
-### Paso 3: Usar Docker Secrets (Recomendado para Swarm/K8s)
+Tambien incluye credenciales generadas para profiles opcionales:
+
+```env
+KEYCLOAK_ADMIN_PASSWORD=<generado>
+KC_DB_PASSWORD=<generado>
+OAUTH2_CLIENT_SECRET=<generado>
+GRAFANA_ADMIN_PASSWORD=<generado>
+SIHSALUS_FUA_GEN_DB_PASSWORD=<generado>
+SIHSALUS_FUA_GEN_TOKEN=<generado>
+HAPI_DB_PASSWORD=<generado>
+```
+
+### Paso 3: Iniciar con el env file generado
 
 ```bash
-# Crear secretos en Docker
-for file in secrets/*.txt; do
-  secret_name=$(basename "$file" .txt)
-  docker secret create "$secret_name" "$file"
-done
+docker compose --env-file .env.production up -d
+```
 
-# En docker-compose.yml:
-services:
-  db:
-    environment:
-      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
-    secrets:
-      - mysql_root_password
-      
-secrets:
-  mysql_root_password:
-    external: true
+Tambien puedes usar el flujo por defecto de Docker Compose:
+
+```bash
+cp .env.production .env
+docker compose up -d
 ```
 
 ---
 
 ## Best Practices
 
-### ✅ Haz esto
+### Haz esto
 
-1. **Generar secretos antes de producción**
+1. **Generar secretos antes de produccion**
    ```bash
    ./scripts/security/secrets_generate.sh
    ```
 
-2. **Mantener archivos en `secrets/` fuera de git**
+2. **Mantener `secrets/` y `.env*` fuera de git**
    ```bash
-   echo "secrets/" >> .gitignore
+   git check-ignore secrets/ .env.production
    ```
 
-3. **Usar Docker Secrets o secretos del SO**
+3. **Usar gestores de secretos para operar**
    ```bash
-   # NO en variables de entorno planas
-   # SÍ en /run/secrets (Docker Secrets)
-   # SÍ en variables de entorno cifradas
+   export SIHSALUS_POSTGRES_PASSWORD="$(vault kv get -field=password secret/data/sihsalus/postgres)"
+   export SIHSALUS_ADMIN_PASSWORD="$(vault kv get -field=password secret/data/sihsalus/admin)"
+   docker compose up -d
    ```
 
-4. **Rotar contraseñas regularmente**
+4. **Rotar credenciales con control**
    ```bash
-   # Generar nuevas
    ./scripts/security/secrets_generate.sh
-   
-   # Actualizar servicios
-   docker compose restart <servicio>
+   docker compose --env-file .env.production up -d
    ```
 
-5. **Auditar acceso a secretos**
+5. **Auditar que no se filtren passwords**
    ```bash
-   # Logs de Docker
-   docker logs <container> | grep password
-   
-   # NO debe haber passwords en logs
+   docker compose logs | grep -i "password"
    ```
 
-6. **Backup encriptado de secretos**
+6. **Respaldar secretos cifrados**
    ```bash
-   tar czf secrets.tar.gz secrets/
-   openssl enc -aes-256-cbc -in secrets.tar.gz -out secrets.tar.gz.enc
+   tar czf secrets.tar.gz secrets/ .env.production
+   openssl enc -aes-256-cbc -salt -in secrets.tar.gz -out secrets.tar.gz.enc
    ```
 
----
+### No hagas esto
 
-### ❌ No hagas esto
-
-1. **Hardcodear contraseñas en código**
+1. **Hardcodear contrasenas en codigo**
    ```bash
-   # ❌ MAL
-   MYSQL_PASSWORD="password123"
-   
-   # ✅ BIEN
-   MYSQL_PASSWORD=${MYSQL_PASSWORD}  # Variable del entorno
+   # Mal
+   SIHSALUS_POSTGRES_PASSWORD=password123
+
+   # Bien
+   SIHSALUS_POSTGRES_PASSWORD=${SIHSALUS_POSTGRES_PASSWORD}
    ```
 
-2. **Commitear `secrets/` a git**
-   ```bash
-   # .gitignore debe incluir:
+2. **Commitear secretos**
+   ```gitignore
    secrets/
-   .env*
+   .env
+   .env.*
    ```
 
-3. **Usar contraseñas débiles o predecibles**
-   ```bash
-   # ❌ MAL
-   KEYCLOAK_ADMIN_PASSWORD=admin123
-   
-   # ✅ BIEN
-   # Usar script de generación
-   ./scripts/security/secrets_generate.sh
+3. **Usar valores por defecto en produccion**
+   ```env
+   SIHSALUS_POSTGRES_PASSWORD=sihsalus
+   SIHSALUS_ADMIN_PASSWORD=Admin123
    ```
 
-4. **Compartir secretos por email/chat sin encriptar**
+4. **Compartir secretos sin cifrar**
    ```bash
-   # Siempre encriptar antes de compartir
    gpg --symmetric secrets.tar.gz
    ```
 
-5. **Olvidar cambiar contraseñas por defecto**
-   ```bash
-   # Siempre reemplazar valores por defecto
-   KEYCLOAK_ADMIN_PASSWORD → Generar nuevo
-   GRAFANA_ADMIN_PASSWORD → Generar nuevo
-   ```
-
 ---
 
-## Recuperación de secretos olvidados
+## Recuperacion de secretos olvidados
 
 Si pierdes los secretos, puedes regenerarlos:
 
 ```bash
-# OPCIÓN 1: Regenerar y reinicializar
 ./scripts/security/secrets_generate.sh
-./scripts/utils/init_full.sh -m production
+```
 
-# OPCIÓN 2: Cambiar contraseña sin reinicializar
-# MariaDB
-docker compose exec db mariadb -u root -pOLDPASS -e "
-  ALTER USER 'openmrs'@'%' IDENTIFIED BY 'NEWPASS';
-  FLUSH PRIVILEGES;
-"
+Si la base de datos ya existe y solo quieres cambiar la contrasena del usuario PostgreSQL:
 
+```bash
+docker compose exec db psql -U sihsalus -d sihsalus -c \
+  "ALTER USER sihsalus WITH PASSWORD 'NEWPASS';"
+```
+
+Luego actualiza `SIHSALUS_POSTGRES_PASSWORD` en `.env` o `.env.production` y reinicia los servicios que dependen de la base de datos:
+
+```bash
+docker compose up -d db backend
+```
+
+Otros servicios:
+
+```bash
 # Keycloak
 docker compose exec keycloak /opt/keycloak/bin/kc.sh \
   change-admin-password --new-password NEWPASS
@@ -220,144 +200,107 @@ docker compose exec grafana grafana-cli admin \
 
 ---
 
-## Gestión de secretos en diferentes ambientes
+## Ambientes
 
 ### Desarrollo
 
 ```bash
-# Usar .env.development con secretos generados localmente
-./scripts/security/secrets_generate.sh
-export $(cat .env.development | xargs)
-docker compose up
+cp .env.template .env
+nano .env
+docker compose up -d
 ```
 
-### Producción
+### Produccion
 
 ```bash
-# Usar variables de entorno del SO o Docker Secrets
-export MYSQL_ROOT_PASSWORD=$(cat /secure/mysql_root_password)
-export KEYCLOAK_ADMIN_PASSWORD=$(cat /secure/keycloak_admin_password)
-# ...
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+./scripts/security/secrets_generate.sh
+docker compose --env-file .env.production up -d
 ```
 
 ### Staging
 
 ```bash
-# Usar .env.staging (nunca commitear)
-cp .env.template .env.staging
 ./scripts/security/secrets_generate.sh
-# Copiar secretos a .env.staging
-docker compose --env-file .env.staging up
+cp .env.production .env.staging
+docker compose --env-file .env.staging up -d
 ```
 
 ---
 
-## Integración con CI/CD
+## Integracion con CI/CD
 
 ### GitHub Actions
 
 ```yaml
-- name: Generar secretos
-  run: ./scripts/security/secrets_generate.sh
-
-- name: Cargar secretos en GitHub
+- name: Cargar secretos
   env:
-    MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
-    KEYCLOAK_ADMIN_PASSWORD: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
+    SIHSALUS_POSTGRES_PASSWORD: ${{ secrets.SIHSALUS_POSTGRES_PASSWORD }}
+    SIHSALUS_ADMIN_PASSWORD: ${{ secrets.SIHSALUS_ADMIN_PASSWORD }}
   run: |
-    echo "MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD" >> $GITHUB_ENV
-    docker compose up
+    echo "SIHSALUS_POSTGRES_PASSWORD=$SIHSALUS_POSTGRES_PASSWORD" >> $GITHUB_ENV
+    echo "SIHSALUS_ADMIN_PASSWORD=$SIHSALUS_ADMIN_PASSWORD" >> $GITHUB_ENV
+    docker compose up -d
 ```
 
 ### GitLab CI
 
 ```yaml
-secrets:
-  variables:
-    MYSQL_ROOT_PASSWORD: $MYSQL_ROOT_PASSWORD
-    KEYCLOAK_ADMIN_PASSWORD: $KEYCLOAK_ADMIN_PASSWORD
+variables:
+  SIHSALUS_POSTGRES_PASSWORD: $SIHSALUS_POSTGRES_PASSWORD
+  SIHSALUS_ADMIN_PASSWORD: $SIHSALUS_ADMIN_PASSWORD
 ```
 
 ---
 
-## Auditoría y Compliance
+## Auditoria y compliance
 
-### Verificar exposición de secretos
+### Verificar exposicion de secretos
 
 ```bash
-# Buscar passwords en logs
+./scripts/security-audit.sh
 docker compose logs | grep -i "password"
-
-# Buscar en archivos
-grep -r "password" . --exclude-dir=.git --exclude-dir=node_modules
-
-# Buscar en Git history (si ya fueron commiteados)
-git log -S "password" --all
+rg -n "password|secret|token" . --glob '!secrets/**' --glob '!.git/**'
 ```
 
-### Rotar credenciales periódicamente
+### Rotacion periodica
 
 ```bash
-# Crear cron para rotación mensual
+# Ejemplo de cron mensual
 0 0 1 * * cd /home/openmrs/sihsalus && \
   ./scripts/security/secrets_generate.sh && \
-  docker compose restart backend db keycloak
+  docker compose --env-file .env.production up -d
 ```
 
 ---
 
-## Recuperación de desastres
+## Recuperacion de desastres
 
-### Backup encriptado de secretos
+### Backup cifrado de secretos
 
 ```bash
-#!/bin/bash
-# backup-secrets.sh
-
-# Crear backup
-tar czf secrets-$(date +%Y%m%d).tar.gz secrets/
-
-# Encriptar
+tar czf secrets-$(date +%Y%m%d).tar.gz secrets/ .env.production
 gpg --symmetric --cipher-algo AES256 secrets-*.tar.gz
-
-# Subir a almacenamiento seguro
-# (S3, Azure Blob, Google Cloud Storage, etc.)
 ```
 
 ### Restore de secretos
 
 ```bash
-# Descargar
-aws s3 cp s3://backup-bucket/secrets-20260111.tar.gz.gpg .
-
-# Desencriptar
 gpg --decrypt secrets-20260111.tar.gz.gpg > secrets-20260111.tar.gz
-
-# Restaurar
 tar xzf secrets-20260111.tar.gz
-./scripts/security/secrets_generate.sh  # Regenerar para actualización
+docker compose --env-file .env.production up -d
 ```
 
 ---
 
-## Integración con Vault (Enterprise)
-
-Para deployments empresariales, considera Hashicorp Vault:
+## Integracion con Vault
 
 ```bash
-# Instalar cliente
-apt-get install vault
-
-# Login a Vault
 vault login -method=ldap username=admin
 
-# Leer secreto
-MYSQL_PASSWORD=$(vault kv get -field=password secret/data/mysql)
+export SIHSALUS_POSTGRES_PASSWORD="$(vault kv get -field=password secret/data/sihsalus/postgres)"
+export SIHSALUS_ADMIN_PASSWORD="$(vault kv get -field=password secret/data/sihsalus/admin)"
 
-# Usar en docker-compose
-export MYSQL_PASSWORD=$(vault kv get -field=password secret/data/mysql)
-docker compose up
+docker compose up -d
 ```
 
 ---
@@ -365,7 +308,6 @@ docker compose up
 ## Links y recursos
 
 - [OWASP: Secrets Management](https://owasp.org/www-project-devsecops-guideline/)
-- [Docker Secrets Documentation](https://docs.docker.com/engine/swarm/secrets/)
 - [HashiCorp Vault](https://www.vaultproject.io/)
 - [OpenSSL Documentation](https://www.openssl.org/docs/)
 - [NIST: Password Guidelines](https://pages.nist.gov/800-63-3/sp800-63b.html)

@@ -382,13 +382,13 @@ docker volume rm sihsalus_prometheus-data
        - targets: ['backend:8080']
    ```
 
-2. **MariaDB**: Agregar exporter
+2. **PostgreSQL**: Agregar exporter
    ```bash
    docker run -d \
      --network sihsalus_default \
-     --name mariadb-exporter \
-     -e DATA_SOURCE_NAME="openmrs:password@(db:3306)/" \
-     prom/mysqld-exporter
+     --name postgres-exporter \
+     -e DATA_SOURCE_NAME="postgresql://sihsalus:password@db:5432/sihsalus?sslmode=disable" \
+     prometheuscommunity/postgres-exporter
    ```
 
 3. **Keycloak**: Descomentar en [prometheus.yml](prometheus/prometheus.yml)
