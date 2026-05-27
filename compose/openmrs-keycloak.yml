@@ -6,6 +6,33 @@ services:
       args:
         SPA_CONFIG_URLS: /openmrs/spa/frontend.json,/openmrs/spa/frontend-keycloak.json
 
+  backend-oauth2-config:
+    environment:
+      OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:?OAUTH2_CLIENT_SECRET is required when OpenMRS OAuth2 is enabled}
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}
+    command:
+      - sh
+      - -euc
+      - |
+        mkdir -p /openmrs/data
+        cat > /openmrs/data/oauth2.properties <<EOF
+        oauth2.enabled=true
+        userAuthorizationUri=$${KEYCLOAK_PUBLIC_URL}/realms/openmrs/protocol/openid-connect/auth
+        accessTokenUri=http://keycloak:8080/realms/openmrs/protocol/openid-connect/token
+        userInfoUri=http://keycloak:8080/realms/openmrs/protocol/openid-connect/userinfo
+        keysUrl=http://keycloak:8080/realms/openmrs/protocol/openid-connect/certs
+        logoutUri=$${KEYCLOAK_PUBLIC_URL}/realms/openmrs/protocol/openid-connect/logout
+        clientId=openmrs
+        clientSecret=$${OAUTH2_CLIENT_SECRET}
+        scope=openid,profile,email
+        openmrs.mapping.user.username=preferred_username
+        openmrs.mapping.person.givenName=given_name
+        openmrs.mapping.person.familyName=family_name
+        openmrs.mapping.user.email=email
+        openmrs.mapping.user.systemId=sub
+        EOF
+        chmod 644 /openmrs/data/oauth2.properties
+
   backend:
     depends_on:
       keycloak:

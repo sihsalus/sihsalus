@@ -54,6 +54,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      backend-oauth2-config:
+        condition: service_completed_successfully
     environment:
       OPENMRS_APPLICATION_DATA_DIRECTORY: /openmrs/data
       SIHSALUS_INITIALIZER_SOURCE_ROOT: ${SIHSALUS_INITIALIZER_SOURCE_ROOT:-/opt/sihsalus/reference-sources/sihsalus-content}
@@ -79,7 +81,23 @@ services:
       start_period: 2m
     volumes:
       - openmrs-data:/openmrs/data
-      - ./keycloak/oauth2.properties:/openmrs/data/oauth2.properties:ro
+
+  backend-oauth2-config:
+    container_name: sihsalus-backend-oauth2-config
+    image: alpine:3.20
+    restart: "no"
+    user: "0:0"
+    command:
+      - sh
+      - -euc
+      - |
+        mkdir -p /openmrs/data
+        cat > /openmrs/data/oauth2.properties <<'EOF'
+        oauth2.enabled=false
+        EOF
+        chmod 644 /openmrs/data/oauth2.properties
+    volumes:
+      - openmrs-data:/openmrs/data
 
   db:
     container_name: sihsalus-postgres

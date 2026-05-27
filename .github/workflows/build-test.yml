@@ -27,3 +27,6 @@ jobs:
         run: |
           docker compose -f docker-compose.yml config
           docker compose -f docker-compose-no-volumes.yml config
+
+      - name: Validate Keycloak/backend OAuth2 wiring
+        run: ./tests/compose/test-keycloak-backend-oauth2.sh

@@ -148,11 +148,12 @@ docker compose \
 ```env
 KEYCLOAK_ADMIN_PASSWORD=<password_fuerte>
 KC_DB_PASSWORD=<password_bd>
-OAUTH2_ENABLED=true
 OAUTH2_CLIENT_SECRET=<secret_cliente_openmrs>
 KEYCLOAK_PORT=8180        # Opcional (puerto de escucha)
 KEYCLOAK_PUBLIC_URL=http://localhost:8180
 ```
+
+`compose/openmrs-keycloak.yml` fuerza `OAUTH2_ENABLED=true` para el backend y genera `/openmrs/data/oauth2.properties` dentro del volumen `openmrs-data` antes de iniciar OpenMRS.
 
 **Puertos**:
 - `8180` - Keycloak Admin Console (HTTP)

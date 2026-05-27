@@ -10,7 +10,6 @@ Keycloak es el servidor de identidad y acceso que proporciona autenticación OAu
 # En .env:
 KEYCLOAK_ADMIN_PASSWORD=<password_seguro>      # Password del usuario admin
 KC_DB_PASSWORD=<password_seguro>               # Password de PostgreSQL de Keycloak
-OAUTH2_ENABLED=true                            # Activa oauth2login en OpenMRS
 OAUTH2_CLIENT_SECRET=<secret_aleatorio>        # Secret del cliente OpenMRS
 KEYCLOAK_PUBLIC_URL=http://localhost:8180      # URL que usaran los navegadores
 ```
@@ -74,28 +73,36 @@ Los claims OIDC se mapean automáticamente a atributos de OpenMRS:
 
 ## Integración con OpenMRS
 
-El backend OpenMRS obtiene la configuración desde [oauth2.properties](oauth2.properties):
+El modulo `oauth2login` de OpenMRS lee `/openmrs/data/oauth2.properties`.
+
+En modo core, `compose/core.yml` genera este archivo deshabilitado dentro del volumen `openmrs-data`:
 
 ```properties
-# OAuth2 endpoints
-oauth2.enabled=${OAUTH2_ENABLED}
-userAuthorizationUri=${KEYCLOAK_PUBLIC_URL}/realms/openmrs/protocol/openid-connect/auth
+oauth2.enabled=false
+```
+
+Cuando se usa `compose/openmrs-keycloak.yml`, el servicio `backend-oauth2-config` genera el archivo habilitado antes de iniciar el backend:
+
+```properties
+oauth2.enabled=true
+userAuthorizationUri=http://localhost:8180/realms/openmrs/protocol/openid-connect/auth
 accessTokenUri=http://keycloak:8080/realms/openmrs/protocol/openid-connect/token
 userInfoUri=http://keycloak:8080/realms/openmrs/protocol/openid-connect/userinfo
 keysUrl=http://keycloak:8080/realms/openmrs/protocol/openid-connect/certs
+logoutUri=http://localhost:8180/realms/openmrs/protocol/openid-connect/logout
 
-# Client credentials
 clientId=openmrs
-clientSecret=${OAUTH2_CLIENT_SECRET}
+clientSecret=<OAUTH2_CLIENT_SECRET>
 scope=openid,profile,email
 
-# Mapeos de claims a atributos de usuario
 openmrs.mapping.user.username=preferred_username
 openmrs.mapping.person.givenName=given_name
 openmrs.mapping.person.familyName=family_name
 openmrs.mapping.user.email=email
 openmrs.mapping.user.systemId=sub
 ```
+
+`KEYCLOAK_PUBLIC_URL` y `OAUTH2_CLIENT_SECRET` se toman del `.env`/`--env-file`; no se montan placeholders literales al backend.
 
 El frontend O3 recibe la configuración OAuth2 desde
 [frontend-keycloak.json](../frontend/frontend-keycloak.json), agregada por
