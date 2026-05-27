@@ -1,6 +1,6 @@
 # Monitoring - Observabilidad (Grafana, Prometheus, Loki, Alloy)
 
-Stack de observabilidad para disponibilidad HTTP, métricas del propio stack y logs de contenedores. No incluye métricas de CPU/memoria por contenedor hasta agregar cAdvisor/node-exporter.
+Stack de observabilidad para disponibilidad HTTP, métricas del propio stack, recursos del host, métricas de contenedores y logs de contenedores.
 
 ## Stack
 
@@ -9,6 +9,8 @@ Stack de observabilidad para disponibilidad HTTP, métricas del propio stack y l
 - **Loki** - Agregador de logs (búsqueda rápida)
 - **Alloy** - Colector opcional de logs Docker
 - **Blackbox Exporter** - Probes de disponibilidad (health checks)
+- **Node Exporter** - Métricas del host: CPU, memoria, disco, carga
+- **cAdvisor** - Métricas de contenedores Docker: CPU, memoria, red, filesystem
 
 ---
 
@@ -82,6 +84,8 @@ GRAFANA_ROOT_URL=http://localhost:3001   # URL base (para links)
 - Prometheus itself
 - Grafana
 - Loki
+- Node Exporter (host)
+- cAdvisor (contenedores Docker)
 - Blackbox HTTP probes (Gateway, OpenMRS endpoints)
 
 **Retención**: 30 días (configurable)
@@ -159,6 +163,28 @@ sum(rate({job="docker", level="error"}[5m]))
 
 ---
 
+### Node Exporter
+
+**Rol**: Métricas del host donde corre Docker: CPU, memoria, disco, carga y filesystems.
+
+**Notas**:
+- Se ejecuta dentro del profile `monitoring`.
+- Monta el root filesystem del host en modo solo lectura.
+- Las métricas principales son `node_cpu_seconds_total`, `node_memory_*` y `node_filesystem_*`.
+
+---
+
+### cAdvisor
+
+**Rol**: Métricas por contenedor Docker: CPU, memoria, red, filesystem y presencia del contenedor.
+
+**Notas**:
+- Se ejecuta dentro del profile `monitoring`.
+- Requiere acceso solo lectura a rutas del runtime Docker y `/dev/kmsg`.
+- En Docker Desktop algunas métricas pueden variar frente a Linux nativo; en producción Linux entrega la cobertura completa.
+
+---
+
 ## Dashboards
 
 ### Docker Overview
@@ -225,6 +251,18 @@ probe_duration_seconds{job="blackbox-http-prod"}
 
 # Estado de targets scrapeados
 up
+
+# Uso de CPU del host
+1 - avg(rate(node_cpu_seconds_total{job="node-exporter", mode="idle"}[5m]))
+
+# Memoria disponible del host
+node_memory_MemAvailable_bytes{job="node-exporter"}
+
+# CPU por contenedor SIHSALUS
+sum by (name) (rate(container_cpu_usage_seconds_total{job="cadvisor", name=~"sihsalus-.+", image!=""}[5m]))
+
+# Memoria por contenedor SIHSALUS
+container_memory_working_set_bytes{job="cadvisor", name=~"sihsalus-.+", image!=""}
 ```
 
 ### LogQL (Loki)
