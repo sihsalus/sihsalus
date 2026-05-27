@@ -6,6 +6,7 @@ RUN apk --no-cache add \
     openssl \
     curl \
     bash \
+    coreutils \
     tzdata && \
     # Set timezone to Lima
     cp /usr/share/zoneinfo/America/Lima /etc/localtime && \
