@@ -40,6 +40,7 @@ server {
   listen [::]:443 ssl;
   http2 on;
   server_name ${CERT_WEB_DOMAIN_COMMON_NAME} localhost 127.0.0.1 _;
+  client_max_body_size 0;
 
   # SSL configuration
   ssl_certificate     /etc/letsencrypt/live/${CERT_WEB_DOMAIN_COMMON_NAME}/fullchain.pem;
@@ -135,6 +136,7 @@ server {
 
   location /orthanc/ {
     set $orthanc_proxy http://orthanc-proxy;
+    client_max_body_size 0;
     rewrite ^/orthanc/(.*)$ /$1 break;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
@@ -147,6 +149,7 @@ server {
 
   location /imaging/dicom-web/ {
     set $orthanc_proxy http://orthanc-proxy;
+    client_max_body_size 0;
     rewrite ^/imaging/(.*)$ /$1 break;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
@@ -154,6 +157,7 @@ server {
 
   location /imaging/wado {
     set $orthanc_proxy http://orthanc-proxy;
+    client_max_body_size 0;
     rewrite ^/imaging/(.*)$ /$1 break;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
@@ -190,12 +194,14 @@ server {
 
   location /dicom-web/ {
     set $orthanc_proxy http://orthanc-proxy;
+    client_max_body_size 0;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
   }
 
   location /wado {
     set $orthanc_proxy http://orthanc-proxy;
+    client_max_body_size 0;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
   }
