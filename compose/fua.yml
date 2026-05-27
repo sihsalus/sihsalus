@@ -7,7 +7,7 @@
 services:
   fua-generator:
     container_name: sihsalus-fua-generator
-    image: ghcr.io/sihsalus/generador-de-fua:${FUA_GENERATOR_TAG:-latest}
+    image: marcelius733/fua-generator:dev-0.1.6
     restart: "unless-stopped"
     profiles: [ fua ]
     environment:
