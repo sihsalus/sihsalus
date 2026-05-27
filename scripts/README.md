@@ -6,8 +6,7 @@ Este directorio centraliza todos los scripts utilizados en el proyecto sihsalus 
 
 ```
 scripts/
-├── backup/          # Scripts relacionados con backups de base de datos
-├── database/        # Scripts de inicialización y configuración de base de datos
+├── backup/          # Backup/restore de la base PostgreSQL del backend
 ├── frontend/        # Scripts para el frontend (nginx, SPA)
 └── utils/           # Scripts de utilidades generales
 ```
@@ -15,22 +14,11 @@ scripts/
 ## Contenido por Carpeta
 
 ### backup/
-Scripts para realizar backups completos e incrementales de las bases de datos master y réplica:
-- `backup_full.sh` - Backup completo
-- `backup_incremental.sh` - Backup incremental
-- `backup_full_generate.sh` - Generación de backup completo
-- `backup_incremental_generate.sh` - Generación de backup incremental
-- `backup_full_generate_replica.sh` - Backup completo de réplica
-- `backup_incremental_generate_replica.sh` - Backup incremental de réplica
-- `replica_reset.sh` - Script bash para resetear la replicación de la base de datos
-- `backup_all.sh` - Backup de todo el sistema
-
-### database/
-Scripts de inicialización de las bases de datos:
-- `db_init_master.sh` - Inicialización de la base de datos master
-- `db_init_slave.sh` - Inicialización de la base de datos slave/réplica
-- `init-master-sql.sql` - (futuro) Script SQL para master
-- `init-slave-sql.sql` - (futuro) Script SQL para slave
+Backup/restore de la base PostgreSQL del backend `sihsalus-core` (ver
+[backup/README.md](backup/README.md)):
+- `backup_dump.sh` - Backup lógico en caliente con `pg_dump` (formato custom)
+- `restore_dump.sh` - Restore de un `.dump` con `pg_restore --clean`
+- `backup_all.sh` - Backup de todo el sistema (DB + Keycloak + Orthanc + métricas + configs)
 
 ### frontend/
 Scripts relacionados con el frontend:
@@ -56,7 +44,7 @@ Todos los scripts de backup generan archivos cifrados automáticamente usando AE
 **Ejemplo de uso:**
 ```bash
 export BACKUP_ENCRYPTION_PASSWORD="<clave-segura>"
-./backup_full.sh
+./backup_dump.sh
 ```
 
 ### Rotación y Retención de Logs
