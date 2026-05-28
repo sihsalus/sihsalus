@@ -10,6 +10,7 @@ trap 'rm -f "$CORE_CONFIG" "$KEYCLOAK_CONFIG"' EXIT
 
 export SIHSALUS_POSTGRES_PASSWORD="ci-postgres-password"
 export SIHSALUS_ADMIN_PASSWORD="ci-admin-password"
+export OAUTH2_ENABLED="true"
 export KEYCLOAK_ADMIN_PASSWORD="ci-keycloak-admin-password"
 export KC_DB_PASSWORD="ci-keycloak-db-password"
 export OAUTH2_CLIENT_SECRET="ci-oauth2-client-secret"
@@ -83,7 +84,11 @@ assert_equal(
     "service_completed_successfully",
     "core backend must wait for oauth2 config generation",
 )
-assert_equal(env(core_backend)["OAUTH2_ENABLED"], "false", "core backend OAuth2 must default to disabled")
+assert_equal(
+    env(core_backend)["OAUTH2_ENABLED"],
+    "false",
+    "core backend must ignore accidental OAUTH2_ENABLED=true from the environment",
+)
 assert_contains(
     command_text(core_generator),
     "oauth2.enabled=false",
