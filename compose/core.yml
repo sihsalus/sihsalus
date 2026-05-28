@@ -31,7 +31,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        FRONTEND_SOURCE_IMAGE: ghcr.io/sihsalus/sihsalus-frontend:${FRONTEND_SOURCE_TAG:-latest}
+        FRONTEND_SOURCE_IMAGE: ${FRONTEND_SOURCE_IMAGE:-ghcr.io/sihsalus/sihsalus-frontend:${FRONTEND_SOURCE_TAG:-latest}}
         SPA_PATH: /openmrs/spa
         API_URL: /openmrs
         SPA_CONFIG_URLS: /openmrs/spa/frontend.json
