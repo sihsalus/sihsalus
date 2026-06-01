@@ -60,8 +60,11 @@ services:
       SIHSALUS_ADMIN_PASSWORD: ${SIHSALUS_ADMIN_PASSWORD:-Admin123}
       SIHSALUS_OCL_STATIC_IMPORT_ENABLED: ${SIHSALUS_OCL_STATIC_IMPORT_ENABLED:-false}
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/openmrs/actuator/health" ]
-      timeout: 5s
+      test: [ "CMD-SHELL", 'curl -fsS "http://localhost:8080$${SERVER_SERVLET_CONTEXT_PATH:-/openmrs}/actuator/health/readiness" >/dev/null' ]
+      interval: 30s
+      timeout: 10s
+      retries: 60
+      start_period: 45m
 
   db:
     image: postgres:16-alpine
