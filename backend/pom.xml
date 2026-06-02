@@ -58,9 +58,9 @@
     <!-- Stock Management and Billing -->
     <stockmanagement.version>3.0.0</stockmanagement.version>
     <billing.version>2.2.0</billing.version>
-    <fua.version>1.0.75</fua.version>
-    <imaging.version>1.2.3</imaging.version>
-    <coststructure.version>1.0.0</coststructure.version>
+    <fua.version>1.0.76</fua.version>
+    <imaging.version>1.2.8</imaging.version>
+    <coststructure.version>1.0.1</coststructure.version>
     <!-- <sihsalus-interop.version>1.0.3</sihsalus-interop.version> -->
     <!-- Content Packages -->
     <sihsalus-content.version>1.8.30</sihsalus-content.version>
