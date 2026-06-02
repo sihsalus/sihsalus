@@ -1,0 +1,6 @@
+services:
+  backend:
+    image: ghcr.io/sihsalus/sihsalus-backend:rollback-20260518
+    environment:
+      OMRS_CONFIG_AUTO_UPDATE_DATABASE: "false"
+      OMRS_CONFIG_CREATE_TABLES: "false"

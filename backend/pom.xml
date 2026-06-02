@@ -55,7 +55,7 @@
     <emrapi.version>3.4.0</emrapi.version>
     <event.version>4.0.0</event.version>
     <bedmanagement.version>7.2.0</bedmanagement.version>
-    <!-- Stock Management and Billing -->
+    <!-- Stock Management and Billing subir version alejandro -->
     <stockmanagement.version>3.0.0</stockmanagement.version>
     <billing.version>2.2.0</billing.version>
     <fua.version>1.0.76</fua.version>
