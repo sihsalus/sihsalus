@@ -55,7 +55,7 @@ services:
       dockerfile: backend/Dockerfile
     restart: "unless-stopped"
     ports:
-      - "9090:8080"
+      - "127.0.0.1:8081:8080"
     depends_on:
       db:
         condition: service_healthy

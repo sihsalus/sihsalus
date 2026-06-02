@@ -1,0 +1,14 @@
+# Backend rollback override (standalone)
+# Usage: docker compose -f docker-compose.yml -f compose/rollback-backend.yml up -d backend
+#
+# This file overrides the backend service to pin a known-good rollback image
+# and disable schema auto-updates. It is NOT included via `include:` because
+# it modifies an existing service; it must be layered explicitly with `-f`
+# alongside the main `docker-compose.yml` (and any other overrides in use).
+
+services:
+  backend:
+    image: ghcr.io/sihsalus/sihsalus-backend:rollback-20260518
+    environment:
+      OMRS_CONFIG_AUTO_UPDATE_DATABASE: "false"
+      OMRS_CONFIG_CREATE_TABLES: "false"
