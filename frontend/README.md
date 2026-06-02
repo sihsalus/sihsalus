@@ -26,7 +26,7 @@ frontend/
 
 ### `frontend` (Imagen runtime versionada)
 
-Imagen: `${FRONTEND_RUNTIME_IMAGE:-ghcr.io/sihsalus/sihsalus-frontend-runtime}:${FRONTEND_RUNTIME_TAG:-latest}`
+Imagen: `${FRONTEND_RUNTIME_IMAGE:-sihsalus-frontend-runtime}:${FRONTEND_RUNTIME_TAG:-latest}`
 
 **Rol**: Servidor HTTP ligero que ya contiene los archivos estáticos de la SPA en `/usr/share/nginx/html`.
 
