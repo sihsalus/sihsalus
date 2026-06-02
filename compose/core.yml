@@ -26,7 +26,7 @@ services:
 
   frontend:
     container_name: sihsalus-frontend
-    image: ${FRONTEND_RUNTIME_IMAGE:-ghcr.io/sihsalus/sihsalus-frontend-runtime}:${FRONTEND_RUNTIME_TAG:-latest}
+    image: ${FRONTEND_RUNTIME_IMAGE:-ghcr.io/sihsalus/sihsalus-frontend}:${FRONTEND_RUNTIME_TAG:-latest}
     build:
       context: ./frontend
       dockerfile: Dockerfile
