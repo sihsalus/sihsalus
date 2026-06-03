@@ -28,7 +28,7 @@
     <openmrs.version>2.8.6</openmrs.version>
     <initializer.version>2.11.0</initializer.version>
     <fhir2.version>4.0.0-SNAPSHOT</fhir2.version>
-    <webservices.rest.version>3.4.1</webservices.rest.version>
+    <webservices.rest.version>3.5.0</webservices.rest.version>
     <addresshierarchy.version>2.21.0</addresshierarchy.version>
     <patientdocuments.version>1.1.0-SNAPSHOT</patientdocuments.version>
     <idgen.version>5.0.4</idgen.version>
@@ -55,12 +55,11 @@
     <emrapi.version>3.4.0</emrapi.version>
     <event.version>4.0.0</event.version>
     <bedmanagement.version>7.2.0</bedmanagement.version>
-    <!-- Stock Management and Billing subir version alejandro -->
-    <stockmanagement.version>3.0.0</stockmanagement.version>
+    <!-- Stock Management and Billing -->
+    <stockmanagement.version>3.1.1</stockmanagement.version>
     <billing.version>2.2.0</billing.version>
     <fua.version>1.0.76</fua.version>
     <imaging.version>1.2.8</imaging.version>
-    <coststructure.version>1.0.1</coststructure.version>
     <!-- <sihsalus-interop.version>1.0.3</sihsalus-interop.version> -->
     <!-- Content Packages -->
     <sihsalus-content.version>1.9.0</sihsalus-content.version>
@@ -86,12 +85,6 @@
       <groupId>io.github.proyecto-santaclotilde</groupId>
       <artifactId>imaging-omod</artifactId>
       <version>${imaging.version}</version>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.github.proyecto-santaclotilde</groupId>
-      <artifactId>coststructure-omod</artifactId>
-      <version>${coststructure.version}</version>
       <scope>provided</scope>
     </dependency>
     
@@ -262,7 +255,7 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>org.openmrs.module</groupId>
+      <groupId>io.github.proyecto-santaclotilde</groupId>
       <artifactId>stockmanagement-omod</artifactId>
       <version>${stockmanagement.version}</version>
       <scope>provided</scope>
