@@ -34,7 +34,7 @@
     <idgen.version>5.0.4</idgen.version>
     <legacyui.version>2.1.0</legacyui.version>
     <metadatamapping.version>2.0.0</metadatamapping.version>
-    <openconceptlab.version>3.0.0</openconceptlab.version>
+    <openconceptlab.version>3.1.0</openconceptlab.version>
     <attachments.version>4.0.0</attachments.version>
     <referencedemodata.version>2.6.1</referencedemodata.version>
     <queue.version>3.0.0</queue.version>
@@ -58,7 +58,7 @@
     <!-- Stock Management and Billing -->
     <stockmanagement.version>3.1.1</stockmanagement.version>
     <billing.version>2.2.0</billing.version>
-    <tasks.version>2.1.0-SNAPSHOT</tasks.version>
+    <tasks.version>2.1.0</tasks.version>
     <fua.version>1.0.76</fua.version>
     <imaging.version>1.2.8</imaging.version>
     <!-- <sihsalus-interop.version>1.0.3</sihsalus-interop.version> -->
