@@ -45,6 +45,9 @@ echo -n "$(generate_password)" > secrets/pihole_password.txt
 echo -n "$(generate_password)" > secrets/fua_db_password.txt
 echo -n "$(generate_password)" > secrets/fua_token.txt
 
+# Reportes SQL (Indicadores)
+echo -n "$(generate_password)" > secrets/reportes_sql_db_password.txt
+
 # Ajustar permisos
 chmod 600 secrets/*
 
@@ -105,6 +108,11 @@ SIHSALUS_FUA_GEN_DB_USER=fuagenerator
 SIHSALUS_FUA_GEN_DB_PASSWORD_FILE=/run/secrets/fua_db_password
 SIHSALUS_FUA_GEN_DB=fuagenerator
 SIHSALUS_FUA_GEN_TOKEN_FILE=/run/secrets/fua_token
+
+# Reportes SQL (Indicadores)
+SIHSALUS_REPORTES_SQL_DB_USER=reportes_sql
+SIHSALUS_REPORTES_SQL_DB_PASSWORD_FILE=/run/secrets/reportes_sql_db_password
+SIHSALUS_REPORTES_SQL_DB=reportes_sql
 EOF
 
 echo "✅ Plantilla .env.production creada"

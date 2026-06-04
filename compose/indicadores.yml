@@ -1,0 +1,52 @@
+# Reportes SQL (Indicadores)
+# Profile: indicadores
+#
+# Provides SQL-based reporting and indicators.
+# Exposed under /openmrs/services/reportes-sql
+
+services:
+  reportes-sql:
+    container_name: sihsalus-reportes-sql
+    image: ${REPORTES_SQL_IMAGE:-ghcr.io/sihsalus/reportes-sql}:${REPORTES_SQL_TAG:-latest}
+    restart: "unless-stopped"
+    profiles: [ indicadores ]
+    environment:
+      PORT: "8000"
+      BASE_PATH: "/openmrs/services/reportes-sql"
+      INDICADORES_DB_HOST: "reportes-sql-db"
+      INDICADORES_DB_PORT: "5432"
+      INDICADORES_DB_NAME: ${SIHSALUS_REPORTES_SQL_DB:-reportes_sql}
+      INDICADORES_DB_USER: ${SIHSALUS_REPORTES_SQL_DB_USER:-reportes_sql}
+      INDICADORES_DB_PASSWORD: ${SIHSALUS_REPORTES_SQL_DB_PASSWORD:-}
+      OPENMRS_API_URL: "http://backend:8080/openmrs"
+      OPENMRS_DB_HOST: "db"
+      OPENMRS_DB_PORT: "3306"
+      OPENMRS_DB_NAME: "openmrs"
+      OPENMRS_DB_USER: ${OMRS_DB_USER:-openmrs}
+      OPENMRS_DB_PASSWORD: ${MYSQL_OPENMRS_PASSWORD:-openmrs}
+    depends_on:
+      reportes-sql-db:
+        condition: service_healthy
+    networks:
+      - default
+      - services-network
+
+  reportes-sql-db:
+    container_name: sihsalus-reportes-sql-db
+    image: postgres:17
+    restart: "unless-stopped"
+    profiles: [ indicadores ]
+    environment:
+      POSTGRES_USER: ${SIHSALUS_REPORTES_SQL_DB_USER:-reportes_sql}
+      POSTGRES_PASSWORD: ${SIHSALUS_REPORTES_SQL_DB_PASSWORD:-}
+      POSTGRES_DB: ${SIHSALUS_REPORTES_SQL_DB:-reportes_sql}
+    volumes:
+      - db-reportes-sql:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${SIHSALUS_REPORTES_SQL_DB_USER:-reportes_sql} -d ${SIHSALUS_REPORTES_SQL_DB:-reportes_sql}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - services-network

@@ -6,14 +6,15 @@ Este directorio contiene la configuración modular de servicios en YAML. Cada ar
 
 ```
 compose/
-├── core.yml       # Servicios base (gateway, frontend, backend, db)
-├── fua.yml        # Generador de Formato Único de Atención (MINSA)
-├── hapi.yml       # Servidor FHIR para interoperabilidad
-├── imaging.yml    # Stack médico (OHIF + Orthanc + DICOM)
-├── replica.yml    # Réplica MariaDB para redundancia/backups
-├── keycloak.yml   # Autenticación OAuth2/OpenID Connect
-├── monitoring.yml # Observabilidad (Grafana + Prometheus + Loki, Alloy opcional)
-└── ssl.yml        # SSL/HTTPS (certificados Let's Encrypt o auto-firmados)
+├── core.yml         # Servicios base (gateway, frontend, backend, db)
+├── fua.yml          # Generador de Formato Único de Atención (MINSA)
+├── indicadores.yml  # Reportes SQL (indicadores)
+├── hapi.yml         # Servidor FHIR para interoperabilidad
+├── imaging.yml      # Stack médico (OHIF + Orthanc + DICOM)
+├── replica.yml      # Réplica MariaDB para redundancia/backups
+├── keycloak.yml     # Autenticación OAuth2/OpenID Connect
+├── monitoring.yml   # Observabilidad (Grafana + Prometheus + Loki, Alloy opcional)
+└── ssl.yml          # SSL/HTTPS (certificados Let's Encrypt o auto-firmados)
 ```
 
 ---
@@ -91,6 +92,36 @@ FUA_LOCATIONS=<ubicaciones_json>   # En gateway env vars
 
 **Puertos**:
 - `3000` - FUA Generator (HTTP)
+
+**Base de datos**: PostgreSQL 17
+
+---
+
+### 📊 Indicadores (`indicadores.yml`) - Reportes SQL
+
+Servicio de reportes e indicadores basado en SQL, expuesto bajo `/openmrs/services/reportes-sql`.
+
+**Activar**:
+```bash
+docker compose --profile indicadores up -d
+```
+
+**Servicios**:
+- `reportes-sql` - Aplicación de reportes SQL (Node.js/Fastify)
+- `reportes-sql-db` - PostgreSQL para indicadores
+
+**Variables requeridas**:
+```env
+SIHSALUS_REPORTES_SQL_DB_PASSWORD=<password>
+```
+
+**Variables opcionales**:
+```env
+REPORTES_SQL_IMAGE=ghcr.io/sihsalus/reportes-sql   # Imagen del servicio
+REPORTES_SQL_TAG=latest                            # Tag de la imagen
+SIHSALUS_REPORTES_SQL_DB=reportes_sql             # Nombre de la base de datos
+SIHSALUS_REPORTES_SQL_DB_USER=reportes_sql         # Usuario de la base de datos
+```
 
 **Base de datos**: PostgreSQL 17
 
@@ -315,6 +346,11 @@ docker compose --profile imaging up -d
 docker compose --profile fua --profile hapi --profile monitoring up -d
 ```
 
+### Indicadores + Backend
+```bash
+docker compose --profile indicadores up -d
+```
+
 ---
 
 ## Volúmenes Persistentes
@@ -325,6 +361,7 @@ Cada profile define volúmenes persistentes para datos:
 |---------|-----------|
 | core | `openmrs-data`, mariadb data |
 | fua | `db-fua-generator` (PostgreSQL) |
+| indicadores | `db-reportes-sql` (PostgreSQL) |
 | hapi | `hapi_pgdata` (PostgreSQL) |
 | imaging | `orthanc-data` (DICOM files) |
 | keycloak | `keycloak-data` (PostgreSQL) |
