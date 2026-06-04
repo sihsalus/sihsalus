@@ -17,7 +17,7 @@ services:
       INDICADORES_DB_PORT: "5432"
       INDICADORES_DB_NAME: ${SIHSALUS_REPORTES_SQL_DB:-reportes_sql}
       INDICADORES_DB_USER: ${SIHSALUS_REPORTES_SQL_DB_USER:-reportes_sql}
-      INDICADORES_DB_PASSWORD: ${SIHSALUS_REPORTES_SQL_DB_PASSWORD:-}
+      INDICADORES_DB_PASSWORD: ${SIHSALUS_REPORTES_SQL_DB_PASSWORD:-reportes_sql}
       OPENMRS_API_URL: "http://backend:8080/openmrs"
       OPENMRS_DB_HOST: "db"
       OPENMRS_DB_PORT: "3306"
@@ -38,7 +38,7 @@ services:
     profiles: [ indicadores ]
     environment:
       POSTGRES_USER: ${SIHSALUS_REPORTES_SQL_DB_USER:-reportes_sql}
-      POSTGRES_PASSWORD: ${SIHSALUS_REPORTES_SQL_DB_PASSWORD:-}
+      POSTGRES_PASSWORD: ${SIHSALUS_REPORTES_SQL_DB_PASSWORD:-reportes_sql}
       POSTGRES_DB: ${SIHSALUS_REPORTES_SQL_DB:-reportes_sql}
     volumes:
       - db-reportes-sql:/var/lib/postgresql/data
