@@ -31,7 +31,7 @@ RUN cp -R /openmrs_distro/backend/target/sdk-distro/web/openmrs_config /openmrs/
 
 
 ### Run Stage
-FROM openmrs/openmrs-core:2.8.5-amazoncorretto-21
+FROM openmrs/openmrs-core:2.8.7-amazoncorretto-21
 
 # Do not copy the war if using the correct openmrs-core image version
 COPY --from=dev /openmrs/distribution/openmrs_core/openmrs.war /openmrs/distribution/openmrs_core/
