@@ -25,12 +25,12 @@
 
     <!-- track module versions
          we do so here so that we can utilise Maven to track updates, etc. -->
-    <openmrs.version>2.8.6</openmrs.version>
+    <openmrs.version>2.8.7</openmrs.version>
     <initializer.version>2.11.0</initializer.version>
     <fhir2.version>4.0.0</fhir2.version>
     <webservices.rest.version>3.5.0</webservices.rest.version>
     <addresshierarchy.version>2.21.0</addresshierarchy.version>
-    <patientdocuments.version>1.1.0-SNAPSHOT</patientdocuments.version>
+    <patientdocuments.version>1.1.0</patientdocuments.version>
     <idgen.version>5.0.4</idgen.version>
     <legacyui.version>2.1.0</legacyui.version>
     <metadatamapping.version>2.0.0</metadatamapping.version>
@@ -57,13 +57,13 @@
     <bedmanagement.version>7.2.0</bedmanagement.version>
     <!-- Stock Management and Billing -->
     <stockmanagement.version>3.1.1</stockmanagement.version>
-    <billing.version>2.2.0</billing.version>
+    <billing.version>2.3.0</billing.version>
     <tasks.version>2.1.0</tasks.version>
     <fua.version>1.0.76</fua.version>
     <imaging.version>1.2.8</imaging.version>
     <!-- <sihsalus-interop.version>1.0.3</sihsalus-interop.version> -->
     <!-- Content Packages -->
-    <sihsalus-content.version>1.9.6</sihsalus-content.version>
+    <sihsalus-content.version>1.10.2</sihsalus-content.version>
     <reference-content.version>1.4.0</reference-content.version>
     <reference-demo-content.version>1.8.0-SNAPSHOT</reference-demo-content.version>
   </properties>
