@@ -15,13 +15,11 @@
 ## Tabla de Contenidos
 
 - [Inicio Rápido](#inicio-rápido)
-- [Arranque y Healthchecks](#arranque-y-healthchecks)
 - [Profiles](#profiles)
 - [Actualización en Producción](#actualización-en-producción)
 - [Docker Bake (Build)](#docker-bake-build)
 - [Configuración SSL/HTTPS](#configuración-sslhttps)
 - [Backup y Restore](#backup-y-restore)
-- [Seguridad de Red y Puertos](#seguridad-de-red-y-puertos)
 - [Políticas de Seguridad](#políticas-de-seguridad-cifrado-de-backups-y-retención-de-logs)
 
 ---
@@ -113,8 +111,6 @@ git -C /ruta/a/sihsalus pull --ff-only
 
 # 2) Definir tag inmutable del frontend
 export FRONTEND_RUNTIME_TAG=sha-<digest>
-export FRONTEND_SOURCE_TAG=sha-<digest>
-
 # 3) Actualizar solo frontend desde registry
 docker compose pull frontend
 docker compose up -d --no-deps --force-recreate frontend
