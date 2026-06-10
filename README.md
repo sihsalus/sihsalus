@@ -28,23 +28,25 @@
 
 ### 1. Configurar variables de entorno
 
+Para desarrollo local, `docker compose up -d` puede arrancar sin `.env`: las credenciales de base usan `openmrs` por defecto.
+
+Para producción o pruebas compartidas, crea `.env` y cambia las credenciales:
+
 ```bash
 cp .env.template .env
 # Editar .env con tus valores
 ```
-
-Variables obligatorias en `.env`:
 
 ```env
 # Base de datos OpenMRS
 MYSQL_OPENMRS_PASSWORD=<password_seguro>
 MYSQL_ROOT_PASSWORD=<password_seguro>
 
-# Token OCL para importar conceptos médicos
+# Token OCL para importar conceptos médicos, si vas a importar conceptos
 OMRS_OCL_TOKEN=<tu_token_de_ocl>
 ```
 
-> En desarrollo local, las contraseñas de base se inicializan como `openmrs` por defecto. Cámbialas en `.env` para evitar credenciales débiles.
+> No uses los defaults `openmrs`/`openmrs` en producción.
 
 ### 2. Construir e iniciar
 
@@ -96,30 +98,42 @@ El perfil `ssl` es un caso especial: no basta con pasar `--profile ssl` si solo 
 
 ## Actualización en Producción
 
-La práctica habitual en producción es **no hacer build en el servidor** para desplegar una nueva versión.  
-Se recomienda trabajar con tags fijos (`sha-*`, `vX.Y.Z`, etc.) y actualizar por `pull + recreate`.
+En producción, el objetivo es desplegar imágenes versionadas y evitar builds locales cuando la imagen runtime ya está publicada.
+Mientras el runtime del frontend no se publique en un registry, el flujo actual reconstruye solo el wrapper `frontend` desde una imagen fuente versionada.
 
-### Frontend (canónico en producción)
+### Frontend (flujo actual)
 
-1. Actualizar el repositorio solo si cambiaste archivos de configuración/inventario.
-2. Definir el tag de imagen objetivo (inmutable).
-3. Descargar la imagen remota y recrear solo el servicio frontend.
+Actualmente el frontend se despliega como una imagen runtime local (`sihsalus-frontend-runtime`) construida desde la imagen fuente publicada en GHCR (`ghcr.io/sihsalus/sihsalus-frontend`). Por eso, mientras no se publique una imagen runtime en el registry, la actualización de frontend en producción requiere reconstruir solo ese wrapper runtime.
 
 ```bash
 # 1) Sincronizar cambios de infra (compose/env/docs si aplica)
 git -C /ruta/a/sihsalus pull --ff-only
 
-# 2) Definir tag inmutable del frontend
+# 2) Definir tag fuente del frontend publicado en GHCR
+export FRONTEND_SOURCE_TAG=sha-<digest>
+
+# 3) Reconstruir y recrear solo frontend
+DOCKER_BUILDKIT=1 docker compose build --pull frontend
+docker compose up -d --no-deps --no-build --force-recreate frontend
+docker compose ps frontend
+docker compose logs --tail 100 frontend
+```
+
+Si necesitas rollback, vuelve a exportar el tag anterior en `FRONTEND_SOURCE_TAG`, reconstruye `frontend` y recrea el servicio.
+
+### Frontend (sin build, cuando exista runtime publicado)
+
+La práctica más reproducible es publicar también la imagen runtime y desplegar por `pull + recreate`. Ese flujo requiere que exista `ghcr.io/sihsalus/sihsalus-frontend-runtime:<tag>` o una imagen equivalente.
+
+```bash
+export FRONTEND_RUNTIME_IMAGE=ghcr.io/sihsalus/sihsalus-frontend-runtime
 export FRONTEND_RUNTIME_TAG=sha-<digest>
-# 3) Actualizar solo frontend desde registry
+
 docker compose pull frontend
 docker compose up -d --no-deps --force-recreate frontend
 docker compose ps frontend
 docker compose logs --tail 100 frontend
 ```
-
-Si en tu flujo operativo no manejas tags inmutables todavía, puedes usar `latest` temporalmente, pero
-evita `docker compose build` en producción para mantener despliegues reproducibles y trazables.
 
 ### Backend (si cambió la imagen del backend)
 
