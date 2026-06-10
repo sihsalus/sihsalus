@@ -17,6 +17,7 @@
 - [Inicio Rápido](#inicio-rápido)
 - [Arranque y Healthchecks](#arranque-y-healthchecks)
 - [Profiles](#profiles)
+- [Actualización en Producción](#actualización-en-producción)
 - [Docker Bake (Build)](#docker-bake-build)
 - [Configuración SSL/HTTPS](#configuración-sslhttps)
 - [Backup y Restore](#backup-y-restore)
@@ -94,6 +95,45 @@ docker compose -f docker-compose.yml -f compose/openmrs-keycloak.yml -f compose/
 Cada profile requiere sus variables en `.env`. Ver `.env.template` para la lista completa.
 
 El perfil `ssl` es un caso especial: no basta con pasar `--profile ssl` si solo se usa `docker-compose.yml`, porque la configuración SSL vive en `compose/ssl.yml` y ese archivo modifica el servicio `gateway` para exponer HTTPS.
+
+## Actualización en Producción
+
+La práctica habitual en producción es **no hacer build en el servidor** para desplegar una nueva versión.  
+Se recomienda trabajar con tags fijos (`sha-*`, `vX.Y.Z`, etc.) y actualizar por `pull + recreate`.
+
+### Frontend (canónico en producción)
+
+1. Actualizar el repositorio solo si cambiaste archivos de configuración/inventario.
+2. Definir el tag de imagen objetivo (inmutable).
+3. Descargar la imagen remota y recrear solo el servicio frontend.
+
+```bash
+# 1) Sincronizar cambios de infra (compose/env/docs si aplica)
+git -C /ruta/a/sihsalus pull --ff-only
+
+# 2) Definir tag inmutable del frontend
+export FRONTEND_RUNTIME_TAG=sha-<digest>
+export FRONTEND_SOURCE_TAG=sha-<digest>
+
+# 3) Actualizar solo frontend desde registry
+docker compose pull frontend
+docker compose up -d --no-deps --force-recreate frontend
+docker compose ps frontend
+docker compose logs --tail 100 frontend
+```
+
+Si en tu flujo operativo no manejas tags inmutables todavía, puedes usar `latest` temporalmente, pero
+evita `docker compose build` en producción para mantener despliegues reproducibles y trazables.
+
+### Backend (si cambió la imagen del backend)
+
+```bash
+export BACKEND_TAG=sha-<digest>
+docker compose pull backend
+docker compose up -d --no-deps --force-recreate backend
+```
+
+Cuando cambie la interfaz de API entre frontend y backend, actualiza primero backend y luego frontend en el mismo ciclo de despliegue.
 
 ### Estructura de archivos
 
