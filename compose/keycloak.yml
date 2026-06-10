@@ -9,8 +9,6 @@ services:
       dockerfile: Dockerfile
     restart: "unless-stopped"
     profiles: [ keycloak ]
-    env_file:
-      - ./.env
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-}
@@ -44,14 +42,13 @@ services:
     image: postgres:17
     restart: "unless-stopped"
     profiles: [ keycloak ]
-    env_file:
-      - ./.env
     environment:
       POSTGRES_DB: ${KC_DB_DATABASE:-keycloak}
       POSTGRES_USER: ${KC_DB_USERNAME:-keycloak}
       POSTGRES_PASSWORD: ${KC_DB_PASSWORD:-}
     ports:
-      - "5434:5432"
+      # Solo accesible desde el host (administracion); Keycloak llega via auth-network.
+      - "127.0.0.1:5434:5432"
     volumes:
       - keycloak-data:/var/lib/postgresql/data
     healthcheck:
