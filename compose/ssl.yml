@@ -41,11 +41,13 @@ services:
       CERT_WEB_DOMAIN_COMMON_NAME: ${CERT_WEB_DOMAIN_COMMON_NAME:-localhost}
       FRAME_ANCESTORS: ${FRAME_ANCESTORS:-https://dyaku.minsa.gob.pe/fhir}
     healthcheck:
-      test: [ "CMD", "wget", "--no-check-certificate", "-q", "-O", "/dev/null", "https://localhost/" ]
+      # El entrypoint del gateway espera a que certbot genere los certificados
+      # antes de levantar nginx; start_period cubre esa espera inicial.
+      test: [ "CMD", "wget", "--no-check-certificate", "-q", "-O", "/dev/null", "https://localhost/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 300s
     volumes:
       - letsencrypt-data:/etc/letsencrypt:ro
       - certbot-data:/var/www/certbot:rw

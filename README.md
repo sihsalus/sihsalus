@@ -15,10 +15,12 @@
 ## Tabla de Contenidos
 
 - [Inicio Rápido](#inicio-rápido)
+- [Arranque y Healthchecks](#arranque-y-healthchecks)
 - [Profiles](#profiles)
 - [Docker Bake (Build)](#docker-bake-build)
 - [Configuración SSL/HTTPS](#configuración-sslhttps)
 - [Backup y Restore](#backup-y-restore)
+- [Seguridad de Red y Puertos](#seguridad-de-red-y-puertos)
 - [Políticas de Seguridad](#políticas-de-seguridad-cifrado-de-backups-y-retención-de-logs)
 
 ---
@@ -42,6 +44,11 @@ MYSQL_ROOT_PASSWORD=<password_seguro>
 # Token OCL para importar conceptos médicos
 OMRS_OCL_TOKEN=<tu_token_de_ocl>
 ```
+
+> Las contraseñas de la base de datos **no tienen valor por defecto**: si están
+> vacías, `docker compose` falla inmediatamente con un mensaje indicando la
+> variable que falta. Esto es intencional (fail-fast) para evitar despliegues
+> con credenciales débiles.
 
 ### 2. Construir e iniciar
 
