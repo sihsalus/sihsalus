@@ -45,10 +45,7 @@ MYSQL_ROOT_PASSWORD=<password_seguro>
 OMRS_OCL_TOKEN=<tu_token_de_ocl>
 ```
 
-> Las contraseñas de la base de datos **no tienen valor por defecto**: si están
-> vacías, `docker compose` falla inmediatamente con un mensaje indicando la
-> variable que falta. Esto es intencional (fail-fast) para evitar despliegues
-> con credenciales débiles.
+> En desarrollo local, las contraseñas de base se inicializan como `openmrs` por defecto. Cámbialas en `.env` para evitar credenciales débiles.
 
 ### 2. Construir e iniciar
 
