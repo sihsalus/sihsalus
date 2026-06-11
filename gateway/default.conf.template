@@ -72,6 +72,13 @@ server {
 
   resolver 127.0.0.11 valid=30s ipv6=off;
 
+  # Healthcheck del gateway: respondido por nginx sin tocar upstreams.
+  location = /health {
+    access_log off;
+    default_type text/plain;
+    return 200 'OK';
+  }
+
   location /openmrs/spa/ {
     set $frontend http://frontend;
     rewrite ^/openmrs/spa/(.*) /$1 break;
@@ -96,6 +103,16 @@ server {
     set $backend http://backend:8080;
     proxy_read_timeout 300s;
     proxy_pass $backend;
+    # Mientras el backend inicializa (primer arranque puede tardar >30 min)
+    # se muestra una pagina de espera en lugar del 502 generico.
+    proxy_intercept_errors on;
+    error_page 502 503 504 = @backend_unavailable;
+  }
+
+  location @backend_unavailable {
+    default_type text/html;
+    add_header Retry-After 30 always;
+    return 503 '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta http-equiv="refresh" content="30"><title>SIH Salus - Iniciando</title><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f5f5f5;color:#333}div{text-align:center;max-width:32em;padding:2em}h1{color:#f26522}</style></head><body><div><h1>SIH Salus se est&aacute; iniciando</h1><p>El servidor est&aacute; cargando los datos del sistema. En el primer arranque este proceso puede tardar varios minutos.</p><p>Esta p&aacute;gina se actualizar&aacute; autom&aacute;ticamente.</p></div></body></html>';
   }
 
   # OHIF Imaging Viewer
