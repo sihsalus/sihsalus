@@ -161,6 +161,22 @@ else
     print_failure "HTTPS connection failed (HTTP $HTTP_CODE)"
 fi
 
+# Test gateway health and OpenMRS readiness endpoints
+print_test "Testing gateway health and readiness endpoints..."
+GATEWAY_HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://$DOMAIN/health 2>&1)
+if [ "$GATEWAY_HEALTH_STATUS" = "200" ]; then
+    print_success "Gateway health endpoint is healthy"
+else
+    print_failure "Gateway health endpoint failed (HTTP $GATEWAY_HEALTH_STATUS)"
+fi
+
+READY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://$DOMAIN/ready 2>&1)
+if [ "$READY_STATUS" = "200" ]; then
+    print_success "OpenMRS readiness endpoint is ready"
+else
+    print_failure "OpenMRS readiness endpoint failed (HTTP $READY_STATUS)"
+fi
+
 # Test HTTP/2 support
 print_test "Testing HTTP/2 support..."
 if curl -s -I https://$DOMAIN/openmrs/spa/home 2>&1 | grep -q "HTTP/2"; then

@@ -57,7 +57,24 @@ docker compose up -d
 # http://localhost/openmrs/spa
 ```
 
-La primera vez, OpenMRS puede tardar unos minutos en quedar listo. La señal de que ya terminó de arrancar es `http://localhost/openmrs/login.htm` respondiendo `200`; después de eso la SPA queda en `http://localhost/openmrs/spa/`.
+La primera vez, OpenMRS puede tardar unos minutos en quedar listo. La señal principal de readiness es `http://localhost/openmrs/health/started` respondiendo `200`; después de eso `http://localhost/openmrs/login.htm` y la SPA en `http://localhost/openmrs/spa/` deben responder correctamente.
+
+### Health y readiness
+
+El gateway expone dos señales distintas:
+
+- `GET /health`: lo responde Nginx sin tocar upstreams; indica que el gateway está vivo.
+- `GET /ready`: proxy a `/openmrs/health/started`; responde `200` solo cuando OpenMRS terminó de inicializar.
+
+Comandos útiles durante arranque o actualización:
+
+```bash
+curl -k -i https://localhost/health
+curl -k -i https://localhost/ready
+curl -k -i https://localhost/openmrs/health/started
+curl -k -i https://localhost/openmrs/ws/rest/v1/session
+curl -k -i https://localhost/openmrs/spa/home
+```
 
 ## Profiles
 
@@ -144,6 +161,15 @@ docker compose up -d --no-deps --force-recreate backend
 ```
 
 Cuando cambie la interfaz de API entre frontend y backend, actualiza primero backend y luego frontend en el mismo ciclo de despliegue.
+
+### Gateway (si cambió Nginx, SSL o health/readiness)
+
+```bash
+DOCKER_BUILDKIT=1 docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl build gateway
+docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d --no-deps --force-recreate gateway
+curl -k -i https://localhost/health
+curl -k -i https://localhost/ready
+```
 
 ### Estructura de archivos
 

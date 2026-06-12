@@ -79,6 +79,20 @@ server {
     return 200 'OK';
   }
 
+  # Readiness global: valida que OpenMRS ya termino su arranque.
+  location = /ready {
+    access_log off;
+    proxy_intercept_errors on;
+    proxy_pass http://backend/openmrs/health/started;
+    error_page 500 502 503 504 = @openmrs_not_ready;
+  }
+
+  location @openmrs_not_ready {
+    default_type text/plain;
+    add_header Retry-After 30 always;
+    return 503 'NOT_READY';
+  }
+
   location /openmrs/spa/ {
     set $frontend http://frontend;
     rewrite ^/openmrs/spa/(.*) /$1 break;
@@ -163,7 +177,6 @@ server {
     set $ohif http://ohif;
     rewrite ^/imaging/(.*) /$1 break;
     proxy_buffering off;
-    sub_filter_types text/html;
     sub_filter 'src="/' 'src="/imaging/';
     sub_filter 'href="/' 'href="/imaging/';
     sub_filter "window.PUBLIC_URL = '/';" "window.PUBLIC_URL = '/imaging/';";
