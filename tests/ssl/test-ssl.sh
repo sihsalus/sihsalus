@@ -71,6 +71,21 @@ else
     print_failure "HTTPS connection failed"
 fi
 
+# Test 3b: Test gateway health and OpenMRS readiness endpoints
+print_test "Testing gateway health and readiness endpoints..."
+if curl -k -s -o /dev/null -w "%{http_code}" https://localhost/health | grep -q "200"; then
+    print_success "Gateway health endpoint is healthy"
+else
+    print_failure "Gateway health endpoint failed"
+fi
+
+READY_STATUS=$(curl -k -s -o /dev/null -w "%{http_code}" https://localhost/ready)
+if [ "$READY_STATUS" = "200" ]; then
+    print_success "OpenMRS readiness endpoint is ready"
+else
+    print_failure "OpenMRS readiness endpoint failed (HTTP $READY_STATUS)"
+fi
+
 # Test 4: Test HTTP/2 support
 print_test "Testing HTTP/2 support..."
 if curl -k -s -I https://localhost/openmrs/spa/home 2>&1 | grep -q "HTTP/2"; then

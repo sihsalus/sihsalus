@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-url="${1:-http://localhost/openmrs/login.htm}"
+url="${1:-http://localhost/openmrs/health/started}"
 timeout_seconds="${2:-${OPENMRS_WAIT_TIMEOUT_SECONDS:-1800}}"
 poll_seconds="${3:-10}"
 log_container="${4:-backend}"
