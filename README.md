@@ -152,6 +152,24 @@ docker compose ps frontend
 docker compose logs --tail 100 frontend
 ```
 
+### Frontend (producción sin `*.map`)
+
+Por defecto, en el build de runtime del frontend se eliminan los `*.map` de producción.
+
+`compose/core.yml` pasa `STRIP_SOURCE_MAPS` al build y el valor por defecto es `true`:
+
+```bash
+STRIP_SOURCE_MAPS=true  # true = elimina *.map, false = los conserva
+```
+
+Efecto esperado:
+
+- Si usas `docker compose build` / `docker compose up` para reconstruir `frontend`, la imagen resultante queda sin mapas de fuente.
+- Si usas una imagen preconstruida de registry, debe haberse publicado con `STRIP_SOURCE_MAPS=true` para que no lleve mapas.
+- Si necesitas mapas para depuración puntual de preproducción, puedes reconstruir con `STRIP_SOURCE_MAPS=false`.
+
+
+
 ### Backend (si cambió la imagen del backend)
 
 ```bash
