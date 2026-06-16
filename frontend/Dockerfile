@@ -1,4 +1,5 @@
 ARG FRONTEND_SOURCE_IMAGE=ghcr.io/sihsalus/sihsalus-frontend:latest
+ARG STRIP_SOURCE_MAPS=true
 
 FROM ${FRONTEND_SOURCE_IMAGE} AS assemble
 
@@ -8,6 +9,7 @@ ARG SPA_PATH=/openmrs/spa
 ARG API_URL=/openmrs
 ARG SPA_CONFIG_URLS=/openmrs/spa/frontend.json
 ARG SPA_DEFAULT_LOCALE=es
+ARG STRIP_SOURCE_MAPS=true
 
 ENV SPA_OUTPUT_DIR=/tmp/spa \
     SPA_PATH=${SPA_PATH} \
@@ -21,7 +23,10 @@ COPY frontend-keycloak.json /app/config/frontend-keycloak.json
 RUN rm -rf "$SPA_OUTPUT_DIR" \
     && mkdir -p "$SPA_OUTPUT_DIR" \
     && node packages/tooling/scripts/assemble-importmap.js \
-    && node /app/patch-config-urls.js
+    && node /app/patch-config-urls.js \
+    && if [ "$STRIP_SOURCE_MAPS" = "true" ]; then \
+         find "$SPA_OUTPUT_DIR" -type f -name "*.map" -delete; \
+       fi
 
 FROM nginx:1.28-alpine
 

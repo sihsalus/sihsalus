@@ -42,6 +42,7 @@ services:
         API_URL: /openmrs
         SPA_CONFIG_URLS: /openmrs/spa/frontend.json
         SPA_DEFAULT_LOCALE: es
+        STRIP_SOURCE_MAPS: ${STRIP_SOURCE_MAPS:-true}
     restart: "unless-stopped"
     healthcheck:
       test: [ "CMD-SHELL", "wget -q -O - http://127.0.0.1/ | grep -q 'initializeSpa'" ]
