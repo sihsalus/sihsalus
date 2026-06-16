@@ -1,6 +1,10 @@
 map $request_uri $csp_header {
-  default "default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://dyaku.minsa.gob.pe; base-uri 'self'; font-src 'self'; img-src 'self' data:; frame-ancestors 'self' ${FRAME_ANCESTORS};";
-  "~^/imaging/" "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' ws: wss:; worker-src 'self' blob:; base-uri 'self'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
+  # Dyaku/FHIR interoperability is consumed server-side by OpenMRS modules.
+  # Browser CSP intentionally does not allow direct Dyaku access.
+  default "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'self'; font-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
+  "~^/openmrs/spa/" "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; base-uri 'self'; font-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
+  "~^/imaging/" "default-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; base-uri 'self'; object-src 'none'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
+  # Legacy OpenMRS pages still depend on inline scripts and eval-like behavior.
   "~^/openmrs/(?:admin|dictionary|module|patientDashboard.form)/" "default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; base-uri 'self'; font-src 'self'; frame-ancestors 'self';";
   "~^/openmrs/owa" "default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; base-uri 'self'; font-src 'self' data:; img-src 'self' data:; frame-ancestors 'self';";
 }
@@ -40,7 +44,9 @@ server {
   listen [::]:443 ssl;
   http2 on;
   server_name ${CERT_WEB_DOMAIN_COMMON_NAME} localhost 127.0.0.1 _;
-  client_max_body_size 0;
+  # Default upload cap. DICOM upload endpoints override this because studies
+  # can be large and are restricted to Orthanc proxy locations below.
+  client_max_body_size 100m;
 
   # SSL configuration
   ssl_certificate     /etc/letsencrypt/live/${CERT_WEB_DOMAIN_COMMON_NAME}/fullchain.pem;
@@ -190,6 +196,7 @@ server {
 
   location /orthanc/ {
     set $orthanc_proxy http://orthanc-proxy;
+    # Orthanc UI/API can receive DICOM studies and archives.
     client_max_body_size 0;
     rewrite ^/orthanc/(.*)$ /$1 break;
     proxy_read_timeout 300s;
@@ -203,6 +210,7 @@ server {
 
   location /imaging/dicom-web/ {
     set $orthanc_proxy http://orthanc-proxy;
+    # DICOMweb STOW-RS uploads can exceed the default gateway upload cap.
     client_max_body_size 0;
     rewrite ^/imaging/(.*)$ /$1 break;
     proxy_read_timeout 300s;
@@ -211,7 +219,6 @@ server {
 
   location /imaging/wado {
     set $orthanc_proxy http://orthanc-proxy;
-    client_max_body_size 0;
     rewrite ^/imaging/(.*)$ /$1 break;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
@@ -247,6 +254,7 @@ server {
 
   location /dicom-web/ {
     set $orthanc_proxy http://orthanc-proxy;
+    # DICOMweb STOW-RS uploads can exceed the default gateway upload cap.
     client_max_body_size 0;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
@@ -254,7 +262,6 @@ server {
 
   location /wado {
     set $orthanc_proxy http://orthanc-proxy;
-    client_max_body_size 0;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
   }
