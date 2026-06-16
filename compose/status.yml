@@ -1,0 +1,31 @@
+# Local status panel checks for SIH Salus
+# Usage:
+#   docker compose -f docker-compose.yml -f compose/status.yml --profile status up -d
+
+services:
+  gatus:
+    container_name: sihsalus-gatus
+    image: twinproduction/gatus:v5.20.0
+    restart: "unless-stopped"
+    profiles: [ status ]
+    ports:
+      # Local-only by default. The gateway can publish a restricted route later.
+      - "127.0.0.1:${GATUS_PORT:-8086}:8080"
+    environment:
+      GATUS_CONFIG_PATH: /config/config.yaml
+    volumes:
+      - ./monitoring/status/gatus/config.yaml:/config/config.yaml:ro
+      - gatus-data:/data
+    depends_on:
+      gateway:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - default
+
+volumes:
+  gatus-data:
+    name: sihsalus-gatus-data
