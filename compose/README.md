@@ -157,7 +157,7 @@ Sistema centralizado de identidad para OpenMRS.
 ```bash
 docker compose \
   -f docker-compose.yml \
-  -f compose/openmrs-keycloak.yml \
+  -f compose/keycloak.yml \
   --profile keycloak \
   up -d
 ```
@@ -276,7 +276,7 @@ docker compose up -d
 ```bash
 docker compose \
   -f docker-compose.yml \
-  -f compose/openmrs-keycloak.yml \
+  -f compose/keycloak.yml \
   --profile keycloak \
   up -d
 ```
@@ -285,7 +285,7 @@ docker compose \
 ```bash
 docker compose \
   -f docker-compose.yml \
-  -f compose/openmrs-keycloak.yml \
+  -f compose/keycloak.yml \
   -f compose/ssl.yml \
   --profile keycloak \
   --profile ssl \
@@ -296,7 +296,7 @@ docker compose \
 ```bash
 docker compose \
   -f docker-compose.yml \
-  -f compose/openmrs-keycloak.yml \
+  -f compose/keycloak.yml \
   -f compose/ssl.yml \
   --profile keycloak \
   --profile monitoring \

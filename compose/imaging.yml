@@ -43,7 +43,7 @@ services:
             "ExternalRoot": "/"
           },
           "RemoteAccessAllowed": true,
-          "AuthenticationEnabled": false,
+          "AuthenticationEnabled": ${ORTHANC_AUTHENTICATION_ENABLED:-false},
           "RegisteredUsers": {},
           "DicomAet": "ORTHANC",
           "DicomPort": 4242,

@@ -94,7 +94,7 @@ docker compose --profile hapi up -d
 docker compose --profile imaging up -d
 
 # Core + Keycloak Auth
-docker compose -f docker-compose.yml -f compose/openmrs-keycloak.yml --profile keycloak up -d
+docker compose -f docker-compose.yml -f compose/keycloak.yml --profile keycloak up -d
 
 # Core + Observabilidad (Grafana/Prometheus/Loki)
 docker compose --profile monitoring up -d
@@ -106,7 +106,7 @@ docker compose --profile fua --profile hapi --profile monitoring up -d
 docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d
 
 # Core + Keycloak Auth + SSL/HTTPS
-docker compose -f docker-compose.yml -f compose/openmrs-keycloak.yml -f compose/ssl.yml --profile keycloak --profile ssl up -d
+docker compose -f docker-compose.yml -f compose/keycloak.yml -f compose/ssl.yml --profile keycloak --profile ssl up -d
 ```
 
 Cada profile requiere sus variables en `.env`. Ver `.env.template` para la lista completa.
@@ -262,7 +262,7 @@ SSL y Keycloak se pueden usar juntos cargando ambos overrides:
 ```bash
 docker compose \
   -f docker-compose.yml \
-  -f compose/openmrs-keycloak.yml \
+  -f compose/keycloak.yml \
   -f compose/ssl.yml \
   --profile keycloak \
   --profile ssl \
