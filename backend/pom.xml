@@ -61,7 +61,6 @@
     <tasks.version>2.1.0</tasks.version>
     <fua.version>1.0.77</fua.version>
     <imaging.version>1.2.8</imaging.version>
-    <!-- <sihsalus-interop.version>1.0.3</sihsalus-interop.version> -->
     <!-- Content Packages -->
     <sihsalus-content.version>1.12.6</sihsalus-content.version>
     <reference-content.version>1.4.0</reference-content.version>
@@ -88,15 +87,6 @@
       <version>${imaging.version}</version>
       <scope>provided</scope>
     </dependency>
-    
-    <!--
-    <dependency>
-      <groupId>org.openmrs.module</groupId>
-      <artifactId>sihsalusinterop-omod</artifactId>
-      <version>${sihsalus-interop.version}</version>
-      <scope>provided</scope>
-    </dependency>
-    -->
 
     <!-- Module dependencies -->
     <dependency>
@@ -307,24 +297,6 @@
         </executions>
       </plugin>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.11.0</version>
-        <executions>
-          <execution>
-            <id>compile-build-tools</id>
-            <phase>compile</phase>
-            <goals>
-              <goal>compile</goal>
-            </goals>
-            <configuration>
-              <source>1.8</source>
-              <target>1.8</target>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
         <groupId>org.openmrs.maven.plugins</groupId>
         <artifactId>openmrs-sdk-maven-plugin</artifactId>
         <executions>
@@ -337,26 +309,6 @@
             <configuration>
               <distro>${project.build.directory}/distro.properties</distro>
               <dir>${project.build.directory}/sdk-distro</dir>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>exec-maven-plugin</artifactId>
-        <version>3.3.0</version>
-        <executions>
-          <execution>
-            <id>normalize-ocl-exports</id>
-            <phase>package</phase>
-            <goals>
-              <goal>java</goal>
-            </goals>
-            <configuration>
-              <mainClass>org.openmrs.distro.tools.NormalizeOclExports</mainClass>
-              <arguments>
-                <argument>${project.build.directory}/sdk-distro/web/openmrs_config/ocl</argument>
-              </arguments>
             </configuration>
           </execution>
         </executions>

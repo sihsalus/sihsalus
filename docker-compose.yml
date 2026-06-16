@@ -7,7 +7,7 @@
 #   docker compose --profile fua up -d                          # + FUA Generator
 #   docker compose --profile hapi up -d                         # + HAPI FHIR Server
 #   docker compose --profile imaging up -d                      # + Medical Imaging (OHIF/Orthanc)
-#   docker compose -f docker-compose.yml -f compose/openmrs-keycloak.yml --profile keycloak up -d  # + Keycloak Auth
+#   docker compose -f docker-compose.yml -f compose/keycloak.yml --profile keycloak up -d  # + Keycloak Auth
 #   docker compose --profile monitoring up -d                   # + Observability (Grafana/Prometheus/Loki)
 #   docker compose --profile monitoring --profile logs up -d    # + Docker log collection (Alloy; mounts Docker socket)
 #   docker compose --profile replica up -d                      # + MariaDB Replica
@@ -17,7 +17,7 @@
 #   docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d
 #
 # SSL/HTTPS + Keycloak:
-#   docker compose -f docker-compose.yml -f compose/openmrs-keycloak.yml -f compose/ssl.yml --profile keycloak --profile ssl up -d
+#   docker compose -f docker-compose.yml -f compose/keycloak.yml -f compose/ssl.yml --profile keycloak --profile ssl up -d
 #
 # BUILD (con Docker Bake):
 #   docker buildx bake                    # Build core images (backend, gateway, frontend)

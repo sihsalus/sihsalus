@@ -104,6 +104,7 @@ services:
     container_name: sihsalus-loki-init
     image: alpine:3.23
     profiles: [ monitoring ]
+    restart: "no"
     user: "0"
     command: chown -R 10001:10001 /loki
     volumes:
