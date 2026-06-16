@@ -1,8 +1,8 @@
 map $request_uri $csp_header {
-  # Dyaku/FHIR interoperability is consumed server-side by OpenMRS modules.
-  # Browser CSP intentionally does not allow direct Dyaku access.
+  # Dyaku/FHIR browser access is scoped to the O3 SPA. Imaging and legacy
+  # surfaces must not inherit external FHIR connectivity by default.
   default "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'self'; font-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
-  "~^/openmrs/spa/" "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; base-uri 'self'; font-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
+  "~^/openmrs/spa/" "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://dyaku.minsa.gob.pe; base-uri 'self'; font-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
   "~^/imaging/" "default-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; base-uri 'self'; object-src 'none'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
   # Legacy OpenMRS pages still depend on inline scripts and eval-like behavior.
   "~^/openmrs/(?:admin|dictionary|module|patientDashboard.form|initialsetup)(?:/|$)" "default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; base-uri 'self'; font-src 'self'; frame-ancestors 'self';";
