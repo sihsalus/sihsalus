@@ -85,7 +85,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 3600s
+      start_period: 10000s
     volumes:
       - openmrs-data:/openmrs/data
       - ./keycloak/oauth2.properties:/openmrs/data/oauth2.properties:ro
