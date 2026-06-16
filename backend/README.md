@@ -16,7 +16,7 @@ Package contents:
 |-----------------|-----------|
 |`openmrs_config` |The OpenMRS configuration, particularly including any files to be processed by the [Initializer module](https://github.com/mekomsolutions/openmrs-module-initializer). An example configuration can be found [here](https://github.com/mekomsolutions/openmrs-config-haiti).
 |`openmrs_core`   |The main OpenMRS WAR file.|
-|`openmrs_module` |The modules (OMODs) to be run in this OpenMRS instance.|
+|`openmrs_modules`|The modules (OMODs) to be run in this OpenMRS instance.|
 |`spa`            |The compiled SPA for the 3.x frontend.|
 |`spa_config`     |Any configuration files used by the SPA.|
 |`openmrs-distro.properties`|The distro.properties used to generate this package.|
@@ -28,12 +28,12 @@ Package contents:
 `omod`s are specified as Maven `<dependency>` in the [pom.xml](pom.xml) file.
 
 #### OpenMRS Configuration (Initializer)
-OpenMRS config can be set in [openmrs-config/configuration/](openmrs-config/configuration/) folder
+OpenMRS config can be set under [`backend/config/openmrs_config/`](config/openmrs_config/) when present.
 
 #### Micro Frontends
-ESMs are set in the [spa-config.json](spa-config.json) file.
+SPA-related configuration is driven by the distro build and the frontend package in this repository.
 
 #### Micro Frontends configuration
-MF Config can be set in [spa-config/configuration/](spa-config/configuration/) folder
+MF Config can be set under the frontend or distro configuration used by the build.
 
 ----

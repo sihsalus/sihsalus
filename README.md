@@ -253,7 +253,7 @@ docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d
 # https://192.168.10.5/openmrs/spa
 ```
 
-`compose/ssl.yml` debe cargarse con `-f` porque no esta incluido por defecto en `docker-compose.yml`. El flag `--profile ssl` activa el servicio `certbot` definido en ese archivo; sin el `-f compose/ssl.yml`, Compose no ve ese profile ni aplica los cambios de `gateway` para publicar el puerto 443.
+`compose/ssl.yml` debe cargarse con `-f` porque no está incluido por defecto en `docker-compose.yml`. El flag `--profile ssl` activa el servicio `certbot` definido en ese archivo; sin el `-f compose/ssl.yml`, Compose no ve ese profile ni aplica los cambios de `gateway` para publicar el puerto 443.
 
 ### SSL con Keycloak
 

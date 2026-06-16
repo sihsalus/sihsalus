@@ -61,7 +61,6 @@
     <tasks.version>2.1.0</tasks.version>
     <fua.version>1.0.77</fua.version>
     <imaging.version>1.2.8</imaging.version>
-    <!-- <sihsalus-interop.version>1.0.3</sihsalus-interop.version> -->
     <!-- Content Packages -->
     <sihsalus-content.version>1.12.5</sihsalus-content.version>
     <reference-content.version>1.4.0</reference-content.version>
@@ -88,15 +87,6 @@
       <version>${imaging.version}</version>
       <scope>provided</scope>
     </dependency>
-    
-    <!--
-    <dependency>
-      <groupId>org.openmrs.module</groupId>
-      <artifactId>sihsalusinterop-omod</artifactId>
-      <version>${sihsalus-interop.version}</version>
-      <scope>provided</scope>
-    </dependency>
-    -->
 
     <!-- Module dependencies -->
     <dependency>
