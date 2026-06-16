@@ -1,20 +1,20 @@
 # Perfiles operativos SIH Salus
 
-Este documento define los perfiles operativos para despliegues de SIH Salus en establecimientos con conectividad limitada. Los perfiles operativos describen realidades de uso; no son solo perfiles tecnicos de Docker Compose.
+Este documento define los perfiles operativos para despliegues de SIH Salus en establecimientos con conectividad limitada. Los perfiles operativos describen realidades de uso; no son solo perfiles técnicos de Docker Compose.
 
 ## Principios
 
 - El perfil por defecto debe permitir atencion clinica local sin internet.
 - Todo servicio habilitado debe tener un responsable operativo claro.
 - Los puestos remotos deben usar la menor cantidad posible de servicios.
-- Las herramientas tecnicas no deben exponerse al personal clinico o administrativo.
+- Las herramientas técnicas no deben exponerse al personal clínico o administrativo.
 - Los paneles de estado no deben mostrar datos personales, datos de salud, tokens ni secretos.
-- El semaforo local debe considerarse un control parcial de disponibilidad, no una certificacion de cumplimiento normativo.
+- El semáforo local debe considerarse un control parcial de disponibilidad, no una certificación de cumplimiento normativo.
 - Las acciones administrativas deben quedar registradas cuando afecten continuidad, seguridad, backup o restauracion.
 
 ## Puesto remoto
 
-Perfil para establecimientos pequenos o aislados donde la prioridad es registrar atenciones y conservar datos localmente.
+Perfil para establecimientos pequeños o aislados donde la prioridad es registrar atenciones y conservar datos localmente.
 
 Servicios habilitados:
 
@@ -83,7 +83,7 @@ Requisitos minimos:
 Politica operativa:
 
 - Keycloak solo debe habilitarse si existe procedimiento local de recuperacion de usuarios.
-- Imaging solo debe habilitarse si hay responsable de almacenamiento y retencion DICOM.
+- Imaging solo debe habilitarse si hay responsable de almacenamiento y retención DICOM.
 - El panel local debe indicar si el sistema puede atender pacientes y si el ultimo backup es valido.
 
 ## Cabecera de microred

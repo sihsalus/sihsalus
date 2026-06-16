@@ -1,6 +1,6 @@
 # Semaforo local: privacidad y cumplimiento
 
-Este documento define los controles minimos para que el semaforo local de SIH Salus apoye disponibilidad operativa sin procesar datos clinicos ni datos personales.
+Este documento define los controles mínimos para que el semáforo local de SIH Salus apoye disponibilidad operativa sin procesar datos clínicos ni datos personales.
 
 ## Alcance
 
