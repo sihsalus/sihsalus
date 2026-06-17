@@ -1,0 +1,69 @@
+storage:
+  type: sqlite
+  path: /data/gatus.db
+
+web:
+  port: 8080
+  address: 0.0.0.0
+
+ui:
+  title: SIH Salus - Estado local
+  header: Estado local del establecimiento
+  logo: ""
+  link: /openmrs/spa
+  buttons:
+    - name: OpenMRS
+      link: /openmrs/spa
+
+metrics: true
+
+endpoints:
+  - name: Sistema web
+    group: Atencion local
+    url: http://gateway/health
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: Backend arrancado
+    group: Atencion local
+    url: http://gateway/startup
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: Atencion clinica
+    group: Atencion local
+    url: http://gateway/ready
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: OpenMRS iniciado
+    group: Atencion local
+    url: http://backend:8080/openmrs/health/started
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: Frontend disponible
+    group: Atencion local
+    url: http://frontend/
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] contains initializeSpa"
+
+  - name: Sesion OpenMRS
+    group: Atencion local
+    url: http://backend:8080/openmrs/ws/rest/v1/session
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: Gateway publico
+    group: Red local
+    url: http://gateway/openmrs/spa
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"

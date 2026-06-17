@@ -6,15 +6,15 @@ Este directorio contiene la configuración modular de servicios en YAML. Cada ar
 
 ```
 compose/
-├── core.yml         # Servicios base (gateway, frontend, backend, db)
-├── fua.yml          # Generador de Formato Único de Atención (MINSA)
-├── indicadores.yml  # Reportes SQL (indicadores)
-├── hapi.yml         # Servidor FHIR para interoperabilidad
-├── imaging.yml      # Stack médico (OHIF + Orthanc + DICOM)
-├── replica.yml      # Réplica MariaDB para redundancia/backups
-├── keycloak.yml     # Autenticación OAuth2/OpenID Connect
-├── monitoring.yml   # Observabilidad (Grafana + Prometheus + Loki, Alloy opcional)
-└── ssl.yml          # SSL/HTTPS (certificados Let's Encrypt o auto-firmados)
+├── core.yml       # Servicios base (gateway, frontend, backend, db)
+├── fua.yml        # Generador de Formato Único de Atención (MINSA)
+├── hapi.yml       # Servidor FHIR para interoperabilidad
+├── imaging.yml    # Stack médico (OHIF + Orthanc + DICOM)
+├── replica.yml    # Réplica MariaDB para redundancia/backups
+├── keycloak.yml   # Autenticación OAuth2/OpenID Connect
+├── monitoring.yml # Observabilidad (Grafana + Prometheus + Loki, Alloy opcional)
+├── status.yml     # Semaforo local liviano (Gatus)
+└── ssl.yml        # SSL/HTTPS (certificados Let's Encrypt o auto-firmados)
 ```
 
 ---
@@ -188,7 +188,7 @@ Sistema centralizado de identidad para OpenMRS.
 ```bash
 docker compose \
   -f docker-compose.yml \
-  -f compose/openmrs-keycloak.yml \
+  -f compose/keycloak.yml \
   --profile keycloak \
   up -d
 ```
@@ -249,6 +249,36 @@ GRAFANA_ADMIN_USER=admin   # Opcional
 GRAFANA_ROOT_URL=...       # Opcional
 ```
 
+---
+
+### Status (`status.yml`) - Semaforo local
+
+Panel liviano de estado operativo para puestos remotos y establecimientos con baja conectividad. Usa Gatus como motor de checks y no reemplaza a Grafana/Prometheus/Loki en cabeceras o soporte tecnico.
+
+Activar:
+
+```bash
+docker compose -f docker-compose.yml -f compose/status.yml --profile status up -d
+```
+
+Servicios:
+
+- `gatus` - Status page local y motor de health checks
+
+Puerto:
+
+- `8086` - Gatus local, ligado a `127.0.0.1` por defecto
+
+Checks iniciales:
+
+- Gateway vivo (`/health`)
+- OpenMRS listo (`/ready`, `/openmrs/health/started`)
+- Frontend disponible
+- Sesion OpenMRS
+
+Nota operativa: el semaforo local debe permanecer separado de herramientas administrativas como Portainer. El personal clinico o administrativo debe ver estados operativos y acciones recomendadas, no logs tecnicos ni acceso a Docker.
+
+
 **Puertos** (solo localhost):
 - `3001` - Grafana (HTTP, solo localhost)
 - `9090` - Prometheus (HTTP, solo localhost)
@@ -307,7 +337,7 @@ docker compose up -d
 ```bash
 docker compose \
   -f docker-compose.yml \
-  -f compose/openmrs-keycloak.yml \
+  -f compose/keycloak.yml \
   --profile keycloak \
   up -d
 ```
@@ -316,7 +346,7 @@ docker compose \
 ```bash
 docker compose \
   -f docker-compose.yml \
-  -f compose/openmrs-keycloak.yml \
+  -f compose/keycloak.yml \
   -f compose/ssl.yml \
   --profile keycloak \
   --profile ssl \
@@ -327,7 +357,7 @@ docker compose \
 ```bash
 docker compose \
   -f docker-compose.yml \
-  -f compose/openmrs-keycloak.yml \
+  -f compose/keycloak.yml \
   -f compose/ssl.yml \
   --profile keycloak \
   --profile monitoring \

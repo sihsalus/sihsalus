@@ -57,7 +57,28 @@ docker compose up -d
 # http://localhost/openmrs/spa
 ```
 
-La primera vez, OpenMRS puede tardar unos minutos en quedar listo. La señal de que ya terminó de arrancar es `http://localhost/openmrs/login.htm` respondiendo `200`; después de eso la SPA queda en `http://localhost/openmrs/spa/`.
+La primera vez, OpenMRS puede tardar bastante en quedar listo, especialmente si importa conceptos y mappings OCL. La señal principal de readiness es `http://localhost/openmrs/health/started` respondiendo `200`; después de eso `http://localhost/openmrs/login.htm` y la SPA en `http://localhost/openmrs/spa/` deben responder correctamente.
+
+### Health y readiness
+
+El gateway expone dos señales distintas:
+
+- `GET /health`: lo responde Nginx sin tocar upstreams; indica que el gateway está vivo.
+- `GET /startup`: comprueba que el backend/OpenMRS responde, aunque siga en Initial Setup o importando metadata.
+- `GET /ready`: proxy a `/openmrs/health/started`; responde `200` solo cuando OpenMRS terminó de inicializar.
+
+Durante bootstrap, `/startup` puede estar en `200` mientras `/ready` sigue en `503`. Eso es esperado: la BD puede tener concepts parcialmente cargados y aun así OpenMRS no estar listo para atender tráfico clínico. Si aparecen errores de import OCL en logs, el estado correcto sigue siendo no listo hasta que `/ready` responda `200`.
+
+Comandos útiles durante arranque o actualización:
+
+```bash
+curl -k -i https://localhost/health
+curl -k -i https://localhost/startup
+curl -k -i https://localhost/ready
+curl -k -i https://localhost/openmrs/health/started
+curl -k -i https://localhost/openmrs/ws/rest/v1/session
+curl -k -i https://localhost/openmrs/spa/home
+```
 
 ## Profiles
 
@@ -80,10 +101,13 @@ docker compose --profile imaging up -d
 docker compose --profile indicadores up -d
 
 # Core + Keycloak Auth
-docker compose -f docker-compose.yml -f compose/openmrs-keycloak.yml --profile keycloak up -d
+docker compose -f docker-compose.yml -f compose/keycloak.yml --profile keycloak up -d
 
 # Core + Observabilidad (Grafana/Prometheus/Loki)
 docker compose --profile monitoring up -d
+
+# Core + Semaforo local (Gatus)
+docker compose -f docker-compose.yml -f compose/status.yml --profile status up -d
 
 # Combinar profiles
 docker compose --profile fua --profile hapi --profile monitoring up -d
@@ -92,7 +116,7 @@ docker compose --profile fua --profile hapi --profile monitoring up -d
 docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d
 
 # Core + Keycloak Auth + SSL/HTTPS
-docker compose -f docker-compose.yml -f compose/openmrs-keycloak.yml -f compose/ssl.yml --profile keycloak --profile ssl up -d
+docker compose -f docker-compose.yml -f compose/keycloak.yml -f compose/ssl.yml --profile keycloak --profile ssl up -d
 ```
 
 Cada profile requiere sus variables en `.env`. Ver `.env.template` para la lista completa.
@@ -138,6 +162,24 @@ docker compose ps frontend
 docker compose logs --tail 100 frontend
 ```
 
+### Frontend (producción sin `*.map`)
+
+Por defecto, en el build de runtime del frontend se eliminan los `*.map` de producción.
+
+`compose/core.yml` pasa `STRIP_SOURCE_MAPS` al build y el valor por defecto es `true`:
+
+```bash
+STRIP_SOURCE_MAPS=true  # true = elimina *.map, false = los conserva
+```
+
+Efecto esperado:
+
+- Si usas `docker compose build` / `docker compose up` para reconstruir `frontend`, la imagen resultante queda sin mapas de fuente.
+- Si usas una imagen preconstruida de registry, debe haberse publicado con `STRIP_SOURCE_MAPS=true` para que no lleve mapas.
+- Si necesitas mapas para depuración puntual de preproducción, puedes reconstruir con `STRIP_SOURCE_MAPS=false`.
+
+
+
 ### Backend (si cambió la imagen del backend)
 
 ```bash
@@ -147,6 +189,15 @@ docker compose up -d --no-deps --force-recreate backend
 ```
 
 Cuando cambie la interfaz de API entre frontend y backend, actualiza primero backend y luego frontend en el mismo ciclo de despliegue.
+
+### Gateway (si cambió Nginx, SSL o health/readiness)
+
+```bash
+DOCKER_BUILDKIT=1 docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl build gateway
+docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d --no-deps --force-recreate gateway
+curl -k -i https://localhost/health
+curl -k -i https://localhost/ready
+```
 
 ### Estructura de archivos
 
@@ -168,6 +219,7 @@ compose/
   imaging.yml                   # profile: imaging
   keycloak.yml                  # profile: keycloak
   monitoring.yml                # profile: monitoring
+  status.yml                    # profile: status
   ssl.yml                       # override con -f (modifica gateway)
 ```
 
@@ -213,7 +265,7 @@ docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d
 # https://192.168.10.5/openmrs/spa
 ```
 
-`compose/ssl.yml` debe cargarse con `-f` porque no esta incluido por defecto en `docker-compose.yml`. El flag `--profile ssl` activa el servicio `certbot` definido en ese archivo; sin el `-f compose/ssl.yml`, Compose no ve ese profile ni aplica los cambios de `gateway` para publicar el puerto 443.
+`compose/ssl.yml` debe cargarse con `-f` porque no está incluido por defecto en `docker-compose.yml`. El flag `--profile ssl` activa el servicio `certbot` definido en ese archivo; sin el `-f compose/ssl.yml`, Compose no ve ese profile ni aplica los cambios de `gateway` para publicar el puerto 443.
 
 ### SSL con Keycloak
 
@@ -222,7 +274,7 @@ SSL y Keycloak se pueden usar juntos cargando ambos overrides:
 ```bash
 docker compose \
   -f docker-compose.yml \
-  -f compose/openmrs-keycloak.yml \
+  -f compose/keycloak.yml \
   -f compose/ssl.yml \
   --profile keycloak \
   --profile ssl \

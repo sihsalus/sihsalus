@@ -1,7 +1,11 @@
 map $request_uri $csp_header {
-  default "default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://dyaku.minsa.gob.pe; base-uri 'self'; font-src 'self'; img-src 'self' data:; frame-ancestors 'self' ${FRAME_ANCESTORS};";
-  "~^/imaging/" "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' ws: wss:; worker-src 'self' blob:; base-uri 'self'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
-  "~^/openmrs/(?:admin|dictionary|module|patientDashboard.form)/" "default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; base-uri 'self'; font-src 'self'; frame-ancestors 'self';";
+  # Dyaku/FHIR browser access is scoped to the O3 SPA. Imaging and legacy
+  # surfaces must not inherit external FHIR connectivity by default.
+  default "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'self'; font-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
+  "~^/openmrs/spa/" "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://dyaku.minsa.gob.pe; base-uri 'self'; font-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
+  "~^/imaging/" "default-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; base-uri 'self'; object-src 'none'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
+  # Legacy OpenMRS pages still depend on inline scripts and eval-like behavior.
+  "~^/openmrs/(?:admin|dictionary|module|patientDashboard.form|initialsetup)(?:/|$)" "default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; base-uri 'self'; font-src 'self'; frame-ancestors 'self';";
   "~^/openmrs/owa" "default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; base-uri 'self'; font-src 'self' data:; img-src 'self' data:; frame-ancestors 'self';";
 }
 
@@ -40,7 +44,9 @@ server {
   listen [::]:443 ssl;
   http2 on;
   server_name ${CERT_WEB_DOMAIN_COMMON_NAME} localhost 127.0.0.1 _;
-  client_max_body_size 0;
+  # Default upload cap. DICOM upload endpoints override this because studies
+  # can be large and are restricted to Orthanc proxy locations below.
+  client_max_body_size 100m;
 
   # SSL configuration
   ssl_certificate     /etc/letsencrypt/live/${CERT_WEB_DOMAIN_COMMON_NAME}/fullchain.pem;
@@ -105,6 +111,43 @@ server {
     return 200 'OK';
   }
 
+  # Startup del backend: valida que OpenMRS/Tomcat responda, aunque siga
+  # ejecutando Initial Setup o imports de metadata.
+  location = /startup {
+    access_log off;
+    proxy_method HEAD;
+    proxy_intercept_errors on;
+    proxy_pass http://backend/openmrs/initialsetup;
+    error_page 301 302 303 307 308 = @backend_started;
+    error_page 500 502 503 504 = @backend_not_started;
+  }
+
+  location @backend_started {
+    default_type text/plain;
+    return 200 'STARTED';
+  }
+
+  location @backend_not_started {
+    default_type text/plain;
+    add_header Retry-After 30 always;
+    return 503 'NOT_STARTED';
+  }
+
+  # Readiness global: valida que OpenMRS ya termino su bootstrap completo.
+  location = /ready {
+    access_log off;
+    proxy_intercept_errors on;
+    proxy_pass http://backend/openmrs/health/started;
+    error_page 500 502 503 504 = @openmrs_not_ready;
+  }
+
+  location @openmrs_not_ready {
+    default_type text/plain;
+    add_header Retry-After 30 always;
+    add_header X-SIHSALUS-Readiness 'openmrs-bootstrap-pending' always;
+    return 503 'NOT_READY: OpenMRS bootstrap is not complete';
+  }
+
   location /openmrs/spa/ {
     set $frontend http://frontend;
     rewrite ^/openmrs/spa/(.*) /$1 break;
@@ -139,7 +182,7 @@ server {
   location @backend_unavailable {
     default_type text/html;
     add_header Retry-After 30 always;
-    return 503 '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta http-equiv="refresh" content="30"><title>SIH Salus - Iniciando</title><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f5f5f5;color:#333}div{text-align:center;max-width:32em;padding:2em}h1{color:#f26522}</style></head><body><div><h1>SIH Salus se est&aacute; iniciando</h1><p>El servidor est&aacute; cargando los datos del sistema. En el primer arranque este proceso puede tardar varios minutos.</p><p>Esta p&aacute;gina se actualizar&aacute; autom&aacute;ticamente.</p></div></body></html>';
+    return 503 '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta http-equiv="refresh" content="30"><title>SIH Salus - Iniciando</title><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f5f5f5;color:#333}div{text-align:center;max-width:34em;padding:2em}h1{color:#f26522}</style></head><body><div><h1>SIH Salus se est&aacute; iniciando</h1><p>OpenMRS todav&iacute;a est&aacute; terminando su bootstrap. En el primer arranque puede cargar configuraci&oacute;n, conceptos y mappings OCL durante varios minutos.</p><p>Verifica <code>/startup</code> para saber si el backend responde y <code>/ready</code> para saber si ya puede atender tr&aacute;fico cl&iacute;nico.</p><p>Esta p&aacute;gina se actualizar&aacute; autom&aacute;ticamente.</p></div></body></html>';
   }
 
   # OHIF Imaging Viewer
@@ -153,6 +196,7 @@ server {
 
   location /orthanc/ {
     set $orthanc_proxy http://orthanc-proxy;
+    # Orthanc UI/API can receive DICOM studies and archives.
     client_max_body_size 0;
     rewrite ^/orthanc/(.*)$ /$1 break;
     proxy_read_timeout 300s;
@@ -166,6 +210,7 @@ server {
 
   location /imaging/dicom-web/ {
     set $orthanc_proxy http://orthanc-proxy;
+    # DICOMweb STOW-RS uploads can exceed the default gateway upload cap.
     client_max_body_size 0;
     rewrite ^/imaging/(.*)$ /$1 break;
     proxy_read_timeout 300s;
@@ -174,7 +219,6 @@ server {
 
   location /imaging/wado {
     set $orthanc_proxy http://orthanc-proxy;
-    client_max_body_size 0;
     rewrite ^/imaging/(.*)$ /$1 break;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
@@ -191,7 +235,6 @@ server {
     set $ohif http://ohif;
     rewrite ^/imaging/(.*) /$1 break;
     proxy_buffering off;
-    sub_filter_types text/html;
     sub_filter 'src="/' 'src="/imaging/';
     sub_filter 'href="/' 'href="/imaging/';
     sub_filter "window.PUBLIC_URL = '/';" "window.PUBLIC_URL = '/imaging/';";
@@ -211,6 +254,7 @@ server {
 
   location /dicom-web/ {
     set $orthanc_proxy http://orthanc-proxy;
+    # DICOMweb STOW-RS uploads can exceed the default gateway upload cap.
     client_max_body_size 0;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
@@ -218,7 +262,6 @@ server {
 
   location /wado {
     set $orthanc_proxy http://orthanc-proxy;
-    client_max_body_size 0;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
   }
