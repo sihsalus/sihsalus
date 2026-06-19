@@ -323,6 +323,20 @@ docker compose \
   up -d
 ```
 
+### Reiniciar backend sin cambiar el modo HTTPS
+
+Usa el mismo set de archivos `-f` y perfiles con el que levantaste el entorno. Si el stack está en HTTPS, no uses un `docker compose up -d` genérico sin `compose/ssl.yml`, porque puede reconciliar `gateway` con la configuración HTTP.
+
+```bash
+# Solo reiniciar proceso
+docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl restart backend
+
+# Recrear backend con la imagen/config actual, sin tocar gateway
+docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d --no-deps --force-recreate backend
+```
+
+Si el entorno incluye Keycloak, agrega también `-f compose/keycloak.yml --profile keycloak`.
+
 ### Stack completo de producción
 ```bash
 docker compose \
