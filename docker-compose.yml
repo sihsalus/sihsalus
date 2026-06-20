@@ -6,7 +6,6 @@
 #   docker compose up -d                                        # Core (gateway, frontend, backend, db)
 #   docker compose --profile fua up -d                          # + FUA Generator
 #   docker compose --profile hapi up -d                         # + HAPI FHIR Server
-#   docker compose --profile ai up -d                           # + OpenMRS LiveKit local AI
 #   docker compose --profile imaging up -d                      # + Medical Imaging (OHIF/Orthanc)
 #   docker compose -f docker-compose.yml -f compose/keycloak.yml --profile keycloak up -d  # + Keycloak Auth
 #   docker compose --profile monitoring up -d                   # + Observability (Grafana/Prometheus/Loki)
@@ -33,8 +32,6 @@ include:
   - path: compose/fua.yml
     project_directory: .
   - path: compose/hapi.yml
-    project_directory: .
-  - path: compose/openmrs-livekit.yml
     project_directory: .
   - path: compose/imaging.yml
     project_directory: .

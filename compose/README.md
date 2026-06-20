@@ -9,7 +9,6 @@ compose/
 ├── core.yml       # Servicios base (gateway, frontend, backend, db)
 ├── fua.yml        # Generador de Formato Único de Atención (MINSA)
 ├── hapi.yml       # Servidor FHIR para interoperabilidad
-├── openmrs-livekit.yml # Servicio local de IA/voz para OpenMRS LiveKit
 ├── imaging.yml    # Stack médico (OHIF + Orthanc + DICOM)
 ├── replica.yml    # Réplica MariaDB para redundancia/backups
 ├── keycloak.yml   # Autenticación OAuth2/OpenID Connect
@@ -122,37 +121,6 @@ HAPI_DB_NAME=hapi          # Opcional
 - `8085` - HAPI FHIR API (HTTP)
 
 **Base de datos**: PostgreSQL 15
-
----
-
-### OpenMRS LiveKit (`openmrs-livekit.yml`) - IA local de voz
-
-Servicio opcional para el flujo de traduccion clinica, de-identificacion y revision humana antes de generar borradores OpenMRS. El gateway lo publica en `/services/openmrs-livekit/` y el microfrontend O3 lo consume desde el mismo origen.
-
-**Activar**:
-```bash
-docker compose --profile ai up -d
-```
-
-**Servicios**:
-- `openmrs-livekit` - Agente LiveKit / API local de revision
-
-**Variables principales**:
-```env
-OPENMRS_LIVEKIT_IMAGE=ghcr.io/sihsalus/openmrs-livekit
-OPENMRS_LIVEKIT_TAG=latest
-LIVEKIT_URL=ws://livekit:7880
-LIVEKIT_API_KEY=devkey
-LIVEKIT_API_SECRET=secret
-OPENMRS_LIVEKIT_ENABLE_TRANSCRIPT_SAVE=false
-OPENMRS_LIVEKIT_TRANSCRIPT_REDACTION_ENABLED=true
-```
-
-**Puertos internos**:
-- `8000` - API/metrics del servicio, expuesto solo al gateway
-- `8081` - health server LiveKit del agente
-
-**Nota**: el profile `ai` no publica puertos al host. El acceso de usuario debe pasar por OpenMRS/O3 y el gateway.
 
 ---
 
@@ -389,7 +357,6 @@ Cada profile define volúmenes persistentes para datos:
 | core | `openmrs-data`, mariadb data |
 | fua | `db-fua-generator` (PostgreSQL) |
 | hapi | `hapi_pgdata` (PostgreSQL) |
-| ai | sin volumen persistente por defecto |
 | imaging | `orthanc-data` (DICOM files) |
 | keycloak | `keycloak-data` (PostgreSQL) |
 | monitoring | `grafana-data`, `prometheus-data`, `loki-data` |

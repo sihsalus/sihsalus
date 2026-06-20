@@ -19,11 +19,6 @@ map $http_x_real_ip $forwarded_ip {
   default $remote_addr;
 }
 
-map $http_upgrade $connection_upgrade {
-  default upgrade;
-  '' close;
-}
-
 upstream backend {
   server backend:8080 max_fails=0;
 }
@@ -242,29 +237,6 @@ server {
     set $orthanc_proxy http://orthanc-proxy;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;
-  }
-
-  # Local AI voice/translation service consumed by the OpenMRS LiveKit ESM.
-  location = /services/openmrs-livekit {
-    return 301 /services/openmrs-livekit/;
-  }
-
-  location /services/openmrs-livekit/ {
-    set $openmrs_livekit http://openmrs-livekit:8000;
-    rewrite ^/services/openmrs-livekit/(.*)$ /$1 break;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection $connection_upgrade;
-    proxy_buffering off;
-    proxy_read_timeout 300s;
-    proxy_pass $openmrs_livekit;
-    proxy_intercept_errors on;
-    error_page 502 503 504 = @openmrs_livekit_unavailable;
-  }
-
-  location @openmrs_livekit_unavailable {
-    default_type application/json;
-    add_header Retry-After 30 always;
-    return 503 '{"error":"OpenMRS LiveKit service is temporarily unavailable","status":503}';
   }
 
   ${FUA_LOCATIONS}
