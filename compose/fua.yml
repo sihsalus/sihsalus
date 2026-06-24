@@ -17,6 +17,7 @@ services:
       TOKEN: ${SIHSALUS_FUA_GEN_TOKEN:-fuagenerator}
       DB_HOST: "fua-generator-db"
       DB_PORT: "5432"
+      SECRET_KEY: ${SIHSALUS_FUA_GEN_SECRET_KEY:-change-me}
     depends_on:
       fua-generator-db:
         condition: service_healthy

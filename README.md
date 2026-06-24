@@ -130,8 +130,6 @@ Mientras el runtime del frontend no se publique en un registry, el flujo actual 
 Actualmente el frontend se despliega como una imagen runtime local (`sihsalus-frontend-runtime`) construida desde la imagen fuente publicada en GHCR (`ghcr.io/sihsalus/sihsalus-frontend`). Por eso, mientras no se publique una imagen runtime en el registry, la actualización de frontend en producción requiere reconstruir solo ese wrapper runtime.
 
 ```bash
-# 1) Sincronizar cambios de infra (compose/env/docs si aplica)
-git -C /ruta/a/sihsalus pull --ff-only
 
 # 2) Definir tag fuente del frontend publicado en GHCR
 export FRONTEND_SOURCE_TAG=sha-<digest>
