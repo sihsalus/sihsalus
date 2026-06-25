@@ -174,12 +174,44 @@ Efecto esperado:
 
 
 
+### Relevantar backend sin degradar HTTPS
+
+Regla operativa: usa el mismo set de archivos `-f` y `--profile` con el que levantaste el entorno. En un entorno HTTPS, no ejecutes un `docker compose up -d` genérico sin `compose/ssl.yml`, porque Compose puede reconciliar el servicio `gateway` con la configuración HTTP.
+
+Si solo necesitas reiniciar el proceso del backend:
+
+```bash
+# Stack HTTP/local
+docker compose restart backend
+
+# Stack HTTPS
+docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl restart backend
+```
+
+Si necesitas recrear el contenedor de backend con la configuración e imagen ya presentes, sin tocar `gateway`:
+
+```bash
+# Stack HTTP/local
+docker compose up -d --no-deps --force-recreate backend
+
+# Stack HTTPS
+docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d --no-deps --force-recreate backend
+```
+
+Si el entorno también usa Keycloak u otros overrides, añade esos mismos `-f` y perfiles al comando. La idea es no cambiar la definición efectiva del proyecto durante una operación parcial.
+
 ### Backend (si cambió la imagen del backend)
 
 ```bash
 export BACKEND_TAG=sha-<digest>
+
+# Stack HTTP/local
 docker compose pull backend
 docker compose up -d --no-deps --force-recreate backend
+
+# Stack HTTPS
+docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl pull backend
+docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d --no-deps --force-recreate backend
 ```
 
 Cuando cambie la interfaz de API entre frontend y backend, actualiza primero backend y luego frontend en el mismo ciclo de despliegue.
