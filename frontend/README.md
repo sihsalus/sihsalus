@@ -18,7 +18,6 @@ El frontend es una Single Page Application (SPA) moderna construida con React y 
 frontend/
 ├── Dockerfile         # Construye la imagen runtime versionada
 ├── nginx.conf         # Configuración Nginx para SPA
-├── patch-config-urls.js
 └── frontend-keycloak.json
 ```
 
@@ -93,7 +92,7 @@ sendfile on;                        # Zero-copy para archivos estáticos
 | `FRONTEND_SOURCE_IMAGE` | `ghcr.io/sihsalus/sihsalus-frontend:latest` | Imagen fuente con bundles y ensamblador |
 | `SPA_PATH` | `/openmrs/spa` | Path en el que está disponible la SPA |
 | `API_URL` | `/openmrs` | URL base para llamadas a API backend |
-| `SPA_CONFIG_URLS` | `/openmrs/spa/frontend.json` | Ubicación del config JSON |
+| `SPA_CONFIG_URLS` | `/openmrs/spa/frontend.json` | Ubicación del config JSON. Fuente de verdad: `compose/core.yml` |
 | `SPA_DEFAULT_LOCALE` | `es` | Idioma por defecto (es, en, pt, fr, etc.) |
 
 ### Archivos de Configuración SPA
