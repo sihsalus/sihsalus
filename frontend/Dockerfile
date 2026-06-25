@@ -17,12 +17,14 @@ ENV SPA_OUTPUT_DIR=/tmp/spa \
     SPA_CONFIG_URLS=${SPA_CONFIG_URLS} \
     SPA_DEFAULT_LOCALE=${SPA_DEFAULT_LOCALE}
 
+COPY patch-config-urls.js /app/patch-config-urls.js
 COPY frontend-keycloak.json /app/config/frontend-keycloak.json
 
 RUN test -n "$SPA_CONFIG_URLS" || { echo "SPA_CONFIG_URLS build arg is required; define it in compose/core.yml"; exit 1; } \
     && rm -rf "$SPA_OUTPUT_DIR" \
     && mkdir -p "$SPA_OUTPUT_DIR" \
     && node packages/tooling/scripts/assemble-importmap.js \
+    && node /app/patch-config-urls.js \
     && if [ "$STRIP_SOURCE_MAPS" = "true" ]; then \
          find "$SPA_OUTPUT_DIR" -type f -name "*.map" -delete; \
        fi
