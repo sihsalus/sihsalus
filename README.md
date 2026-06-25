@@ -130,14 +130,11 @@ Mientras el runtime del frontend no se publique en un registry, el flujo actual 
 Actualmente el frontend se despliega como una imagen runtime local (`sihsalus-frontend-runtime`) construida desde la imagen fuente publicada en GHCR (`ghcr.io/sihsalus/sihsalus-frontend`). Por eso, mientras no se publique una imagen runtime en el registry, la actualización de frontend en producción requiere reconstruir solo ese wrapper runtime.
 
 ```bash
-# 1) Sincronizar cambios de infra (compose/env/docs si aplica)
-git -C /ruta/a/sihsalus pull --ff-only
-
 # 2) Definir tag fuente del frontend publicado en GHCR
 export FRONTEND_SOURCE_TAG=sha-<digest>
+docker pull ghcr.io/sihsalus/sihsalus-frontend:FRONTEND_SOURCE_TAG
 
 # 3) Reconstruir y recrear solo frontend
-DOCKER_BUILDKIT=1 docker compose build --pull frontend
 docker compose up -d --no-deps --no-build --force-recreate frontend
 docker compose ps frontend
 docker compose logs --tail 100 frontend
@@ -190,7 +187,7 @@ Cuando cambie la interfaz de API entre frontend y backend, actualiza primero bac
 ### Gateway (si cambió Nginx, SSL o health/readiness)
 
 ```bash
-DOCKER_BUILDKIT=1 docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl build gateway
+docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl build gateway
 docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d --no-deps --force-recreate gateway
 curl -k -i https://localhost/health
 curl -k -i https://localhost/ready
