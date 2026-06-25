@@ -15,10 +15,12 @@ if (!fs.existsSync(indexPath)) {
   process.exit(1);
 }
 
-const configUrls = rawConfigUrls
-  .split(',')
-  .map((url) => url.trim())
-  .filter(Boolean);
+const configUrls = Array.from(new Set(
+  rawConfigUrls
+    .split(',')
+    .map((url) => url.trim())
+    .filter(Boolean)
+));
 
 if (configUrls.length === 0) {
   console.error('[patch-config-urls] SPA_CONFIG_URLS did not contain any usable config URL');
