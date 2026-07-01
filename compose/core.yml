@@ -33,6 +33,7 @@ services:
   frontend:
     container_name: sihsalus-frontend
     image: ${FRONTEND_RUNTIME_IMAGE:-sihsalus-frontend-runtime}:${FRONTEND_RUNTIME_TAG:-latest}
+    pull_policy: always
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -57,6 +58,7 @@ services:
   backend:
     container_name: sihsalus-backend
     image: ghcr.io/sihsalus/sihsalus-backend:${BACKEND_TAG:-latest}
+    pull_policy: always
     build:
       context: .
       dockerfile: backend/Dockerfile
