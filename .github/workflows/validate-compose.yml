@@ -1,0 +1,57 @@
+name: Validate Compose Configuration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/validate-compose.yml'
+      - '.env.template'
+      - 'docker-compose.yml'
+      - 'compose/**'
+      - 'gateway/**'
+      - 'frontend/**'
+      - 'keycloak/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/validate-compose.yml'
+      - '.env.template'
+      - 'docker-compose.yml'
+      - 'compose/**'
+      - 'gateway/**'
+      - 'frontend/**'
+      - 'keycloak/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compose-config:
+    name: Validate Docker Compose config
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validate core stack
+        run: docker compose config --quiet
+
+      - name: Validate optional profiles
+        run: |
+          docker compose --profile fua config --quiet
+          docker compose --profile hapi config --quiet
+          docker compose --profile imaging config --quiet
+          docker compose --profile indicadores config --quiet
+          docker compose --profile monitoring --profile logs config --quiet
+          docker compose --profile replica config --quiet
+
+      - name: Validate standalone overrides
+        run: |
+          docker compose -f docker-compose.yml -f compose/keycloak.yml --profile keycloak config --quiet
+          docker compose -f docker-compose.yml -f compose/status.yml --profile status config --quiet
+          docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl config --quiet
+          docker compose -f docker-compose.yml -f compose/keycloak.yml -f compose/ssl.yml --profile keycloak --profile ssl config --quiet
