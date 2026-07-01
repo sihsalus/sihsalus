@@ -46,6 +46,7 @@ jobs:
           docker compose --profile hapi config --quiet
           docker compose --profile imaging config --quiet
           docker compose --profile indicadores config --quiet
+          docker compose --profile keycloak config --quiet
           docker compose --profile monitoring --profile logs config --quiet
           docker compose --profile replica config --quiet
 
