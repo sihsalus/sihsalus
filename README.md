@@ -115,6 +115,9 @@ docker compose --profile fua --profile hapi --profile monitoring up -d
 # Core + SSL/HTTPS (override especial; requiere cargar compose/ssl.yml)
 docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d
 
+# Core + SSL/HTTPS + FUA:
+docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl --profile fua up -d
+
 # Core + Keycloak Auth + SSL/HTTPS
 docker compose -f docker-compose.yml -f compose/keycloak.yml -f compose/ssl.yml --profile keycloak --profile ssl up -d
 ```
