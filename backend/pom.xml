@@ -27,7 +27,7 @@
          we do so here so that we can utilise Maven to track updates, etc. -->
     <openmrs.version>2.8.7</openmrs.version>
     <initializer.version>2.12.0</initializer.version>
-    <fhir2.version>4.0.0</fhir2.version>
+    <fhir2.version>4.1.0</fhir2.version>
     <webservices.rest.version>3.5.0</webservices.rest.version>
     <addresshierarchy.version>2.21.0</addresshierarchy.version>
     <patientdocuments.version>1.1.0</patientdocuments.version>
@@ -62,7 +62,7 @@
     <fua.version>1.0.80</fua.version>
     <imaging.version>1.2.8</imaging.version>
     <!-- Content Packages -->
-    <sihsalus-content.version>1.14.2</sihsalus-content.version>
+    <sihsalus-content.version>1.14.7</sihsalus-content.version>
     <reference-content.version>1.4.0</reference-content.version>
     <reference-demo-content.version>1.8.0-SNAPSHOT</reference-demo-content.version>
   </properties>
