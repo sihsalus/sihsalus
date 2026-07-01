@@ -15,6 +15,7 @@ services:
       DB_PASSWORD: ${SIHSALUS_FUA_GEN_DB_PASSWORD:-fuagenerator}
       DB_NAME: ${SIHSALUS_FUA_GEN_DB:-fuagenerator}
       TOKEN: ${SIHSALUS_FUA_GEN_TOKEN:-fuagenerator}
+      SECRET_KEY: ${SIHSALUS_FUA_GEN_SECRET_KEY:-change-me}
       DB_HOST: "fua-generator-db"
       DB_PORT: "5432"
     depends_on:
