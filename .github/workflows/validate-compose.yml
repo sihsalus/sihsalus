@@ -49,6 +49,7 @@ jobs:
           docker compose --profile keycloak config --quiet
           docker compose --profile monitoring --profile logs config --quiet
           docker compose --profile replica config --quiet
+          docker compose --profile keycloak config --quiet
 
       - name: Validate standalone overrides
         run: |
