@@ -86,6 +86,7 @@ docker compose --profile fua up -d
 ```env
 SIHSALUS_FUA_GEN_DB_PASSWORD=<password>
 SIHSALUS_FUA_GEN_TOKEN=<token_acceso_fua>
+SIHSALUS_FUA_GEN_SECRET_KEY=<secret_fua>
 FUA_CONFIG=<configuracion_json>    # En gateway env vars
 FUA_LOCATIONS=<ubicaciones_json>   # En gateway env vars
 ```

@@ -29,12 +29,13 @@ if (configUrls.length === 0) {
 
 const replacement = `configUrls: ${JSON.stringify(configUrls)}`;
 const html = fs.readFileSync(indexPath, 'utf8');
-const nextHtml = html.replace(/configUrls:\s*\[[^\]]*\]/, replacement);
+const configUrlsPattern = /configUrls:\s*\[[^\]]*\]/;
 
-if (nextHtml === html) {
+if (!configUrlsPattern.test(html)) {
   console.error('[patch-config-urls] configUrls initializer not found in index.html');
   process.exit(1);
 }
 
+const nextHtml = html.replace(configUrlsPattern, replacement);
 fs.writeFileSync(indexPath, nextHtml);
 console.log(`[patch-config-urls] ${replacement}`);
