@@ -97,6 +97,36 @@ FUA_LOCATIONS=<ubicaciones_json>   # En gateway env vars
 
 ---
 
+### 📊 Indicadores (`indicadores.yml`) - Reportes SQL
+
+Servicio de reportes e indicadores basado en SQL, expuesto bajo `/openmrs/services/reportes-sql`.
+
+**Activar**:
+```bash
+docker compose --profile indicadores up -d
+```
+
+**Servicios**:
+- `reportes-sql` - Aplicación de reportes SQL (Node.js/Fastify)
+- `reportes-sql-db` - PostgreSQL para indicadores
+
+**Variables requeridas**:
+```env
+SIHSALUS_REPORTES_SQL_DB_PASSWORD=<password>
+```
+
+**Variables opcionales**:
+```env
+REPORTES_SQL_IMAGE=ghcr.io/sihsalus/reportes-sql   # Imagen del servicio
+REPORTES_SQL_TAG=latest                            # Tag de la imagen
+SIHSALUS_REPORTES_SQL_DB=reportes_sql             # Nombre de la base de datos
+SIHSALUS_REPORTES_SQL_DB_USER=reportes_sql         # Usuario de la base de datos
+```
+
+**Base de datos**: PostgreSQL 17
+
+---
+
 ### 🏥 HAPI FHIR (`hapi.yml`) - Interoperabilidad MINSA
 
 Servidor FHIR para intercambio de datos con otros sistemas de salud.
@@ -360,6 +390,11 @@ docker compose --profile imaging up -d
 docker compose --profile fua --profile hapi --profile monitoring up -d
 ```
 
+### Indicadores + Backend
+```bash
+docker compose --profile indicadores up -d
+```
+
 ---
 
 ## Volúmenes Persistentes
@@ -370,6 +405,7 @@ Cada profile define volúmenes persistentes para datos:
 |---------|-----------|
 | core | `openmrs-data`, mariadb data |
 | fua | `db-fua-generator` (PostgreSQL) |
+| indicadores | `db-reportes-sql` (PostgreSQL) |
 | hapi | `hapi_pgdata` (PostgreSQL) |
 | imaging | `orthanc-data` (DICOM files) |
 | keycloak | `keycloak-data` (PostgreSQL) |

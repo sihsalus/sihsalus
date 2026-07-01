@@ -97,6 +97,9 @@ docker compose --profile hapi up -d
 # Core + Medical Imaging (OHIF/Orthanc)
 docker compose --profile imaging up -d
 
+# Core + Indicadores (Reportes SQL)
+docker compose --profile indicadores up -d
+
 # Core + Keycloak Auth
 docker compose -f docker-compose.yml -f compose/keycloak.yml --profile keycloak up -d
 
@@ -240,6 +243,7 @@ imaging/                        # OHIF config
 compose/
   core.yml                      # gateway, frontend, backend, db
   fua.yml                       # profile: fua
+  indicadores.yml               # profile: indicadores
   hapi.yml                      # profile: hapi
   imaging.yml                   # profile: imaging
   keycloak.yml                  # profile: keycloak

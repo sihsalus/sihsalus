@@ -241,6 +241,17 @@ server {
 
   ${FUA_LOCATIONS}
 
+  # Reportes SQL (Indicadores)
+  location = /openmrs/services/reportes-sql {
+    return 301 /openmrs/services/reportes-sql/;
+  }
+
+  location /openmrs/services/reportes-sql/ {
+    set $reportes_sql http://reportes-sql:8000;
+    proxy_pass $reportes_sql;
+    proxy_read_timeout 300s;
+  }
+
   location /grafana {
     set $grafana http://grafana:3000;
     proxy_read_timeout 300s;
