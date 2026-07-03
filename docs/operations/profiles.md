@@ -195,4 +195,7 @@ Restricciones:
 - Toda actualizacion debe dejar version anterior, version nueva, operador, fecha y resultado.
 - Todo backup debe poder verificarse por fecha, checksum y resultado.
 
-Ver tambien: [Semaforo local: privacidad y cumplimiento](status-compliance.md).
+Ver tambien:
+
+- [Semaforo local: privacidad y cumplimiento](status-compliance.md)
+- [Metricas de seed restore y arranque OpenMRS](seed-restore-metrics.md)
