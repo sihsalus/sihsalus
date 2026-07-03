@@ -20,7 +20,7 @@ services:
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
     entrypoint: [ "/bin/sh", "/usr/local/bin/apply-seed.sh" ]
     volumes:
-      - ../scripts/seed/apply-seed.sh:/usr/local/bin/apply-seed.sh:ro
+      - ./scripts/seed/apply-seed.sh:/usr/local/bin/apply-seed.sh:ro
       - db-data:/seed/db-data
       - openmrs-data:/seed/openmrs-data
       - db-fua-generator:/seed/fua-db-data
