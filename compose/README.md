@@ -306,7 +306,7 @@ Certificados y configuración HTTPS (Let's Encrypt o auto-firmados).
 docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d
 
 # Production (Let's Encrypt)
-export SSL_MODE=prod CERT_WEB_DOMAINS=yourdomain.com
+export SSL_MODE=prod CERT_WEB_DOMAINS=yourdomain.com CERT_CONTACT_EMAIL=admin@yourdomain.com
 docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d
 ```
 
@@ -317,10 +317,17 @@ docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d
 ```env
 SSL_MODE=dev                                                # dev o prod
 CERT_WEB_DOMAINS=localhost,127.0.0.1,192.168.0.200        # Dominios (comma-separated)
-CERT_WEB_DOMAIN_COMMON_NAME=localhost                      # CN del certificado
+CERT_WEB_DOMAIN_COMMON_NAME=                               # Opcional; por defecto usa el primer dominio
+CERT_CONTACT_EMAIL=                                        # Recomendado con SSL_MODE=prod
+SSL_STAGING=false                                          # true para probar Let's Encrypt staging
+CERT_PROFILE=                                              # classic, tlsserver o shortlived
 CERT_RSA_KEY_SIZE=2048                                     # Tamaño clave RSA y DH params
 CERT_TEMP_CERT_DAYS=365                                    # Validez certs auto-firmados
+CERT_NGINX_STARTUP_WAIT=10                                 # Espera antes de solicitar cert real
+CERT_RENEWAL_INTERVAL=12h                                  # Intervalo de renovacion certbot
 ```
+
+En `SSL_MODE=prod`, certbot crea un certificado temporal para que nginx pueda arrancar, sirve el challenge HTTP-01 desde `/.well-known/acme-challenge/`, solicita el certificado real de Let's Encrypt y luego renueva automáticamente. Para pruebas, usar `SSL_STAGING=true`.
 
 **Nota**: Sobreescribe el servicio `gateway` para agregar HTTPS (puerto 443).
 

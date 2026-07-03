@@ -1,7 +1,9 @@
 # SSL/HTTPS Configuration (standalone override)
 # Usage: docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d
 #
-# This file overrides the gateway to add SSL support and adds the certbot service.
+# This file overrides the gateway to add HTTPS and adds the certbot service.
+# SSL_MODE=dev creates self-signed certificates.
+# SSL_MODE=prod obtains and renews Let's Encrypt certificates via HTTP-01.
 # It is NOT included via `include:` because it modifies the gateway service.
 
 services:
@@ -15,10 +17,14 @@ services:
     environment:
       SSL_MODE: ${SSL_MODE:-dev}
       CERT_WEB_DOMAINS: ${CERT_WEB_DOMAINS:-localhost,127.0.0.1,192.168.0.200,sihsalus.hsc,openmrs.sihsalus.hsc}
-      CERT_WEB_DOMAIN_COMMON_NAME: ${CERT_WEB_DOMAIN_COMMON_NAME:-localhost}
+      CERT_WEB_DOMAIN_COMMON_NAME: ${CERT_WEB_DOMAIN_COMMON_NAME:-}
+      CERT_CONTACT_EMAIL: ${CERT_CONTACT_EMAIL:-}
+      SSL_STAGING: ${SSL_STAGING:-false}
+      CERT_PROFILE: ${CERT_PROFILE:-}
       CERT_RSA_KEY_SIZE: ${CERT_RSA_KEY_SIZE:-2048}
       CERT_TEMP_CERT_DAYS: ${CERT_TEMP_CERT_DAYS:-365}
-      CERT_RENEWAL_INTERVAL: ${CERT_RENEWAL_INTERVAL:-30d}
+      CERT_NGINX_STARTUP_WAIT: ${CERT_NGINX_STARTUP_WAIT:-10}
+      CERT_RENEWAL_INTERVAL: ${CERT_RENEWAL_INTERVAL:-12h}
       CERT_ORG: ${CERT_ORG:-Centro de Salud Santa Clotilde}
       CERT_OU: ${CERT_OU:-sihsalus}
       CERT_COUNTRY: ${CERT_COUNTRY:-PE}
@@ -38,7 +44,8 @@ services:
     ports:
       - "${GATEWAY_HTTPS_PORT:-443}:443"
     environment:
-      CERT_WEB_DOMAIN_COMMON_NAME: ${CERT_WEB_DOMAIN_COMMON_NAME:-localhost}
+      CERT_WEB_DOMAINS: ${CERT_WEB_DOMAINS:-localhost,127.0.0.1,192.168.0.200,sihsalus.hsc,openmrs.sihsalus.hsc}
+      CERT_WEB_DOMAIN_COMMON_NAME: ${CERT_WEB_DOMAIN_COMMON_NAME:-}
       FRAME_ANCESTORS: ${FRAME_ANCESTORS:-https://dyaku.minsa.gob.pe/fhir}
     healthcheck:
       # El entrypoint del gateway espera a que certbot genere los certificados
