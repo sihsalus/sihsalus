@@ -22,6 +22,7 @@ jobs:
     timeout-minutes: 90
     permissions:
       contents: read
+      id-token: write
       packages: write
     steps:
       - uses: actions/checkout@v7
@@ -43,6 +44,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - uses: docker/build-push-action@v7
+        id: build
         with:
           context: .
           file: backend/Dockerfile
@@ -52,6 +54,14 @@ jobs:
           platforms: linux/amd64
           cache-from: type=gha,scope=backend
           cache-to: type=gha,scope=backend,mode=max
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3.9.2
+
+      - name: Sign image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "ghcr.io/sihsalus/sihsalus-backend@${DIGEST}"
 
       - name: Make package public
         run: |
