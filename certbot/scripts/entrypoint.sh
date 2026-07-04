@@ -118,6 +118,8 @@ CERT_FILE="${CERT_ROOT_PATH}/live/${CERT_WEB_DOMAIN_COMMON_NAME}/fullchain.pem"
 KEY_FILE="${CERT_ROOT_PATH}/live/${CERT_WEB_DOMAIN_COMMON_NAME}/privkey.pem"
 RENEWAL_CONF="${CERT_ROOT_PATH}/renewal/${CERT_WEB_DOMAIN_COMMON_NAME}.conf"
 
+ensure_tls_params
+
 if [ -f "${CERT_FILE}" ] && [ -f "${KEY_FILE}" ]; then
     log_info "Certificates already exist for ${CERT_WEB_DOMAIN_COMMON_NAME}"
     if [ "${SSL_MODE}" = "prod" ]; then
@@ -134,7 +136,6 @@ if [ -f "${CERT_FILE}" ] && [ -f "${KEY_FILE}" ]; then
     fi
 fi
 
-ensure_tls_params
 mkdir -p "${CERT_ROOT_PATH}/live/${CERT_WEB_DOMAIN_COMMON_NAME}"
 
 if [ "${SSL_MODE}" = "dev" ]; then
@@ -255,6 +256,7 @@ certbot certonly --webroot -w "${CERTBOT_DATA_PATH}" \
     ${EMAIL_ARG} \
     ${DOMAIN_ARGS} \
     ${PROFILE_ARG} \
+    --cert-name "${CERT_WEB_DOMAIN_COMMON_NAME}" \
     --rsa-key-size "${CERT_RSA_KEY_SIZE}" \
     --agree-tos \
     --no-eff-email
