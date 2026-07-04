@@ -37,22 +37,66 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Prepare evidence directory
+        run: mkdir -p compose-validation
+
       - name: Validate core stack
-        run: docker compose config --quiet
+        run: |
+          docker compose config --quiet
+          docker compose config > compose-validation/core.yml
 
       - name: Validate optional profiles
         run: |
-          docker compose --profile fua config --quiet
-          docker compose --profile hapi config --quiet
-          docker compose --profile imaging config --quiet
-          docker compose --profile indicadores config --quiet
-          docker compose --profile keycloak config --quiet
-          docker compose --profile monitoring --profile logs config --quiet
-          docker compose --profile replica config --quiet
-          docker compose --profile keycloak config --quiet
+          set -euo pipefail
+
+          validate() {
+            name="$1"
+            shift
+            docker compose "$@" config --quiet
+            docker compose "$@" config > "compose-validation/${name}.yml"
+          }
+
+          validate fua --profile fua
+          validate hapi --profile hapi
+          validate imaging --profile imaging
+          validate indicadores --profile indicadores
+          validate keycloak --profile keycloak
+          validate monitoring-logs --profile monitoring --profile logs
+          validate replica --profile replica
 
       - name: Validate standalone overrides
         run: |
-          docker compose -f docker-compose.yml -f compose/status.yml --profile status config --quiet
-          docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl config --quiet
-          docker compose -f docker-compose.yml -f compose/ssl.yml --profile keycloak --profile ssl config --quiet
+          set -euo pipefail
+
+          validate_override() {
+            name="$1"
+            shift
+            docker compose "$@" config --quiet
+            docker compose "$@" config > "compose-validation/${name}.yml"
+          }
+
+          validate_override status -f docker-compose.yml -f compose/status.yml --profile status
+          validate_override ssl -f docker-compose.yml -f compose/ssl.yml --profile ssl
+          validate_override keycloak-ssl -f docker-compose.yml -f compose/ssl.yml --profile keycloak --profile ssl
+
+      - name: Write validation summary
+        if: always()
+        run: |
+          {
+            echo "## Compose validation evidence"
+            echo ""
+            echo "| Target | Evidence file |"
+            echo "| --- | --- |"
+            for file in compose-validation/*.yml; do
+              name="$(basename "$file" .yml)"
+              echo "| ${name} | ${file} |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload compose validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compose-validation
+          path: compose-validation/
+          if-no-files-found: error
