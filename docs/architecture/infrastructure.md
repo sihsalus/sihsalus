@@ -36,6 +36,7 @@ En servidores, la composición elegida se guarda en `COMPOSE_FILE` y `COMPOSE_PR
 | Servicios, redes y volúmenes | `docker-compose.yml` y `compose/*.yml` |
 | Variables | `.env.template` |
 | Combinaciones soportadas | `scripts/validate-compose.sh` |
+| Validación de PR | `.github/workflows/ci.yml`, check `PR Gate` |
 | Builds de imágenes | `docker-bake.hcl` y workflows `build-*.yml` |
 | Operación de despliegue | `docs/operations/deploy-checklist.md` |
 | Credenciales | `scripts/security/README.md` |
@@ -52,6 +53,8 @@ La documentación no debe copiar listas completas de variables o comandos si pue
 - El Compose de CI no declara volúmenes persistentes.
 
 Los modelos renderizados se guardan como artifacts de CI para evidencia de cambio.
+
+`PR Gate` siempre se publica. La validación Compose corre en todos los cambios; Maven se omite cuando el diff no toca `pom.xml` ni `backend/`. Esto permite exigir un único check sin ejecutar el build pesado en cambios solo documentales.
 
 ## Decisiones pendientes
 
