@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main, pre-release]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect relevant changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.scope.outputs.backend }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Detect backend changes
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          backend=true
+
+          if [ "$EVENT_NAME" != "workflow_dispatch" ] \
+            && [ -n "$BASE_SHA" ] \
+            && [[ ! "$BASE_SHA" =~ ^0+$ ]] \
+            && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
+            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- pom.xml backend/; then
+            backend=false
+          fi
+
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "Backend build required: $backend"
+
+  compose:
+    name: Validate Compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Validate models and invariants
+        run: ./scripts/validate-compose.sh compose-validation
+
+      - name: Write validation summary
+        if: always()
+        run: |
+          {
+            echo "## Compose validation evidence"
+            echo ""
+            echo "| Target | Evidence file |"
+            echo "| --- | --- |"
+            for file in compose-validation/*.json; do
+              [ -f "$file" ] || continue
+              name="$(basename "$file" .json)"
+              echo "| ${name} | ${file} |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Compose evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: compose-validation
+          path: compose-validation/
+          if-no-files-found: warn
+          retention-days: 14
+
+  backend:
+    name: Build backend
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: '8'
+          cache: maven
+
+      - name: Build backend distribution
+        run: mvn --batch-mode --update-snapshots --file backend/pom.xml clean package
+
+  gate:
+    name: PR Gate
+    if: always()
+    needs: [compose, backend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require successful validations
+        env:
+          COMPOSE_RESULT: ${{ needs.compose.result }}
+          BACKEND_RESULT: ${{ needs.backend.result }}
+        run: |
+          [ "$COMPOSE_RESULT" = "success" ]
+          [ "$BACKEND_RESULT" = "success" ] || [ "$BACKEND_RESULT" = "skipped" ]

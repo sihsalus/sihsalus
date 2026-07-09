@@ -1,83 +1,34 @@
-# Scripts Directory
+# Scripts operativos
 
-Este directorio centraliza todos los scripts utilizados en el proyecto sihsalus Distribution.
+Este directorio contiene las herramientas ejecutables del stack. La documentación detallada vive junto al subsistema correspondiente para evitar instrucciones duplicadas.
 
-## Estructura
+## Inventario
 
-```
-scripts/
-├── backup/          # Scripts relacionados con backups de base de datos
-├── database/        # Scripts de inicialización y configuración de base de datos
-├── frontend/        # Scripts para el frontend (nginx, SPA)
-└── utils/           # Scripts de utilidades generales
-```
+| Ruta | Responsabilidad | Documentación |
+| --- | --- | --- |
+| `backup/` | Dump, backup binario, restore y rotación | [backup/README.md](backup/README.md) |
+| `database/` | Inicialización de usuarios y réplica MariaDB | [database/README.md](database/README.md) |
+| `security/` | Generación y auditoría de archivos de entorno | [security/README.md](security/README.md) |
+| `seed/` | Crear y aplicar releases de datos seed | Comentarios de cada script |
+| `utils/` | Inicialización, certificados y soporte operativo | [utils/README.md](utils/README.md) |
+| `validate-compose.sh` | Validación local y de CI de todos los modelos Compose | [compose/README.md](../compose/README.md) |
+| `management-tunnel.sh` | Túneles SSH hacia consolas administrativas locales | Ayuda del script |
+| `verify-installation.sh` | Verificación posterior a instalación | Ayuda del script |
 
-## Contenido por Carpeta
+## Reglas
 
-### backup/
-Scripts para realizar backups completos e incrementales de las bases de datos master y réplica:
-- `backup_full.sh` - Backup completo
-- `backup_incremental.sh` - Backup incremental
-- `backup_full_generate.sh` - Generación de backup completo
-- `backup_incremental_generate.sh` - Generación de backup incremental
-- `backup_full_generate_replica.sh` - Backup completo de réplica
-- `backup_incremental_generate_replica.sh` - Backup incremental de réplica
-- `replica_reset.sh` - Script bash para resetear la replicación de la base de datos
-- `backup_all.sh` - Backup de todo el sistema
+- Ejecuta los scripts desde la raíz del repositorio, salvo que su ayuda indique otra cosa.
+- Usa el mismo `.env`, `COMPOSE_FILE` y `COMPOSE_PROFILES` del servidor.
+- No ejecutes scripts de restore sin backup previo y ventana operativa aprobada.
+- `BACKUP_ENCRYPTION_PASSWORD` debe venir del ambiente o de un gestor de secretos; Docker Compose no usa Docker secrets en este repositorio.
+- Los backups solo se cifran cuando `BACKUP_ENCRYPTION_PASSWORD` está definida. Producción debe definirla.
+- No guardes claves, tokens, archivos `.env` o datos clínicos en Git ni en artifacts de CI.
 
-### database/
-Scripts de inicialización de las bases de datos:
-- `db_init_master.sh` - Inicialización de la base de datos master
-- `db_init_slave.sh` - Inicialización de la base de datos slave/réplica
-- `init-master-sql.sql` - (futuro) Script SQL para master
-- `init-slave-sql.sql` - (futuro) Script SQL para slave
+## Validación rápida
 
-### frontend/
-Scripts relacionados con el frontend:
-- `frontend_startup.sh` - Script de inicio del contenedor nginx con el SPA
-
-### utils/
-Scripts de utilidades generales:
-- `init_full.sh` - Inicialización completa del sistema desde cero
-- `logs_creation.sh` - Obtención de logs del módulo initializer
-- `generateCertificate.sh` - Generación de certificados SSL autofirmados
-- `rebuildService.sh` - Reconstrucción del servicio
-- `bulk_form_uploader.py` - Carga masiva de formularios
-- `insertar_usuarios.py` - Inserción de usuarios en el sistema
-- `rebuildScriptPython.py` - Script de reconstrucción en Python
-- `docker-compose-app.service` - Archivo de servicio systemd
-
-
-## Políticas de Seguridad y Cumplimiento
-
-### Cifrado de Backups
-Todos los scripts de backup generan archivos cifrados automáticamente usando AES-256 (openssl). La clave de cifrado debe ser provista mediante la variable de entorno `BACKUP_ENCRYPTION_PASSWORD` (recomendado: usar Docker secrets). El archivo .tar.gz sin cifrar se elimina tras el cifrado exitoso. El backup final tiene extensión `.tar.gz.enc`.
-
-**Ejemplo de uso:**
 ```bash
-export BACKUP_ENCRYPTION_PASSWORD="<clave-segura>"
-./backup_full.sh
+./scripts/validate-compose.sh
+./scripts/security-audit.sh .env.production
 ```
 
-### Rotación y Retención de Logs
-Cada script de backup mantiene solo los últimos 5 archivos de log (por ejemplo, `fullBackup_log.txt`, `fullBackup_log.txt.20240501120000`, ...). Los logs más antiguos se eliminan automáticamente para limitar el almacenamiento y cumplir políticas de retención.
-
-**Importante:** Nunca almacenes la clave de cifrado en el código ni en archivos versionados. Usa Docker secrets o variables de entorno seguras.
-
----
-## Uso
-
-Los scripts están referenciados en:
-- `docker-compose.yml` - Para entornos de desarrollo
-- `compose/ssl.yml` - Para entornos con SSL/HTTPS
-- `frontend/Dockerfile` - Para la construcción del contenedor frontend
-
-## Migración
-
-Esta estructura fue creada para centralizar scripts que anteriormente estaban dispersos en:
-- `backupScripts/` → `scripts/backup/`
-- `db-config/` → `scripts/database/`
-- `utils/` → `scripts/utils/`
-- `frontend/startup.sh` → `scripts/frontend/frontend_startup.sh`
-
-Todas las referencias en los archivos de configuración han sido actualizadas para reflejar la nueva ubicación.
+Para despliegues, usa el [checklist operativo](../docs/operations/deploy-checklist.md).
