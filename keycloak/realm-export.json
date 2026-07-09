@@ -35,15 +35,14 @@
             "clientAuthenticatorType": "client-secret",
             "secret": "${OAUTH2_CLIENT_SECRET}",
             "redirectUris": [
-                "http://localhost/openmrs/*",
-                "https://localhost/openmrs/*"
+                "${OPENMRS_REDIRECT_URI}"
             ],
             "webOrigins": [
                 "+"
             ],
             "standardFlowEnabled": true,
             "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": true,
+            "directAccessGrantsEnabled": false,
             "serviceAccountsEnabled": false,
             "publicClient": false,
             "frontchannelLogout": true,

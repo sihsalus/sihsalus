@@ -1,20 +1,18 @@
 # Keycloak y OpenMRS OAuth2
 
-Keycloak es opcional. El core genera `oauth2.properties` con OAuth2 deshabilitado; `compose/keycloak.yml` activa OAuth2, exige credenciales y agrega la configuración del login al frontend.
+Keycloak es opcional y se publica mediante el gateway bajo `/keycloak/`. El puerto directo `8180` queda ligado a localhost para administración de emergencia.
 
-## Activación
-
-Configura como mínimo:
+## Desarrollo
 
 ```env
+KEYCLOAK_MODE=development
 KEYCLOAK_ADMIN_PASSWORD=<password-seguro>
 KC_DB_PASSWORD=<password-seguro>
 OAUTH2_CLIENT_SECRET=<secret-del-cliente-openmrs>
-KC_HOSTNAME=localhost
-KEYCLOAK_PUBLIC_URL=http://localhost:8180
+KC_HOSTNAME=http://localhost/keycloak
+KEYCLOAK_PUBLIC_URL=http://localhost/keycloak
+OPENMRS_REDIRECT_URI=http://localhost/openmrs/*
 ```
-
-Inicia el stack:
 
 ```bash
 docker compose \
@@ -24,39 +22,43 @@ docker compose \
   up -d --build
 ```
 
-`--build` es necesario cuando cambia la lista de configuraciones del frontend. El override agrega `frontend-keycloak.json` durante el ensamblado de la SPA.
+Acceso: `http://localhost/keycloak/`.
 
-## Flujo de configuración
+## Producción HTTPS
 
-1. `backend-oauth2-config` escribe la configuración efectiva en el volumen `openmrs-data`.
-2. El backend espera que esa tarea termine.
-3. Con el override, el backend también espera que Keycloak esté saludable.
-4. El frontend muestra el proveedor OAuth2 configurado en `frontend/frontend-keycloak.json`.
+Keycloak conserva HTTP únicamente dentro de Docker; el gateway termina TLS y envía headers `X-Forwarded-*`. No publiques `8180` en la red.
 
-`OAUTH2_ENABLED` no debe definirse en `.env`. Permitir que el ambiente lo cambie sin cargar el override produciría un backend y un archivo de configuración en estados distintos.
+```env
+COMPOSE_FILE=docker-compose.yml:compose/keycloak.yml:compose/ssl.yml
+COMPOSE_PROFILES=keycloak,ssl
+KEYCLOAK_MODE=production
+KC_HOSTNAME=https://sihsalus.example.org/keycloak
+KEYCLOAK_PUBLIC_URL=https://sihsalus.example.org/keycloak
+OPENMRS_REDIRECT_URI=https://sihsalus.example.org/openmrs/*
+```
 
-## URLs internas y públicas
+En modo `production`, el contenedor exige hostname y redirect URI HTTPS, habilita hostname estricto y arranca con `start --optimized`. Una URL HTTP provoca un fallo temprano. El realm usa Authorization Code Flow y mantiene deshabilitado Direct Access Grants/password grant.
 
-- Los endpoints de token, user info y claves usan `http://keycloak:8080` dentro de Docker.
-- Las redirecciones del navegador usan `KEYCLOAK_PUBLIC_URL`.
-- `KC_HOSTNAME` debe representar el host aceptado por Keycloak.
+## Wiring con OpenMRS
 
-En un entorno HTTPS, Keycloak también debe publicarse con una URL HTTPS válida o detrás de un proxy TLS. No conviene servir OpenMRS por HTTPS y enviar credenciales de identidad a Keycloak por HTTP en una red no confiable.
+1. El core genera `oauth2.properties` con OAuth2 deshabilitado.
+2. `compose/keycloak.yml` lo regenera con OAuth2 habilitado.
+3. El backend espera la tarea de configuración y un Keycloak saludable.
+4. El frontend incluye `frontend-keycloak.json` durante su build.
 
-## Usuarios
+`OAUTH2_ENABLED` no se define en `.env`; core y override controlan ese estado para evitar configuraciones divergentes.
 
-El módulo OAuth2 de OpenMRS necesita poder mapear el usuario autenticado. Mantén el mismo `username` en OpenMRS y Keycloak y asigna los roles clínicos en OpenMRS. El realm importado es una base de configuración, no un reemplazo de la administración de permisos de OpenMRS.
+Los endpoints de token, user info y claves usan la red interna Docker. Las redirecciones del navegador usan `KEYCLOAK_PUBLIC_URL` a través del gateway.
 
-## Validación y diagnóstico
+## Usuarios y permisos
+
+El usuario autenticado debe poder mapearse a un usuario OpenMRS. Mantén el mismo `username` en ambos sistemas y administra roles clínicos dentro de OpenMRS. El realm importado configura OIDC, pero no sustituye la autorización clínica.
+
+## Diagnóstico
 
 ```bash
 ./scripts/validate-compose.sh
-
-docker compose \
-  -f docker-compose.yml \
-  -f compose/keycloak.yml \
-  --profile keycloak \
-  logs backend-oauth2-config keycloak backend
+docker compose logs backend-oauth2-config keycloak backend gateway
 ```
 
-Si falla una redirección, revisa `KEYCLOAK_PUBLIC_URL`, `KC_HOSTNAME` y los `Valid redirect URIs` del cliente `openmrs` en el realm.
+Si falla una redirección, revisa `KEYCLOAK_PUBLIC_URL`, `KC_HOSTNAME`, el certificado y los `Valid redirect URIs` del cliente `openmrs`.

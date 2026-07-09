@@ -14,14 +14,15 @@ ENV KEYCLOAK_IMPORT=/opt/keycloak/data/import/realm-export.json
 
 # Copiamos el realm duro
 COPY realm-export.json /opt/keycloak/data/import/realm-export.json
+COPY entrypoint.sh /opt/keycloak/bin/sihsalus-entrypoint.sh
 
 # Ajustamos permisos para el usuario 1000
 USER root
-RUN chown -R 1000:0 /opt/keycloak/data
+RUN chown -R 1000:0 /opt/keycloak/data \
+    && chmod 755 /opt/keycloak/bin/sihsalus-entrypoint.sh
 USER 1000
 
 # Pre-compilación para PostgreSQL
 RUN /opt/keycloak/bin/kc.sh build --db=${KC_DB}
 
-# Arranca en modo dev e importa el realm
-ENTRYPOINT ["/opt/keycloak/bin/kc.sh", "start-dev", "--import-realm"]
+ENTRYPOINT ["/opt/keycloak/bin/sihsalus-entrypoint.sh"]

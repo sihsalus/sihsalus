@@ -60,9 +60,13 @@ validate replica -f docker-compose.yml --profile replica
 validate keycloak -f docker-compose.yml -f compose/keycloak.yml --profile keycloak
 validate status -f docker-compose.yml -f compose/status.yml --profile status
 validate ssl -f docker-compose.yml -f compose/ssl.yml --profile ssl
+KEYCLOAK_MODE=production \
+KEYCLOAK_PUBLIC_URL=https://sihsalus.example.test/keycloak \
+KC_HOSTNAME=https://sihsalus.example.test/keycloak \
+OPENMRS_REDIRECT_URI=https://sihsalus.example.test/openmrs/* \
 validate keycloak-ssl -f docker-compose.yml -f compose/keycloak.yml -f compose/ssl.yml --profile keycloak --profile ssl
 
-python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" <<'PY'
+python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" "$EVIDENCE_DIR/imaging.json" "$EVIDENCE_DIR/keycloak-ssl.json" <<'PY'
 import json
 import sys
 
@@ -83,7 +87,7 @@ def service(config, name):
         fail(f"missing service: {name}")
 
 
-core, keycloak, ssl, ci = map(load, sys.argv[1:])
+core, keycloak, ssl, ci, imaging, keycloak_ssl = map(load, sys.argv[1:])
 core_backend = service(core, "backend")
 core_generator = service(core, "backend-oauth2-config")
 
@@ -112,9 +116,29 @@ spa_urls = service(keycloak, "frontend").get("build", {}).get("args", {}).get("S
 if "frontend-keycloak.json" not in spa_urls:
     fail("Keycloak override must include the frontend OAuth2 configuration")
 
+keycloak_ports = service(keycloak, "keycloak").get("ports", [])
+if not any(str(port.get("target")) == "8080" and port.get("host_ip") == "127.0.0.1" for port in keycloak_ports):
+    fail("Keycloak direct port must bind to localhost")
+
+production_keycloak_env = service(keycloak_ssl, "keycloak").get("environment", {})
+if production_keycloak_env.get("KEYCLOAK_MODE") != "production":
+    fail("Keycloak+SSL model must use production mode")
+if not production_keycloak_env.get("KC_HOSTNAME", "").startswith("https://"):
+    fail("production Keycloak hostname must use HTTPS")
+if not production_keycloak_env.get("OPENMRS_REDIRECT_URI", "").startswith("https://"):
+    fail("production OpenMRS redirect URI must use HTTPS")
+
 ssl_ports = service(ssl, "gateway").get("ports", [])
 if not any(str(port.get("target")) == "443" for port in ssl_ports):
     fail("SSL override must publish gateway port 443")
+
+orthanc_ports = service(imaging, "orthanc").get("ports", [])
+if not any(str(port.get("target")) == "4242" and port.get("host_ip") == "127.0.0.1" for port in orthanc_ports):
+    fail("DICOM port must bind to localhost by default")
+
+imaging_acl = service(imaging, "gateway").get("environment", {}).get("IMAGING_ACCESS_CONTROL", "")
+if "deny all" not in imaging_acl:
+    fail("Imaging gateway routes must deny non-private clients by default")
 
 if ci.get("volumes"):
     fail("docker-compose-no-volumes.yml must not declare named volumes")
