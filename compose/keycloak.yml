@@ -1,7 +1,29 @@
-# Keycloak OIDC/OAuth2 Authentication
-# Profile: keycloak
+# Keycloak OIDC/OAuth2 override.
+# Load explicitly with:
+#   docker compose -f docker-compose.yml -f compose/keycloak.yml --profile keycloak up -d
 
 services:
+  frontend:
+    build:
+      args:
+        SPA_CONFIG_URLS: /openmrs/spa/frontend.json,/openmrs/spa/frontend-keycloak.json
+
+  backend-oauth2-config:
+    environment:
+      OAUTH2_ENABLED: "true"
+      OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:?OAUTH2_CLIENT_SECRET is required when Keycloak is enabled}
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}
+
+  backend:
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    environment:
+      OAUTH2_ENABLED: "true"
+      OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:?OAUTH2_CLIENT_SECRET is required when Keycloak is enabled}
+    volumes:
+      - ./keycloak/openmrs_config/globalproperties/oauth2login.xml:/openmrs/distribution/openmrs_config/globalproperties/oauth2login.xml:ro
+
   keycloak:
     container_name: sihsalus-keycloak
     build:
@@ -11,12 +33,12 @@ services:
     profiles: [ keycloak ]
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-}
-      OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:-}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required when Keycloak is enabled}
+      OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:?OAUTH2_CLIENT_SECRET is required when Keycloak is enabled}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/${KC_DB_DATABASE:-keycloak}
       KC_DB_USERNAME: ${KC_DB_USERNAME:-keycloak}
-      KC_DB_PASSWORD: ${KC_DB_PASSWORD:-}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:?KC_DB_PASSWORD is required when Keycloak is enabled}
       KC_HOSTNAME: ${KC_HOSTNAME:-localhost}
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
@@ -45,7 +67,7 @@ services:
     environment:
       POSTGRES_DB: ${KC_DB_DATABASE:-keycloak}
       POSTGRES_USER: ${KC_DB_USERNAME:-keycloak}
-      POSTGRES_PASSWORD: ${KC_DB_PASSWORD:-}
+      POSTGRES_PASSWORD: ${KC_DB_PASSWORD:?KC_DB_PASSWORD is required when Keycloak is enabled}
     ports:
       # Solo accesible desde el host (administracion); Keycloak llega via auth-network.
       - "127.0.0.1:5434:5432"
@@ -59,3 +81,11 @@ services:
       start_period: 30s
     networks:
       - auth-network
+
+volumes:
+  keycloak-data:
+    name: sihsalus-keycloak-data
+
+networks:
+  auth-network:
+    driver: bridge

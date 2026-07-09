@@ -16,6 +16,7 @@
 
 - [Inicio Rápido](#inicio-rápido)
 - [Profiles](#profiles)
+- [Arquitectura de infraestructura](docs/architecture/infrastructure.md)
 - [Actualización en Producción](#actualización-en-producción)
 - [Docker Bake (Build)](#docker-bake-build)
 - [Configuración SSL/HTTPS](#configuración-sslhttps)
@@ -47,6 +48,13 @@ OMRS_OCL_TOKEN=<tu_token_de_ocl>
 ```
 
 > No uses los defaults `openmrs`/`openmrs` en producción.
+
+También puedes generar `.env.production` con credenciales aleatorias y auditarlo antes del despliegue:
+
+```bash
+./scripts/security/secrets_generate.sh
+./scripts/security-audit.sh .env.production
+```
 
 ### 2. Construir e iniciar
 
@@ -126,6 +134,8 @@ Cada profile requiere sus variables en `.env`. Ver `.env.template` para la lista
 
 El perfil `ssl` es un caso especial: no basta con pasar `--profile ssl` si solo se usa `docker-compose.yml`, porque la configuración SSL vive en `compose/ssl.yml` y ese archivo modifica el servicio `gateway` para exponer HTTPS.
 
+En servidores, define `COMPOSE_FILE` y `COMPOSE_PROFILES` en el archivo de entorno para conservar siempre la misma combinación. Ver [compose/README.md](compose/README.md).
+
 ## Actualización en Producción
 
 En producción, el objetivo es desplegar imágenes versionadas y evitar builds locales cuando la imagen runtime ya está publicada.
@@ -138,9 +148,10 @@ Actualmente el frontend se despliega como una imagen runtime local (`sihsalus-fr
 ```bash
 # 2) Definir tag fuente del frontend publicado en GHCR
 export FRONTEND_SOURCE_TAG=sha-<digest>
-docker pull ghcr.io/sihsalus/sihsalus-frontend:FRONTEND_SOURCE_TAG
+docker pull "ghcr.io/sihsalus/sihsalus-frontend:${FRONTEND_SOURCE_TAG}"
 
 # 3) Reconstruir y recrear solo frontend
+docker compose build frontend
 docker compose up -d --no-deps --no-build --force-recreate frontend
 docker compose ps frontend
 docker compose logs --tail 100 frontend
@@ -254,6 +265,8 @@ compose/
   status.yml                    # profile: status
   ssl.yml                       # override con -f (modifica gateway)
 ```
+
+Ver [arquitectura de infraestructura](docs/architecture/infrastructure.md) para límites, fuentes de verdad e invariantes de CI.
 
 ## Docker Bake (Build)
 
