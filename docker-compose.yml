@@ -38,8 +38,6 @@ include:
     project_directory: .
   - path: compose/replica.yml
     project_directory: .
-  - path: compose/keycloak.yml
-    project_directory: .
   - path: compose/monitoring.yml
     project_directory: .
   - path: compose/indicadores.yml
@@ -62,9 +60,6 @@ volumes:
   # Imaging (profile: imaging)
   orthanc-data:
     name: sihsalus-orthanc-data
-  # Keycloak (profile: keycloak)
-  keycloak-data:
-    name: sihsalus-keycloak-data
   # Monitoring (profile: monitoring)
   prometheus-data:
     name: sihsalus-prometheus-data
@@ -85,27 +80,6 @@ networks:
     ipam:
       config:
         - subnet: 172.27.0.0/24
-  # Red medica - DICOM/Orthanc/OHIF
-  dicom-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.24.0.0/24
-  # Red de autenticacion - Keycloak
-  auth-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.23.0.0/24
   # Red de monitoreo - Prometheus, Loki, Grafana
   monitoring-network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.25.0.0/24
-  # Red de gestion - Grafana admin
-  management-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.26.0.0/24

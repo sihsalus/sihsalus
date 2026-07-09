@@ -10,17 +10,20 @@ Usar este checklist para cambios en `main`, despliegues de `qlty`, `staging` o p
 - Backup reciente confirmado.
 - Ruta de rollback definida.
 - Variables y secretos requeridos confirmados sin exponer valores.
-- Si el entorno usa HTTPS, todos los comandos Compose incluyen `-f compose/ssl.yml --profile ssl`.
+- `COMPOSE_FILE` y `COMPOSE_PROFILES` reflejan el stack real del servidor.
+- Si el entorno usa HTTPS, `COMPOSE_FILE` incluye `compose/ssl.yml` y `COMPOSE_PROFILES` incluye `ssl`.
 
 ## Ejecución
 
 ```bash
 git pull --ff-only
+./scripts/security-audit.sh .env.production
+./scripts/validate-compose.sh
 docker compose config --quiet
 docker compose ps
 ```
 
-Para entornos HTTPS:
+Si el servidor todavía no usa selección persistente, pasa los overrides en cada comando. Ejemplo HTTPS:
 
 ```bash
 docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl config --quiet

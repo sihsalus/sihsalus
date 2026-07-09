@@ -7,7 +7,9 @@ on:
       - '.github/workflows/validate-compose.yml'
       - '.env.template'
       - 'docker-compose.yml'
+      - 'docker-compose-no-volumes.yml'
       - 'compose/**'
+      - 'scripts/validate-compose.sh'
       - 'gateway/**'
       - 'frontend/**'
       - 'keycloak/**'
@@ -17,7 +19,9 @@ on:
       - '.github/workflows/validate-compose.yml'
       - '.env.template'
       - 'docker-compose.yml'
+      - 'docker-compose-no-volumes.yml'
       - 'compose/**'
+      - 'scripts/validate-compose.sh'
       - 'gateway/**'
       - 'frontend/**'
       - 'keycloak/**'
@@ -37,47 +41,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Prepare evidence directory
-        run: mkdir -p compose-validation
-
-      - name: Validate core stack
-        run: |
-          docker compose config --quiet
-          docker compose config > compose-validation/core.yml
-
-      - name: Validate optional profiles
-        run: |
-          set -euo pipefail
-
-          validate() {
-            name="$1"
-            shift
-            docker compose "$@" config --quiet
-            docker compose "$@" config > "compose-validation/${name}.yml"
-          }
-
-          validate fua --profile fua
-          validate hapi --profile hapi
-          validate imaging --profile imaging
-          validate indicadores --profile indicadores
-          validate keycloak --profile keycloak
-          validate monitoring-logs --profile monitoring --profile logs
-          validate replica --profile replica
-
-      - name: Validate standalone overrides
-        run: |
-          set -euo pipefail
-
-          validate_override() {
-            name="$1"
-            shift
-            docker compose "$@" config --quiet
-            docker compose "$@" config > "compose-validation/${name}.yml"
-          }
-
-          validate_override status -f docker-compose.yml -f compose/status.yml --profile status
-          validate_override ssl -f docker-compose.yml -f compose/ssl.yml --profile ssl
-          validate_override keycloak-ssl -f docker-compose.yml -f compose/ssl.yml --profile keycloak --profile ssl
+      - name: Validate Compose models and invariants
+        run: ./scripts/validate-compose.sh compose-validation
 
       - name: Write validation summary
         if: always()
@@ -87,8 +52,8 @@ jobs:
             echo ""
             echo "| Target | Evidence file |"
             echo "| --- | --- |"
-            for file in compose-validation/*.yml; do
-              name="$(basename "$file" .yml)"
+            for file in compose-validation/*.json; do
+              name="$(basename "$file" .json)"
               echo "| ${name} | ${file} |"
             done
           } >> "$GITHUB_STEP_SUMMARY"

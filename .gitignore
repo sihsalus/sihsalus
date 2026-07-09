@@ -12,6 +12,9 @@ CLAUDE.md
 .clinerules
 
 .env
+.env.*
+!.env.template
+/secrets/
 *.pem
 *.crt
 *.key
