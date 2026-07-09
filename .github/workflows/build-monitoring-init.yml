@@ -51,7 +51,7 @@ jobs:
           cache-to: type=gha,scope=monitoring,mode=max
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@v3.9.2
+        uses: sigstore/cosign-installer@v4.1.2
 
       - name: Sign image
         env:
