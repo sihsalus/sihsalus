@@ -20,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       backend: ${{ steps.scope.outputs.backend }}
+      backup: ${{ steps.scope.outputs.backup }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -32,6 +33,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
           backend=true
+          backup=true
 
           if [ "$EVENT_NAME" != "workflow_dispatch" ] \
             && [ -n "$BASE_SHA" ] \
@@ -41,8 +43,18 @@ jobs:
             backend=false
           fi
 
+          if [ "$EVENT_NAME" != "workflow_dispatch" ] \
+            && [ -n "$BASE_SHA" ] \
+            && [[ ! "$BASE_SHA" =~ ^0+$ ]] \
+            && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
+            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml scripts/backup/ tests/backup/; then
+            backup=false
+          fi
+
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "backup=$backup" >> "$GITHUB_OUTPUT"
           echo "Backend build required: $backend"
+          echo "Backup round-trip required: $backup"
 
   compose:
     name: Validate Compose
@@ -97,16 +109,30 @@ jobs:
       - name: Build backend distribution
         run: mvn --batch-mode --update-snapshots --file backend/pom.xml clean package
 
+  backup:
+    name: Backup round-trip
+    needs: changes
+    if: needs.changes.outputs.backup == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Test encrypted dump and restore
+        run: ./tests/backup/dump-roundtrip.sh
+
   gate:
     name: PR Gate
     if: always()
-    needs: [compose, backend]
+    needs: [compose, backend, backup]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful validations
         env:
           COMPOSE_RESULT: ${{ needs.compose.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
+          BACKUP_RESULT: ${{ needs.backup.result }}
         run: |
           [ "$COMPOSE_RESULT" = "success" ]
           [ "$BACKEND_RESULT" = "success" ] || [ "$BACKEND_RESULT" = "skipped" ]
+          [ "$BACKUP_RESULT" = "success" ] || [ "$BACKUP_RESULT" = "skipped" ]

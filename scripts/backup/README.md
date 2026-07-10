@@ -1,59 +1,71 @@
-# Backup y Restore
+# Backup y restore MariaDB
 
-Scripts para respaldar y restaurar la base de datos MariaDB de sihsalus.
+Los scripts canónicos son:
 
-## Scripts disponibles
+| Script | Formato | Uso |
+| --- | --- | --- |
+| `backup_dump.sh` | SQL gzip, opcionalmente cifrado | Backup frecuente en caliente |
+| `restore_dump.sh` | SQL gzip, opcionalmente cifrado | Restore lógico con backend detenido |
+| `backup_full.sh` | `mariadb-backup`, siempre cifrado | Backup físico para recuperación completa |
+| `restore_full.sh` | `mariadb-backup` | Restore físico con snapshot previo del volumen |
 
-| Script | Tipo | Downtime | Descripcion |
-|--------|------|----------|-------------|
-| `backup_dump.sh` | SQL (caliente) | No | Dump SQL con `--single-transaction` |
-| `restore_dump.sh` | SQL (caliente) | Solo backend | Restaura dump `.sql.gz` sin detener DB |
-| `backup_full.sh` | Binario (frio) | No | Backup con `mariadb-backup` |
-| `restore_full.sh` | Binario (frio) | Si | Restaura backup binario, con snapshot de seguridad |
+## Requisitos de producción
 
-## Uso rapido
+```env
+MYSQL_ROOT_PASSWORD=<password-root>
+BACKUP_ENCRYPTION_PASSWORD=<clave-independiente>
+```
 
-### Dump SQL (en caliente, sin downtime)
+Para backup físico se recomienda el usuario dedicado:
+
+```env
+OMRS_DB_BACKUP_USER=openmrs_backup
+OMRS_DB_BACKUP_PASSWORD=<password-seguro>
+```
+
+No guardes `BACKUP_ENCRYPTION_PASSWORD` dentro del repositorio ni junto al backup cifrado.
+
+## Dump lógico
 
 ```bash
-# Backup
-./scripts/backup/backup_dump.sh
-
-# Restore interactivo (lista dumps disponibles)
-./scripts/backup/restore_dump.sh
-
-# Restore directo
-./scripts/backup/restore_dump.sh --file ~/sihsalus-dumps/dump_2026-03-09.sql.gz
+./scripts/backup/backup_dump.sh --dir /ruta/backups --max 10
+./scripts/backup/restore_dump.sh --file /ruta/backups/dump_FECHA.sql.gz.enc
 ```
 
-### Backup binario (en frio, mas rapido)
+El restore detiene y vuelve a iniciar únicamente `backend`; no reconcilia `gateway`, por lo que no elimina el override HTTPS.
+
+Para automatización o cuando otro runbook controla la aplicación:
 
 ```bash
-# Backup
-./scripts/backup/backup_full.sh
-
-# Restore interactivo
-./scripts/backup/restore_full.sh
-
-# Restore directo
-./scripts/backup/restore_full.sh --file ~/sihsalus-fullBackups/backup_2026-03-01.tar.gz.enc
+./scripts/backup/restore_dump.sh \
+  --file /ruta/backups/dump_FECHA.sql.gz.enc \
+  --yes \
+  --no-app-control
 ```
 
-## Opciones comunes
+## Backup físico
 
-```
---container NOMBRE    Contenedor DB (default: sihsalus-db-master)
---dir DIRECTORIO      Directorio de backups
---file ARCHIVO        Archivo especifico (omitir para seleccion interactiva)
---max N               Maximo de backups a retener (solo backup scripts)
+```bash
+./scripts/backup/backup_full.sh --dir /ruta/backups --max 10
+./scripts/backup/restore_full.sh --file /ruta/backups/backup_FECHA.tar.gz.enc
 ```
 
-## Cifrado
+Para ejecutar el backup físico sobre la réplica:
 
-Los backups se cifran con AES-256 si la variable `BACKUP_ENCRYPTION_PASSWORD` esta definida.
-El restore descifra automaticamente archivos `.enc` (pide clave si no esta en env).
+```bash
+./scripts/backup/backup_full.sh --container sihsalus-db-replic --dir /ruta/backups
+```
 
-## Seguridad del restore
+`restore_full.sh` detecta el volumen real montado en `/var/lib/mysql`, crea un snapshot temporal, restaura y levanta solo `db` y `backend`. Puede recibir `DB_VOLUME` explícitamente si el contenedor de base de datos no existe.
 
-- `restore_dump.sh`: idempotente, solo detiene el backend
-- `restore_full.sh`: crea un snapshot del volumen antes de limpiar. Si el restore falla, restaura automaticamente el snapshot anterior
+## Prueba automatizada
+
+```bash
+./tests/backup/dump-roundtrip.sh
+```
+
+La prueba inicia una MariaDB efímera, inserta datos, crea un dump cifrado, muta la tabla, restaura y verifica el valor original. CI la ejecuta cuando cambian los scripts o la propia prueba.
+
+## Regla operativa
+
+Un backup no se considera válido hasta verificar al menos checksum, descifrado y restore. Programa un restore periódico con datos no clínicos o en un ambiente aislado.

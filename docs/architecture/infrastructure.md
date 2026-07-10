@@ -51,6 +51,7 @@ La documentación no debe copiar listas completas de variables o comandos si pue
 - El override TLS publica el puerto 443.
 - Cada combinación soportada produce un modelo Compose válido.
 - El Compose de CI no declara volúmenes persistentes.
+- Los scripts de dump cifrado completan un backup/restore real sobre MariaDB efímera.
 
 Los modelos renderizados se guardan como artifacts de CI para evidencia de cambio.
 
