@@ -45,6 +45,8 @@ export SIHSALUS_REPORTES_SQL_DB_PASSWORD="${SIHSALUS_REPORTES_SQL_DB_PASSWORD:-c
 export KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-ci-keycloak-admin-123}"
 export KC_DB_PASSWORD="${KC_DB_PASSWORD:-ci-keycloak-db-123}"
 export OAUTH2_CLIENT_SECRET="${OAUTH2_CLIENT_SECRET:-ci-oauth2-secret-123}"
+export IMAGING_OIDC_CLIENT_SECRET="${IMAGING_OIDC_CLIENT_SECRET:-ci-imaging-client-secret-123}"
+export IMAGING_OAUTH_COOKIE_SECRET="${IMAGING_OAUTH_COOKIE_SECRET:-QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=}"
 export GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD:-ci-grafana-password-123}"
 export OMRS_OCL_TOKEN="${OMRS_OCL_TOKEN:-}"
 
@@ -64,15 +66,24 @@ validate indicadores -f docker-compose.yml --profile indicadores
 validate monitoring-logs -f docker-compose.yml --profile monitoring --profile logs
 validate replica -f docker-compose.yml --profile replica
 validate keycloak -f docker-compose.yml -f compose/keycloak.yml --profile keycloak
+validate imaging-auth -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml --profile keycloak --profile imaging
 validate status -f docker-compose.yml -f compose/status.yml --profile status
 validate ssl -f docker-compose.yml -f compose/ssl.yml --profile ssl
 KEYCLOAK_MODE=production \
 KEYCLOAK_PUBLIC_URL=https://sihsalus.example.test/keycloak \
 KC_HOSTNAME=https://sihsalus.example.test/keycloak \
 OPENMRS_REDIRECT_URI=https://sihsalus.example.test/openmrs/* \
+IMAGING_OAUTH_REDIRECT_URI=https://sihsalus.example.test/imaging/oauth2/callback \
 validate keycloak-ssl -f docker-compose.yml -f compose/keycloak.yml -f compose/ssl.yml --profile keycloak --profile ssl
+KEYCLOAK_MODE=production \
+KEYCLOAK_PUBLIC_URL=https://sihsalus.example.test/keycloak \
+KC_HOSTNAME=https://sihsalus.example.test/keycloak \
+OPENMRS_REDIRECT_URI=https://sihsalus.example.test/openmrs/* \
+IMAGING_OAUTH_REDIRECT_URI=https://sihsalus.example.test/imaging/oauth2/callback \
+IMAGING_OAUTH_COOKIE_SECURE=true \
+validate imaging-auth-ssl -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml -f compose/ssl.yml --profile keycloak --profile imaging --profile ssl
 
-python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" "$EVIDENCE_DIR/imaging.json" "$EVIDENCE_DIR/keycloak-ssl.json" "$EVIDENCE_DIR/monitoring-logs.json" <<'PY'
+python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" "$EVIDENCE_DIR/imaging.json" "$EVIDENCE_DIR/keycloak-ssl.json" "$EVIDENCE_DIR/monitoring-logs.json" "$EVIDENCE_DIR/imaging-auth.json" "$EVIDENCE_DIR/imaging-auth-ssl.json" keycloak/realm-export.json <<'PY'
 import json
 import sys
 
@@ -93,7 +104,7 @@ def service(config, name):
         fail(f"missing service: {name}")
 
 
-core, keycloak, ssl, ci, imaging, keycloak_ssl, monitoring = map(load, sys.argv[1:])
+core, keycloak, ssl, ci, imaging, keycloak_ssl, monitoring, imaging_auth, imaging_auth_ssl, realm = map(load, sys.argv[1:])
 core_backend = service(core, "backend")
 core_generator = service(core, "backend-oauth2-config")
 
@@ -133,6 +144,8 @@ if not production_keycloak_env.get("KC_HOSTNAME", "").startswith("https://"):
     fail("production Keycloak hostname must use HTTPS")
 if not production_keycloak_env.get("OPENMRS_REDIRECT_URI", "").startswith("https://"):
     fail("production OpenMRS redirect URI must use HTTPS")
+if not production_keycloak_env.get("IMAGING_OAUTH_REDIRECT_URI", "").startswith("https://"):
+    fail("production Imaging redirect URI must use HTTPS")
 
 ssl_ports = service(ssl, "gateway").get("ports", [])
 if not any(str(port.get("target")) == "443" for port in ssl_ports):
@@ -143,8 +156,53 @@ if not any(str(port.get("target")) == "4242" and port.get("host_ip") == "127.0.0
     fail("DICOM port must bind to localhost by default")
 
 imaging_acl = service(imaging, "gateway").get("environment", {}).get("IMAGING_ACCESS_CONTROL", "")
-if "deny all" not in imaging_acl:
-    fail("Imaging gateway routes must deny non-private clients by default")
+if imaging_acl.strip() != "deny all;":
+    fail("Imaging gateway routes must stay closed without the auth override")
+
+imaging_auth_service = service(imaging_auth, "imaging-auth")
+if imaging_auth_service.get("image") != "quay.io/oauth2-proxy/oauth2-proxy:v7.15.3":
+    fail("Imaging auth proxy must use the reviewed pinned version")
+if imaging_auth_service.get("ports"):
+    fail("Imaging auth proxy must not publish host ports")
+
+auth_env = imaging_auth_service.get("environment", {})
+if auth_env.get("OAUTH2_PROXY_PROVIDER") != "keycloak-oidc":
+    fail("Imaging auth must use the Keycloak OIDC provider")
+if auth_env.get("OAUTH2_PROXY_ALLOWED_ROLES") != "imaging-access":
+    fail("Imaging auth must require the explicit imaging-access role")
+if auth_env.get("OAUTH2_PROXY_CODE_CHALLENGE_METHOD") != "S256":
+    fail("Imaging auth must require PKCE S256")
+if "{id_token}" not in auth_env.get("OAUTH2_PROXY_BACKEND_LOGOUT_URL", ""):
+    fail("Imaging logout must terminate the Keycloak session")
+if auth_env.get("OAUTH2_PROXY_PASS_ACCESS_TOKEN") != "false":
+    fail("Imaging auth must not pass reusable access tokens to browser applications")
+
+protected_acl = service(imaging_auth, "gateway").get("environment", {}).get("IMAGING_ACCESS_CONTROL", "")
+if "deny all" not in protected_acl or "auth_request /imaging/oauth2/auth" not in protected_acl:
+    fail("Imaging auth override must combine network ACL and individual authentication")
+if service(imaging_auth, "gateway").get("depends_on", {}).get("imaging-auth", {}).get("condition") != "service_started":
+    fail("gateway must start with the Imaging auth proxy")
+
+production_auth_env = service(imaging_auth_ssl, "imaging-auth").get("environment", {})
+if production_auth_env.get("OAUTH2_PROXY_COOKIE_SECURE") != "true":
+    fail("production Imaging cookies must be HTTPS-only")
+if not production_auth_env.get("OAUTH2_PROXY_REDIRECT_URL", "").startswith("https://"):
+    fail("production Imaging callback must use HTTPS")
+
+realm_roles = {role.get("name") for role in realm.get("roles", {}).get("realm", [])}
+if "imaging-access" not in realm_roles:
+    fail("Keycloak realm must define imaging-access")
+
+imaging_clients = [client for client in realm.get("clients", []) if client.get("clientId") == "sihsalus-imaging"]
+if len(imaging_clients) != 1:
+    fail("Keycloak realm must define one dedicated Imaging client")
+imaging_client = imaging_clients[0]
+if imaging_client.get("directAccessGrantsEnabled") is not False:
+    fail("Imaging client must disable password grants")
+if imaging_client.get("secret") != "${IMAGING_OIDC_CLIENT_SECRET}":
+    fail("Imaging client must use its dedicated injected secret")
+if imaging_client.get("attributes", {}).get("pkce.code.challenge.method") != "S256":
+    fail("Imaging client must require PKCE S256")
 
 if ci.get("volumes"):
     fail("docker-compose-no-volumes.yml must not declare named volumes")

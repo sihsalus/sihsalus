@@ -56,7 +56,7 @@ Registrar:
 - Si aplica, Keycloak redirige a `/openmrs/spa/home`.
 - Si aplica, FUA responde bajo su ruta de gateway.
 - Si aplica, indicadores responde bajo `/openmrs/services/reportes-sql`.
-- Si aplica, imaging/OHIF no muestra errores de gateway/CSP.
+- Si aplica, Imaging rechaza anónimos, acepta solo `imaging-access`, carga OHIF/DICOMweb y `/imaging/logout` exige un nuevo login.
 - Logs de `gateway` y `backend` sin errores nuevos críticos.
 
 ## Cierre

@@ -1,0 +1,60 @@
+# Individual OIDC authorization for OHIF and Orthanc web routes.
+# Load after compose/keycloak.yml and enable the imaging + keycloak profiles.
+
+services:
+  gateway:
+    depends_on:
+      imaging-auth:
+        condition: service_started
+    environment:
+      IMAGING_ACCESS_CONTROL: >-
+        ${IMAGING_NETWORK_ACCESS_CONTROL:-allow 127.0.0.1; allow 10.0.0.0/8; allow 172.16.0.0/12; allow 192.168.0.0/16; deny all;}
+        auth_request /imaging/oauth2/auth;
+        error_page 401 = @imaging_oauth_signin;
+
+  imaging-auth:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.3
+    restart: "unless-stopped"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    environment:
+      OAUTH2_PROXY_PROVIDER: keycloak-oidc
+      OAUTH2_PROXY_CLIENT_ID: sihsalus-imaging
+      OAUTH2_PROXY_CLIENT_SECRET: ${IMAGING_OIDC_CLIENT_SECRET:?IMAGING_OIDC_CLIENT_SECRET is required for Imaging}
+      OAUTH2_PROXY_COOKIE_SECRET: ${IMAGING_OAUTH_COOKIE_SECRET:?IMAGING_OAUTH_COOKIE_SECRET is required for Imaging}
+      OAUTH2_PROXY_COOKIE_NAME: _sihsalus_imaging
+      OAUTH2_PROXY_COOKIE_SECURE: ${IMAGING_OAUTH_COOKIE_SECURE:-false}
+      OAUTH2_PROXY_COOKIE_HTTPONLY: "true"
+      OAUTH2_PROXY_COOKIE_SAMESITE: lax
+      OAUTH2_PROXY_COOKIE_EXPIRE: 8h
+      OAUTH2_PROXY_COOKIE_REFRESH: 1h
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+      OAUTH2_PROXY_PROXY_PREFIX: /imaging/oauth2
+      OAUTH2_PROXY_REDIRECT_URL: ${IMAGING_OAUTH_REDIRECT_URI:-http://localhost/imaging/oauth2/callback}
+      OAUTH2_PROXY_OIDC_ISSUER_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost/keycloak}/realms/openmrs
+      # Browser redirects use the public gateway URL. Token and key retrieval
+      # stay on Docker's internal network and do not depend on hairpin DNS.
+      OAUTH2_PROXY_SKIP_OIDC_DISCOVERY: "true"
+      OAUTH2_PROXY_LOGIN_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost/keycloak}/realms/openmrs/protocol/openid-connect/auth
+      OAUTH2_PROXY_REDEEM_URL: http://keycloak:8080/realms/openmrs/protocol/openid-connect/token
+      OAUTH2_PROXY_PROFILE_URL: http://keycloak:8080/realms/openmrs/protocol/openid-connect/userinfo
+      OAUTH2_PROXY_OIDC_JWKS_URL: http://keycloak:8080/realms/openmrs/protocol/openid-connect/certs
+      OAUTH2_PROXY_BACKEND_LOGOUT_URL: http://keycloak:8080/realms/openmrs/protocol/openid-connect/logout?id_token_hint={id_token}
+      OAUTH2_PROXY_ALLOWED_ROLES: imaging-access
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_SCOPE: openid profile email
+      OAUTH2_PROXY_CODE_CHALLENGE_METHOD: S256
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_TRUSTED_PROXY_IPS: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_PASS_ACCESS_TOKEN: "false"
+      OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER: "false"
+      OAUTH2_PROXY_PASS_USER_HEADERS: "false"
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      OAUTH2_PROXY_UPSTREAMS: static://202
+      OAUTH2_PROXY_SILENCE_PING_LOGGING: "true"
+    networks:
+      - auth-network
+      - default
+

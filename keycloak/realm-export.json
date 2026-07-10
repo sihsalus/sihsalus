@@ -21,10 +21,14 @@
                 "name": "Provider",
                 "description": "Healthcare provider role"
             },
-            {
-                "name": "Clerk",
-                "description": "Data entry clerk role"
-            }
+      {
+        "name": "Clerk",
+        "description": "Data entry clerk role"
+      },
+      {
+        "name": "imaging-access",
+        "description": "Authorized access to OHIF and Orthanc web routes"
+      }
         ]
     },
     "clients": [
@@ -100,16 +104,39 @@
                         "jsonType.label": "String"
                     }
                 }
-            ]
-        }
-    ],
+      ]
+    },
+    {
+      "clientId": "sihsalus-imaging",
+      "name": "SIH Salus Imaging",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${IMAGING_OIDC_CLIENT_SECRET}",
+      "redirectUris": [
+        "${IMAGING_OAUTH_REDIRECT_URI}"
+      ],
+      "webOrigins": [],
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": false,
+      "frontchannelLogout": true,
+      "fullScopeAllowed": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ],
     "users": [
         {
             "username": "admin",
             "enabled": true,
             "firstName": "Super",
-            "lastName": "User",
-            "email": "admin@openmrs.org",
+      "lastName": "User",
+      "email": "admin@openmrs.org",
+      "emailVerified": true,
             "credentials": [
                 {
                     "type": "password",
@@ -117,9 +144,10 @@
                     "temporary": true
                 }
             ],
-            "realmRoles": [
-                "System Developer"
-            ]
+      "realmRoles": [
+        "System Developer",
+        "imaging-access"
+      ]
         }
     ]
 }

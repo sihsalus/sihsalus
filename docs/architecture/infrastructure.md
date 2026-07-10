@@ -8,7 +8,7 @@ SIH Salus usa Docker Compose como orquestador de un único host. El diseño prio
 | --- | --- | --- |
 | Entrada | `gateway`, `certbot` | HTTP/HTTPS, CSP, proxy y certificados |
 | Aplicación clínica | `frontend`, `backend`, `db` | SPA OpenMRS, API y datos clínicos |
-| Identidad | `keycloak`, `keycloak-db` | OIDC opcional; no reemplaza roles de OpenMRS |
+| Identidad | `keycloak`, `keycloak-db`, `imaging-auth` | OIDC opcional; autorización Imaging por rol dedicado |
 | Interoperabilidad | `hapi-fhir`, `fua-generator`, `reportes-sql` | Integraciones y reportes con bases separadas |
 | Imágenes | `ohif`, `orthanc`, `orthanc-proxy` | Visualización y almacenamiento DICOM |
 | Operación | `grafana`, `prometheus`, `loki`, `alloy`, `gatus` | Métricas, logs y estado local sin datos clínicos |
@@ -21,6 +21,7 @@ Los servicios se descubren por el DNS de Compose. No se fijan subredes ni direcc
 docker-compose.yml
   + include: core y módulos que solo agregan servicios
   + override opcional: compose/keycloak.yml
+  + override requerido por Imaging: compose/imaging-auth.yml
   + override opcional: compose/ssl.yml
   + override opcional: compose/status.yml
 ```
@@ -47,6 +48,7 @@ La documentación no debe copiar listas completas de variables o comandos si pue
 
 - El core mantiene OAuth2 deshabilitado.
 - El override Keycloak activa OAuth2 en backend, archivo generado y frontend.
+- Las rutas web de Imaging permanecen cerradas sin el override OIDC y exigen `imaging-access` cuando se habilitan.
 - El backend espera la configuración OAuth2 y, cuando aplica, un Keycloak saludable.
 - El override TLS publica el puerto 443.
 - Cada combinación soportada produce un modelo Compose válido.

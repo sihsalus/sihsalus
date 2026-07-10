@@ -21,7 +21,10 @@ services:
       FRAME_ANCESTORS: ${FRAME_ANCESTORS:-}
       FUA_CONFIG: ${FUA_CONFIG:-}
       FUA_LOCATIONS: ${FUA_LOCATIONS:-}
-      IMAGING_ACCESS_CONTROL: "${IMAGING_ACCESS_CONTROL:-allow 127.0.0.1; allow 10.0.0.0/8; allow 172.16.0.0/12; allow 192.168.0.0/16; deny all;}"
+      # Imaging web routes are closed unless compose/imaging-auth.yml replaces
+      # this value with network ACL plus OIDC auth_request directives.
+      IMAGING_ACCESS_CONTROL: "deny all;"
+      IMAGING_NETWORK_ACCESS_CONTROL: "${IMAGING_NETWORK_ACCESS_CONTROL:-allow 127.0.0.1; allow 10.0.0.0/8; allow 172.16.0.0/12; allow 192.168.0.0/16; deny all;}"
     healthcheck:
       # /health lo sirve el propio nginx: mide la salud del gateway, no la de
       # los upstreams ("/" redirige 301 al frontend y acoplaria ambos estados).

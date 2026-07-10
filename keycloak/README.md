@@ -9,6 +9,8 @@ KEYCLOAK_MODE=development
 KEYCLOAK_ADMIN_PASSWORD=<password-seguro>
 KC_DB_PASSWORD=<password-seguro>
 OAUTH2_CLIENT_SECRET=<secret-del-cliente-openmrs>
+IMAGING_OIDC_CLIENT_SECRET=<secret-del-cliente-imaging>
+IMAGING_OAUTH_REDIRECT_URI=http://localhost/imaging/oauth2/callback
 KC_HOSTNAME=http://localhost/keycloak
 KEYCLOAK_PUBLIC_URL=http://localhost/keycloak
 OPENMRS_REDIRECT_URI=http://localhost/openmrs/*
@@ -35,9 +37,10 @@ KEYCLOAK_MODE=production
 KC_HOSTNAME=https://sihsalus.example.org/keycloak
 KEYCLOAK_PUBLIC_URL=https://sihsalus.example.org/keycloak
 OPENMRS_REDIRECT_URI=https://sihsalus.example.org/openmrs/*
+IMAGING_OAUTH_REDIRECT_URI=https://sihsalus.example.org/imaging/oauth2/callback
 ```
 
-En modo `production`, el contenedor exige hostname y redirect URI HTTPS, habilita hostname estricto y arranca con `start --optimized`. Una URL HTTP provoca un fallo temprano. El realm usa Authorization Code Flow y mantiene deshabilitado Direct Access Grants/password grant.
+En modo `production`, el contenedor exige hostname y redirect URI HTTPS, habilita hostname estricto y arranca con `start --optimized`. Una URL HTTP provoca un fallo temprano. El realm usa Authorization Code Flow, mantiene deshabilitado Direct Access Grants/password grant y exige PKCE S256 en el cliente `sihsalus-imaging`.
 
 ## Wiring con OpenMRS
 
@@ -52,7 +55,7 @@ Los endpoints de token, user info y claves usan la red interna Docker. Las redir
 
 ## Usuarios y permisos
 
-El usuario autenticado debe poder mapearse a un usuario OpenMRS. Mantén el mismo `username` en ambos sistemas y administra roles clínicos dentro de OpenMRS. El realm importado configura OIDC, pero no sustituye la autorización clínica.
+El usuario autenticado debe poder mapearse a un usuario OpenMRS. Mantén el mismo `username` en ambos sistemas y administra roles clínicos dentro de OpenMRS. El realm importado configura OIDC, pero no sustituye la autorización clínica. Imaging es la excepción explícita: el gateway exige además el realm role `imaging-access` antes de exponer OHIF o DICOMweb.
 
 ## Diagnóstico
 
