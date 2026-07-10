@@ -1,26 +1,34 @@
-# One-shot seed restore from a GitHub Release artifact.
+# One-shot encrypted seed restore from a GitHub Release artifact.
 #
-# Usage:
-#   SIHSALUS_SEED_URL=https://github.com/sihsalus/sihsalus/releases/download/<tag>/sihsalus-seed.tar.gz \
-#   docker compose -f docker-compose.yml -f compose/seed.yml --profile seed up -d
+# Bring the normal stack down without deleting volumes, then run only the
+# restore service:
+#   docker compose down
+#   docker compose \
+#     -f docker-compose.yml \
+#     -f compose/seed.yml \
+#     --profile seed \
+#     run --build --rm --no-deps seed
 #
-# To replace existing volumes:
-#   SIHSALUS_SEED_FORCE=true ...
+# After a successful restore, start the normal stack without this override.
+# To replace existing volumes, set SIHSALUS_SEED_FORCE=true.
 
 services:
   seed:
-    image: curlimages/curl:8.10.1
+    image: sihsalus-seed-restore:local
+    build:
+      context: ./scripts/seed
     user: "0:0"
     profiles: [ "seed" ]
     restart: "no"
     environment:
-      SIHSALUS_SEED_URL: ${SIHSALUS_SEED_URL:-}
-      SIHSALUS_SEED_SHA256: ${SIHSALUS_SEED_SHA256:-}
+      SIHSALUS_SEED_URL: ${SIHSALUS_SEED_URL:?set SIHSALUS_SEED_URL}
+      SIHSALUS_SEED_SHA256: ${SIHSALUS_SEED_SHA256:?set SIHSALUS_SEED_SHA256}
+      SIHSALUS_SEED_PASSPHRASE_FILE: /run/secrets/seed_passphrase
       SIHSALUS_SEED_FORCE: ${SIHSALUS_SEED_FORCE:-false}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
-    entrypoint: [ "/bin/sh", "/usr/local/bin/apply-seed.sh" ]
+    secrets:
+      - seed_passphrase
     volumes:
-      - ./scripts/seed/apply-seed.sh:/usr/local/bin/apply-seed.sh:ro
       - db-data:/seed/db-data
       - openmrs-data:/seed/openmrs-data
       - db-fua-generator:/seed/fua-db-data
@@ -29,3 +37,17 @@ services:
     depends_on:
       seed:
         condition: service_completed_successfully
+
+  backend-oauth2-config:
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+  fua-generator-db:
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+secrets:
+  seed_passphrase:
+    file: ${SIHSALUS_SEED_PASSPHRASE_FILE:?set SIHSALUS_SEED_PASSPHRASE_FILE}

@@ -9,7 +9,7 @@ Este directorio contiene las herramientas ejecutables del stack. La documentaci�
 | `backup/` | Dump, backup binario, restore y rotación | [backup/README.md](backup/README.md) |
 | `database/` | Inicialización de usuarios y réplica MariaDB | [database/README.md](database/README.md) |
 | `security/` | Generación y auditoría de archivos de entorno | [security/README.md](security/README.md) |
-| `seed/` | Crear y aplicar releases de datos seed | Comentarios de cada script |
+| `seed/` | Crear y aplicar releases cifrados de datos seed | [seed/README.md](seed/README.md) |
 | `utils/` | Inicialización, certificados y soporte operativo | [utils/README.md](utils/README.md) |
 | `validate-compose.sh` | Validación local y de CI de todos los modelos Compose | [compose/README.md](../compose/README.md) |
 | `management-tunnel.sh` | Túneles SSH hacia consolas administrativas locales | Ayuda del script |
@@ -22,6 +22,7 @@ Este directorio contiene las herramientas ejecutables del stack. La documentaci�
 - No ejecutes scripts de restore sin backup previo y ventana operativa aprobada.
 - `BACKUP_ENCRYPTION_PASSWORD` debe venir del ambiente o de un gestor de secretos; Docker Compose no usa Docker secrets en este repositorio.
 - Los backups solo se cifran cuando `BACKUP_ENCRYPTION_PASSWORD` está definida. Producción debe definirla.
+- Los seeds se cifran siempre y requieren `SIHSALUS_SEED_PASSPHRASE_FILE`.
 - No guardes claves, tokens, archivos `.env` o datos clínicos en Git ni en artifacts de CI.
 
 ## Validación rápida
