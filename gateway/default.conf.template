@@ -139,6 +139,8 @@ server {
     proxy_set_header X-Forwarded-Host $host;
     proxy_set_header X-Forwarded-Proto $forwarded_proto;
     proxy_set_header X-Forwarded-Port $server_port;
+    proxy_set_header X-Forwarded-Prefix /keycloak;
+    proxy_read_timeout 300s;
     proxy_pass $keycloak;
   }
 
@@ -168,6 +170,7 @@ server {
   }
 
   location /orthanc/ {
+    ${IMAGING_ACCESS_CONTROL}
     set $orthanc_proxy http://orthanc-proxy;
     # Orthanc UI/API can receive DICOM studies and archives.
     client_max_body_size 0;
@@ -182,6 +185,7 @@ server {
   }
 
   location /imaging/dicom-web/ {
+    ${IMAGING_ACCESS_CONTROL}
     set $orthanc_proxy http://orthanc-proxy;
     # DICOMweb STOW-RS uploads can exceed the default gateway upload cap.
     client_max_body_size 0;
@@ -191,6 +195,7 @@ server {
   }
 
   location /imaging/wado {
+    ${IMAGING_ACCESS_CONTROL}
     set $orthanc_proxy http://orthanc-proxy;
     rewrite ^/imaging/(.*)$ /$1 break;
     proxy_read_timeout 300s;
@@ -205,6 +210,7 @@ server {
   }
 
   location /imaging/ {
+    ${IMAGING_ACCESS_CONTROL}
     set $ohif http://ohif;
     rewrite ^/imaging/(.*) /$1 break;
     proxy_buffering off;
@@ -226,6 +232,7 @@ server {
   }
 
   location /dicom-web/ {
+    ${IMAGING_ACCESS_CONTROL}
     set $orthanc_proxy http://orthanc-proxy;
     # DICOMweb STOW-RS uploads can exceed the default gateway upload cap.
     client_max_body_size 0;
@@ -234,6 +241,7 @@ server {
   }
 
   location /wado {
+    ${IMAGING_ACCESS_CONTROL}
     set $orthanc_proxy http://orthanc-proxy;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;

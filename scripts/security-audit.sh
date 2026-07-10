@@ -106,6 +106,21 @@ if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
     check_secret KEYCLOAK_ADMIN_PASSWORD
     check_secret KC_DB_PASSWORD
     check_secret OAUTH2_CLIENT_SECRET
+
+    if [ "$(env_value KEYCLOAK_MODE)" = "production" ]; then
+      case "$(env_value KEYCLOAK_PUBLIC_URL)" in
+        https://*) ok "KEYCLOAK_PUBLIC_URL uses HTTPS" ;;
+        *) fail "KEYCLOAK_PUBLIC_URL must use HTTPS in production mode" ;;
+      esac
+      case "$(env_value KC_HOSTNAME)" in
+        https://*) ok "KC_HOSTNAME uses HTTPS" ;;
+        *) fail "KC_HOSTNAME must be a full HTTPS URL in production mode" ;;
+      esac
+      case "$(env_value OPENMRS_REDIRECT_URI)" in
+        https://*) ok "OPENMRS_REDIRECT_URI uses HTTPS" ;;
+        *) fail "OPENMRS_REDIRECT_URI must use HTTPS in production mode" ;;
+      esac
+    fi
   fi
   if profile_enabled monitoring || profile_enabled logs; then
     check_secret GRAFANA_ADMIN_PASSWORD

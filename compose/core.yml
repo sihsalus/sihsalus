@@ -21,6 +21,7 @@ services:
       FRAME_ANCESTORS: ${FRAME_ANCESTORS:-}
       FUA_CONFIG: ${FUA_CONFIG:-}
       FUA_LOCATIONS: ${FUA_LOCATIONS:-}
+      IMAGING_ACCESS_CONTROL: "${IMAGING_ACCESS_CONTROL:-allow 127.0.0.1; allow 10.0.0.0/8; allow 172.16.0.0/12; allow 192.168.0.0/16; deny all;}"
     healthcheck:
       # /health lo sirve el propio nginx: mide la salud del gateway, no la de
       # los upstreams ("/" redirige 301 al frontend y acoplaria ambos estados).
@@ -77,7 +78,7 @@ services:
       OMRS_OCL_TOKEN: ${OMRS_OCL_TOKEN:-}
       OAUTH2_ENABLED: "false"
       OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:-}
-      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost/keycloak}
     healthcheck:
       # /health/started solo responde 200 cuando OpenMRS termino de inicializar.
       # Si falla, Docker conserva este mensaje en el historial del healthcheck,
@@ -100,7 +101,7 @@ services:
     environment:
       OAUTH2_ENABLED: "false"
       OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:-}
-      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost/keycloak}
     command:
       - sh
       - -euc
