@@ -23,6 +23,8 @@ El archivo contiene credenciales para el core y los perfiles opcionales. Antes d
 
 No se crean archivos duplicados bajo `secrets/`: `.env.production` es la única salida local y ya está excluida de Git.
 
+El archivo generado usa `DEPLOYMENT_ENV=production` y conserva `latest` como marcador visible. `security-audit.sh` fallará hasta reemplazar esos tags por versiones inmutables; esto evita desplegar accidentalmente una imagen distinta durante un recreate o rollback.
+
 ## Auditar configuración
 
 ```bash

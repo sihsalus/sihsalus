@@ -61,4 +61,4 @@ Los modelos renderizados se guardan como artifacts de CI para evidencia de cambi
 
 - Las imágenes con tag `latest` siguen siendo adecuadas para desarrollo, pero producción debe fijar tags inmutables.
 - `container_name` facilita scripts operativos existentes, aunque impide ejecutar dos proyectos SIH Salus en el mismo host. Su eliminación requiere actualizar primero esos scripts.
-- El socket Docker solo se monta al activar el profile `logs`; aun en modo de solo lectura implica privilegios elevados y debe limitarse a hosts administrados.
+- El socket Docker solo se monta en `docker-socket-proxy` al activar `logs`; Alloy recibe una API limitada con operaciones de escritura deshabilitadas.

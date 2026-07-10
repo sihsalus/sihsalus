@@ -27,6 +27,12 @@ else
   trap 'rm -rf "$EVIDENCE_DIR"' EXIT
 fi
 
+# Profiles are applied after interpolation. The core must therefore render
+# without any optional-profile credentials in the process environment.
+env -i PATH="$PATH" HOME="${HOME:-/tmp}" \
+  docker compose --env-file /dev/null -f docker-compose.yml config --quiet
+echo "[OK] core without optional-profile secrets"
+
 # Deterministic non-production values. /dev/null prevents a local .env from
 # changing which files/profiles are validated or leaking secrets to artifacts.
 export MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-ci-root-password-123}"
@@ -66,7 +72,7 @@ KC_HOSTNAME=https://sihsalus.example.test/keycloak \
 OPENMRS_REDIRECT_URI=https://sihsalus.example.test/openmrs/* \
 validate keycloak-ssl -f docker-compose.yml -f compose/keycloak.yml -f compose/ssl.yml --profile keycloak --profile ssl
 
-python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" "$EVIDENCE_DIR/imaging.json" "$EVIDENCE_DIR/keycloak-ssl.json" <<'PY'
+python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" "$EVIDENCE_DIR/imaging.json" "$EVIDENCE_DIR/keycloak-ssl.json" "$EVIDENCE_DIR/monitoring-logs.json" <<'PY'
 import json
 import sys
 
@@ -87,7 +93,7 @@ def service(config, name):
         fail(f"missing service: {name}")
 
 
-core, keycloak, ssl, ci, imaging, keycloak_ssl = map(load, sys.argv[1:])
+core, keycloak, ssl, ci, imaging, keycloak_ssl, monitoring = map(load, sys.argv[1:])
 core_backend = service(core, "backend")
 core_generator = service(core, "backend-oauth2-config")
 
@@ -142,6 +148,18 @@ if "deny all" not in imaging_acl:
 
 if ci.get("volumes"):
     fail("docker-compose-no-volumes.yml must not declare named volumes")
+
+alloy = service(monitoring, "alloy")
+socket_proxy = service(monitoring, "docker-socket-proxy")
+
+for volume in alloy.get("volumes", []):
+    if volume.get("source") == "/var/run/docker.sock":
+        fail("Alloy must not mount the Docker socket directly")
+
+if socket_proxy.get("environment", {}).get("POST") != "0":
+    fail("Docker socket proxy must reject POST requests")
+if not any(volume.get("source") == "/var/run/docker.sock" for volume in socket_proxy.get("volumes", [])):
+    fail("Docker socket proxy must own the socket mount")
 
 print("[OK] semantic Compose invariants")
 PY
