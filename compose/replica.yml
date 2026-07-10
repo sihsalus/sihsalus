@@ -19,9 +19,9 @@ services:
       retries: 5
       start_period: 30s
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required when replica is enabled}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-}
       OMRS_DB_REPL_USER: ${OMRS_DB_REPL_USER:-openmrs_repl}
-      OMRS_DB_REPL_PASSWORD: ${OMRS_DB_REPL_PASSWORD:?OMRS_DB_REPL_PASSWORD is required when replica is enabled}
+      OMRS_DB_REPL_PASSWORD: ${OMRS_DB_REPL_PASSWORD:-}
     volumes:
       - ./scripts/database/db_replica_entrypoint.sh:/usr/local/bin/sihsalus-db-replica-entrypoint.sh:ro
       - ./scripts/database/db_init_slave.sh:/docker-entrypoint-initdb.d/db_init_slave.sh:ro

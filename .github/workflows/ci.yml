@@ -21,12 +21,13 @@ jobs:
     outputs:
       backend: ${{ steps.scope.outputs.backend }}
       backup: ${{ steps.scope.outputs.backup }}
+      monitoring: ${{ steps.scope.outputs.monitoring }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
 
-      - name: Detect backend changes
+      - name: Detect scoped changes
         id: scope
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -34,27 +35,37 @@ jobs:
         run: |
           backend=true
           backup=true
+          monitoring=true
 
+          can_diff=false
           if [ "$EVENT_NAME" != "workflow_dispatch" ] \
             && [ -n "$BASE_SHA" ] \
             && [[ ! "$BASE_SHA" =~ ^0+$ ]] \
-            && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
+            && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            can_diff=true
+          fi
+
+          if [ "$can_diff" = "true" ] \
             && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- pom.xml backend/; then
             backend=false
           fi
 
-          if [ "$EVENT_NAME" != "workflow_dispatch" ] \
-            && [ -n "$BASE_SHA" ] \
-            && [[ ! "$BASE_SHA" =~ ^0+$ ]] \
-            && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
+          if [ "$can_diff" = "true" ] \
             && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml scripts/backup/ tests/backup/; then
             backup=false
           fi
 
+          if [ "$can_diff" = "true" ] \
+            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml compose/monitoring.yml monitoring/alloy/ tests/monitoring/; then
+            monitoring=false
+          fi
+
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
           echo "backup=$backup" >> "$GITHUB_OUTPUT"
+          echo "monitoring=$monitoring" >> "$GITHUB_OUTPUT"
           echo "Backend build required: $backend"
           echo "Backup round-trip required: $backup"
+          echo "Monitoring runtime test required: $monitoring"
 
   compose:
     name: Validate Compose
@@ -121,10 +132,22 @@ jobs:
       - name: Test encrypted dump and restore
         run: ./tests/backup/dump-roundtrip.sh
 
+  monitoring:
+    name: Docker API proxy
+    needs: changes
+    if: needs.changes.outputs.monitoring == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Verify read-only Docker API
+        run: ./tests/monitoring/socket-proxy.sh
+
   gate:
     name: PR Gate
     if: always()
-    needs: [compose, backend, backup]
+    needs: [compose, backend, backup, monitoring]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful validations
@@ -132,7 +155,9 @@ jobs:
           COMPOSE_RESULT: ${{ needs.compose.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
           BACKUP_RESULT: ${{ needs.backup.result }}
+          MONITORING_RESULT: ${{ needs.monitoring.result }}
         run: |
           [ "$COMPOSE_RESULT" = "success" ]
           [ "$BACKEND_RESULT" = "success" ] || [ "$BACKEND_RESULT" = "skipped" ]
           [ "$BACKUP_RESULT" = "success" ] || [ "$BACKUP_RESULT" = "skipped" ]
+          [ "$MONITORING_RESULT" = "success" ] || [ "$MONITORING_RESULT" = "skipped" ]

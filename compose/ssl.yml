@@ -40,7 +40,6 @@ services:
     build:
       context: ./gateway
       dockerfile: Dockerfile
-    image: sihsalus-gateway:latest
     ports:
       - "${GATEWAY_HTTPS_PORT:-443}:443"
     environment:

@@ -24,7 +24,7 @@ services:
         exec /run.sh
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required when monitoring is enabled}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-}
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001}
       GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_USERS_ALLOW_SIGN_UP: "false"
@@ -137,7 +137,6 @@ services:
       - "127.0.0.1:12345:12345"
     volumes:
       - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       - alloy-data:/var/lib/alloy
     command:
       - run
@@ -151,8 +150,31 @@ services:
       retries: 3
       start_period: 10s
     depends_on:
-      - loki
-      - prometheus
+      loki:
+        condition: service_started
+      prometheus:
+        condition: service_started
+      docker-socket-proxy:
+        condition: service_started
     networks:
       - monitoring-network
-      - default
+
+  docker-socket-proxy:
+    container_name: sihsalus-docker-socket-proxy
+    image: tecnativa/docker-socket-proxy:v0.4.2
+    restart: "unless-stopped"
+    profiles: [ logs ]
+    environment:
+      CONTAINERS: "1"
+      EVENTS: "1"
+      INFO: "1"
+      PING: "1"
+      VERSION: "1"
+      POST: "0"
+      LOG_LEVEL: warning
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - monitoring-network

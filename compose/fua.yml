@@ -12,10 +12,10 @@ services:
     profiles: [ fua ]
     environment:
       DB_USER: ${SIHSALUS_FUA_GEN_DB_USER:-fuagenerator}
-      DB_PASSWORD: ${SIHSALUS_FUA_GEN_DB_PASSWORD:?SIHSALUS_FUA_GEN_DB_PASSWORD is required when FUA is enabled}
+      DB_PASSWORD: ${SIHSALUS_FUA_GEN_DB_PASSWORD:-}
       DB_NAME: ${SIHSALUS_FUA_GEN_DB:-fuagenerator}
-      TOKEN: ${SIHSALUS_FUA_GEN_TOKEN:?SIHSALUS_FUA_GEN_TOKEN is required when FUA is enabled}
-      SECRET_KEY: ${SIHSALUS_FUA_GEN_SECRET_KEY:?SIHSALUS_FUA_GEN_SECRET_KEY is required when FUA is enabled}
+      TOKEN: ${SIHSALUS_FUA_GEN_TOKEN:-}
+      SECRET_KEY: ${SIHSALUS_FUA_GEN_SECRET_KEY:-}
       DB_HOST: "fua-generator-db"
       DB_PORT: "5432"
     depends_on:
@@ -38,7 +38,7 @@ services:
     profiles: [ fua ]
     environment:
       POSTGRES_USER: ${SIHSALUS_FUA_GEN_DB_USER:-fuagenerator}
-      POSTGRES_PASSWORD: ${SIHSALUS_FUA_GEN_DB_PASSWORD:?SIHSALUS_FUA_GEN_DB_PASSWORD is required when FUA is enabled}
+      POSTGRES_PASSWORD: ${SIHSALUS_FUA_GEN_DB_PASSWORD:-}
       POSTGRES_DB: ${SIHSALUS_FUA_GEN_DB:-fuagenerator}
     volumes:
       - db-fua-generator:/var/lib/postgresql/data

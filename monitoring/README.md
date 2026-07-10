@@ -132,11 +132,13 @@ sum(rate({job="docker", level="error"}[5m]))
 
 ### Alloy (antes Grafana Agent)
 
-**Rol**: Colector opcional de logs Docker. Requiere montar `/var/run/docker.sock` en modo read-only, por eso está separado en el profile `logs`.
+**Rol**: Colector opcional de logs Docker. Alloy no monta el socket directamente: usa `docker-socket-proxy`, que solo permite endpoints de lectura para contenedores/eventos y rechaza `POST`.
 
 **Imagen**: Integrada en compose
 
 **Configuración**: [config.alloy](alloy/config.alloy)
+
+El proxy no publica el puerto `2375` al host y es el único contenedor con acceso a `/var/run/docker.sock`. Sigue siendo un componente privilegiado y debe habilitarse solo en hosts administrados.
 
 **Funciones**:
 1. Descubrimiento de contenedores Docker

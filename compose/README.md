@@ -12,7 +12,7 @@
 | Imaging | `--profile imaging` | OHIF, Orthanc y proxy DICOMweb |
 | Indicadores | `--profile indicadores` | Reportes SQL y PostgreSQL propio |
 | Monitoring | `--profile monitoring` | Grafana, Prometheus, Loki y blackbox |
-| Logs | `--profile monitoring --profile logs` | Alloy con acceso de solo lectura al socket Docker |
+| Logs | `--profile monitoring --profile logs` | Alloy mediante proxy Docker API de solo lectura |
 | Réplica | `--profile replica` | Réplica MariaDB para contingencia |
 | Keycloak | `-f compose/keycloak.yml --profile keycloak` | Activa OIDC en frontend/backend y agrega Keycloak |
 | HTTPS | `-f compose/ssl.yml --profile ssl` | Modifica gateway y agrega certbot |
@@ -68,7 +68,7 @@ docker compose ps
 `.env.template` es el inventario canónico. Las reglas son:
 
 - El core conserva defaults solo para desarrollo local.
-- Los perfiles opcionales fallan temprano si falta una credencial requerida.
+- El core puede renderizar sin secretos de profiles opcionales. Al activar un profile, su servicio o `security-audit.sh` rechaza credenciales vacías.
 - `OAUTH2_ENABLED` no se configura en `.env`: core lo fija en `false` y `compose/keycloak.yml` lo cambia a `true`.
 - En producción se usan tags inmutables, no `latest`.
 - HAPI y las consolas de observabilidad se publican solo en localhost.

@@ -71,6 +71,21 @@ profile_enabled() {
   [[ "$profiles" == *",$1,"* ]]
 }
 
+check_pinned_tag() {
+  local name="$1"
+  local value
+  value="$(env_value "$name")"
+
+  case "$value" in
+    ""|latest)
+      fail "$name must use an immutable tag in production"
+      ;;
+    *)
+      ok "$name is pinned to $value"
+      ;;
+  esac
+}
+
 if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
   MODE="$(file_mode "$ENV_FILE")"
   case "$MODE" in
@@ -98,6 +113,19 @@ if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
 
   check_secret MYSQL_OPENMRS_PASSWORD
   check_secret MYSQL_ROOT_PASSWORD
+
+  if [ "$(env_value DEPLOYMENT_ENV)" = "production" ]; then
+    check_pinned_tag BACKEND_TAG
+    check_pinned_tag FRONTEND_SOURCE_TAG
+    check_pinned_tag FRONTEND_RUNTIME_TAG
+
+    if profile_enabled hapi; then
+      check_pinned_tag HAPI_TAG
+    fi
+    if profile_enabled indicadores; then
+      check_pinned_tag REPORTES_SQL_TAG
+    fi
+  fi
 
   if profile_enabled replica; then
     check_secret OMRS_DB_REPL_PASSWORD
