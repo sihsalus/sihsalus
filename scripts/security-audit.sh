@@ -134,6 +134,7 @@ if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
     check_secret KEYCLOAK_ADMIN_PASSWORD
     check_secret KC_DB_PASSWORD
     check_secret OAUTH2_CLIENT_SECRET
+    check_secret IMAGING_OIDC_CLIENT_SECRET
 
     if [ "$(env_value KEYCLOAK_MODE)" = "production" ]; then
       case "$(env_value KEYCLOAK_PUBLIC_URL)" in
@@ -148,6 +149,28 @@ if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
         https://*) ok "OPENMRS_REDIRECT_URI uses HTTPS" ;;
         *) fail "OPENMRS_REDIRECT_URI must use HTTPS in production mode" ;;
       esac
+      case "$(env_value IMAGING_OAUTH_REDIRECT_URI)" in
+        https://*/imaging/oauth2/callback) ok "IMAGING_OAUTH_REDIRECT_URI uses the HTTPS callback" ;;
+        *) fail "IMAGING_OAUTH_REDIRECT_URI must be HTTPS and end in /imaging/oauth2/callback" ;;
+      esac
+    fi
+  fi
+  if profile_enabled imaging; then
+    if profile_enabled keycloak; then
+      ok "Imaging includes the Keycloak profile"
+    else
+      fail "Imaging requires the keycloak profile for individual authentication"
+    fi
+    case "$(env_value COMPOSE_FILE)" in
+      *compose/imaging-auth.yml*) ok "Imaging authentication override is selected" ;;
+      *) fail "COMPOSE_FILE must include compose/imaging-auth.yml when Imaging is enabled" ;;
+    esac
+    check_secret IMAGING_OAUTH_COOKIE_SECRET
+
+    if [ "$(env_value DEPLOYMENT_ENV)" = "production" ]; then
+      [ "$(env_value IMAGING_OAUTH_COOKIE_SECURE)" = "true" ] \
+        && ok "Imaging session cookie is HTTPS-only" \
+        || fail "IMAGING_OAUTH_COOKIE_SECURE must be true in production"
     fi
   fi
   if profile_enabled monitoring || profile_enabled logs; then

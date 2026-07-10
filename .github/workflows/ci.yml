@@ -22,6 +22,7 @@ jobs:
       backend: ${{ steps.scope.outputs.backend }}
       backup: ${{ steps.scope.outputs.backup }}
       monitoring: ${{ steps.scope.outputs.monitoring }}
+      imaging: ${{ steps.scope.outputs.imaging }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -36,6 +37,7 @@ jobs:
           backend=true
           backup=true
           monitoring=true
+          imaging=true
 
           can_diff=false
           if [ "$EVENT_NAME" != "workflow_dispatch" ] \
@@ -60,12 +62,19 @@ jobs:
             monitoring=false
           fi
 
+          if [ "$can_diff" = "true" ] \
+            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml compose/core.yml compose/keycloak.yml compose/imaging-auth.yml gateway/ keycloak/ tests/imaging/; then
+            imaging=false
+          fi
+
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
           echo "backup=$backup" >> "$GITHUB_OUTPUT"
           echo "monitoring=$monitoring" >> "$GITHUB_OUTPUT"
+          echo "imaging=$imaging" >> "$GITHUB_OUTPUT"
           echo "Backend build required: $backend"
           echo "Backup round-trip required: $backup"
           echo "Monitoring runtime test required: $monitoring"
+          echo "Imaging auth runtime test required: $imaging"
 
   compose:
     name: Validate Compose
@@ -144,10 +153,22 @@ jobs:
       - name: Verify read-only Docker API
         run: ./tests/monitoring/socket-proxy.sh
 
+  imaging:
+    name: Imaging authorization
+    needs: changes
+    if: needs.changes.outputs.imaging == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Test anonymous denial, authorized access and logout
+        run: ./tests/imaging/auth-gateway.sh
+
   gate:
     name: PR Gate
     if: always()
-    needs: [compose, backend, backup, monitoring]
+    needs: [compose, backend, backup, monitoring, imaging]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful validations
@@ -156,8 +177,10 @@ jobs:
           BACKEND_RESULT: ${{ needs.backend.result }}
           BACKUP_RESULT: ${{ needs.backup.result }}
           MONITORING_RESULT: ${{ needs.monitoring.result }}
+          IMAGING_RESULT: ${{ needs.imaging.result }}
         run: |
           [ "$COMPOSE_RESULT" = "success" ]
           [ "$BACKEND_RESULT" = "success" ] || [ "$BACKEND_RESULT" = "skipped" ]
           [ "$BACKUP_RESULT" = "success" ] || [ "$BACKUP_RESULT" = "skipped" ]
           [ "$MONITORING_RESULT" = "success" ] || [ "$MONITORING_RESULT" = "skipped" ]
+          [ "$IMAGING_RESULT" = "success" ] || [ "$IMAGING_RESULT" = "skipped" ]

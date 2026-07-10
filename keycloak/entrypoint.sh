@@ -24,6 +24,14 @@ case "$MODE" in
         ;;
     esac
 
+    case "${IMAGING_OAUTH_REDIRECT_URI:-}" in
+      https://*/imaging/oauth2/callback) ;;
+      *)
+        echo "IMAGING_OAUTH_REDIRECT_URI must be an HTTPS callback ending in /imaging/oauth2/callback in production mode" >&2
+        exit 1
+        ;;
+    esac
+
     export KC_HOSTNAME_STRICT=true
     exec /opt/keycloak/bin/kc.sh start --optimized --import-realm
     ;;

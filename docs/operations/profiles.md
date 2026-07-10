@@ -83,7 +83,7 @@ Requisitos mínimos:
 Política operativa:
 
 - Keycloak solo debe habilitarse si existe procedimiento local de recuperación de usuarios.
-- Imaging solo debe habilitarse si hay responsable de almacenamiento y retención DICOM.
+- Imaging solo debe habilitarse si hay responsable de almacenamiento y retención DICOM, Keycloak y asignación individual del rol `imaging-access`.
 - El panel local debe indicar si el sistema puede atender pacientes y si el último backup es válido.
 
 ## Cabecera de microred
@@ -180,7 +180,7 @@ Restricciones:
 | Perfil operativo | Compose/profiles esperados |
 | --- | --- |
 | Puesto remoto | `docker-compose.yml` + `compose/ssl.yml` + `compose/status.yml` |
-| Centro de salud | Puesto remoto + `compose/keycloak.yml` o `compose/imaging.yml` según necesidad |
+| Centro de salud | Puesto remoto + `compose/keycloak.yml`; Imaging añade `--profile imaging` y `compose/imaging-auth.yml` |
 | Cabecera de microred | Centro + `--profile hapi` + `--profile monitoring` + `--profile replica` |
 | Brigada | Puesto remoto + configuración local de jornada/exportacion |
 | Soporte técnico | `--profile monitoring`, `--profile logs`, futuro `--profile support` |

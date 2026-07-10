@@ -37,6 +37,8 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required when Keycloak is enabled}
       OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:?OAUTH2_CLIENT_SECRET is required when Keycloak is enabled}
+      IMAGING_OIDC_CLIENT_SECRET: ${IMAGING_OIDC_CLIENT_SECRET:?IMAGING_OIDC_CLIENT_SECRET is required when Keycloak is enabled}
+      IMAGING_OAUTH_REDIRECT_URI: ${IMAGING_OAUTH_REDIRECT_URI:-http://localhost/imaging/oauth2/callback}
       KEYCLOAK_MODE: ${KEYCLOAK_MODE:-development}
       OPENMRS_REDIRECT_URI: ${OPENMRS_REDIRECT_URI:-http://localhost/openmrs/*}
       KC_DB: postgres

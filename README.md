@@ -102,8 +102,8 @@ docker compose --profile fua up -d
 # Core + HAPI FHIR
 docker compose --profile hapi up -d
 
-# Core + Medical Imaging (OHIF/Orthanc)
-docker compose --profile imaging up -d
+# Core + Medical Imaging autenticado (OHIF/Orthanc + Keycloak)
+docker compose -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml --profile keycloak --profile imaging up -d
 
 # Core + Indicadores (Reportes SQL)
 docker compose --profile indicadores up -d
@@ -260,6 +260,7 @@ compose/
   indicadores.yml               # profile: indicadores
   hapi.yml                      # profile: hapi
   imaging.yml                   # profile: imaging
+  imaging-auth.yml              # override OIDC obligatorio para Imaging web
   keycloak.yml                  # profile: keycloak
   monitoring.yml                # profile: monitoring
   status.yml                    # profile: status

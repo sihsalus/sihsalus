@@ -22,6 +22,10 @@ secret() {
   openssl rand -hex 24
 }
 
+cookie_secret() {
+  openssl rand -base64 32 | tr -- '+/' '-_' | tr -d '\n'
+}
+
 MYSQL_OPENMRS_PASSWORD="$(secret)"
 MYSQL_ROOT_PASSWORD="$(secret)"
 OMRS_DB_REPL_PASSWORD="$(secret)"
@@ -29,6 +33,8 @@ OMRS_DB_BACKUP_PASSWORD="$(secret)"
 KEYCLOAK_ADMIN_PASSWORD="$(secret)"
 KC_DB_PASSWORD="$(secret)"
 OAUTH2_CLIENT_SECRET="$(secret)"
+IMAGING_OIDC_CLIENT_SECRET="$(secret)"
+IMAGING_OAUTH_COOKIE_SECRET="$(cookie_secret)"
 GRAFANA_ADMIN_PASSWORD="$(secret)"
 FUA_DB_PASSWORD="$(secret)"
 FUA_TOKEN="$(secret)"
@@ -41,6 +47,10 @@ cat > "$OUTPUT_FILE" <<EOF
 # This file contains plaintext credentials. Keep mode 600 and store backups encrypted.
 
 DEPLOYMENT_ENV=production
+
+# Enable authenticated Imaging only when it is needed.
+# COMPOSE_FILE=docker-compose.yml:compose/keycloak.yml:compose/imaging-auth.yml:compose/ssl.yml
+# COMPOSE_PROFILES=keycloak,imaging,ssl
 
 # Core MariaDB
 OPENMRS_DB_USER=openmrs
@@ -70,6 +80,12 @@ KEYCLOAK_PORT=8180
 KEYCLOAK_PUBLIC_URL=http://localhost/keycloak
 OPENMRS_REDIRECT_URI=http://localhost/openmrs/*
 OAUTH2_CLIENT_SECRET=${OAUTH2_CLIENT_SECRET}
+IMAGING_OIDC_CLIENT_SECRET=${IMAGING_OIDC_CLIENT_SECRET}
+IMAGING_OAUTH_REDIRECT_URI=http://localhost/imaging/oauth2/callback
+
+# Imaging OIDC session
+IMAGING_OAUTH_COOKIE_SECRET=${IMAGING_OAUTH_COOKIE_SECRET}
+IMAGING_OAUTH_COOKIE_SECURE=true
 
 # Monitoring
 GRAFANA_ADMIN_USER=admin
