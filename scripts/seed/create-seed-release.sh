@@ -112,6 +112,10 @@ restart_captured_containers() {
   [ "$BACKEND_WAS_RUNNING" = "false" ] || wait_healthy sihsalus-backend 450 || restart_failed=true
   [ "$FUA_WAS_RUNNING" = "false" ] || wait_healthy sihsalus-fua-generator 120 || restart_failed=true
 
+  if is_running sihsalus-gateway; then
+    docker exec sihsalus-gateway nginx -s reload >/dev/null || restart_failed=true
+  fi
+
   [ "$restart_failed" = "false" ]
 }
 
