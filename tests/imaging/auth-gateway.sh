@@ -42,6 +42,7 @@ docker run --rm \
 cat > "$TMP_DIR/upstream.conf" <<'EOF'
 server {
   listen 80;
+  listen 8080;
   location / {
     default_type text/plain;
     return 200 'mock imaging upstream';
