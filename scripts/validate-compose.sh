@@ -49,6 +49,7 @@ export IMAGING_OIDC_CLIENT_SECRET="${IMAGING_OIDC_CLIENT_SECRET:-ci-imaging-clie
 export IMAGING_OAUTH_COOKIE_SECRET="${IMAGING_OAUTH_COOKIE_SECRET:-QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=}"
 export GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD:-ci-grafana-password-123}"
 export OMRS_OCL_TOKEN="${OMRS_OCL_TOKEN:-}"
+unset FUA_GENERATOR_IMAGE FUA_GENERATOR_TAG
 
 validate() {
   local name="$1"
@@ -83,7 +84,7 @@ IMAGING_OAUTH_REDIRECT_URI=https://sihsalus.example.test/imaging/oauth2/callback
 IMAGING_OAUTH_COOKIE_SECURE=true \
 validate imaging-auth-ssl -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml -f compose/ssl.yml --profile keycloak --profile imaging --profile ssl
 
-python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" "$EVIDENCE_DIR/imaging.json" "$EVIDENCE_DIR/keycloak-ssl.json" "$EVIDENCE_DIR/monitoring-logs.json" "$EVIDENCE_DIR/imaging-auth.json" "$EVIDENCE_DIR/imaging-auth-ssl.json" keycloak/realm-export.json <<'PY'
+python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/fua.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" "$EVIDENCE_DIR/imaging.json" "$EVIDENCE_DIR/keycloak-ssl.json" "$EVIDENCE_DIR/monitoring-logs.json" "$EVIDENCE_DIR/imaging-auth.json" "$EVIDENCE_DIR/imaging-auth-ssl.json" keycloak/realm-export.json <<'PY'
 import json
 import sys
 
@@ -104,7 +105,7 @@ def service(config, name):
         fail(f"missing service: {name}")
 
 
-core, keycloak, ssl, ci, imaging, keycloak_ssl, monitoring, imaging_auth, imaging_auth_ssl, realm = map(load, sys.argv[1:])
+core, fua, keycloak, ssl, ci, imaging, keycloak_ssl, monitoring, imaging_auth, imaging_auth_ssl, realm = map(load, sys.argv[1:])
 core_backend = service(core, "backend")
 core_generator = service(core, "backend-oauth2-config")
 
@@ -116,6 +117,27 @@ if "keycloak" in core.get("services", {}):
     fail("core must not start Keycloak without the explicit override")
 if core_backend.get("depends_on", {}).get("backend-oauth2-config", {}).get("condition") != "service_completed_successfully":
     fail("backend must wait for OAuth2 config generation")
+
+fua_generator = service(fua, "fua-generator")
+fua_database = service(fua, "fua-generator-db")
+fua_image = fua_generator.get("image", "")
+if not fua_image.startswith("ghcr.io/sihsalus/generador-de-fua:sha-"):
+    fail("FUA generator must default to an immutable official GHCR image")
+
+fua_environment = fua_generator.get("environment", {})
+fua_database_environment = fua_database.get("environment", {})
+fua_database_variables = {
+    "DB_USER": "POSTGRES_USER",
+    "DB_PASSWORD": "POSTGRES_PASSWORD",
+    "DB_NAME": "POSTGRES_DB",
+}
+for application_variable, database_variable in fua_database_variables.items():
+    if fua_environment.get(application_variable) != fua_database_environment.get(database_variable):
+        fail(f"FUA database wiring mismatch: {application_variable} != {database_variable}")
+
+fua_healthcheck = "\n".join(map(str, fua_generator.get("healthcheck", {}).get("test", [])))
+if "http://localhost:3000/health" not in fua_healthcheck:
+    fail("FUA healthcheck must use the database-aware readiness endpoint")
 
 keycloak_backend = service(keycloak, "backend")
 keycloak_generator = service(keycloak, "backend-oauth2-config")

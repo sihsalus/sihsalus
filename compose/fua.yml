@@ -7,16 +7,13 @@
 services:
   fua-generator:
     container_name: sihsalus-fua-generator
-    image: ${FUA_GENERATOR_IMAGE:-marcelius733/fua-generator}:${FUA_GENERATOR_TAG:-dev-0.1.7}
+    image: ${FUA_GENERATOR_IMAGE:-ghcr.io/sihsalus/generador-de-fua}:${FUA_GENERATOR_TAG:-sha-b426f4d}
     restart: "unless-stopped"
     profiles: [ fua ]
-    # fua-generator dev-0.1.7 currently reads these names positionally as
-    # database <- DB_USER, username <- DB_PASSWORD, password <- DB_NAME.
-    # Counter-map them here until the upstream image corrects that wiring.
     environment:
-      DB_USER: ${SIHSALUS_FUA_GEN_DB:-fuagenerator}
-      DB_PASSWORD: ${SIHSALUS_FUA_GEN_DB_USER:-fuagenerator}
-      DB_NAME: ${SIHSALUS_FUA_GEN_DB_PASSWORD:-}
+      DB_USER: ${SIHSALUS_FUA_GEN_DB_USER:-fuagenerator}
+      DB_PASSWORD: ${SIHSALUS_FUA_GEN_DB_PASSWORD:-}
+      DB_NAME: ${SIHSALUS_FUA_GEN_DB:-fuagenerator}
       TOKEN: ${SIHSALUS_FUA_GEN_TOKEN:-}
       SECRET_KEY: ${SIHSALUS_FUA_GEN_SECRET_KEY:-}
       DB_HOST: "fua-generator-db"
@@ -25,25 +22,7 @@ services:
       fua-generator-db:
         condition: service_healthy
     healthcheck:
-      test:
-        - CMD
-        - node
-        - -e
-        - >-
-          const { Client } = require('pg');
-          const client = new Client({
-            database: process.env.DB_USER,
-            user: process.env.DB_PASSWORD,
-            password: process.env.DB_NAME,
-            host: process.env.DB_HOST,
-            port: Number(process.env.DB_PORT)
-          });
-          client.connect()
-            .then(() => client.query('SELECT 1'))
-            .then(() => client.end())
-            .then(() => fetch('http://localhost:3000/'))
-            .then(response => process.exit(response.status === 200 ? 0 : 1))
-            .catch(() => process.exit(1));
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(response => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
