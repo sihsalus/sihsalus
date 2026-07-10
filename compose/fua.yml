@@ -7,15 +7,17 @@
 services:
   fua-generator:
     container_name: sihsalus-fua-generator
-    image: ${FUA_GENERATOR_IMAGE:-ghcr.io/sihsalus/generador-de-fua}:${FUA_GENERATOR_TAG:-sha-b426f4d}
+    image: ${FUA_GENERATOR_IMAGE:-ghcr.io/sihsalus/generador-de-fua}:${FUA_GENERATOR_TAG:-sha-8deb5ba}
     restart: "unless-stopped"
     profiles: [ fua ]
     environment:
+      NODE_ENV: "production"
       DB_USER: ${SIHSALUS_FUA_GEN_DB_USER:-fuagenerator}
       DB_PASSWORD: ${SIHSALUS_FUA_GEN_DB_PASSWORD:-}
       DB_NAME: ${SIHSALUS_FUA_GEN_DB:-fuagenerator}
       TOKEN: ${SIHSALUS_FUA_GEN_TOKEN:-}
       SECRET_KEY: ${SIHSALUS_FUA_GEN_SECRET_KEY:-}
+      ENCRYPTION_KEY: ${SIHSALUS_FUA_GEN_ENCRYPTION_KEY:-}
       DB_HOST: "fua-generator-db"
       DB_PORT: "5432"
     depends_on:

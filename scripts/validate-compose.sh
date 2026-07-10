@@ -40,6 +40,7 @@ export OMRS_DB_REPL_PASSWORD="${OMRS_DB_REPL_PASSWORD:-ci-replica-password-123}"
 export SIHSALUS_FUA_GEN_DB_PASSWORD="${SIHSALUS_FUA_GEN_DB_PASSWORD:-ci-fua-db-password-123}"
 export SIHSALUS_FUA_GEN_TOKEN="${SIHSALUS_FUA_GEN_TOKEN:-ci-fua-token-123}"
 export SIHSALUS_FUA_GEN_SECRET_KEY="${SIHSALUS_FUA_GEN_SECRET_KEY:-ci-fua-secret-123}"
+export SIHSALUS_FUA_GEN_ENCRYPTION_KEY="${SIHSALUS_FUA_GEN_ENCRYPTION_KEY:-ci-smoke-key}"
 export HAPI_DB_PASSWORD="${HAPI_DB_PASSWORD:-ci-hapi-password-123}"
 export SIHSALUS_REPORTES_SQL_DB_PASSWORD="${SIHSALUS_REPORTES_SQL_DB_PASSWORD:-ci-reportes-password-123}"
 export KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-ci-keycloak-admin-123}"
@@ -126,6 +127,11 @@ if not fua_image.startswith("ghcr.io/sihsalus/generador-de-fua:sha-"):
 
 fua_environment = fua_generator.get("environment", {})
 fua_database_environment = fua_database.get("environment", {})
+if fua_environment.get("NODE_ENV") != "production":
+    fail("FUA generator must run with NODE_ENV=production")
+if len(fua_environment.get("ENCRYPTION_KEY", "").encode("utf-8")) != 12:
+    fail("FUA generator ENCRYPTION_KEY must be exactly 12 bytes")
+
 fua_database_variables = {
     "DB_USER": "POSTGRES_USER",
     "DB_PASSWORD": "POSTGRES_PASSWORD",
