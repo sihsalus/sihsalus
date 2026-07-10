@@ -53,7 +53,7 @@ jobs:
           fi
 
           if [ "$can_diff" = "true" ] \
-            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml scripts/backup/ tests/backup/; then
+            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml compose/seed.yml scripts/backup/ scripts/seed/ tests/backup/ tests/seed/; then
             backup=false
           fi
 
@@ -140,6 +140,9 @@ jobs:
 
       - name: Test encrypted dump and restore
         run: ./tests/backup/dump-roundtrip.sh
+
+      - name: Test encrypted seed restore
+        run: ./tests/seed/roundtrip.sh
 
   monitoring:
     name: Docker API proxy
