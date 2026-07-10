@@ -50,6 +50,9 @@ export IMAGING_OIDC_CLIENT_SECRET="${IMAGING_OIDC_CLIENT_SECRET:-ci-imaging-clie
 export IMAGING_OAUTH_COOKIE_SECRET="${IMAGING_OAUTH_COOKIE_SECRET:-QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=}"
 export GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD:-ci-grafana-password-123}"
 export OMRS_OCL_TOKEN="${OMRS_OCL_TOKEN:-}"
+export SIHSALUS_SEED_URL="${SIHSALUS_SEED_URL:-https://example.test/sihsalus-seed.tar.gz.enc}"
+export SIHSALUS_SEED_SHA256="${SIHSALUS_SEED_SHA256:-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}"
+export SIHSALUS_SEED_PASSPHRASE_FILE="${SIHSALUS_SEED_PASSPHRASE_FILE:-/dev/null}"
 unset FUA_GENERATOR_IMAGE FUA_GENERATOR_TAG
 
 validate() {
@@ -71,6 +74,7 @@ validate keycloak -f docker-compose.yml -f compose/keycloak.yml --profile keyclo
 validate imaging-auth -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml --profile keycloak --profile imaging
 validate status -f docker-compose.yml -f compose/status.yml --profile status
 validate ssl -f docker-compose.yml -f compose/ssl.yml --profile ssl
+validate seed -f docker-compose.yml -f compose/seed.yml --profile seed --profile fua
 KEYCLOAK_MODE=production \
 KEYCLOAK_PUBLIC_URL=https://sihsalus.example.test/keycloak \
 KC_HOSTNAME=https://sihsalus.example.test/keycloak \
@@ -85,7 +89,7 @@ IMAGING_OAUTH_REDIRECT_URI=https://sihsalus.example.test/imaging/oauth2/callback
 IMAGING_OAUTH_COOKIE_SECURE=true \
 validate imaging-auth-ssl -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml -f compose/ssl.yml --profile keycloak --profile imaging --profile ssl
 
-python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/fua.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" "$EVIDENCE_DIR/imaging.json" "$EVIDENCE_DIR/keycloak-ssl.json" "$EVIDENCE_DIR/monitoring-logs.json" "$EVIDENCE_DIR/imaging-auth.json" "$EVIDENCE_DIR/imaging-auth-ssl.json" keycloak/realm-export.json <<'PY'
+python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/fua.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" "$EVIDENCE_DIR/imaging.json" "$EVIDENCE_DIR/keycloak-ssl.json" "$EVIDENCE_DIR/monitoring-logs.json" "$EVIDENCE_DIR/imaging-auth.json" "$EVIDENCE_DIR/imaging-auth-ssl.json" "$EVIDENCE_DIR/seed.json" keycloak/realm-export.json <<'PY'
 import json
 import sys
 
@@ -106,7 +110,7 @@ def service(config, name):
         fail(f"missing service: {name}")
 
 
-core, fua, keycloak, ssl, ci, imaging, keycloak_ssl, monitoring, imaging_auth, imaging_auth_ssl, realm = map(load, sys.argv[1:])
+core, fua, keycloak, ssl, ci, imaging, keycloak_ssl, monitoring, imaging_auth, imaging_auth_ssl, seed, realm = map(load, sys.argv[1:])
 core_backend = service(core, "backend")
 core_generator = service(core, "backend-oauth2-config")
 
@@ -118,6 +122,13 @@ if "keycloak" in core.get("services", {}):
     fail("core must not start Keycloak without the explicit override")
 if core_backend.get("depends_on", {}).get("backend-oauth2-config", {}).get("condition") != "service_completed_successfully":
     fail("backend must wait for OAuth2 config generation")
+
+seed_service = service(seed, "seed")
+if seed_service.get("environment", {}).get("SIHSALUS_SEED_PASSPHRASE_FILE") != "/run/secrets/seed_passphrase":
+    fail("seed restore must read its passphrase from the mounted Compose secret")
+for writer in ("db", "backend-oauth2-config", "fua-generator-db"):
+    if service(seed, writer).get("depends_on", {}).get("seed", {}).get("condition") != "service_completed_successfully":
+        fail(f"{writer} must wait for the seed restore")
 
 fua_generator = service(fua, "fua-generator")
 fua_database = service(fua, "fua-generator-db")
