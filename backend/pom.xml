@@ -59,7 +59,7 @@
     <stockmanagement.version>3.1.1</stockmanagement.version>
     <billing.version>2.3.0</billing.version>
     <tasks.version>2.1.0</tasks.version>
-    <fua.version>1.0.83</fua.version>
+    <fua.version>1.0.80</fua.version>
     <imaging.version>1.2.8</imaging.version>
     <!-- Content Packages -->
     <sihsalus-content.version>1.16.3</sihsalus-content.version>
