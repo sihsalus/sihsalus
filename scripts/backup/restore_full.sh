@@ -18,16 +18,9 @@ NC='\033[0m'
 CONTAINER_NAME="${CONTAINER_NAME:-sihsalus-db-master}"
 BACKUP_DIR="${BACKUP_DIR:-/home/${USER}/sihsalus-fullBackups}"
 BACKUP_FILE=""
-COMPOSE_PROJECT="sihsalus-distro-referenceapplication"
-DB_VOLUME="${COMPOSE_PROJECT}_db-data"
-BACKUP_VOLUME="${COMPOSE_PROJECT}_db-backup"
+DB_VOLUME="${DB_VOLUME:-}"
 MARIADB_IMAGE="mariadb:10.11.7"
 TEMP_DIR="/tmp/sihsalus-restore-$$"
-
-# Leer credenciales desde Docker secrets si existen
-if [ -f /run/secrets/BACKUP_ENCRYPTION_PASSWORD ]; then
-    export BACKUP_ENCRYPTION_PASSWORD="$(cat /run/secrets/BACKUP_ENCRYPTION_PASSWORD)"
-fi
 
 # Parseo de argumentos
 while [[ $# -gt 0 ]]; do
@@ -109,6 +102,18 @@ echo ""
 echo -e "[INFO] Backup seleccionado: ${GREEN}$(basename "$selected_file")${NC}"
 
 # --- Verificaciones previas ---
+
+# Resolver el volumen real desde el mount del contenedor para no depender del
+# nombre del proyecto Compose ni de un prefijo historico.
+if [ -z "$DB_VOLUME" ]; then
+    DB_VOLUME="$(docker inspect "$CONTAINER_NAME" --format '{{range .Mounts}}{{if eq .Destination "/var/lib/mysql"}}{{.Name}}{{end}}{{end}}' 2>/dev/null || true)"
+fi
+
+if [ -z "$DB_VOLUME" ]; then
+    echo -e "${RED}[ERROR] No se pudo resolver el volumen /var/lib/mysql de '$CONTAINER_NAME'.${NC}"
+    echo "[INFO] Define DB_VOLUME explicitamente si el contenedor no existe."
+    exit 1
+fi
 
 # Verificar que el volumen de datos existe
 if ! docker volume inspect "$DB_VOLUME" &>/dev/null; then
@@ -228,7 +233,7 @@ if ! docker run --rm \
         -v "$DB_VOLUME:/dest" \
         busybox sh -c "cp -a /source/. /dest/"
     echo -e "${YELLOW}[INFO] Snapshot restaurado. Reiniciando con datos anteriores...${NC}"
-    docker compose up -d
+    docker compose up -d db backend
     exit 1
 fi
 
@@ -237,7 +242,7 @@ echo -e "${GREEN}[OK] Datos restaurados${NC}"
 # --- Reiniciar servicios ---
 
 echo "[INFO] Reiniciando servicios..."
-docker compose up -d
+docker compose up -d db backend
 
 # Limpiar snapshot despues de exito
 echo "[INFO] Eliminando snapshot (restore exitoso)..."

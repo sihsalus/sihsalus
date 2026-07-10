@@ -3,7 +3,7 @@
 # Script: restore_dump.sh
 # Descripcion: Restaura la DB desde un dump SQL en caliente (sin detener la DB).
 #              Compatible con backups de backup_dump.sh
-# Uso: ./restore_dump.sh [--container NOMBRE] [--dir DIRECTORIO] [--file ARCHIVO]
+# Uso: ./restore_dump.sh [--container NOMBRE] [--dir DIRECTORIO] [--file ARCHIVO] [--yes] [--no-app-control]
 # ------------------------------------------------------------------------------
 
 set -euo pipefail
@@ -20,11 +20,8 @@ DB_NAME="openmrs"
 DB_USER="root"
 DB_PASSWORD="${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD no definido}"
 TEMP_DIR="/tmp/sihsalus-restore-dump-$$"
-
-# Leer credenciales desde Docker secrets si existen
-if [ -f /run/secrets/BACKUP_ENCRYPTION_PASSWORD ]; then
-    export BACKUP_ENCRYPTION_PASSWORD="$(cat /run/secrets/BACKUP_ENCRYPTION_PASSWORD)"
-fi
+ASSUME_YES="${RESTORE_ASSUME_YES:-false}"
+MANAGE_BACKEND="${RESTORE_MANAGE_BACKEND:-true}"
 
 # Parseo de argumentos
 while [[ $# -gt 0 ]]; do
@@ -32,11 +29,13 @@ while [[ $# -gt 0 ]]; do
         --container) CONTAINER_NAME="$2"; shift 2;;
         --dir) BACKUP_DIR="$2"; shift 2;;
         --file) BACKUP_FILE="$2"; shift 2;;
+        --yes) ASSUME_YES=true; shift;;
+        --no-app-control) MANAGE_BACKEND=false; shift;;
         --help|-h)
-            echo "Uso: $0 [--container NOMBRE] [--dir DIRECTORIO] [--file ARCHIVO]"
+            echo "Uso: $0 [--container NOMBRE] [--dir DIRECTORIO] [--file ARCHIVO] [--yes] [--no-app-control]"
             echo ""
-            echo "Restaura un dump SQL en caliente (DB sigue corriendo)."
-            echo "El backend debe estar detenido para evitar escrituras durante el restore."
+            echo "  --yes             No solicita confirmacion interactiva."
+            echo "  --no-app-control  No detiene ni inicia el backend (CI o control externo)."
             exit 0;;
         *) echo "Opcion desconocida: $1"; exit 1;;
     esac
@@ -93,14 +92,20 @@ echo -e "[INFO] Dump seleccionado: ${GREEN}$(basename "$selected_file")${NC}"
 echo ""
 echo -e "${YELLOW}ATENCION: Esto reemplazara la base de datos '$DB_NAME'.${NC}"
 echo -e "${YELLOW}El backend deberia estar detenido para evitar conflictos.${NC}"
-read -p "Continuar? (s/N): " resp
-[[ "$resp" =~ ^[sS]$ ]] || { echo "Cancelado."; exit 0; }
+if [ "$ASSUME_YES" != "true" ]; then
+    read -p "Continuar? (s/N): " resp
+    [[ "$resp" =~ ^[sS]$ ]] || { echo "Cancelado."; exit 0; }
+fi
 
 # --- Detener backend (pero NO la DB) ---
 
-echo "[INFO] Deteniendo backend para evitar escrituras..."
-docker compose stop backend 2>/dev/null || true
-sleep 2
+if [ "$MANAGE_BACKEND" = "true" ]; then
+    echo "[INFO] Deteniendo backend para evitar escrituras..."
+    docker compose stop backend 2>/dev/null || true
+    sleep 2
+else
+    echo "[INFO] Control del backend deshabilitado por --no-app-control"
+fi
 
 # --- Descifrar si es necesario ---
 
@@ -133,28 +138,31 @@ echo "[INFO] Restaurando dump en la base de datos (en caliente)..."
 echo "[INFO] Esto puede tomar varios minutos segun el tamano..."
 
 # Drop y recrear la DB, luego importar
-docker exec -i "$CONTAINER_NAME" mariadb \
+docker exec -i -e MYSQL_PWD="$DB_PASSWORD" "$CONTAINER_NAME" mariadb \
     --user="$DB_USER" \
-    --password="$DB_PASSWORD" \
     -e "DROP DATABASE IF EXISTS ${DB_NAME}; CREATE DATABASE ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;"
 
 # Importar el dump
-gunzip -c "$sql_source" | docker exec -i "$CONTAINER_NAME" mariadb \
+gunzip -c "$sql_source" | docker exec -i -e MYSQL_PWD="$DB_PASSWORD" "$CONTAINER_NAME" mariadb \
     --user="$DB_USER" \
-    --password="$DB_PASSWORD" \
     "$DB_NAME"
 
 echo -e "${GREEN}[OK] Dump restaurado exitosamente${NC}"
 
 # --- Reiniciar backend ---
 
-echo "[INFO] Reiniciando backend..."
-docker compose up -d
+if [ "$MANAGE_BACKEND" = "true" ]; then
+    echo "[INFO] Reiniciando backend..."
+    # Solo se apunta al backend: no se reconcilia gateway y no se degrada HTTPS.
+    docker compose up -d backend
+fi
 
 echo ""
 echo -e "${GREEN}============================================${NC}"
 echo -e "${GREEN}  Restauracion en caliente completada${NC}"
 echo -e "${GREEN}============================================${NC}"
 echo ""
-echo "[INFO] Verifica que el backend inicie correctamente:"
-echo "  docker compose logs -f backend"
+if [ "$MANAGE_BACKEND" = "true" ]; then
+    echo "[INFO] Verifica que el backend inicie correctamente:"
+    echo "  docker compose logs -f backend"
+fi

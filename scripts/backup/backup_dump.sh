@@ -35,10 +35,9 @@ mkdir -p "$BACKUP_DIR"
 echo "[INFO] Iniciando dump SQL en caliente de '$DB_NAME' ($TIMESTAMP)"
 
 # Dump en caliente con --single-transaction (consistente, sin bloqueo)
-docker exec "$CONTAINER_NAME" \
+docker exec -e MYSQL_PWD="$DB_PASSWORD" "$CONTAINER_NAME" \
     mariadb-dump \
     --user="$DB_USER" \
-    --password="$DB_PASSWORD" \
     --single-transaction \
     --routines \
     --triggers \
