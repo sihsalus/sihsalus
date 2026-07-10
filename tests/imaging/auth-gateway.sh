@@ -42,6 +42,7 @@ docker run --rm \
 cat > "$TMP_DIR/upstream.conf" <<'EOF'
 server {
   listen 80;
+  listen 8080;
   location / {
     default_type text/plain;
     return 200 'mock imaging upstream';
@@ -95,6 +96,17 @@ for _ in $(seq 1 30); do
 done
 curl --fail --silent --show-error "$BASE_URL/health" >/dev/null
 
+startup_headers="$TMP_DIR/startup.headers"
+startup_body="$TMP_DIR/startup.body"
+status="$(curl --http1.1 --max-time 5 --silent --show-error \
+  --output "$startup_body" --dump-header "$startup_headers" \
+  --write-out '%{http_code}' "$BASE_URL/startup")"
+[ "$status" = "200" ]
+startup_bytes="$(wc -c < "$startup_body" | tr -d '[:space:]')"
+content_lengths="$(awk 'tolower($1) == "content-length:" { gsub(/\r/, "", $2); print $2 }' "$startup_headers")"
+[ "$content_lengths" = "$startup_bytes" ]
+grep -qi '^X-Content-Type-Options: nosniff' "$startup_headers"
+
 for path in /imaging/ /orthanc/ /dicom-web/studies /wado; do
   headers="$TMP_DIR/anonymous.headers"
   status="$(curl --silent --show-error --output /dev/null --dump-header "$headers" --write-out '%{http_code}' "$BASE_URL$path")"
@@ -118,4 +130,4 @@ status="$(curl --silent --show-error --output /dev/null --dump-header "$signout_
 [ "$status" = "302" ]
 grep -Eqi '^Set-Cookie: _sihsalus_imaging=.*Max-Age=0' "$signout_headers"
 
-echo "[OK] Imaging routes deny anonymous users, accept authorized sessions and clear logout cookies"
+echo "[OK] Gateway startup framing and imaging authorization routes"

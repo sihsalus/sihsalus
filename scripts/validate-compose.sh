@@ -23,8 +23,12 @@ for gateway_template in gateway/default.conf.template gateway/default-ssl.conf.t
     echo "[FAIL] $gateway_template must define dynamic startup and readiness upstreams" >&2
     exit 1
   fi
+  if grep -q 'proxy_method HEAD;' "$gateway_template"; then
+    echo "[FAIL] $gateway_template must not discard the startup response body" >&2
+    exit 1
+  fi
 done
-echo "[OK] gateway health routes use dynamic Docker DNS"
+echo "[OK] gateway health routes use dynamic Docker DNS and valid startup framing"
 
 if [ "$#" -gt 1 ]; then
   echo "Usage: $0 [evidence-directory]" >&2

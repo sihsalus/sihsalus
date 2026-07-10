@@ -90,7 +90,6 @@ server {
   location = /startup {
     access_log off;
     set $backend_health http://backend:8080;
-    proxy_method HEAD;
     proxy_intercept_errors on;
     proxy_pass $backend_health/openmrs/initialsetup;
     error_page 301 302 303 307 308 = @backend_started;
