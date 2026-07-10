@@ -115,9 +115,10 @@ server {
   # ejecutando Initial Setup o imports de metadata.
   location = /startup {
     access_log off;
+    set $backend_health http://backend:8080;
     proxy_method HEAD;
     proxy_intercept_errors on;
-    proxy_pass http://backend/openmrs/initialsetup;
+    proxy_pass $backend_health/openmrs/initialsetup;
     error_page 301 302 303 307 308 = @backend_started;
     error_page 500 502 503 504 = @backend_not_started;
   }
@@ -136,8 +137,9 @@ server {
   # Readiness global: valida que OpenMRS ya termino su bootstrap completo.
   location = /ready {
     access_log off;
+    set $backend_health http://backend:8080;
     proxy_intercept_errors on;
-    proxy_pass http://backend/openmrs/health/started;
+    proxy_pass $backend_health/openmrs/health/started;
     error_page 500 502 503 504 = @openmrs_not_ready;
   }
 

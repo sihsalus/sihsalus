@@ -14,6 +14,18 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
+for gateway_template in gateway/default.conf.template gateway/default-ssl.conf.template; do
+  if grep -Eq 'proxy_pass http://backend(/|:)' "$gateway_template"; then
+    echo "[FAIL] $gateway_template must resolve backend health routes dynamically" >&2
+    exit 1
+  fi
+  if [ "$(grep -c 'set \$backend_health http://backend:8080;' "$gateway_template")" -ne 2 ]; then
+    echo "[FAIL] $gateway_template must define dynamic startup and readiness upstreams" >&2
+    exit 1
+  fi
+done
+echo "[OK] gateway health routes use dynamic Docker DNS"
+
 if [ "$#" -gt 1 ]; then
   echo "Usage: $0 [evidence-directory]" >&2
   exit 2
