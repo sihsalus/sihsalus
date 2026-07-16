@@ -18,17 +18,6 @@ TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
 BACKUP_NAME="backup_$TIMESTAMP"
 TEMP_FULL_BACKUP_PATH="/backup/full"
 
-# Leer credenciales sensibles desde Docker secrets si existen
-if [ -f /run/secrets/OMRS_DB_R_PASSWORD ]; then
-    export OMRS_DB_R_PASSWORD="$(cat /run/secrets/OMRS_DB_R_PASSWORD)"
-fi
-if [ -f /run/secrets/OMRS_DB_BACKUP_PASSWORD ]; then
-    export OMRS_DB_BACKUP_PASSWORD="$(cat /run/secrets/OMRS_DB_BACKUP_PASSWORD)"
-fi
-if [ -f /run/secrets/BACKUP_ENCRYPTION_PASSWORD ]; then
-    export BACKUP_ENCRYPTION_PASSWORD="$(cat /run/secrets/BACKUP_ENCRYPTION_PASSWORD)"
-fi
-
 if [ -n "${OMRS_DB_BACKUP_USER:-}" ] || [ -n "${OMRS_DB_BACKUP_PASSWORD:-}" ]; then
     : "${OMRS_DB_BACKUP_USER:?OMRS_DB_BACKUP_USER requerido si defines OMRS_DB_BACKUP_PASSWORD}"
     : "${OMRS_DB_BACKUP_PASSWORD:?OMRS_DB_BACKUP_PASSWORD requerido si defines OMRS_DB_BACKUP_USER}"
@@ -36,7 +25,7 @@ if [ -n "${OMRS_DB_BACKUP_USER:-}" ] || [ -n "${OMRS_DB_BACKUP_PASSWORD:-}" ]; t
     DB_BACKUP_PASSWORD="$OMRS_DB_BACKUP_PASSWORD"
 else
     DB_BACKUP_USER="root"
-    DB_BACKUP_PASSWORD="${MYSQL_ROOT_PASSWORD:-${OMRS_DB_R_PASSWORD:-}}"
+    DB_BACKUP_PASSWORD="${MYSQL_ROOT_PASSWORD:-}"
 fi
 
 # Parseo de argumentos
@@ -87,12 +76,12 @@ fi
 
 # Crear backup dentro del contenedor
 docker exec --user root "$CONTAINER_NAME" rm -rf "$TEMP_FULL_BACKUP_PATH"
-docker exec --user root "$CONTAINER_NAME" mariadb-backup --user="$DB_BACKUP_USER" --password="$DB_BACKUP_PASSWORD" --backup --target-dir="$TEMP_FULL_BACKUP_PATH"
+docker exec --user root -e MYSQL_PWD="$DB_BACKUP_PASSWORD" "$CONTAINER_NAME" \
+    mariadb-backup --user="$DB_BACKUP_USER" --backup --target-dir="$TEMP_FULL_BACKUP_PATH"
 
 # Copiar backup al host
 docker cp "$CONTAINER_NAME:$TEMP_FULL_BACKUP_PATH" "$FULL_BACKUP_DIR/$BACKUP_NAME"
 
-# Comprimir backup
 # Comprimir backup
 tar -czf "$FULL_BACKUP_DIR/$BACKUP_NAME.tar.gz" -C "$FULL_BACKUP_DIR" "$BACKUP_NAME"
 rm -rf "$FULL_BACKUP_DIR/$BACKUP_NAME"

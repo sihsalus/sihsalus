@@ -7,22 +7,24 @@
 services:
   fua-generator:
     container_name: sihsalus-fua-generator
-    image: marcelius733/fua-generator:dev-0.1.7
+    image: ${FUA_GENERATOR_IMAGE:-ghcr.io/sihsalus/generador-de-fua}:${FUA_GENERATOR_TAG:-sha-8deb5ba}
     restart: "unless-stopped"
     profiles: [ fua ]
     environment:
+      NODE_ENV: "production"
       DB_USER: ${SIHSALUS_FUA_GEN_DB_USER:-fuagenerator}
-      DB_PASSWORD: ${SIHSALUS_FUA_GEN_DB_PASSWORD:-fuagenerator}
+      DB_PASSWORD: ${SIHSALUS_FUA_GEN_DB_PASSWORD:-}
       DB_NAME: ${SIHSALUS_FUA_GEN_DB:-fuagenerator}
-      TOKEN: ${SIHSALUS_FUA_GEN_TOKEN:-fuagenerator}
-      SECRET_KEY: ${SIHSALUS_FUA_GEN_SECRET_KEY:-change-me}
+      TOKEN: ${SIHSALUS_FUA_GEN_TOKEN:-}
+      SECRET_KEY: ${SIHSALUS_FUA_GEN_SECRET_KEY:-}
+      ENCRYPTION_KEY: ${SIHSALUS_FUA_GEN_ENCRYPTION_KEY:-123456789012}
       DB_HOST: "fua-generator-db"
       DB_PORT: "5432"
     depends_on:
       fua-generator-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD","node","-e","fetch('http://localhost:3000/').then(r => process.exit(r.status === 200 ? 0 : 1)).catch(() => process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(response => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -38,7 +40,7 @@ services:
     profiles: [ fua ]
     environment:
       POSTGRES_USER: ${SIHSALUS_FUA_GEN_DB_USER:-fuagenerator}
-      POSTGRES_PASSWORD: ${SIHSALUS_FUA_GEN_DB_PASSWORD:-fuagenerator}
+      POSTGRES_PASSWORD: ${SIHSALUS_FUA_GEN_DB_PASSWORD:-}
       POSTGRES_DB: ${SIHSALUS_FUA_GEN_DB:-fuagenerator}
     volumes:
       - db-fua-generator:/var/lib/postgresql/data

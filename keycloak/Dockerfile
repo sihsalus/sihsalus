@@ -1,9 +1,7 @@
 # keycloak/Dockerfile
-# Updated: 2025-10-20 - Latest version and secrets support
 FROM quay.io/keycloak/keycloak:26.4.1
 
-# Variables por defecto (sobreescribibles desde docker-compose)
-# IMPORTANTE: No incluir passwords aquí - usar Docker Secrets
+# Non-sensitive defaults. Credentials are injected by Compose at runtime.
 ENV KEYCLOAK_ADMIN=admin
 ENV KC_DB=postgres
 ENV KC_DB_URL=jdbc:postgresql://keycloak-db:5432/keycloak
@@ -16,14 +14,15 @@ ENV KEYCLOAK_IMPORT=/opt/keycloak/data/import/realm-export.json
 
 # Copiamos el realm duro
 COPY realm-export.json /opt/keycloak/data/import/realm-export.json
+COPY entrypoint.sh /opt/keycloak/bin/sihsalus-entrypoint.sh
 
 # Ajustamos permisos para el usuario 1000
 USER root
-RUN chown -R 1000:0 /opt/keycloak/data
+RUN chown -R 1000:0 /opt/keycloak/data \
+    && chmod 755 /opt/keycloak/bin/sihsalus-entrypoint.sh
 USER 1000
 
 # Pre-compilación para PostgreSQL
 RUN /opt/keycloak/bin/kc.sh build --db=${KC_DB}
 
-# Arranca en modo dev e importa el realm
-ENTRYPOINT ["/opt/keycloak/bin/kc.sh", "start-dev", "--import-realm"]
+ENTRYPOINT ["/opt/keycloak/bin/sihsalus-entrypoint.sh"]

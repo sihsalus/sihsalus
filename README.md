@@ -8,7 +8,7 @@
 ![License](https://img.shields.io/badge/MPL_2.0-brightgreen?style=flat-square&label=License)
 
 > SIH Salus es una distribución OpenMRS 3.x para establecimientos de salud del Perú.
-> Certificados SSL auto-firmados, despliegue offline, backups cifrados.
+> SSL auto-firmado o Let's Encrypt, despliegue offline, backups cifrados.
 
 ---
 
@@ -16,6 +16,7 @@
 
 - [Inicio Rápido](#inicio-rápido)
 - [Profiles](#profiles)
+- [Arquitectura de infraestructura](docs/architecture/infrastructure.md)
 - [Actualización en Producción](#actualización-en-producción)
 - [Docker Bake (Build)](#docker-bake-build)
 - [Configuración SSL/HTTPS](#configuración-sslhttps)
@@ -47,6 +48,13 @@ OMRS_OCL_TOKEN=<tu_token_de_ocl>
 ```
 
 > No uses los defaults `openmrs`/`openmrs` en producción.
+
+También puedes generar `.env.production` con credenciales aleatorias y auditarlo antes del despliegue:
+
+```bash
+./scripts/security/secrets_generate.sh
+./scripts/security-audit.sh .env.production
+```
 
 ### 2. Construir e iniciar
 
@@ -94,8 +102,8 @@ docker compose --profile fua up -d
 # Core + HAPI FHIR
 docker compose --profile hapi up -d
 
-# Core + Medical Imaging (OHIF/Orthanc)
-docker compose --profile imaging up -d
+# Core + Medical Imaging autenticado (OHIF/Orthanc + Keycloak)
+docker compose -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml --profile keycloak --profile imaging up -d
 
 # Core + Indicadores (Reportes SQL)
 docker compose --profile indicadores up -d
@@ -126,6 +134,8 @@ Cada profile requiere sus variables en `.env`. Ver `.env.template` para la lista
 
 El perfil `ssl` es un caso especial: no basta con pasar `--profile ssl` si solo se usa `docker-compose.yml`, porque la configuración SSL vive en `compose/ssl.yml` y ese archivo modifica el servicio `gateway` para exponer HTTPS.
 
+En servidores, define `COMPOSE_FILE` y `COMPOSE_PROFILES` en el archivo de entorno para conservar siempre la misma combinación. Ver [compose/README.md](compose/README.md).
+
 ## Actualización en Producción
 
 En producción, el objetivo es desplegar imágenes versionadas y evitar builds locales cuando la imagen runtime ya está publicada.
@@ -138,9 +148,10 @@ Actualmente el frontend se despliega como una imagen runtime local (`sihsalus-fr
 ```bash
 # 2) Definir tag fuente del frontend publicado en GHCR
 export FRONTEND_SOURCE_TAG=sha-<digest>
-docker pull ghcr.io/sihsalus/sihsalus-frontend:FRONTEND_SOURCE_TAG
+docker pull "ghcr.io/sihsalus/sihsalus-frontend:${FRONTEND_SOURCE_TAG}"
 
 # 3) Reconstruir y recrear solo frontend
+docker compose build frontend
 docker compose up -d --no-deps --no-build --force-recreate frontend
 docker compose ps frontend
 docker compose logs --tail 100 frontend
@@ -249,11 +260,14 @@ compose/
   indicadores.yml               # profile: indicadores
   hapi.yml                      # profile: hapi
   imaging.yml                   # profile: imaging
+  imaging-auth.yml              # override OIDC obligatorio para Imaging web
   keycloak.yml                  # profile: keycloak
   monitoring.yml                # profile: monitoring
   status.yml                    # profile: status
   ssl.yml                       # override con -f (modifica gateway)
 ```
+
+Ver [arquitectura de infraestructura](docs/architecture/infrastructure.md) para límites, fuentes de verdad e invariantes de CI.
 
 ## Docker Bake (Build)
 
@@ -277,16 +291,19 @@ Alternativamente, `docker compose build` sigue funcionando.
 
 ## Configuración SSL/HTTPS
 
-SIHSALUS genera certificados SSL auto-firmados, pensados para redes hospitalarias internas sin acceso a internet.
+SIH Salus soporta dos modos HTTPS:
 
-No se requiere un dominio público ni una autoridad certificadora externa. El sistema genera su propio certificado al iniciar por primera vez.
+- `SSL_MODE=dev`: certificados auto-firmados para redes internas u offline.
+- `SSL_MODE=prod`: certificados reales de Let's Encrypt usando HTTP-01 y renovación automática.
 
-### Iniciar con SSL
+`compose/ssl.yml` debe cargarse con `-f` porque no está incluido por defecto en `docker-compose.yml`. El flag `--profile ssl` activa el servicio `certbot` definido en ese archivo; sin el `-f compose/ssl.yml`, Compose no ve ese profile ni aplica los cambios de `gateway` para publicar el puerto 443.
+
+### SSL interno auto-firmado
 
 Agregar las variables SSL al `.env`:
 
 ```env
-CERT_WEB_DOMAIN_COMMON_NAME=192.168.10.5
+SSL_MODE=dev
 CERT_WEB_DOMAINS=192.168.10.5,localhost,127.0.0.1
 ```
 
@@ -297,7 +314,30 @@ docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d
 # https://192.168.10.5/openmrs/spa
 ```
 
-`compose/ssl.yml` debe cargarse con `-f` porque no está incluido por defecto en `docker-compose.yml`. El flag `--profile ssl` activa el servicio `certbot` definido en ese archivo; sin el `-f compose/ssl.yml`, Compose no ve ese profile ni aplica los cambios de `gateway` para publicar el puerto 443.
+`CERT_WEB_DOMAIN_COMMON_NAME` es opcional; si no se define, se usa el primer valor de `CERT_WEB_DOMAINS`.
+
+### SSL producción con Let's Encrypt
+
+Requisitos:
+
+- El dominio debe resolver públicamente hacia el servidor.
+- El puerto `80` debe estar accesible para el challenge HTTP-01.
+- Usar `SSL_STAGING=true` primero si se quiere probar sin consumir rate limits.
+
+Ejemplo:
+
+```env
+SSL_MODE=prod
+CERT_WEB_DOMAINS=sihsalus.example.org
+CERT_CONTACT_EMAIL=admin@example.org
+SSL_STAGING=false
+```
+
+```bash
+docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d
+```
+
+El contenedor `certbot` crea un certificado temporal para que nginx arranque, valida el challenge HTTP-01, reemplaza el temporal por el certificado de Let's Encrypt y luego renueva cada `CERT_RENEWAL_INTERVAL`.
 
 ### SSL con Keycloak
 
@@ -317,26 +357,33 @@ docker compose \
 
 | Variable | Descripción | Default |
 |----------|-------------|---------|
-| `SSL_MODE` | `dev` (genera una vez y termina) o `prod` (renueva automáticamente) | `dev` |
+| `SSL_MODE` | `dev` para auto-firmado o `prod` para Let's Encrypt | `dev` |
 | `CERT_WEB_DOMAINS` | Todas las direcciones por las que se accederá al servidor, separadas por coma (IPs y/o nombres) | `localhost,127.0.0.1` |
-| `CERT_WEB_DOMAIN_COMMON_NAME` | La dirección principal del servidor (IP o nombre) | `localhost` |
+| `CERT_WEB_DOMAIN_COMMON_NAME` | Dirección principal del servidor; si se omite usa el primer dominio | primer `CERT_WEB_DOMAINS` |
+| `CERT_CONTACT_EMAIL` | Email de contacto para Let's Encrypt | vacío |
+| `SSL_STAGING` | Usa staging de Let's Encrypt para pruebas | `false` |
+| `CERT_PROFILE` | Perfil Let's Encrypt: `classic`, `tlsserver` o `shortlived` | vacío |
 | `CERT_RSA_KEY_SIZE` | Tamaño de la clave RSA y de los parámetros DH generados por certbot | `2048` |
+| `CERT_NGINX_STARTUP_WAIT` | Espera antes de solicitar el certificado real en `prod` | `10` |
+| `CERT_RENEWAL_INTERVAL` | Intervalo del daemon de renovación en `prod` | `12h` |
 
 ### Ejemplo para despliegue en hospital
 
 Si el servidor tiene IP `192.168.10.5` en la red del hospital y los equipos acceden por esa IP:
 
 ```env
-CERT_WEB_DOMAIN_COMMON_NAME=192.168.10.5
+SSL_MODE=dev
 CERT_WEB_DOMAINS=192.168.10.5,localhost,127.0.0.1
 ```
 
 Si el hospital tiene varias VLANs y el servidor tiene más de una IP, incluirlas todas:
 
 ```env
-CERT_WEB_DOMAIN_COMMON_NAME=192.168.10.5
+SSL_MODE=dev
 CERT_WEB_DOMAINS=192.168.10.5,192.168.20.5,172.16.0.5,localhost,127.0.0.1
 ```
+
+Let's Encrypt tambien puede emitir certificados para IP publicas, pero exige el perfil `shortlived`. Si `SSL_MODE=prod` y `CERT_WEB_DOMAINS` contiene una IP, SIH Salus selecciona `CERT_PROFILE=shortlived` automáticamente.
 
 ### Instalar el certificado en los equipos del hospital
 

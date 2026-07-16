@@ -1,7 +1,29 @@
-# Keycloak OIDC/OAuth2 Authentication
-# Profile: keycloak
+# Keycloak OIDC/OAuth2 override.
+# Load explicitly with:
+#   docker compose -f docker-compose.yml -f compose/keycloak.yml --profile keycloak up -d
 
 services:
+  frontend:
+    build:
+      args:
+        SPA_CONFIG_URLS: /openmrs/spa/frontend.json,/openmrs/spa/frontend-keycloak.json
+
+  backend-oauth2-config:
+    environment:
+      OAUTH2_ENABLED: "true"
+      OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:?OAUTH2_CLIENT_SECRET is required when Keycloak is enabled}
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost/keycloak}
+
+  backend:
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    environment:
+      OAUTH2_ENABLED: "true"
+      OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:?OAUTH2_CLIENT_SECRET is required when Keycloak is enabled}
+    volumes:
+      - ./keycloak/openmrs_config/globalproperties/oauth2login.xml:/openmrs/distribution/openmrs_config/globalproperties/oauth2login.xml:ro
+
   keycloak:
     container_name: sihsalus-keycloak
     build:
@@ -11,19 +33,27 @@ services:
     profiles: [ keycloak ]
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-}
-      OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:-}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required when Keycloak is enabled}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required when Keycloak is enabled}
+      OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:?OAUTH2_CLIENT_SECRET is required when Keycloak is enabled}
+      IMAGING_OIDC_CLIENT_SECRET: ${IMAGING_OIDC_CLIENT_SECRET:?IMAGING_OIDC_CLIENT_SECRET is required when Keycloak is enabled}
+      IMAGING_OAUTH_REDIRECT_URI: ${IMAGING_OAUTH_REDIRECT_URI:-http://localhost/imaging/oauth2/callback}
+      KEYCLOAK_MODE: ${KEYCLOAK_MODE:-development}
+      OPENMRS_REDIRECT_URI: ${OPENMRS_REDIRECT_URI:-http://localhost/openmrs/*}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/${KC_DB_DATABASE:-keycloak}
       KC_DB_USERNAME: ${KC_DB_USERNAME:-keycloak}
-      KC_DB_PASSWORD: ${KC_DB_PASSWORD:-}
-      KC_HOSTNAME: ${KC_HOSTNAME:-localhost}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:?KC_DB_PASSWORD is required when Keycloak is enabled}
+      KC_HOSTNAME: ${KC_HOSTNAME:-http://localhost/keycloak}
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
       KC_PROXY_HEADERS: xforwarded
     ports:
-      - "${KEYCLOAK_PORT:-8180}:8080"
+      # Acceso de emergencia/administración desde el host. Los navegadores usan
+      # el gateway en /keycloak/, incluido en el mismo dominio HTTPS de OpenMRS.
+      - "127.0.0.1:${KEYCLOAK_PORT:-8180}:8080"
     healthcheck:
       test: [ "CMD-SHELL", "bash -c '</dev/tcp/localhost/9000'" ]
       interval: 30s
@@ -45,7 +75,7 @@ services:
     environment:
       POSTGRES_DB: ${KC_DB_DATABASE:-keycloak}
       POSTGRES_USER: ${KC_DB_USERNAME:-keycloak}
-      POSTGRES_PASSWORD: ${KC_DB_PASSWORD:-}
+      POSTGRES_PASSWORD: ${KC_DB_PASSWORD:?KC_DB_PASSWORD is required when Keycloak is enabled}
     ports:
       # Solo accesible desde el host (administracion); Keycloak llega via auth-network.
       - "127.0.0.1:5434:5432"
@@ -59,3 +89,11 @@ services:
       start_period: 30s
     networks:
       - auth-network
+
+volumes:
+  keycloak-data:
+    name: sihsalus-keycloak-data
+
+networks:
+  auth-network:
+    driver: bridge

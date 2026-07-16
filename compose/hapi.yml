@@ -4,11 +4,11 @@
 services:
   hapi-fhir:
     container_name: sihsalus-hapi-fhir
-    image: johanamador/hapi-fhir-minsa-peru:latest
+    image: ${HAPI_IMAGE:-johanamador/hapi-fhir-minsa-peru}:${HAPI_TAG:-latest}
     restart: "unless-stopped"
     profiles: [ hapi ]
     ports:
-      - "8085:8080"
+      - "127.0.0.1:${HAPI_PORT:-8085}:8080"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://hapi-postgres:5432/${HAPI_DB_NAME:-hapi}
       SPRING_DATASOURCE_USERNAME: ${HAPI_DB_USER:-hapi}

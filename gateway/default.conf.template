@@ -89,9 +89,9 @@ server {
   # ejecutando Initial Setup o imports de metadata.
   location = /startup {
     access_log off;
-    proxy_method HEAD;
+    set $backend_health http://backend:8080;
     proxy_intercept_errors on;
-    proxy_pass http://backend/openmrs/initialsetup;
+    proxy_pass $backend_health/openmrs/initialsetup;
     error_page 301 302 303 307 308 = @backend_started;
     error_page 500 502 503 504 = @backend_not_started;
   }
@@ -110,8 +110,9 @@ server {
   # Readiness global: valida que OpenMRS ya termino su bootstrap completo.
   location = /ready {
     access_log off;
+    set $backend_health http://backend:8080;
     proxy_intercept_errors on;
-    proxy_pass http://backend/openmrs/health/started;
+    proxy_pass $backend_health/openmrs/health/started;
     error_page 500 502 503 504 = @openmrs_not_ready;
   }
 
@@ -139,6 +140,8 @@ server {
     proxy_set_header X-Forwarded-Host $host;
     proxy_set_header X-Forwarded-Proto $forwarded_proto;
     proxy_set_header X-Forwarded-Port $server_port;
+    proxy_set_header X-Forwarded-Prefix /keycloak;
+    proxy_read_timeout 300s;
     proxy_pass $keycloak;
   }
 
@@ -158,6 +161,35 @@ server {
     return 503 '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta http-equiv="refresh" content="30"><title>SIH Salus - Iniciando</title><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f5f5f5;color:#333}div{text-align:center;max-width:34em;padding:2em}h1{color:#f26522}</style></head><body><div><h1>SIH Salus se est&aacute; iniciando</h1><p>OpenMRS todav&iacute;a est&aacute; terminando su bootstrap. En el primer arranque puede cargar configuraci&oacute;n, conceptos y mappings OCL durante varios minutos.</p><p>Verifica <code>/startup</code> para saber si el backend responde y <code>/ready</code> para saber si ya puede atender tr&aacute;fico cl&iacute;nico.</p><p>Esta p&aacute;gina se actualizar&aacute; autom&aacute;ticamente.</p></div></body></html>';
   }
 
+  # OIDC endpoints for individually authorized Imaging access. These locations
+  # resolve lazily; core keeps all Imaging routes closed when imaging-auth is absent.
+  location = /imaging/oauth2/auth {
+    internal;
+    set $imaging_auth http://imaging-auth:4180;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header X-Original-URI $request_uri;
+    proxy_pass $imaging_auth/imaging/oauth2/auth;
+  }
+
+  location /imaging/oauth2/ {
+    ${IMAGING_NETWORK_ACCESS_CONTROL}
+    set $imaging_auth http://imaging-auth:4180;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Proto $forwarded_proto;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Auth-Request-Redirect $forwarded_proto://$http_host$request_uri;
+    proxy_pass $imaging_auth;
+  }
+
+  location @imaging_oauth_signin {
+    return 302 /imaging/oauth2/start?rd=$forwarded_proto://$http_host$request_uri;
+  }
+
+  location = /imaging/logout {
+    return 302 /imaging/oauth2/sign_out?rd=/;
+  }
+
   # OHIF Imaging Viewer
   location = /imaging {
     return 301 /imaging/;
@@ -168,6 +200,7 @@ server {
   }
 
   location /orthanc/ {
+    ${IMAGING_ACCESS_CONTROL}
     set $orthanc_proxy http://orthanc-proxy;
     # Orthanc UI/API can receive DICOM studies and archives.
     client_max_body_size 0;
@@ -182,6 +215,7 @@ server {
   }
 
   location /imaging/dicom-web/ {
+    ${IMAGING_ACCESS_CONTROL}
     set $orthanc_proxy http://orthanc-proxy;
     # DICOMweb STOW-RS uploads can exceed the default gateway upload cap.
     client_max_body_size 0;
@@ -191,6 +225,7 @@ server {
   }
 
   location /imaging/wado {
+    ${IMAGING_ACCESS_CONTROL}
     set $orthanc_proxy http://orthanc-proxy;
     rewrite ^/imaging/(.*)$ /$1 break;
     proxy_read_timeout 300s;
@@ -205,6 +240,7 @@ server {
   }
 
   location /imaging/ {
+    ${IMAGING_ACCESS_CONTROL}
     set $ohif http://ohif;
     rewrite ^/imaging/(.*) /$1 break;
     proxy_buffering off;
@@ -226,6 +262,7 @@ server {
   }
 
   location /dicom-web/ {
+    ${IMAGING_ACCESS_CONTROL}
     set $orthanc_proxy http://orthanc-proxy;
     # DICOMweb STOW-RS uploads can exceed the default gateway upload cap.
     client_max_body_size 0;
@@ -234,6 +271,7 @@ server {
   }
 
   location /wado {
+    ${IMAGING_ACCESS_CONTROL}
     set $orthanc_proxy http://orthanc-proxy;
     proxy_read_timeout 300s;
     proxy_pass $orthanc_proxy;

@@ -21,7 +21,6 @@ services:
       retries: 3
       start_period: 60s
     networks:
-      - dicom-network
       - default
 
   orthanc:
@@ -33,8 +32,9 @@ services:
       # Orthanc corre con AuthenticationEnabled=false: su HTTP (8042) NO debe
       # exponerse a la red. El acceso web es via gateway (/orthanc/, /dicom-web/).
       - "127.0.0.1:8042:8042"
-      # DICOM (modalidades del hospital envian estudios a este puerto).
-      - "4242:4242"
+      # Seguro por defecto. Define DICOM_BIND_ADDRESS con la IP LAN concreta
+      # solo cuando las modalidades deban enviar estudios a este host.
+      - "${DICOM_BIND_ADDRESS:-127.0.0.1}:${DICOM_PORT:-4242}:4242"
     environment:
       ORTHANC_JSON: |
         {
@@ -47,6 +47,7 @@ services:
           "RegisteredUsers": {},
           "DicomAet": "ORTHANC",
           "DicomPort": 4242,
+          "DicomCheckCalledAet": ${ORTHANC_DICOM_CHECK_CALLED_AET:-true},
           "DicomWeb": {
             "Enable": true,
             "Root": "/dicom-web/",
@@ -55,10 +56,10 @@ services:
             "Ssl": false
           },
           "StableAge": 60,
-          "StrictAetComparison": false,
+          "StrictAetComparison": ${ORTHANC_STRICT_AET_COMPARISON:-true},
           "HttpTimeout": 60,
           "ConcurrentJobs": 2,
-          "OverwriteInstances": true
+          "OverwriteInstances": ${ORTHANC_OVERWRITE_INSTANCES:-false}
         }
     volumes:
       - orthanc-data:/var/lib/orthanc/db
@@ -69,7 +70,6 @@ services:
       retries: 3
       start_period: 60s
     networks:
-      - dicom-network
       - default
 
   orthanc-proxy:
