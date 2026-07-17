@@ -36,12 +36,20 @@ docker run --detach --rm \
 PORT="$(docker port "$CONTAINER_NAME" 80/tcp | sed -E 's/.*:([0-9]+)$/\1/' | head -n 1)"
 BASE_URL="http://127.0.0.1:$PORT"
 
+ready=false
 for _ in $(seq 1 30); do
   if curl --fail --silent --output /dev/null "$BASE_URL/"; then
+    ready=true
     break
   fi
   sleep 0.2
 done
+
+if [ "$ready" != "true" ]; then
+  echo "[FAIL] frontend nginx did not become ready" >&2
+  docker logs "$CONTAINER_NAME" >&2
+  exit 1
+fi
 
 assert_cache_control() {
   local path="$1"
