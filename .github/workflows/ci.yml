@@ -83,6 +83,9 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
+      - name: Test frontend cache policy
+        run: ./tests/frontend/cache-policy.sh
+
       - name: Validate models and invariants
         run: ./scripts/validate-compose.sh compose-validation
 
