@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1
 
 ARG OPENMRS_BUILD_IMAGE=openmrs/openmrs-core:2.8.x-dev-amazoncorretto-21
-ARG OPENMRS_RUNTIME_IMAGE=openmrs/openmrs-core:2.8.7-amazoncorretto-21
+# Pin the multi-arch runtime used by Reference Application 3.7.1. The Core
+# 2.8.8 WAR is copied below; its exact runtime tag contains a reverted DB check.
+ARG OPENMRS_RUNTIME_IMAGE=openmrs/openmrs-core:2.8.x-amazoncorretto-21@sha256:7f08dd72400c08d4fbf584cc9ac7cf17d96a2ae5fa0c43b4dc60a40ea7d0b760
 
 ### Build Stage
 # The dev tag provides Maven/OpenMRS build tooling for the 2.8 line.
