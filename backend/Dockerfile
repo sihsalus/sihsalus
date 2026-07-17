@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 ARG OPENMRS_BUILD_IMAGE=openmrs/openmrs-core:2.8.x-dev-amazoncorretto-21
-ARG OPENMRS_RUNTIME_IMAGE=openmrs/openmrs-core:2.8.7-amazoncorretto-21
+ARG OPENMRS_RUNTIME_IMAGE=openmrs/openmrs-core:2.8.8-amazoncorretto-21
 
 ### Build Stage
 # The dev tag provides Maven/OpenMRS build tooling for the 2.8 line.
