@@ -38,6 +38,20 @@ RUN cp /openmrs_distro/backend/target/sdk-distro/web/openmrs_core/openmrs.war /o
 # Runtime stays pinned to the exact OpenMRS patch version used in production.
 FROM ${OPENMRS_RUNTIME_IMAGE}
 
+# The pinned OpenMRS runtime quotes the wildcard used to clear distribution
+# directories, so removed modules and metadata survive in the persistent volume.
+# Keep the upstream safety guard while allowing the wildcard to expand.
+RUN sed -i \
+      -e 's|rm -fR "${OMRS_MODULES_DIR:?}/\*"|rm -fR "${OMRS_MODULES_DIR:?}"/*|' \
+      -e 's|rm -fR "${OMRS_OWA_DIR:?}/\*"|rm -fR "${OMRS_OWA_DIR:?}"/*|' \
+      -e 's|rm -fR "${OMRS_CONFIG_DIR:?}/\*"|rm -fR "${OMRS_CONFIG_DIR:?}"/*|' \
+      -e 's|rm -fR "${OMRS_FRONTEND_DIR:?}/\*"|rm -fR "${OMRS_FRONTEND_DIR:?}"/*|' \
+      /openmrs/startup-init.sh && \
+    grep -qF 'rm -fR "${OMRS_MODULES_DIR:?}"/*' /openmrs/startup-init.sh && \
+    grep -qF 'rm -fR "${OMRS_OWA_DIR:?}"/*' /openmrs/startup-init.sh && \
+    grep -qF 'rm -fR "${OMRS_CONFIG_DIR:?}"/*' /openmrs/startup-init.sh && \
+    grep -qF 'rm -fR "${OMRS_FRONTEND_DIR:?}"/*' /openmrs/startup-init.sh
+
 # Do not copy the war if using the correct openmrs-core image version
 COPY --from=dev /openmrs/distribution/openmrs_core/openmrs.war /openmrs/distribution/openmrs_core/
 
