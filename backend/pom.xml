@@ -62,7 +62,7 @@
     <fua.version>1.0.86</fua.version>
     <imaging.version>1.2.8</imaging.version>
     <!-- Content Packages -->
-    <sihsalus-content.version>1.23.1</sihsalus-content.version>
+    <sihsalus-content.version>1.23.2</sihsalus-content.version>
     <reference-content.version>1.4.0</reference-content.version>
   </properties>
 
