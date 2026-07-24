@@ -1,6 +1,9 @@
 name: Deploy Frontend
 
 on:
+  push:
+    tags:
+      - 'frontend-release-*'
   schedule:
     # Offset from common five-minute boundaries to reduce scheduler contention.
     - cron: '3-58/5 * * * *'
@@ -41,12 +44,23 @@ jobs:
         env:
           REQUESTED_SHA: ${{ github.event.client_payload.sha || inputs.sha }}
           REQUESTED_DIGEST: ${{ github.event.client_payload.digest || inputs.digest }}
+          RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || '' }}
+          REQUIRE_LATEST: ${{ github.event_name == 'push' && 'true' || 'false' }}
         run: |
           set -euo pipefail
 
           image='ghcr.io/sihsalus/sihsalus-frontend'
           requested_sha="${REQUESTED_SHA:-}"
           requested_digest="${REQUESTED_DIGEST:-}"
+          release_tag="${RELEASE_TAG:-}"
+
+          if [[ -n "${release_tag}" ]]; then
+            if [[ ! "${release_tag}" =~ ^frontend-release-([0-9a-f]{40})$ ]]; then
+              echo "::error::The frontend release tag is invalid."
+              exit 2
+            fi
+            requested_sha="${BASH_REMATCH[1]}"
+          fi
 
           if [[ -n "${requested_sha}" && ! "${requested_sha}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::The requested frontend SHA is invalid."
@@ -85,6 +99,17 @@ jobs:
           if [[ "${immutable_sha}" != "${requested_sha}" ]]; then
             echo "::error::The immutable image revision does not match its tag."
             exit 1
+          fi
+
+          if [[ "${REQUIRE_LATEST}" == "true" ]]; then
+            latest_json="$(docker buildx imagetools inspect "${image}:latest" --format '{{json .}}')"
+            latest_sha="$(jq -r '.image.config.Labels["org.opencontainers.image.revision"] // empty' <<<"${latest_json}")"
+            latest_digest="$(jq -r '.manifest.digest // empty' <<<"${latest_json}")"
+
+            if [[ "${latest_sha}" != "${requested_sha}" || "${latest_digest}" != "${immutable_digest}" ]]; then
+              echo "::error::The release signal is not the currently promoted latest image."
+              exit 1
+            fi
           fi
 
           if [[ -n "${requested_digest}" && "${immutable_digest}" != "${requested_digest}" ]]; then

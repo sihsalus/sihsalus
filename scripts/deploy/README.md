@@ -19,7 +19,14 @@ completo. El único pull explícito es la imagen fuente del frontend por digest;
 el build y la recreación están dirigidos exclusivamente al servicio `frontend`
 con `--no-deps`.
 
-La automatización normal vive en `.github/workflows/deploy-frontend.yml`.
+La automatización normal vive en `.github/workflows/deploy-frontend.yml`. Una
+release verificada de `sihsalus-frontend` publica el tag de señal
+`frontend-release-<SHA>` en este repositorio mediante una deploy key limitada al
+distro. El workflow exige que ese SHA y su digest correspondan a la imagen
+`latest` promovida y los valida contra la imagen inmutable antes de desplegar.
+El sondeo programado de `latest` permanece como respaldo si falla la señal
+inmediata.
+
 Para una ejecución manual:
 
 ```bash

@@ -4,11 +4,15 @@ Usar este checklist para cambios en `main`, despliegues de `qlty`, `staging` o p
 
 ## Frontend automatizado en entornos no productivos
 
-El workflow `Deploy Frontend` consulta cada cinco minutos la imagen `latest`
-promovida por el release de `sihsalus-frontend`, resuelve y verifica su tag
-inmutable, y despliega secuencialmente en DEV y QLTY. DEV funciona como canario:
-si falla, QLTY no se modifica. Un fallo posterior a la actualización restaura
-el tag y contenedor frontend anterior.
+El release de `sihsalus-frontend` publica un tag de señal
+`frontend-release-<SHA>` mediante una deploy key limitada a este repositorio. El
+workflow `Deploy Frontend` resuelve y verifica la imagen inmutable y despliega
+secuencialmente en DEV y QLTY. DEV funciona como canario: si falla, QLTY no se
+modifica. Un fallo posterior a la actualización restaura el tag y contenedor
+frontend anterior. Un sondeo de `latest` cada cinco minutos conserva una ruta de
+respaldo si la señal inmediata no llega. La señal solo es aceptada cuando su SHA
+y digest siguen correspondiendo a `latest`, por lo que la deploy key no puede
+seleccionar otra versión.
 
 Cada servidor consume la imagen fuente mediante su digest `sha256`, reconstruye
 el wrapper runtime y recrea únicamente `frontend` con `--no-deps --pull never`.
@@ -17,8 +21,10 @@ datos u otros servicios; el único pull permitido es el digest inmutable de la
 imagen fuente del frontend.
 
 El workflow también acepta `repository_dispatch` de tipo `frontend-published` y
-ejecución manual. Producción queda fuera de esta automatización y conserva el
-checklist con aprobación explícita.
+ejecución manual. La deploy key de señal no contiene credenciales de los
+servidores; esas permanecen exclusivamente en los entornos protegidos del
+distro. Producción queda fuera de esta automatización y conserva el checklist
+con aprobación explícita.
 
 ## Antes del despliegue
 
