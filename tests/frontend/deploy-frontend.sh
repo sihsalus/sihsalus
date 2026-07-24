@@ -125,7 +125,7 @@ assert_value() {
 assert_frontend_only_mutations() {
   local commands="$1"
   local expected_build='docker compose build --pull frontend'
-  local expected_up='docker compose up -d --no-deps --no-build --force-recreate frontend'
+  local expected_up='docker compose up -d --no-deps --no-build --pull never --force-recreate frontend'
   local expected_pull="docker pull ${TARGET_SOURCE_IMAGE}"
 
   if grep -Eq '^docker compose (pull|down|stop|restart)( |$)' "$commands"; then
@@ -208,7 +208,7 @@ grep -Fqx \
   "docker image inspect ${TARGET_SOURCE_IMAGE} --format {{index .Config.Labels \"org.opencontainers.image.revision\"}}" \
   "$success_fixture/state/commands"
 grep -q 'docker compose build --pull frontend' "$success_fixture/state/commands"
-grep -q 'docker compose up -d --no-deps --no-build --force-recreate frontend' "$success_fixture/state/commands"
+grep -q 'docker compose up -d --no-deps --no-build --pull never --force-recreate frontend' "$success_fixture/state/commands"
 assert_frontend_only_mutations "$success_fixture/state/commands"
 
 source_mismatch_fixture="$TEST_ROOT/source-mismatch"
@@ -273,7 +273,7 @@ assert_value "$OLD_SHA" \
   "$(cat "$verification_fixture/state/deployed_sha")" \
   "verification rollback did not restore the previous frontend"
 assert_value "2" \
-  "$(grep -c '^docker compose up -d --no-deps --no-build --force-recreate frontend$' "$verification_fixture/state/commands")" \
+  "$(grep -c '^docker compose up -d --no-deps --no-build --pull never --force-recreate frontend$' "$verification_fixture/state/commands")" \
   "verification rollback did not recreate only the new and previous frontend"
 assert_frontend_only_mutations "$verification_fixture/state/commands"
 

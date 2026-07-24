@@ -122,7 +122,7 @@ rollback() {
     cp -p "$ENV_BACKUP" .env
     if [ "$FRONTEND_RECREATE_ATTEMPTED" = true ]; then
       echo "[deploy-frontend] restoring previous frontend container" >&2
-      docker compose up -d --no-deps --no-build --force-recreate frontend || true
+      docker compose up -d --no-deps --no-build --pull never --force-recreate frontend || true
     fi
   fi
 
@@ -162,7 +162,7 @@ docker compose build --pull frontend
 
 echo "[deploy-frontend] recreating frontend only"
 FRONTEND_RECREATE_ATTEMPTED=true
-docker compose up -d --no-deps --no-build --force-recreate frontend
+docker compose up -d --no-deps --no-build --pull never --force-recreate frontend
 
 for _ in $(seq 1 36); do
   health="$(container_health)"
