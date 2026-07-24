@@ -7,10 +7,17 @@ El script:
 
 1. valida el SHA y digest solicitados;
 2. actualiza el checkout del distro mediante fast-forward;
-3. fija `FRONTEND_SOURCE_TAG` y `FRONTEND_RUNTIME_TAG` al tag inmutable;
+3. fija `FRONTEND_SOURCE_IMAGE` al digest inmutable y conserva el tag SHA como
+   metadato operativo; el runtime local recibe un tag derivado del mismo digest
+   para que un rebuild del mismo commit no destruya la ruta de rollback;
 4. reconstruye el wrapper runtime y recrea solo `frontend`;
 5. verifica salud, imagen y `build-info.json`;
 6. restaura la configuración y el contenedor anterior si falla.
+
+No ejecuta `docker compose pull`, `up`, `restart` ni `build` sobre el stack
+completo. El único pull explícito es la imagen fuente del frontend por digest;
+el build y la recreación están dirigidos exclusivamente al servicio `frontend`
+con `--no-deps`.
 
 La automatización normal vive en `.github/workflows/deploy-frontend.yml`.
 Para una ejecución manual:

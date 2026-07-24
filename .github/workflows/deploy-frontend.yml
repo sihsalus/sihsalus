@@ -33,7 +33,7 @@ jobs:
       digest: ${{ steps.release.outputs.digest }}
       tag: ${{ steps.release.outputs.tag }}
     steps:
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
 
       - name: Resolve and verify release
         id: release
@@ -59,8 +59,16 @@ jobs:
 
           if [[ -z "${requested_sha}" ]]; then
             latest_json="$(docker buildx imagetools inspect "${image}:latest" --format '{{json .}}')"
-            requested_sha="$(jq -r '.image.config.Labels["org.opencontainers.image.revision"] // empty' <<<"${latest_json}")"
-            requested_digest="$(jq -r '.manifest.digest // empty' <<<"${latest_json}")"
+            latest_sha="$(jq -r '.image.config.Labels["org.opencontainers.image.revision"] // empty' <<<"${latest_json}")"
+            latest_digest="$(jq -r '.manifest.digest // empty' <<<"${latest_json}")"
+
+            if [[ -n "${requested_digest}" && "${requested_digest}" != "${latest_digest}" ]]; then
+              echo "::error::The requested digest is not the currently promoted latest image."
+              exit 1
+            fi
+
+            requested_sha="${latest_sha}"
+            requested_digest="${latest_digest}"
           fi
 
           if [[ ! "${requested_sha}" =~ ^[0-9a-f]{40}$ ]]; then
@@ -100,7 +108,7 @@ jobs:
       name: development
       url: https://gidis-hsc-dev.inf.pucp.edu.pe/openmrs/spa
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Configure SSH
         env:
@@ -141,7 +149,7 @@ jobs:
       name: quality
       url: https://gidis-hsc-qlty.inf.pucp.edu.pe/openmrs/spa
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Configure SSH
         env:
