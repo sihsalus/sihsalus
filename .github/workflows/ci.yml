@@ -86,6 +86,9 @@ jobs:
       - name: Test frontend cache policy
         run: ./tests/frontend/cache-policy.sh
 
+      - name: Test frontend deployment and rollback
+        run: ./tests/frontend/deploy-frontend.sh
+
       - name: Validate models and invariants
         run: ./scripts/validate-compose.sh compose-validation
 
