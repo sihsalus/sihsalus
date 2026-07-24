@@ -97,6 +97,31 @@ assert_value() {
   fi
 }
 
+invalid_fixture="$TEST_ROOT/invalid-input"
+make_fixture "$invalid_fixture"
+if (
+  cd "$invalid_fixture"
+  PATH="$invalid_fixture/bin:$PATH" \
+    FAKE_STATE_DIR="$invalid_fixture/state" \
+    "$ROOT/scripts/deploy/deploy-frontend.sh" "not-a-sha" "$TARGET_DIGEST"
+); then
+  echo "deployment should have rejected an invalid SHA" >&2
+  exit 1
+fi
+if (
+  cd "$invalid_fixture"
+  PATH="$invalid_fixture/bin:$PATH" \
+    FAKE_STATE_DIR="$invalid_fixture/state" \
+    "$ROOT/scripts/deploy/deploy-frontend.sh" "$TARGET_SHA" "not-a-digest"
+); then
+  echo "deployment should have rejected an invalid image digest" >&2
+  exit 1
+fi
+if [ -e "$invalid_fixture/state/commands" ]; then
+  echo "invalid input unexpectedly invoked a deployment command" >&2
+  exit 1
+fi
+
 noop_fixture="$TEST_ROOT/noop"
 make_fixture "$noop_fixture"
 sed -i.bak "s/${OLD_SHA}/${TARGET_SHA}/g" "$noop_fixture/.env"
