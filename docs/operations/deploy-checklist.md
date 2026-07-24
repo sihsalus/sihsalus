@@ -11,9 +11,10 @@ si falla, QLTY no se modifica. Un fallo posterior a la actualización restaura
 el tag y contenedor frontend anterior.
 
 Cada servidor consume la imagen fuente mediante su digest `sha256`, reconstruye
-el wrapper runtime y recrea únicamente `frontend` con `--no-deps`. El despliegue
-no descarga, reconstruye ni recrea gateway, backend, bases de datos u otros
-servicios.
+el wrapper runtime y recrea únicamente `frontend` con `--no-deps --pull never`.
+El despliegue no descarga, reconstruye ni recrea gateway, backend, bases de
+datos u otros servicios; el único pull permitido es el digest inmutable de la
+imagen fuente del frontend.
 
 El workflow también acepta `repository_dispatch` de tipo `frontend-published` y
 ejecución manual. Producción queda fuera de esta automatización y conserva el
