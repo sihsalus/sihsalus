@@ -2,6 +2,18 @@
 
 Usar este checklist para cambios en `main`, despliegues de `qlty`, `staging` o producción.
 
+## Frontend automatizado en entornos no productivos
+
+El workflow `Deploy Frontend` consulta cada cinco minutos la imagen `latest`
+promovida por el release de `sihsalus-frontend`, resuelve y verifica su tag
+inmutable, y despliega secuencialmente en DEV y QLTY. DEV funciona como canario:
+si falla, QLTY no se modifica. Un fallo posterior a la actualización restaura
+el tag y contenedor frontend anterior.
+
+El workflow también acepta `repository_dispatch` de tipo `frontend-published` y
+ejecución manual. Producción queda fuera de esta automatización y conserva el
+checklist con aprobación explícita.
+
 ## Antes del despliegue
 
 - PR aprobado y mergeado.

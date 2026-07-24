@@ -1,0 +1,174 @@
+name: Deploy Frontend
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  repository_dispatch:
+    types: [frontend-published]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Frontend commit SHA; leave empty to deploy the verified latest image
+        required: false
+        type: string
+      digest:
+        description: Optional expected sha256 digest
+        required: false
+        type: string
+
+concurrency:
+  group: deploy-frontend-non-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  resolve:
+    name: Resolve immutable frontend
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.release.outputs.sha }}
+      digest: ${{ steps.release.outputs.digest }}
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Resolve and verify release
+        id: release
+        env:
+          REQUESTED_SHA: ${{ github.event.client_payload.sha || inputs.sha }}
+          REQUESTED_DIGEST: ${{ github.event.client_payload.digest || inputs.digest }}
+        run: |
+          set -euo pipefail
+
+          image='ghcr.io/sihsalus/sihsalus-frontend'
+          requested_sha="${REQUESTED_SHA:-}"
+          requested_digest="${REQUESTED_DIGEST:-}"
+
+          if [[ -n "${requested_sha}" && ! "${requested_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::The requested frontend SHA is invalid."
+            exit 2
+          fi
+
+          if [[ -n "${requested_digest}" && ! "${requested_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::The requested frontend digest is invalid."
+            exit 2
+          fi
+
+          if [[ -z "${requested_sha}" ]]; then
+            latest_json="$(docker buildx imagetools inspect "${image}:latest" --format '{{json .}}')"
+            requested_sha="$(jq -r '.image.config.Labels["org.opencontainers.image.revision"] // empty' <<<"${latest_json}")"
+            requested_digest="$(jq -r '.manifest.digest // empty' <<<"${latest_json}")"
+          fi
+
+          if [[ ! "${requested_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::The published image does not contain a valid source revision."
+            exit 1
+          fi
+
+          tag="sha-${requested_sha}"
+          immutable_json="$(docker buildx imagetools inspect "${image}:${tag}" --format '{{json .}}')"
+          immutable_sha="$(jq -r '.image.config.Labels["org.opencontainers.image.revision"] // empty' <<<"${immutable_json}")"
+          immutable_digest="$(jq -r '.manifest.digest // empty' <<<"${immutable_json}")"
+
+          if [[ "${immutable_sha}" != "${requested_sha}" ]]; then
+            echo "::error::The immutable image revision does not match its tag."
+            exit 1
+          fi
+
+          if [[ -n "${requested_digest}" && "${immutable_digest}" != "${requested_digest}" ]]; then
+            echo "::error::The immutable image digest does not match the promoted release."
+            exit 1
+          fi
+
+          {
+            echo "sha=${requested_sha}"
+            echo "digest=${immutable_digest}"
+            echo "tag=${tag}"
+          } >>"${GITHUB_OUTPUT}"
+
+          echo "Resolved ${tag} at ${immutable_digest}"
+
+  deploy-dev:
+    name: Deploy DEV
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: development
+      url: https://gidis-hsc-dev.inf.pucp.edu.pe/openmrs/spa
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Configure SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.SSH_PRIVATE_KEY_DEV }}
+          KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS_DEV }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "${HOME}/.ssh"
+          printf '%s\n' "${DEPLOY_KEY}" >"${HOME}/.ssh/deploy_key"
+          printf '%s\n' "${KNOWN_HOSTS}" >"${HOME}/.ssh/known_hosts"
+          chmod 600 "${HOME}/.ssh/deploy_key" "${HOME}/.ssh/known_hosts"
+          ssh-keygen -y -f "${HOME}/.ssh/deploy_key" >/dev/null
+
+      - name: Validate deployment script
+        run: bash -n scripts/deploy/deploy-frontend.sh
+
+      - name: Deploy verified frontend
+        env:
+          TARGET_SHA: ${{ needs.resolve.outputs.sha }}
+          TARGET_DIGEST: ${{ needs.resolve.outputs.digest }}
+        run: |
+          ssh \
+            -i "${HOME}/.ssh/deploy_key" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            u.hsc.dev@200.16.7.137 \
+            "cd /home/u.hsc.dev/sihsalus && bash -s -- '${TARGET_SHA}' '${TARGET_DIGEST}'" \
+            <scripts/deploy/deploy-frontend.sh
+
+  deploy-qlty:
+    name: Deploy QLTY
+    needs: [resolve, deploy-dev]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: quality
+      url: https://gidis-hsc-qlty.inf.pucp.edu.pe/openmrs/spa
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Configure SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.SSH_PRIVATE_KEY_QLTY }}
+          KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS_QLTY }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "${HOME}/.ssh"
+          printf '%s\n' "${DEPLOY_KEY}" >"${HOME}/.ssh/deploy_key"
+          printf '%s\n' "${KNOWN_HOSTS}" >"${HOME}/.ssh/known_hosts"
+          chmod 600 "${HOME}/.ssh/deploy_key" "${HOME}/.ssh/known_hosts"
+          ssh-keygen -y -f "${HOME}/.ssh/deploy_key" >/dev/null
+
+      - name: Validate deployment script
+        run: bash -n scripts/deploy/deploy-frontend.sh
+
+      - name: Deploy verified frontend
+        env:
+          TARGET_SHA: ${{ needs.resolve.outputs.sha }}
+          TARGET_DIGEST: ${{ needs.resolve.outputs.digest }}
+        run: |
+          ssh \
+            -i "${HOME}/.ssh/deploy_key" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            u.hsc.qlty@200.16.7.138 \
+            "cd /home/u.hsc.qlty/sihsalus && bash -s -- '${TARGET_SHA}' '${TARGET_DIGEST}'" \
+            <scripts/deploy/deploy-frontend.sh

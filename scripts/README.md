@@ -8,6 +8,7 @@ Este directorio contiene las herramientas ejecutables del stack. La documentaci�
 | --- | --- | --- |
 | `backup/` | Dump, backup binario, restore y rotación | [backup/README.md](backup/README.md) |
 | `database/` | Inicialización de usuarios y réplica MariaDB | [database/README.md](database/README.md) |
+| `deploy/` | Despliegue inmutable y rollback del frontend | [deploy/README.md](deploy/README.md) |
 | `security/` | Generación y auditoría de archivos de entorno | [security/README.md](security/README.md) |
 | `seed/` | Crear y aplicar releases cifrados de datos seed | [seed/README.md](seed/README.md) |
 | `utils/` | Inicialización, certificados y soporte operativo | [utils/README.md](utils/README.md) |
