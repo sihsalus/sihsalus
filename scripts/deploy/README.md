@@ -22,9 +22,10 @@ con `--no-deps`.
 La automatización normal vive en `.github/workflows/deploy-frontend.yml`. Una
 release verificada de `sihsalus-frontend` publica el tag de señal
 `frontend-release-<SHA>` en este repositorio mediante una deploy key limitada al
-distro. El workflow valida ese SHA contra la imagen inmutable antes de
-desplegar. El sondeo programado de `latest` permanece como respaldo si falla la
-señal inmediata.
+distro. El workflow exige que ese SHA y su digest correspondan a la imagen
+`latest` promovida y los valida contra la imagen inmutable antes de desplegar.
+El sondeo programado de `latest` permanece como respaldo si falla la señal
+inmediata.
 
 Para una ejecución manual:
 

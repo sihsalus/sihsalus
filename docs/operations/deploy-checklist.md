@@ -10,7 +10,9 @@ workflow `Deploy Frontend` resuelve y verifica la imagen inmutable y despliega
 secuencialmente en DEV y QLTY. DEV funciona como canario: si falla, QLTY no se
 modifica. Un fallo posterior a la actualización restaura el tag y contenedor
 frontend anterior. Un sondeo de `latest` cada cinco minutos conserva una ruta de
-respaldo si la señal inmediata no llega.
+respaldo si la señal inmediata no llega. La señal solo es aceptada cuando su SHA
+y digest siguen correspondiendo a `latest`, por lo que la deploy key no puede
+seleccionar otra versión.
 
 Cada servidor consume la imagen fuente mediante su digest `sha256`, reconstruye
 el wrapper runtime y recrea únicamente `frontend` con `--no-deps --pull never`.
