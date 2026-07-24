@@ -2,7 +2,8 @@ name: Deploy Frontend
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    # Offset from common five-minute boundaries to reduce scheduler contention.
+    - cron: '3-58/5 * * * *'
   repository_dispatch:
     types: [frontend-published]
   workflow_dispatch:
