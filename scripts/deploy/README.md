@@ -12,12 +12,18 @@ El script:
    para que un rebuild del mismo commit no destruya la ruta de rollback;
 4. reconstruye el wrapper runtime y recrea solo `frontend`;
 5. verifica salud, imagen y `build-info.json`;
-6. restaura la configuración y el contenedor anterior si falla.
+6. restaura la configuración y el contenedor anterior si falla;
+7. solo después de verificar el frontend, elimina imágenes antiguas de los dos
+   repositorios exclusivos del frontend y conserva las imágenes fuente y
+   runtime activas.
 
 No ejecuta `docker compose pull`, `up`, `restart` ni `build` sobre el stack
 completo. El único pull explícito es la imagen fuente del frontend por digest;
 el build y la recreación están dirigidos exclusivamente al servicio `frontend`
-con `--no-deps`.
+con `--no-deps`. La limpieza tampoco usa `docker image prune`: enumera
+únicamente `ghcr.io/sihsalus/sihsalus-frontend` y el repositorio runtime
+configurado en `FRONTEND_RUNTIME_IMAGE`, por lo que no elimina imágenes de
+OpenMRS, base de datos, gateway ni otros servicios.
 
 La automatización normal vive en `.github/workflows/deploy-frontend.yml`. Una
 release verificada de `sihsalus-frontend` publica el tag de señal
@@ -35,5 +41,8 @@ Para una ejecución manual:
   sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 ```
 
-El comando debe ejecutarse desde la raíz del repositorio y requiere que el
-runtime anterior siga disponible localmente para poder realizar rollback.
+El comando debe ejecutarse desde la raíz del repositorio. Durante una
+actualización, la imagen anterior permanece disponible hasta que terminan la
+verificación y la posibilidad de rollback automático. Una reversión posterior
+a un despliegue exitoso vuelve a descargar por digest y reconstruir el frontend
+anterior.

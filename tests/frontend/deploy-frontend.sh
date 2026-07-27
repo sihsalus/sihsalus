@@ -14,6 +14,13 @@ TARGET_DIGEST='sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 SOURCE_REPOSITORY='ghcr.io/sihsalus/sihsalus-frontend'
 TARGET_SOURCE_IMAGE="${SOURCE_REPOSITORY}@${TARGET_DIGEST}"
 TARGET_RUNTIME_TAG="digest-${TARGET_DIGEST#sha256:}"
+TARGET_RUNTIME_IMAGE="sihsalus-frontend-runtime:${TARGET_RUNTIME_TAG}"
+TARGET_SOURCE_ID='sha256:target-source-image'
+TARGET_RUNTIME_ID='sha256:target-runtime-image'
+OLD_SOURCE_ID='sha256:old-source-image'
+OLD_RUNTIME_ID='sha256:old-runtime-image'
+STALE_SOURCE_ID='sha256:stale-source-image'
+STALE_RUNTIME_ID='sha256:stale-runtime-image'
 
 make_fixture() {
   local fixture="$1"
@@ -28,6 +35,8 @@ EOF
   printf '%s\n' "$TARGET_SHA" >"$fixture/state/source_sha"
   printf '%s\n' "healthy" >"$fixture/state/health"
   printf '%s\n' "sihsalus-frontend-runtime:sha-${OLD_SHA}" >"$fixture/state/image"
+  printf '%s\n' "$OLD_SOURCE_ID" "$TARGET_SOURCE_ID" "$STALE_SOURCE_ID" >"$fixture/state/source_image_ids"
+  printf '%s\n' "$OLD_RUNTIME_ID" "$TARGET_RUNTIME_ID" "$STALE_RUNTIME_ID" >"$fixture/state/runtime_image_ids"
 
   cat >"$fixture/bin/git" <<'EOF'
 #!/usr/bin/env bash
@@ -42,11 +51,52 @@ printf 'docker %s\n' "$*" >>"${FAKE_STATE_DIR}/commands"
 
 case "${1:-}" in
   image)
-    if [ "${2:-}" != "inspect" ]; then
-      echo "unexpected docker image command: $*" >&2
-      exit 89
-    fi
-    cat "${FAKE_STATE_DIR}/source_sha"
+    case "${2:-}" in
+      inspect)
+        if [[ "$*" == *'org.opencontainers.image.revision'* ]]; then
+          cat "${FAKE_STATE_DIR}/source_sha"
+        elif [[ "$*" == *'{{.Id}}'* ]]; then
+          case "${3:-}" in
+            "${FAKE_TARGET_SOURCE_IMAGE}")
+              printf '%s\n' "${FAKE_TARGET_SOURCE_ID}"
+              ;;
+            "${FAKE_TARGET_RUNTIME_IMAGE}")
+              printf '%s\n' "${FAKE_TARGET_RUNTIME_ID}"
+              ;;
+            *)
+              echo "unexpected image inspection: $*" >&2
+              exit 88
+              ;;
+          esac
+        else
+          echo "unexpected image inspection: $*" >&2
+          exit 88
+        fi
+        ;;
+      ls)
+        case "${3:-}" in
+          "${FAKE_SOURCE_REPOSITORY}")
+            cat "${FAKE_STATE_DIR}/source_image_ids"
+            ;;
+          sihsalus-frontend-runtime)
+            cat "${FAKE_STATE_DIR}/runtime_image_ids"
+            ;;
+          *)
+            echo "unexpected image repository listing: $*" >&2
+            exit 88
+            ;;
+        esac
+        ;;
+      rm)
+        if [ "${FAKE_FAIL_CLEANUP:-false}" = true ]; then
+          exit 73
+        fi
+        ;;
+      *)
+        echo "unexpected docker image command: $*" >&2
+        exit 89
+        ;;
+    esac
     ;;
   exec)
     printf '{\n  "gitSha": "%s"\n}\n' "$(cat "${FAKE_STATE_DIR}/deployed_sha")"
@@ -106,10 +156,54 @@ run_deploy() {
     PATH="$fixture/bin:$PATH" \
       FAKE_STATE_DIR="$fixture/state" \
       FAKE_TARGET_RUNTIME_TAG="$TARGET_RUNTIME_TAG" \
+      FAKE_TARGET_RUNTIME_IMAGE="$TARGET_RUNTIME_IMAGE" \
+      FAKE_TARGET_SOURCE_IMAGE="$TARGET_SOURCE_IMAGE" \
+      FAKE_TARGET_RUNTIME_ID="$TARGET_RUNTIME_ID" \
+      FAKE_TARGET_SOURCE_ID="$TARGET_SOURCE_ID" \
+      FAKE_SOURCE_REPOSITORY="$SOURCE_REPOSITORY" \
       FAKE_TARGET_SHA="$TARGET_SHA" \
       FAKE_BAD_SHA="$BAD_SHA" \
       "$ROOT/scripts/deploy/deploy-frontend.sh" "$TARGET_SHA" "$TARGET_DIGEST"
   )
+}
+
+assert_scoped_image_cleanup() {
+  local commands="$1"
+
+  grep -Fqx "docker image ls ${SOURCE_REPOSITORY} --quiet --no-trunc" "$commands"
+  grep -Fqx "docker image ls sihsalus-frontend-runtime --quiet --no-trunc" "$commands"
+
+  grep -Fqx "docker image rm ${OLD_SOURCE_ID}" "$commands"
+  grep -Fqx "docker image rm ${STALE_SOURCE_ID}" "$commands"
+  grep -Fqx "docker image rm ${OLD_RUNTIME_ID}" "$commands"
+  grep -Fqx "docker image rm ${STALE_RUNTIME_ID}" "$commands"
+
+  if grep -Fqx "docker image rm ${TARGET_SOURCE_ID}" "$commands" ||
+    grep -Fqx "docker image rm ${TARGET_RUNTIME_ID}" "$commands"; then
+    echo "cleanup attempted to remove an active frontend image" >&2
+    exit 1
+  fi
+
+  if grep -Eq '^docker image prune( |$)' "$commands"; then
+    echo "cleanup attempted a global image prune" >&2
+    exit 1
+  fi
+
+  if grep '^docker image ls ' "$commands" |
+    grep -Fvx "docker image ls ${SOURCE_REPOSITORY} --quiet --no-trunc" |
+    grep -Fvx "docker image ls sihsalus-frontend-runtime --quiet --no-trunc"; then
+    echo "cleanup enumerated images outside the frontend repositories" >&2
+    exit 1
+  fi
+
+  if grep '^docker image rm ' "$commands" |
+    grep -Fvx "docker image rm ${OLD_SOURCE_ID}" |
+    grep -Fvx "docker image rm ${STALE_SOURCE_ID}" |
+    grep -Fvx "docker image rm ${OLD_RUNTIME_ID}" |
+    grep -Fvx "docker image rm ${STALE_RUNTIME_ID}"; then
+    echo "cleanup attempted to remove an unexpected image" >&2
+    exit 1
+  fi
 }
 
 assert_value() {
@@ -187,6 +281,7 @@ if grep -Eq 'docker (pull|compose build|compose up)' "$noop_fixture/state/comman
   echo "idempotent deployment unexpectedly changed the frontend" >&2
   exit 1
 fi
+assert_scoped_image_cleanup "$noop_fixture/state/commands"
 
 success_fixture="$TEST_ROOT/success"
 make_fixture "$success_fixture"
@@ -210,6 +305,32 @@ grep -Fqx \
 grep -q 'docker compose build --pull frontend' "$success_fixture/state/commands"
 grep -q 'docker compose up -d --no-deps --no-build --pull never --force-recreate frontend' "$success_fixture/state/commands"
 assert_frontend_only_mutations "$success_fixture/state/commands"
+assert_scoped_image_cleanup "$success_fixture/state/commands"
+
+cleanup_warning_fixture="$TEST_ROOT/cleanup-warning"
+make_fixture "$cleanup_warning_fixture"
+if ! (
+  cd "$cleanup_warning_fixture"
+  PATH="$cleanup_warning_fixture/bin:$PATH" \
+    FAKE_STATE_DIR="$cleanup_warning_fixture/state" \
+    FAKE_TARGET_RUNTIME_TAG="$TARGET_RUNTIME_TAG" \
+    FAKE_TARGET_RUNTIME_IMAGE="$TARGET_RUNTIME_IMAGE" \
+    FAKE_TARGET_SOURCE_IMAGE="$TARGET_SOURCE_IMAGE" \
+    FAKE_TARGET_RUNTIME_ID="$TARGET_RUNTIME_ID" \
+    FAKE_TARGET_SOURCE_ID="$TARGET_SOURCE_ID" \
+    FAKE_SOURCE_REPOSITORY="$SOURCE_REPOSITORY" \
+    FAKE_TARGET_SHA="$TARGET_SHA" \
+    FAKE_BAD_SHA="$BAD_SHA" \
+    FAKE_FAIL_CLEANUP=true \
+    "$ROOT/scripts/deploy/deploy-frontend.sh" "$TARGET_SHA" "$TARGET_DIGEST"
+); then
+  echo "best-effort cleanup should not invalidate a verified deployment" >&2
+  exit 1
+fi
+assert_value "$TARGET_SHA" \
+  "$(cat "$cleanup_warning_fixture/state/deployed_sha")" \
+  "cleanup warning invalidated the healthy frontend"
+assert_scoped_image_cleanup "$cleanup_warning_fixture/state/commands"
 
 source_mismatch_fixture="$TEST_ROOT/source-mismatch"
 make_fixture "$source_mismatch_fixture"
@@ -230,10 +351,15 @@ if (
   cd "$rollback_fixture"
   PATH="$rollback_fixture/bin:$PATH" \
     FAKE_STATE_DIR="$rollback_fixture/state" \
-    FAKE_TARGET_RUNTIME_TAG="$TARGET_RUNTIME_TAG" \
-    FAKE_TARGET_SHA="$TARGET_SHA" \
-    FAKE_BAD_SHA="$BAD_SHA" \
-    FAKE_FAIL_BUILD=true \
+      FAKE_TARGET_RUNTIME_TAG="$TARGET_RUNTIME_TAG" \
+      FAKE_TARGET_RUNTIME_IMAGE="$TARGET_RUNTIME_IMAGE" \
+      FAKE_TARGET_SOURCE_IMAGE="$TARGET_SOURCE_IMAGE" \
+      FAKE_TARGET_RUNTIME_ID="$TARGET_RUNTIME_ID" \
+      FAKE_TARGET_SOURCE_ID="$TARGET_SOURCE_ID" \
+      FAKE_SOURCE_REPOSITORY="$SOURCE_REPOSITORY" \
+      FAKE_TARGET_SHA="$TARGET_SHA" \
+      FAKE_BAD_SHA="$BAD_SHA" \
+      FAKE_FAIL_BUILD=true \
     "$ROOT/scripts/deploy/deploy-frontend.sh" "$TARGET_SHA" "$TARGET_DIGEST"
 ); then
   echo "deployment should have failed when the runtime build failed" >&2
@@ -257,10 +383,15 @@ if (
   cd "$verification_fixture"
   PATH="$verification_fixture/bin:$PATH" \
     FAKE_STATE_DIR="$verification_fixture/state" \
-    FAKE_TARGET_RUNTIME_TAG="$TARGET_RUNTIME_TAG" \
-    FAKE_TARGET_SHA="$TARGET_SHA" \
-    FAKE_BAD_SHA="$BAD_SHA" \
-    FAKE_BAD_DEPLOY_SHA=true \
+      FAKE_TARGET_RUNTIME_TAG="$TARGET_RUNTIME_TAG" \
+      FAKE_TARGET_RUNTIME_IMAGE="$TARGET_RUNTIME_IMAGE" \
+      FAKE_TARGET_SOURCE_IMAGE="$TARGET_SOURCE_IMAGE" \
+      FAKE_TARGET_RUNTIME_ID="$TARGET_RUNTIME_ID" \
+      FAKE_TARGET_SOURCE_ID="$TARGET_SOURCE_ID" \
+      FAKE_SOURCE_REPOSITORY="$SOURCE_REPOSITORY" \
+      FAKE_TARGET_SHA="$TARGET_SHA" \
+      FAKE_BAD_SHA="$BAD_SHA" \
+      FAKE_BAD_DEPLOY_SHA=true \
     "$ROOT/scripts/deploy/deploy-frontend.sh" "$TARGET_SHA" "$TARGET_DIGEST"
 ); then
   echo "deployment should have failed when runtime verification failed" >&2
