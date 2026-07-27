@@ -98,12 +98,45 @@ RUNTIME_IMAGE_REPOSITORY="$(read_env_value FRONTEND_RUNTIME_IMAGE)"
 RUNTIME_IMAGE_REPOSITORY="${RUNTIME_IMAGE_REPOSITORY:-sihsalus-frontend-runtime}"
 TARGET_RUNTIME_IMAGE="${RUNTIME_IMAGE_REPOSITORY}:${RUNTIME_TAG}"
 
+prune_repository_images_except() {
+  local repository="$1"
+  local active_image="$2"
+  local active_image_id
+  local image_id
+
+  if ! active_image_id="$(docker image inspect "$active_image" --format '{{.Id}}' 2>/dev/null)"; then
+    echo "[deploy-frontend] warning: cannot resolve active image ${active_image}; skipping ${repository} cleanup" >&2
+    return 0
+  fi
+
+  while IFS= read -r image_id; do
+    if [ -z "$image_id" ] || [ "$image_id" = "$active_image_id" ]; then
+      continue
+    fi
+
+    if docker image rm "$image_id"; then
+      echo "[deploy-frontend] removed stale frontend image ${image_id}"
+    else
+      echo "[deploy-frontend] warning: could not remove stale frontend image ${image_id}" >&2
+    fi
+  done < <(docker image ls "$repository" --quiet --no-trunc | awk 'NF && !seen[$0]++')
+}
+
+prune_stale_frontend_images() {
+  # Never run a global prune on a shared clinical host. Restrict cleanup to
+  # the two frontend repositories and preserve the exact active source and
+  # runtime images required by the healthy container.
+  prune_repository_images_except "$SOURCE_REPOSITORY" "$SOURCE_IMAGE"
+  prune_repository_images_except "$RUNTIME_IMAGE_REPOSITORY" "$TARGET_RUNTIME_IMAGE"
+}
+
 if [ "$CURRENT_SHA" = "$TARGET_SHA" ] &&
   [ "$CURRENT_SOURCE_IMAGE" = "$SOURCE_IMAGE" ] &&
   [ "$CURRENT_SOURCE_TAG" = "$SOURCE_TAG" ] &&
   [ "$CURRENT_RUNTIME_TAG" = "$RUNTIME_TAG" ] &&
   [ "$CURRENT_IMAGE" = "$TARGET_RUNTIME_IMAGE" ] &&
   [ "$CURRENT_HEALTH" = "healthy" ]; then
+  prune_stale_frontend_images
   echo "[deploy-frontend] ${SOURCE_TAG} at ${TARGET_DIGEST} is already healthy; nothing to do"
   exit 0
 fi
@@ -198,5 +231,7 @@ fi
 ROLLBACK_REQUIRED=false
 trap - ERR HUP INT TERM
 rm -f "$ENV_BACKUP"
+
+prune_stale_frontend_images
 
 echo "[deploy-frontend] deployed ${SOURCE_TAG} from ${SOURCE_IMAGE}"
