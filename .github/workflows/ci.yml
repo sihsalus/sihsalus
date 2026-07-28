@@ -83,6 +83,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Test frontend bootstrap configuration
+        run: node --test frontend/patch-config-urls.test.js
+
       - name: Test frontend cache policy
         run: ./tests/frontend/cache-policy.sh
 
