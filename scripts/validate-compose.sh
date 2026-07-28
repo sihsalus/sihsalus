@@ -27,8 +27,17 @@ for gateway_template in gateway/default.conf.template gateway/default-ssl.conf.t
     echo "[FAIL] $gateway_template must not discard the startup response body" >&2
     exit 1
   fi
+
+  spa_csp="$(grep -F '"~^/openmrs/spa/"' "$gateway_template")"
+  spa_script_policy="${spa_csp#*script-src }"
+  spa_script_policy="${spa_script_policy%%;*}"
+  if [ "$spa_script_policy" != "'self'" ]; then
+    echo "[FAIL] $gateway_template must not allow inline or cross-origin SPA scripts" >&2
+    exit 1
+  fi
 done
 echo "[OK] gateway health routes use dynamic Docker DNS and valid startup framing"
+echo "[OK] SPA CSP permits only same-origin external scripts"
 
 if [ "$#" -gt 1 ]; then
   echo "Usage: $0 [evidence-directory]" >&2

@@ -18,7 +18,7 @@ El frontend es una Single Page Application (SPA) moderna construida con React y 
 frontend/
 ├── Dockerfile         # Construye la imagen runtime versionada
 ├── nginx.conf         # Configuración Nginx para SPA
-├── patch-config-urls.js # Adapta SPA_CONFIG_URLS al index.html
+├── patch-config-urls.js # Valida el bootstrap actual y adapta shells heredados
 └── frontend-keycloak.json
 ```
 
@@ -36,7 +36,7 @@ Imagen: `${FRONTEND_RUNTIME_IMAGE:-sihsalus-frontend-runtime}:${FRONTEND_RUNTIME
 
 **Puertos**: 80 (interno, accesible solo desde gateway)
 
-**Health check**: verifica que el HTML servido contenga `initializeSpa`, no solo que Nginx responda.
+**Health check**: verifica `initializeSpa` en el bootstrap externo. Mantiene un fallback al HTML para que un rollback a una imagen heredada siga siendo posible.
 
 ---
 
@@ -148,7 +148,9 @@ FRONTEND_RUNTIME_TAG=tag-anterior docker compose up -d frontend gateway
    ```
 2. Revisa que la imagen tenga el shell correcto:
    ```bash
-   docker compose exec frontend wget -q -O - http://127.0.0.1/ | grep initializeSpa
+   docker compose exec frontend \
+     wget -q -O - http://127.0.0.1/sihsalus-spa-bootstrap.js |
+     grep initializeSpa
    ```
 3. Revisa logs del gateway:
    ```bash

@@ -50,7 +50,9 @@ services:
         STRIP_SOURCE_MAPS: ${STRIP_SOURCE_MAPS:-true}
     restart: "unless-stopped"
     healthcheck:
-      test: [ "CMD-SHELL", "wget -q -O - http://127.0.0.1/ | grep -q 'initializeSpa'" ]
+      # El shell actual externaliza initializeSpa para cumplir CSP. El fallback
+      # al index conserva la capacidad de rollback a una imagen anterior.
+      test: [ "CMD-SHELL", "(wget -q -O - http://127.0.0.1/sihsalus-spa-bootstrap.js | grep -q 'initializeSpa') || (wget -q -O - http://127.0.0.1/ | grep -q 'initializeSpa')" ]
       interval: 15s
       timeout: 5s
       retries: 5
