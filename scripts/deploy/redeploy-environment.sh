@@ -7,6 +7,16 @@ if [ "$#" -ne 0 ]; then
   exit 2
 fi
 
+REDEPLOY_OFFLINE="${REDEPLOY_OFFLINE:-false}"
+case "$REDEPLOY_OFFLINE" in
+  true | false)
+    ;;
+  *)
+    echo "[redeploy-environment] REDEPLOY_OFFLINE must be true or false" >&2
+    exit 2
+    ;;
+esac
+
 for command in docker git awk grep head seq sleep; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "[redeploy-environment] missing command: $command" >&2
@@ -40,6 +50,17 @@ trap 'diagnose_failure 143' TERM
 service_is_active() {
   local service="$1"
   grep -Fxq "$service" <<<"$ACTIVE_SERVICES"
+}
+
+service_allows_successful_exit() {
+  case "$1" in
+    backend-oauth2-config | certbot)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
 }
 
 container_health() {
@@ -127,7 +148,9 @@ wait_for_active_services() {
       health="$(docker inspect "$container_id" --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}')"
       exit_code="$(docker inspect "$container_id" --format '{{.State.ExitCode}}')"
 
-      if [ "$service" = "backend-oauth2-config" ] && [ "$state" = "exited" ] && [ "$exit_code" = "0" ]; then
+      if service_allows_successful_exit "$service" &&
+        [ "$state" = "exited" ] &&
+        [ "$exit_code" = "0" ]; then
         continue
       fi
       case "$state" in
@@ -159,9 +182,13 @@ wait_for_active_services() {
   return 1
 }
 
-echo "[redeploy-environment] updating distro checkout"
-git fetch origin main
-git merge --ff-only origin/main
+if [ "$REDEPLOY_OFFLINE" = true ]; then
+  echo "[redeploy-environment] offline mode: using the prevalidated local checkout and images"
+else
+  echo "[redeploy-environment] updating distro checkout"
+  git fetch origin main
+  git merge --ff-only origin/main
+fi
 
 docker compose config --quiet
 ACTIVE_SERVICES="$(docker compose config --services)"
@@ -174,21 +201,27 @@ fi
 echo "[redeploy-environment] active services"
 printf '%s\n' "$ACTIVE_SERVICES"
 
-echo "[redeploy-environment] pulling the configured classic OpenMRS backend"
-docker compose pull backend
+if [ "$REDEPLOY_OFFLINE" = false ]; then
+  echo "[redeploy-environment] pulling the configured classic OpenMRS backend"
+  docker compose pull backend
 
-echo "[redeploy-environment] pulling registry images for active non-buildable services"
-docker compose pull --ignore-buildable --ignore-pull-failures
+  echo "[redeploy-environment] pulling registry images for active non-buildable services"
+  docker compose pull --ignore-buildable --ignore-pull-failures
+fi
 
-BUILD_SERVICES=(frontend gateway)
-for build_service in certbot keycloak; do
-  if service_is_active "$build_service"; then
-    BUILD_SERVICES+=("$build_service")
-  fi
-done
+if [ "$REDEPLOY_OFFLINE" = false ]; then
+  BUILD_SERVICES=(frontend gateway)
+  for build_service in certbot keycloak; do
+    if service_is_active "$build_service"; then
+      BUILD_SERVICES+=("$build_service")
+    fi
+  done
 
-echo "[redeploy-environment] rebuilding local runtime services without cache: ${BUILD_SERVICES[*]}"
-docker compose build --pull --no-cache "${BUILD_SERVICES[@]}"
+  echo "[redeploy-environment] rebuilding local runtime services without cache: ${BUILD_SERVICES[*]}"
+  docker compose build --pull --no-cache "${BUILD_SERVICES[@]}"
+else
+  echo "[redeploy-environment] offline mode: using prevalidated local runtime images without rebuilding"
+fi
 
 echo "[redeploy-environment] recreating every active service without deleting volumes"
 docker compose up \
