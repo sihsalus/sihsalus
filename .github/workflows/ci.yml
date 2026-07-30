@@ -92,6 +92,9 @@ jobs:
       - name: Test frontend deployment and rollback
         run: ./tests/frontend/deploy-frontend.sh
 
+      - name: Validate full environment redeploy policy
+        run: ./tests/deploy/redeploy-environment-policy.sh
+
       - name: Validate models and invariants
         run: ./scripts/validate-compose.sh compose-validation
 
