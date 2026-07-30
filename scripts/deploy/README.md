@@ -68,3 +68,9 @@ Opera sobre los archivos y perfiles definidos por el `.env` del servidor:
 No ejecuta `docker compose down`, no usa `-v` y no elimina volúmenes. El
 workflow manual `Redeploy Non-Production` ejecuta primero DEV y solo promueve a
 QLTY si DEV y sus verificaciones HTTP terminan correctamente.
+
+Si un establecimiento está temporalmente sin DNS o salida a Internet, se puede
+usar `REDEPLOY_OFFLINE=true` únicamente después de transferir y verificar el
+checkout y todas las imágenes runtime deseadas. Ese modo omite `git fetch`, los
+pulls y los builds; recrea los servicios exclusivamente con las imágenes
+prevalidadas que ya estén presentes. No cambia las versiones fijadas en `.env`.
