@@ -46,3 +46,25 @@ actualización, la imagen anterior permanece disponible hasta que terminan la
 verificación y la posibilidad de rollback automático. Una reversión posterior
 a un despliegue exitoso vuelve a descargar por digest y reconstruir el frontend
 anterior.
+
+## Redeploy integral no destructivo
+
+`redeploy-environment.sh` se usa para reconstruir y recrear un ambiente
+completo cuando una actualización exclusiva del frontend no es suficiente.
+Opera sobre los archivos y perfiles definidos por el `.env` del servidor:
+
+1. rechaza cambios locales en archivos versionados y el perfil destructivo
+   `seed`;
+2. actualiza `main` únicamente mediante fast-forward;
+3. descarga la imagen configurada del backend clásico
+   `ghcr.io/sihsalus/sihsalus-backend`, construido desde `backend/pom.xml`;
+4. descarga las imágenes de registry de todos los perfiles activos;
+5. reconstruye sin caché los runtimes locales activos (`frontend`, `gateway`,
+   `certbot` y/o `keycloak`);
+6. recrea todos los servicios activos, pero conserva volúmenes y datos;
+7. espera MariaDB, frontend, OpenMRS y gateway, y verifica el estado de todos
+   los servicios antes de declarar el ambiente usable.
+
+No ejecuta `docker compose down`, no usa `-v` y no elimina volúmenes. El
+workflow manual `Redeploy Non-Production` ejecuta primero DEV y solo promueve a
+QLTY si DEV y sus verificaciones HTTP terminan correctamente.

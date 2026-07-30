@@ -1,0 +1,141 @@
+name: Redeploy Non-Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_full_redeploy:
+        description: Recreate every active service in DEV and QLTY while preserving volumes
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: redeploy-non-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-dev:
+    name: Clean redeploy DEV
+    if: inputs.confirm_full_redeploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment:
+      name: development
+      url: https://gidis-hsc-dev.inf.pucp.edu.pe/openmrs/spa
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate redeploy policy
+        run: ./tests/deploy/redeploy-environment-policy.sh
+
+      - name: Configure SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.SSH_PRIVATE_KEY_DEV }}
+          KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS_DEV }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "${HOME}/.ssh"
+          printf '%s\n' "${DEPLOY_KEY}" >"${HOME}/.ssh/deploy_key"
+          printf '%s\n' "${KNOWN_HOSTS}" >"${HOME}/.ssh/known_hosts"
+          chmod 600 "${HOME}/.ssh/deploy_key" "${HOME}/.ssh/known_hosts"
+          ssh-keygen -y -f "${HOME}/.ssh/deploy_key" >/dev/null
+
+      - name: Redeploy every active service
+        run: |
+          ssh \
+            -i "${HOME}/.ssh/deploy_key" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            u.hsc.dev@200.16.7.137 \
+            "cd /home/u.hsc.dev/sihsalus && bash -s" \
+            <scripts/deploy/redeploy-environment.sh
+
+      - name: Verify DEV externally
+        run: |
+          set -euo pipefail
+          base='https://gidis-hsc-dev.inf.pucp.edu.pe'
+          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
+            "${base}/health" >/dev/null
+          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
+            "${base}/ready" >/dev/null
+          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
+            "${base}/openmrs/health/started" >/dev/null
+          curl --insecure --fail --silent --show-error \
+            "${base}/openmrs/spa/build-info.json"
+          curl --insecure --fail --silent --show-error \
+            "${base}/openmrs/spa/sihsalus-spa-bootstrap.js" |
+            grep -q 'initializeSpa'
+          csp="$(curl --insecure --fail --silent --show-error --head "${base}/openmrs/spa/" |
+            awk 'BEGIN { IGNORECASE=1 } /^content-security-policy:/ { sub(/\r$/, ""); print; exit }')"
+          grep -Fq "script-src 'self';" <<<"${csp}"
+          if grep -Fq "script-src 'self' 'unsafe-inline'" <<<"${csp}"; then
+            echo "DEV still permits inline SPA scripts" >&2
+            exit 1
+          fi
+
+  deploy-qlty:
+    name: Clean redeploy QLTY
+    if: inputs.confirm_full_redeploy
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment:
+      name: quality
+      url: https://gidis-hsc-qlty.inf.pucp.edu.pe/openmrs/spa
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate redeploy policy
+        run: ./tests/deploy/redeploy-environment-policy.sh
+
+      - name: Configure SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.SSH_PRIVATE_KEY_QLTY }}
+          KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS_QLTY }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "${HOME}/.ssh"
+          printf '%s\n' "${DEPLOY_KEY}" >"${HOME}/.ssh/deploy_key"
+          printf '%s\n' "${KNOWN_HOSTS}" >"${HOME}/.ssh/known_hosts"
+          chmod 600 "${HOME}/.ssh/deploy_key" "${HOME}/.ssh/known_hosts"
+          ssh-keygen -y -f "${HOME}/.ssh/deploy_key" >/dev/null
+
+      - name: Redeploy every active service
+        run: |
+          ssh \
+            -i "${HOME}/.ssh/deploy_key" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            u.hsc.qlty@200.16.7.138 \
+            "cd /home/u.hsc.qlty/sihsalus && bash -s" \
+            <scripts/deploy/redeploy-environment.sh
+
+      - name: Verify QLTY externally
+        run: |
+          set -euo pipefail
+          base='https://gidis-hsc-qlty.inf.pucp.edu.pe'
+          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
+            "${base}/health" >/dev/null
+          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
+            "${base}/ready" >/dev/null
+          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
+            "${base}/openmrs/health/started" >/dev/null
+          curl --insecure --fail --silent --show-error \
+            "${base}/openmrs/spa/build-info.json"
+          curl --insecure --fail --silent --show-error \
+            "${base}/openmrs/spa/sihsalus-spa-bootstrap.js" |
+            grep -q 'initializeSpa'
+          csp="$(curl --insecure --fail --silent --show-error --head "${base}/openmrs/spa/" |
+            awk 'BEGIN { IGNORECASE=1 } /^content-security-policy:/ { sub(/\r$/, ""); print; exit }')"
+          grep -Fq "script-src 'self';" <<<"${csp}"
+          if grep -Fq "script-src 'self' 'unsafe-inline'" <<<"${csp}"; then
+            echo "QLTY still permits inline SPA scripts" >&2
+            exit 1
+          fi
