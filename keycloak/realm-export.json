@@ -10,6 +10,27 @@
     "bruteForceProtected": true,
     "maxFailureWaitSeconds": 300,
     "failureFactor": 5,
+
+    "ssoSessionIdleTimeout": 1800,
+    "ssoSessionMaxLifespan": 28800,
+    "offlineSessionIdleTimeout": 1800,
+
+    "otpPolicyType": "totp",
+    "otpPolicyAlgorithm": "HmacSHA1",
+    "otpPolicyDigits": 6,
+    "otpPolicyPeriod": 30,
+    "otpPolicyLookAheadWindow": 1,
+    "requiredActions": [
+        {
+            "alias": "CONFIGURE_TOTP",
+            "name": "Configure OTP",
+            "providerId": "CONFIGURE_TOTP",
+            "enabled": true,
+            "defaultAction": false,
+            "priority": 10,
+            "config": {}
+        }
+    ],
     "passwordPolicy": "length(8) and digits(1) and lowerCase(1) and upperCase(1) and notUsername(undefined)",
     "roles": {
         "realm": [
