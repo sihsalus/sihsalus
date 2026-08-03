@@ -69,8 +69,9 @@ Opera sobre los archivos y perfiles definidos por el `.env` del servidor:
    `ghcr.io/sihsalus/sihsalus-backend`, construido desde `backend/pom.xml`, y
    valida que su revisión OCI coincida con el commit solicitado;
 4. descarga las imágenes de registry de todos los perfiles activos;
-5. reconstruye sin caché los runtimes locales activos (`frontend`, `gateway`,
-   `certbot` y/o `keycloak`);
+5. reconstruye sin caché y de forma secuencial los runtimes locales activos
+   (`frontend`, `gateway`, `certbot` y/o `keycloak`) para limitar el consumo de
+   CPU, memoria y red del host;
 6. recrea todos los servicios activos, pero conserva volúmenes y datos;
 7. espera MariaDB, frontend, OpenMRS y gateway, y verifica el estado de todos
    los servicios antes de declarar el ambiente usable;
@@ -80,8 +81,9 @@ Opera sobre los archivos y perfiles definidos por el `.env` del servidor:
 No ejecuta `docker compose down`, no usa `-v` y no elimina volúmenes. El
 workflow manual `Redeploy Non-Production` solicita el SHA y digest del backend,
 ejecuta primero DEV y solo promueve a QLTY si DEV y sus verificaciones HTTP
-terminan correctamente. La conexión usa keepalive y la espera de OpenMRS emite
-progreso periódico para tolerar arranques largos.
+terminan correctamente. La conexión usa keepalive con tolerancia de diez
+minutos y la espera de OpenMRS emite progreso periódico para tolerar arranques
+largos.
 
 Si un establecimiento está temporalmente sin DNS o salida a Internet, se puede
 usar `REDEPLOY_OFFLINE=true` únicamente después de transferir y verificar el

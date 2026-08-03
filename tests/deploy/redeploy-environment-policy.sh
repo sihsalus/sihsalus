@@ -18,7 +18,8 @@ grep -Fq 'Usage: $0 <40-character backend git SHA> <sha256 image digest>' "$SCRI
 grep -Fq 'export BACKEND_TAG="$TARGET_BACKEND_REFERENCE"' "$SCRIPT"
 grep -Fq 'docker compose pull backend' "$SCRIPT"
 grep -Fq 'REDEPLOY_OFFLINE="${REDEPLOY_OFFLINE:-false}"' "$SCRIPT"
-grep -Fq 'docker compose build --pull --no-cache "${BUILD_SERVICES[@]}"' "$SCRIPT"
+grep -Fq 'for build_service in "${BUILD_SERVICES[@]}"; do' "$SCRIPT"
+grep -Fq 'docker compose build --pull --no-cache "$build_service"' "$SCRIPT"
 grep -Fq 'offline mode: using prevalidated local runtime images without rebuilding' "$SCRIPT"
 grep -Fq -- '--force-recreate' "$SCRIPT"
 grep -Fq -- '--remove-orphans' "$SCRIPT"
@@ -37,7 +38,7 @@ grep -Fq 'waiting for OpenMRS' "$SCRIPT"
 grep -Fq 'backend_sha:' "$WORKFLOW"
 grep -Fq 'backend_digest:' "$WORKFLOW"
 [ "$(grep -Fc -- '-o ServerAliveInterval=30' "$WORKFLOW")" -eq 2 ]
-[ "$(grep -Fc -- '-o ServerAliveCountMax=6' "$WORKFLOW")" -eq 2 ]
+[ "$(grep -Fc -- '-o ServerAliveCountMax=20' "$WORKFLOW")" -eq 2 ]
 [ "$(grep -Fc "bash -s -- '\${TARGET_BACKEND_SHA}' '\${TARGET_BACKEND_DIGEST}'" "$WORKFLOW")" -eq 2 ]
 
 echo "[OK] full environment redeploy policy"

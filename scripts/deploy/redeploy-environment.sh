@@ -282,8 +282,11 @@ if [ "$REDEPLOY_OFFLINE" = false ]; then
     fi
   done
 
-  echo "[redeploy-environment] rebuilding local runtime services without cache: ${BUILD_SERVICES[*]}"
-  docker compose build --pull --no-cache "${BUILD_SERVICES[@]}"
+  echo "[redeploy-environment] rebuilding local runtime services sequentially without cache: ${BUILD_SERVICES[*]}"
+  for build_service in "${BUILD_SERVICES[@]}"; do
+    echo "[redeploy-environment] rebuilding ${build_service}"
+    docker compose build --pull --no-cache "$build_service"
+  done
 else
   echo "[redeploy-environment] offline mode: using prevalidated local runtime images without rebuilding"
 fi
