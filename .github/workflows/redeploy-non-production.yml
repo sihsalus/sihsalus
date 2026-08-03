@@ -8,6 +8,14 @@ on:
         required: true
         default: false
         type: boolean
+      backend_sha:
+        description: Backend source commit (40 lowercase hexadecimal characters)
+        required: true
+        type: string
+      backend_digest:
+        description: 'Immutable backend image digest (sha256: followed by 64 lowercase hexadecimal characters)'
+        required: true
+        type: string
 
 concurrency:
   group: redeploy-non-production
@@ -44,15 +52,29 @@ jobs:
           ssh-keygen -y -f "${HOME}/.ssh/deploy_key" >/dev/null
 
       - name: Redeploy every active service
+        env:
+          TARGET_BACKEND_SHA: ${{ inputs.backend_sha }}
+          TARGET_BACKEND_DIGEST: ${{ inputs.backend_digest }}
         run: |
+          set -euo pipefail
+          if [[ ! "${TARGET_BACKEND_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::The requested backend SHA is invalid."
+            exit 2
+          fi
+          if [[ ! "${TARGET_BACKEND_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::The requested backend digest is invalid."
+            exit 2
+          fi
           ssh \
             -i "${HOME}/.ssh/deploy_key" \
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             -o ConnectTimeout=15 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=6 \
             u.hsc.dev@200.16.7.137 \
-            "cd /home/u.hsc.dev/sihsalus && bash -s" \
+            "cd /home/u.hsc.dev/sihsalus && bash -s -- '${TARGET_BACKEND_SHA}' '${TARGET_BACKEND_DIGEST}'" \
             <scripts/deploy/redeploy-environment.sh
 
       - name: Verify DEV externally
@@ -106,15 +128,29 @@ jobs:
           ssh-keygen -y -f "${HOME}/.ssh/deploy_key" >/dev/null
 
       - name: Redeploy every active service
+        env:
+          TARGET_BACKEND_SHA: ${{ inputs.backend_sha }}
+          TARGET_BACKEND_DIGEST: ${{ inputs.backend_digest }}
         run: |
+          set -euo pipefail
+          if [[ ! "${TARGET_BACKEND_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::The requested backend SHA is invalid."
+            exit 2
+          fi
+          if [[ ! "${TARGET_BACKEND_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::The requested backend digest is invalid."
+            exit 2
+          fi
           ssh \
             -i "${HOME}/.ssh/deploy_key" \
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             -o ConnectTimeout=15 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=6 \
             u.hsc.qlty@200.16.7.138 \
-            "cd /home/u.hsc.qlty/sihsalus && bash -s" \
+            "cd /home/u.hsc.qlty/sihsalus && bash -s -- '${TARGET_BACKEND_SHA}' '${TARGET_BACKEND_DIGEST}'" \
             <scripts/deploy/redeploy-environment.sh
 
       - name: Verify QLTY externally
