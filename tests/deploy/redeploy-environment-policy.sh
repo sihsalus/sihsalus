@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCRIPT="$ROOT/scripts/deploy/redeploy-environment.sh"
+WORKFLOW="$ROOT/.github/workflows/redeploy-non-production.yml"
 
 bash -n "$SCRIPT"
 
@@ -13,6 +14,8 @@ if grep -Eq 'docker compose down|docker (volume|system) (rm|prune)|docker image 
 fi
 
 grep -Fq 'git merge --ff-only origin/main' "$SCRIPT"
+grep -Fq 'Usage: $0 <40-character backend git SHA> <sha256 image digest>' "$SCRIPT"
+grep -Fq 'export BACKEND_TAG="$TARGET_BACKEND_REFERENCE"' "$SCRIPT"
 grep -Fq 'docker compose pull backend' "$SCRIPT"
 grep -Fq 'REDEPLOY_OFFLINE="${REDEPLOY_OFFLINE:-false}"' "$SCRIPT"
 grep -Fq 'docker compose build --pull --no-cache "${BUILD_SERVICES[@]}"' "$SCRIPT"
@@ -24,6 +27,17 @@ grep -Fq -- '--pull never' "$SCRIPT"
 grep -Fq 'wait_for_openmrs 2400' "$SCRIPT"
 grep -Fq 'wait_for_active_services 600' "$SCRIPT"
 grep -Fq 'backend-oauth2-config | certbot)' "$SCRIPT"
-grep -Fq 'ghcr.io/sihsalus/sihsalus-backend:' "$SCRIPT"
+grep -Fq 'EXPECTED_BACKEND_IMAGE="${BACKEND_REPOSITORY}:${TARGET_BACKEND_REFERENCE}"' "$SCRIPT"
+grep -Fq 'BACKEND_SOURCE_REVISION' "$SCRIPT"
+grep -Fq 'write_env_value BACKEND_TAG "$TARGET_BACKEND_REFERENCE"' "$SCRIPT"
+grep -Fq 'mktemp ./.env.redeploy.XXXXXX' "$SCRIPT"
+grep -Fq 'chmod --reference=.env "$temporary_file"' "$SCRIPT"
+grep -Fq 'mv -f "$temporary_file" .env' "$SCRIPT"
+grep -Fq 'waiting for OpenMRS' "$SCRIPT"
+grep -Fq 'backend_sha:' "$WORKFLOW"
+grep -Fq 'backend_digest:' "$WORKFLOW"
+[ "$(grep -Fc -- '-o ServerAliveInterval=30' "$WORKFLOW")" -eq 2 ]
+[ "$(grep -Fc -- '-o ServerAliveCountMax=6' "$WORKFLOW")" -eq 2 ]
+[ "$(grep -Fc "bash -s -- '\${TARGET_BACKEND_SHA}' '\${TARGET_BACKEND_DIGEST}'" "$WORKFLOW")" -eq 2 ]
 
 echo "[OK] full environment redeploy policy"
