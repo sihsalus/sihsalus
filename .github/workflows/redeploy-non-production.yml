@@ -72,7 +72,7 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -o ConnectTimeout=15 \
             -o ServerAliveInterval=30 \
-            -o ServerAliveCountMax=6 \
+            -o ServerAliveCountMax=20 \
             u.hsc.dev@200.16.7.137 \
             "cd /home/u.hsc.dev/sihsalus && bash -s -- '${TARGET_BACKEND_SHA}' '${TARGET_BACKEND_DIGEST}'" \
             <scripts/deploy/redeploy-environment.sh
@@ -148,7 +148,7 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -o ConnectTimeout=15 \
             -o ServerAliveInterval=30 \
-            -o ServerAliveCountMax=6 \
+            -o ServerAliveCountMax=20 \
             u.hsc.qlty@200.16.7.138 \
             "cd /home/u.hsc.qlty/sihsalus && bash -s -- '${TARGET_BACKEND_SHA}' '${TARGET_BACKEND_DIGEST}'" \
             <scripts/deploy/redeploy-environment.sh
