@@ -3,8 +3,19 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+WORKFLOW="$ROOT/.github/workflows/deploy-frontend.yml"
+REMOTE_RUNNER="$ROOT/scripts/deploy/run-redeploy-remote.sh"
 TEST_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TEST_ROOT"' EXIT
+
+bash -n "$REMOTE_RUNNER"
+[ "$(grep -Fc 'REDEPLOY_SCRIPT_PATH=scripts/deploy/deploy-frontend.sh' "$WORKFLOW")" -eq 2 ]
+grep -Fq 'Verify DEV externally' "$WORKFLOW"
+grep -Fq 'Verify QLTY externally' "$WORKFLOW"
+if grep -Fq '<scripts/deploy/deploy-frontend.sh' "$WORKFLOW"; then
+  echo "frontend workflow still streams a long deployment over one SSH session" >&2
+  exit 1
+fi
 
 OLD_SHA='1111111111111111111111111111111111111111'
 TARGET_SHA='2222222222222222222222222222222222222222'
