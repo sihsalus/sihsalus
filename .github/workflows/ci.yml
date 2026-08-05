@@ -127,19 +127,109 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Set up JDK 8
-        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
-        with:
-          distribution: temurin
-          java-version: '8'
-          cache: maven
+      - name: Build deployable backend image
+        env:
+          DOCKER_BUILDKIT: '1'
+        run: docker build --file backend/Dockerfile --tag sihsalus-backend:ci .
 
-      - name: Build backend distribution
-        run: mvn --batch-mode --update-snapshots --file backend/pom.xml clean package
+      - name: Resolve pinned OpenMRS security baseline
+        id: openmrs-baseline
+        run: |
+          set -euo pipefail
+          baseline_image="$(sed -n 's/^ARG OPENMRS_RUNTIME_IMAGE=//p' backend/Dockerfile)"
+          if [[ ! "${baseline_image}" =~ ^openmrs/openmrs-core:[a-zA-Z0-9._-]+@sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::The OpenMRS runtime baseline is not pinned to an immutable digest."
+            exit 1
+          fi
+          echo "image=${baseline_image}" >>"${GITHUB_OUTPUT}"
+
+      - name: Scan backend candidate
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: sihsalus-backend:ci
+          format: json
+          output: trivy-backend-candidate.json
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: os,library
+
+      - name: Scan pinned OpenMRS baseline
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ steps.openmrs-baseline.outputs.image }}
+          format: json
+          output: trivy-openmrs-baseline.json
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: os,library
+
+      - name: Enforce backend vulnerability ratchet
+        run: |
+          set -euo pipefail
+          candidate_total="$(jq '[.Results[]? | (.Vulnerabilities // [])[]] | length' trivy-backend-candidate.json)"
+          baseline_total="$(jq '[.Results[]? | (.Vulnerabilities // [])[]] | length' trivy-openmrs-baseline.json)"
+          candidate_os="$(jq '[.Results[]? | select(.Class == "os-pkgs") | (.Vulnerabilities // [])[]] | length' trivy-backend-candidate.json)"
+          unexpected="$(
+            jq -n \
+              --slurpfile candidate trivy-backend-candidate.json \
+              --slurpfile baseline trivy-openmrs-baseline.json \
+              'def findings($report):
+                 [$report[0].Results[]? | (.Vulnerabilities // [])[] |
+                  "\(.VulnerabilityID)|\(.PkgName)|\(.InstalledVersion)"] | unique;
+               findings($candidate) - findings($baseline)'
+          )"
+          unexpected_total="$(jq 'length' <<<"${unexpected}")"
+
+          {
+            echo '### Backend vulnerability ratchet'
+            echo "- Candidate HIGH/CRITICAL findings: ${candidate_total}"
+            echo "- Upstream OpenMRS baseline findings: ${baseline_total}"
+            echo "- Candidate OS findings with fixes: ${candidate_os}"
+            echo "- Findings added beyond upstream: ${unexpected_total}"
+          } >>"${GITHUB_STEP_SUMMARY}"
+
+          if [[ "${candidate_os}" != '0' ]]; then
+            echo '::error::The backend still contains fixable HIGH/CRITICAL operating-system vulnerabilities.'
+            jq -r '.Results[]? | select(.Class == "os-pkgs") | (.Vulnerabilities // [])[] |
+              "\(.Severity) \(.VulnerabilityID) \(.PkgName) \(.InstalledVersion) -> \(.FixedVersion)"' \
+              trivy-backend-candidate.json
+            exit 1
+          fi
+
+          if [[ "${unexpected_total}" != '0' ]]; then
+            echo '::error::The SIHSALUS backend adds HIGH/CRITICAL vulnerabilities beyond its pinned OpenMRS base.'
+            jq -r '.[]' <<<"${unexpected}"
+            exit 1
+          fi
+
+      - name: Produce backend Trivy evidence
+        if: always()
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: sihsalus-backend:ci
+          format: sarif
+          output: trivy-backend-results.sarif
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: os,library
+          limit-severities-for-sarif: true
+
+      - name: Upload backend Trivy evidence
+        if: ${{ always() && hashFiles('trivy-backend-results.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-backend-results.sarif
+          category: trivy-backend
 
   backup:
     name: Backup round-trip
