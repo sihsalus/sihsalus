@@ -17,6 +17,19 @@ ARG MVN_ARGS="install"
 COPY pom.xml ./
 COPY backend/pom.xml ./backend/
 
+# Build the SIHSALUS Bed Management patch from an immutable source revision.
+# The checksum prevents a changed or substituted archive from entering the image.
+ARG BEDMANAGEMENT_SOURCE_SHA=270e00f1cdcf856ed939ccb987de3a48107208ca
+ADD --checksum=sha256:d104e361f925d6045829b437c7f778cfb75c8a3d454a4e837fc624285cafdc34 \
+    https://github.com/sihsalus/openmrs-module-bedmanagement/archive/${BEDMANAGEMENT_SOURCE_SHA}.tar.gz \
+    /tmp/bedmanagement-source.tar.gz
+RUN --mount=type=cache,target=/root/.m2/repository \
+    mkdir -p /tmp/bedmanagement-source && \
+    tar -xzf /tmp/bedmanagement-source.tar.gz -C /tmp/bedmanagement-source --strip-components=1 && \
+    mvn --batch-mode --show-version --no-transfer-progress \
+      -Dformatter.skip=true -DskipTests -Dmaven.javadoc.skip=true \
+      --file /tmp/bedmanagement-source/pom.xml install
+
 # Pre-download all dependencies into the BuildKit cache.
 RUN --mount=type=cache,target=/root/.m2/repository \
     mvn $MVN_ARGS_SETTINGS dependency:resolve -B || true
