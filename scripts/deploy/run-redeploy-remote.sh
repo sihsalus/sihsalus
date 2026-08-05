@@ -8,6 +8,7 @@ SSH_BIN="${SSH_BIN:-ssh}"
 POLL_INTERVAL_SECONDS="${REDEPLOY_POLL_INTERVAL_SECONDS:-10}"
 TIMEOUT_SECONDS="${REDEPLOY_TIMEOUT_SECONDS:-3300}"
 MAX_TRANSPORT_FAILURES="${REDEPLOY_MAX_TRANSPORT_FAILURES:-20}"
+INITIAL_TRANSPORT_ATTEMPTS="${REDEPLOY_INITIAL_TRANSPORT_ATTEMPTS:-12}"
 
 usage() {
   echo "Usage: $0 <ssh-key> <user@host> <remote-repository> <backend-sha> <backend-digest> <run-token>" >&2
@@ -54,7 +55,11 @@ if [[ ! "$RUN_TOKEN" =~ ^[A-Za-z0-9._-]+$ ]]; then
   exit 2
 fi
 
-for numeric_value in "$POLL_INTERVAL_SECONDS" "$TIMEOUT_SECONDS" "$MAX_TRANSPORT_FAILURES"; do
+for numeric_value in \
+  "$POLL_INTERVAL_SECONDS" \
+  "$TIMEOUT_SECONDS" \
+  "$MAX_TRANSPORT_FAILURES" \
+  "$INITIAL_TRANSPORT_ATTEMPTS"; do
   if [[ ! "$numeric_value" =~ ^[1-9][0-9]*$ ]]; then
     echo "[remote-redeploy] polling and timeout values must be positive integers" >&2
     exit 2
@@ -85,17 +90,48 @@ REMOTE_LOG="$REMOTE_RUN_DIRECTORY/redeploy.log"
 REMOTE_STATUS="$REMOTE_RUN_DIRECTORY/status"
 REMOTE_PID="$REMOTE_RUN_DIRECTORY/pid"
 
-echo "[remote-redeploy] uploading the validated redeploy script"
-"${SSH_COMMAND[@]}" "$REMOTE_TARGET" \
-  "umask 077; install -d -m 700 '$REMOTE_RUN_DIRECTORY'; cat >'$REMOTE_SCRIPT'; chmod 700 '$REMOTE_SCRIPT'" \
-  <"$REDEPLOY_SCRIPT_PATH"
+cancel_remote_run() {
+  "${SSH_COMMAND[@]}" "$REMOTE_TARGET" bash -s -- \
+    "$REMOTE_STATUS" "$REMOTE_PID" <<'REMOTE_CANCEL' || true
+set -euo pipefail
+status_path="$1"
+pid_path="$2"
 
-echo "[remote-redeploy] starting detached run $RUN_TOKEN"
-"${SSH_COMMAND[@]}" "$REMOTE_TARGET" bash -s -- \
-  "$REMOTE_REPOSITORY" \
-  "$RUN_TOKEN" \
-  "$TARGET_BACKEND_SHA" \
-  "$TARGET_BACKEND_DIGEST" <<'REMOTE_LAUNCHER'
+if [ -f "$status_path" ] || [ ! -f "$pid_path" ]; then
+  exit 0
+fi
+
+remote_pid="$(cat "$pid_path")"
+if [[ "$remote_pid" =~ ^[1-9][0-9]*$ ]]; then
+  kill -TERM -- "-${remote_pid}" 2>/dev/null || kill -TERM "$remote_pid" 2>/dev/null || true
+fi
+REMOTE_CANCEL
+}
+
+cleanup_initialization() {
+  local exit_code="$?"
+  trap - EXIT
+  if [ "$exit_code" -ne 0 ]; then
+    echo "[remote-redeploy] initialization failed; terminating a possible detached run" >&2
+    cancel_remote_run
+  fi
+  exit "$exit_code"
+}
+
+trap cleanup_initialization EXIT
+
+upload_remote_script() {
+  "${SSH_COMMAND[@]}" "$REMOTE_TARGET" \
+    "umask 077; install -d -m 700 '$REMOTE_RUN_DIRECTORY'; cat >'$REMOTE_SCRIPT'; chmod 700 '$REMOTE_SCRIPT'" \
+    <"$REDEPLOY_SCRIPT_PATH"
+}
+
+start_remote_run() {
+  "${SSH_COMMAND[@]}" "$REMOTE_TARGET" bash -s -- \
+    "$REMOTE_REPOSITORY" \
+    "$RUN_TOKEN" \
+    "$TARGET_BACKEND_SHA" \
+    "$TARGET_BACKEND_DIGEST" <<'REMOTE_LAUNCHER'
 set -Eeuo pipefail
 
 repository="$1"
@@ -120,14 +156,14 @@ if [ ! -x "$script_path" ]; then
   exit 2
 fi
 if [ -e "$status_path" ]; then
-  echo "[remote-redeploy] run token already completed; refusing to overwrite evidence" >&2
-  exit 1
+  echo "[remote-redeploy] run token already completed; resuming its monitor"
+  exit 0
 fi
 if [ -f "$pid_path" ]; then
   previous_pid="$(cat "$pid_path")"
   if [[ "$previous_pid" =~ ^[1-9][0-9]*$ ]] && kill -0 "$previous_pid" 2>/dev/null; then
-    echo "[remote-redeploy] run token is already active" >&2
-    exit 1
+    echo "[remote-redeploy] run token is already active; resuming its monitor"
+    exit 0
   fi
 fi
 
@@ -175,6 +211,36 @@ nohup setsid bash -c '
 
 printf '%s\n' "$!" >"$pid_path"
 REMOTE_LAUNCHER
+}
+
+retry_initial_transport() {
+  local operation="$1"
+  local attempt=1
+  local exit_code
+  shift
+
+  while true; do
+    if "$@"; then
+      return 0
+    else
+      exit_code="$?"
+    fi
+
+    if [ "$exit_code" -ne 255 ] || [ "$attempt" -ge "$INITIAL_TRANSPORT_ATTEMPTS" ]; then
+      return "$exit_code"
+    fi
+
+    echo "[remote-redeploy] ${operation} transport failure ${attempt}/${INITIAL_TRANSPORT_ATTEMPTS}; retrying" >&2
+    attempt=$((attempt + 1))
+    sleep "$POLL_INTERVAL_SECONDS"
+  done
+}
+
+echo "[remote-redeploy] uploading the validated redeploy script"
+retry_initial_transport upload upload_remote_script
+
+echo "[remote-redeploy] starting detached run $RUN_TOKEN"
+retry_initial_transport launch start_remote_run
 
 REMOTE_FINISHED=false
 NEXT_LOG_LINE=1
@@ -197,24 +263,6 @@ fetch_remote_log() {
   NEXT_LOG_LINE=$((NEXT_LOG_LINE + line_count))
   rm -f "$CURRENT_TEMP_FILE"
   CURRENT_TEMP_FILE=""
-}
-
-cancel_remote_run() {
-  "${SSH_COMMAND[@]}" "$REMOTE_TARGET" bash -s -- \
-    "$REMOTE_STATUS" "$REMOTE_PID" <<'REMOTE_CANCEL' || true
-set -euo pipefail
-status_path="$1"
-pid_path="$2"
-
-if [ -f "$status_path" ] || [ ! -f "$pid_path" ]; then
-  exit 0
-fi
-
-remote_pid="$(cat "$pid_path")"
-if [[ "$remote_pid" =~ ^[1-9][0-9]*$ ]]; then
-  kill -TERM -- "-${remote_pid}" 2>/dev/null || kill -TERM "$remote_pid" 2>/dev/null || true
-fi
-REMOTE_CANCEL
 }
 
 finish_local() {
