@@ -101,7 +101,7 @@ service_is_active() {
 
 service_allows_successful_exit() {
   case "$1" in
-    backend-oauth2-config | certbot)
+    backend-oauth2-config | certbot | loki-init)
       return 0
       ;;
     *)
