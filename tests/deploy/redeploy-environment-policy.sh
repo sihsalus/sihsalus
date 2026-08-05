@@ -49,6 +49,15 @@ grep -Fq -- '-o ServerAliveInterval=15' "$REMOTE_RUNNER"
 grep -Fq -- '-o ServerAliveCountMax=3' "$REMOTE_RUNNER"
 grep -Fq 'flock -n 9' "$REMOTE_RUNNER"
 
+eval "$(sed -n '/^service_allows_successful_exit() {/,/^}/p' "$SCRIPT")"
+service_allows_successful_exit backend-oauth2-config
+service_allows_successful_exit certbot
+service_allows_successful_exit loki-init
+if service_allows_successful_exit frontend; then
+  echo "[FAIL] a long-running service may not exit successfully during redeploy" >&2
+  exit 1
+fi
+
 bash "$REMOTE_RUNNER_TEST"
 
 echo "[OK] full environment redeploy policy"
