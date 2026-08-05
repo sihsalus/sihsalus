@@ -51,6 +51,13 @@ RUN cp /openmrs_distro/backend/target/sdk-distro/web/openmrs_core/openmrs.war /o
 # Runtime stays pinned to the exact OpenMRS patch version used in production.
 FROM ${OPENMRS_RUNTIME_IMAGE}
 
+# The upstream Amazon Linux 2 image is immutable, so apply the security updates
+# that became available after its publication before dropping back to UID 1001.
+USER root
+RUN yum -y update expat glib2 libssh2 python python-libs vim-data vim-minimal && \
+    yum clean all && \
+    rm -rf /var/cache/yum
+
 # The pinned OpenMRS runtime quotes the wildcard used to clear distribution
 # directories, so removed modules and metadata survive in the persistent volume.
 # Keep the upstream safety guard while allowing the wildcard to expand.
@@ -74,3 +81,5 @@ COPY --from=dev /openmrs/distribution/openmrs_owas /openmrs/distribution/openmrs
 COPY --from=dev  /openmrs/distribution/openmrs_config /openmrs/distribution/openmrs_config
 
 RUN mkdir -p /openmrs/data
+
+USER 1001
