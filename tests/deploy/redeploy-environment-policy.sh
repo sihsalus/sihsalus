@@ -4,9 +4,13 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCRIPT="$ROOT/scripts/deploy/redeploy-environment.sh"
+REMOTE_RUNNER="$ROOT/scripts/deploy/run-redeploy-remote.sh"
+REMOTE_RUNNER_TEST="$ROOT/tests/deploy/run-redeploy-remote-test.sh"
 WORKFLOW="$ROOT/.github/workflows/redeploy-non-production.yml"
 
 bash -n "$SCRIPT"
+bash -n "$REMOTE_RUNNER"
+bash -n "$REMOTE_RUNNER_TEST"
 
 if grep -Eq 'docker compose down|docker (volume|system) (rm|prune)|docker image prune|docker compose .* (--volumes|-v)( |$)' "$SCRIPT"; then
   echo "[FAIL] full redeploy script contains a data-destructive Docker operation" >&2
@@ -37,8 +41,14 @@ grep -Fq 'mv -f "$temporary_file" .env' "$SCRIPT"
 grep -Fq 'waiting for OpenMRS' "$SCRIPT"
 grep -Fq 'backend_sha:' "$WORKFLOW"
 grep -Fq 'backend_digest:' "$WORKFLOW"
-[ "$(grep -Fc -- '-o ServerAliveInterval=30' "$WORKFLOW")" -eq 2 ]
-[ "$(grep -Fc -- '-o ServerAliveCountMax=20' "$WORKFLOW")" -eq 2 ]
-[ "$(grep -Fc "bash -s -- '\${TARGET_BACKEND_SHA}' '\${TARGET_BACKEND_DIGEST}'" "$WORKFLOW")" -eq 2 ]
+[ "$(grep -Fc 'scripts/deploy/run-redeploy-remote.sh' "$WORKFLOW")" -eq 2 ]
+grep -Fq 'nohup setsid bash -c' "$REMOTE_RUNNER"
+grep -Fq 'tail -n "+${NEXT_LOG_LINE}"' "$REMOTE_RUNNER"
+grep -Fq 'kill -TERM -- "-${remote_pid}"' "$REMOTE_RUNNER"
+grep -Fq -- '-o ServerAliveInterval=15' "$REMOTE_RUNNER"
+grep -Fq -- '-o ServerAliveCountMax=3' "$REMOTE_RUNNER"
+grep -Fq 'flock -n 9' "$REMOTE_RUNNER"
+
+bash "$REMOTE_RUNNER_TEST"
 
 echo "[OK] full environment redeploy policy"
