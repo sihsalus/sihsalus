@@ -17,6 +17,19 @@ ARG MVN_ARGS="install"
 COPY pom.xml ./
 COPY backend/pom.xml ./backend/
 
+# Build the SIHSALUS Bed Management patch from an immutable source revision.
+# The checksum prevents a changed or substituted archive from entering the image.
+ARG BEDMANAGEMENT_SOURCE_SHA=4927f1ac9406f63717c92a71035fd9092ce01bab
+ADD --checksum=sha256:1a06525581a6eab8d2a2b3b7ff677f2e4695dca730b71a706c622ad79f8d9f31 \
+    https://github.com/sihsalus/openmrs-module-bedmanagement/archive/${BEDMANAGEMENT_SOURCE_SHA}.tar.gz \
+    /tmp/bedmanagement-source.tar.gz
+RUN --mount=type=cache,target=/root/.m2/repository \
+    mkdir -p /tmp/bedmanagement-source && \
+    tar -xzf /tmp/bedmanagement-source.tar.gz -C /tmp/bedmanagement-source --strip-components=1 && \
+    mvn --batch-mode --show-version --no-transfer-progress \
+      -Dformatter.skip=true -DskipTests -Dmaven.javadoc.skip=true \
+      --file /tmp/bedmanagement-source/pom.xml install
+
 # Pre-download all dependencies into the BuildKit cache.
 RUN --mount=type=cache,target=/root/.m2/repository \
     mvn $MVN_ARGS_SETTINGS dependency:resolve -B || true
@@ -37,6 +50,13 @@ RUN cp /openmrs_distro/backend/target/sdk-distro/web/openmrs_core/openmrs.war /o
 ### Run Stage
 # Runtime stays pinned to the exact OpenMRS patch version used in production.
 FROM ${OPENMRS_RUNTIME_IMAGE}
+
+# The upstream Amazon Linux 2 image is immutable, so apply the security updates
+# that became available after its publication before dropping back to UID 1001.
+USER root
+RUN yum -y update expat glib2 libssh2 python python-libs vim-data vim-minimal && \
+    yum clean all && \
+    rm -rf /var/cache/yum
 
 # The pinned OpenMRS runtime quotes the wildcard used to clear distribution
 # directories, so removed modules and metadata survive in the persistent volume.
@@ -61,3 +81,5 @@ COPY --from=dev /openmrs/distribution/openmrs_owas /openmrs/distribution/openmrs
 COPY --from=dev  /openmrs/distribution/openmrs_config /openmrs/distribution/openmrs_config
 
 RUN mkdir -p /openmrs/data
+
+USER 1001

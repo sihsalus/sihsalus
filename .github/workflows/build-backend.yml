@@ -24,12 +24,13 @@ jobs:
       contents: read
       id-token: write
       packages: write
+      security-events: write
     steps:
       - uses: actions/checkout@v7.0.1
 
       - uses: docker/setup-buildx-action@v4
 
-      - uses: docker/login-action@v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -41,7 +42,6 @@ jobs:
           images: ghcr.io/sihsalus/sihsalus-backend
           tags: |
             type=sha,prefix=sha-,format=long
-            type=raw,value=latest,enable={{is_default_branch}}
 
       - uses: docker/build-push-action@v7
         id: build
@@ -49,11 +49,103 @@ jobs:
           context: .
           file: backend/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ghcr.io/sihsalus/sihsalus-backend:sha-${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
           cache-from: type=gha,scope=backend
           cache-to: type=gha,scope=backend,mode=max
+
+      - name: Resolve pinned OpenMRS security baseline
+        id: openmrs-baseline
+        run: |
+          set -euo pipefail
+          baseline_image="$(sed -n 's/^ARG OPENMRS_RUNTIME_IMAGE=//p' backend/Dockerfile)"
+          if [[ ! "${baseline_image}" =~ ^openmrs/openmrs-core:[a-zA-Z0-9._-]+@sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::The OpenMRS runtime baseline is not pinned to an immutable digest."
+            exit 1
+          fi
+          echo "image=${baseline_image}" >>"${GITHUB_OUTPUT}"
+
+      - name: Scan immutable backend candidate
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+          format: json
+          output: trivy-backend-candidate.json
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: os,library
+
+      - name: Scan pinned OpenMRS baseline
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ steps.openmrs-baseline.outputs.image }}
+          format: json
+          output: trivy-openmrs-baseline.json
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: os,library
+
+      - name: Enforce backend vulnerability ratchet
+        run: |
+          set -euo pipefail
+          candidate_total="$(jq '[.Results[]? | (.Vulnerabilities // [])[]] | length' trivy-backend-candidate.json)"
+          baseline_total="$(jq '[.Results[]? | (.Vulnerabilities // [])[]] | length' trivy-openmrs-baseline.json)"
+          candidate_os="$(jq '[.Results[]? | select(.Class == "os-pkgs") | (.Vulnerabilities // [])[]] | length' trivy-backend-candidate.json)"
+          unexpected="$(
+            jq -n \
+              --slurpfile candidate trivy-backend-candidate.json \
+              --slurpfile baseline trivy-openmrs-baseline.json \
+              'def findings($report):
+                 [$report[0].Results[]? | (.Vulnerabilities // [])[] |
+                  "\(.VulnerabilityID)|\(.PkgName)|\(.InstalledVersion)"] | unique;
+               findings($candidate) - findings($baseline)'
+          )"
+          unexpected_total="$(jq 'length' <<<"${unexpected}")"
+
+          {
+            echo '### Backend vulnerability ratchet'
+            echo "- Candidate HIGH/CRITICAL findings: ${candidate_total}"
+            echo "- Upstream OpenMRS baseline findings: ${baseline_total}"
+            echo "- Candidate OS findings with fixes: ${candidate_os}"
+            echo "- Findings added beyond upstream: ${unexpected_total}"
+          } >>"${GITHUB_STEP_SUMMARY}"
+
+          if [[ "${candidate_os}" != '0' ]]; then
+            echo '::error::The backend still contains fixable HIGH/CRITICAL operating-system vulnerabilities.'
+            jq -r '.Results[]? | select(.Class == "os-pkgs") | (.Vulnerabilities // [])[] |
+              "\(.Severity) \(.VulnerabilityID) \(.PkgName) \(.InstalledVersion) -> \(.FixedVersion)"' \
+              trivy-backend-candidate.json
+            exit 1
+          fi
+
+          if [[ "${unexpected_total}" != '0' ]]; then
+            echo '::error::The SIHSALUS backend adds HIGH/CRITICAL vulnerabilities beyond its pinned OpenMRS base.'
+            jq -r '.[]' <<<"${unexpected}"
+            exit 1
+          fi
+
+      - name: Produce backend Trivy evidence
+        if: always()
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+          format: sarif
+          output: trivy-backend-results.sarif
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: os,library
+          limit-severities-for-sarif: true
+
+      - name: Upload backend Trivy evidence
+        if: ${{ always() && hashFiles('trivy-backend-results.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-backend-results.sarif
+          category: trivy-backend
 
       - name: Install cosign
         uses: sigstore/cosign-installer@v4.1.2
@@ -62,6 +154,19 @@ jobs:
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: cosign sign --yes "ghcr.io/sihsalus/sihsalus-backend@${DIGEST}"
+
+      - name: Promote verified backend image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          image='ghcr.io/sihsalus/sihsalus-backend'
+          docker buildx imagetools create --prefer-index=false --tag "${image}:latest" "${image}@${DIGEST}"
+          promoted_digest="$(docker buildx imagetools inspect "${image}:latest" --format '{{.Manifest.Digest}}')"
+          if [[ "${promoted_digest}" != "${DIGEST}" ]]; then
+            echo "::error::The promoted backend alias does not resolve to the scanned digest."
+            exit 1
+          fi
 
       - name: Make package public
         run: |

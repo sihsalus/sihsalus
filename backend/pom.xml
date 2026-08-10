@@ -34,7 +34,7 @@
     <idgen.version>5.0.4</idgen.version>
     <legacyui.version>2.1.0</legacyui.version>
     <metadatamapping.version>2.0.0</metadatamapping.version>
-    <openconceptlab.version>3.1.0</openconceptlab.version>
+    <openconceptlab.version>3.2.0</openconceptlab.version>
     <attachments.version>4.0.0</attachments.version>
     <referencedemodata.version>2.6.1</referencedemodata.version>
     <queue.version>3.0.0</queue.version>
@@ -54,7 +54,7 @@
     <o3forms.version>2.3.0</o3forms.version>
     <emrapi.version>3.4.0</emrapi.version>
     <event.version>4.0.0</event.version>
-    <bedmanagement.version>7.2.0</bedmanagement.version>
+    <bedmanagement.version>7.3.0-sihsalus.1</bedmanagement.version>
     <!-- Stock Management and Billing -->
     <stockmanagement.version>3.1.1</stockmanagement.version>
     <billing.version>2.3.0</billing.version>
@@ -62,7 +62,7 @@
     <fua.version>1.0.86</fua.version>
     <imaging.version>1.2.8</imaging.version>
     <!-- Content Packages -->
-    <sihsalus-content.version>1.23.6</sihsalus-content.version>
+    <sihsalus-content.version>1.24.1</sihsalus-content.version>
     <reference-content.version>1.4.0</reference-content.version>
   </properties>
 

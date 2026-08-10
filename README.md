@@ -220,7 +220,7 @@ Si el entorno también usa Keycloak u otros overrides, añade esos mismos `-f` y
 ### Backend (si cambió la imagen del backend)
 
 ```bash
-export BACKEND_TAG=sha-<digest>
+export BACKEND_TAG=sha-<commit>@sha256:<digest>
 
 # Stack HTTP/local
 docker compose pull backend

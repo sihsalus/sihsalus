@@ -129,7 +129,7 @@ jobs:
     name: Deploy DEV
     needs: resolve
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     environment:
       name: development
       url: https://gidis-hsc-dev.inf.pucp.edu.pe/openmrs/spa
@@ -148,29 +148,53 @@ jobs:
           chmod 600 "${HOME}/.ssh/deploy_key" "${HOME}/.ssh/known_hosts"
           ssh-keygen -y -f "${HOME}/.ssh/deploy_key" >/dev/null
 
-      - name: Validate deployment script
-        run: bash -n scripts/deploy/deploy-frontend.sh
+      - name: Validate deployment scripts
+        run: |
+          bash -n scripts/deploy/deploy-frontend.sh
+          bash -n scripts/deploy/run-redeploy-remote.sh
 
       - name: Deploy verified frontend
         env:
           TARGET_SHA: ${{ needs.resolve.outputs.sha }}
           TARGET_DIGEST: ${{ needs.resolve.outputs.digest }}
         run: |
-          ssh \
-            -i "${HOME}/.ssh/deploy_key" \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -o ConnectTimeout=15 \
+          set -euo pipefail
+          REDEPLOY_SCRIPT_PATH=scripts/deploy/deploy-frontend.sh \
+            REDEPLOY_TIMEOUT_SECONDS=1200 \
+            scripts/deploy/run-redeploy-remote.sh \
+            "${HOME}/.ssh/deploy_key" \
             u.hsc.dev@200.16.7.137 \
-            "cd /home/u.hsc.dev/sihsalus && bash -s -- '${TARGET_SHA}' '${TARGET_DIGEST}'" \
-            <scripts/deploy/deploy-frontend.sh
+            /home/u.hsc.dev/sihsalus \
+            "${TARGET_SHA}" \
+            "${TARGET_DIGEST}" \
+            "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-frontend-dev"
+
+      - name: Verify DEV externally
+        env:
+          TARGET_SHA: ${{ needs.resolve.outputs.sha }}
+        run: |
+          set -euo pipefail
+          base='https://gidis-hsc-dev.inf.pucp.edu.pe'
+          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
+            "${base}/health" >/dev/null
+          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
+            "${base}/ready" >/dev/null
+          actual_sha="$(
+            curl --insecure --fail --silent --show-error \
+              -H 'Cache-Control: no-cache' \
+              "${base}/openmrs/spa/build-info.json?release=${TARGET_SHA}" |
+              jq -r '.gitSha // empty'
+          )"
+          if [ "${actual_sha}" != "${TARGET_SHA}" ]; then
+            echo "::error::DEV serves frontend ${actual_sha:-unknown}, expected ${TARGET_SHA}."
+            exit 1
+          fi
 
   deploy-qlty:
     name: Deploy QLTY
     needs: [resolve, deploy-dev]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     environment:
       name: quality
       url: https://gidis-hsc-qlty.inf.pucp.edu.pe/openmrs/spa
@@ -189,20 +213,44 @@ jobs:
           chmod 600 "${HOME}/.ssh/deploy_key" "${HOME}/.ssh/known_hosts"
           ssh-keygen -y -f "${HOME}/.ssh/deploy_key" >/dev/null
 
-      - name: Validate deployment script
-        run: bash -n scripts/deploy/deploy-frontend.sh
+      - name: Validate deployment scripts
+        run: |
+          bash -n scripts/deploy/deploy-frontend.sh
+          bash -n scripts/deploy/run-redeploy-remote.sh
 
       - name: Deploy verified frontend
         env:
           TARGET_SHA: ${{ needs.resolve.outputs.sha }}
           TARGET_DIGEST: ${{ needs.resolve.outputs.digest }}
         run: |
-          ssh \
-            -i "${HOME}/.ssh/deploy_key" \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -o ConnectTimeout=15 \
+          set -euo pipefail
+          REDEPLOY_SCRIPT_PATH=scripts/deploy/deploy-frontend.sh \
+            REDEPLOY_TIMEOUT_SECONDS=1200 \
+            scripts/deploy/run-redeploy-remote.sh \
+            "${HOME}/.ssh/deploy_key" \
             u.hsc.qlty@200.16.7.138 \
-            "cd /home/u.hsc.qlty/sihsalus && bash -s -- '${TARGET_SHA}' '${TARGET_DIGEST}'" \
-            <scripts/deploy/deploy-frontend.sh
+            /home/u.hsc.qlty/sihsalus \
+            "${TARGET_SHA}" \
+            "${TARGET_DIGEST}" \
+            "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-frontend-qlty"
+
+      - name: Verify QLTY externally
+        env:
+          TARGET_SHA: ${{ needs.resolve.outputs.sha }}
+        run: |
+          set -euo pipefail
+          base='https://gidis-hsc-qlty.inf.pucp.edu.pe'
+          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
+            "${base}/health" >/dev/null
+          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
+            "${base}/ready" >/dev/null
+          actual_sha="$(
+            curl --insecure --fail --silent --show-error \
+              -H 'Cache-Control: no-cache' \
+              "${base}/openmrs/spa/build-info.json?release=${TARGET_SHA}" |
+              jq -r '.gitSha // empty'
+          )"
+          if [ "${actual_sha}" != "${TARGET_SHA}" ]; then
+            echo "::error::QLTY serves frontend ${actual_sha:-unknown}, expected ${TARGET_SHA}."
+            exit 1
+          fi

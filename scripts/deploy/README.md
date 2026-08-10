@@ -51,26 +51,45 @@ anterior.
 
 `redeploy-environment.sh` se usa para reconstruir y recrear un ambiente
 completo cuando una actualización exclusiva del frontend no es suficiente.
+Recibe el commit y digest ya publicados del backend para que un `BACKEND_TAG`
+antiguo en el servidor no pueda degradar el despliegue:
+
+```bash
+./scripts/deploy/redeploy-environment.sh \
+  0123456789abcdef0123456789abcdef01234567 \
+  sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+```
+
 Opera sobre los archivos y perfiles definidos por el `.env` del servidor:
 
 1. rechaza cambios locales en archivos versionados y el perfil destructivo
    `seed`;
 2. actualiza `main` únicamente mediante fast-forward;
-3. descarga la imagen configurada del backend clásico
-   `ghcr.io/sihsalus/sihsalus-backend`, construido desde `backend/pom.xml`;
+3. descarga por digest la imagen solicitada del backend clásico
+   `ghcr.io/sihsalus/sihsalus-backend`, construido desde `backend/pom.xml`, y
+   valida que su revisión OCI coincida con el commit solicitado;
 4. descarga las imágenes de registry de todos los perfiles activos;
-5. reconstruye sin caché los runtimes locales activos (`frontend`, `gateway`,
-   `certbot` y/o `keycloak`);
+5. reconstruye sin caché y de forma secuencial los runtimes locales activos
+   (`frontend`, `gateway`, `certbot` y/o `keycloak`) para limitar el consumo de
+   CPU, memoria y red del host;
 6. recrea todos los servicios activos, pero conserva volúmenes y datos;
 7. espera MariaDB, frontend, OpenMRS y gateway, y verifica el estado de todos
-   los servicios antes de declarar el ambiente usable.
+   los servicios antes de declarar el ambiente usable;
+8. solo entonces persiste en `.env` la referencia inmutable
+   `sha-<commit>@sha256:<digest>` usada por el backend.
 
 No ejecuta `docker compose down`, no usa `-v` y no elimina volúmenes. El
-workflow manual `Redeploy Non-Production` ejecuta primero DEV y solo promueve a
-QLTY si DEV y sus verificaciones HTTP terminan correctamente.
+workflow manual `Redeploy Non-Production` solicita el SHA y digest del backend,
+ejecuta primero DEV y solo promueve a QLTY si DEV y sus verificaciones HTTP
+terminan correctamente. La conexión usa keepalive con tolerancia de diez
+minutos y la espera de OpenMRS emite progreso periódico para tolerar arranques
+largos.
 
 Si un establecimiento está temporalmente sin DNS o salida a Internet, se puede
 usar `REDEPLOY_OFFLINE=true` únicamente después de transferir y verificar el
 checkout y todas las imágenes runtime deseadas. Ese modo omite `git fetch`, los
 pulls y los builds; recrea los servicios exclusivamente con las imágenes
-prevalidadas que ya estén presentes. No cambia las versiones fijadas en `.env`.
+prevalidadas que ya estén presentes. También exige el SHA y digest del backend;
+la referencia por digest debe haberse descargado explícitamente o transferido
+con sus metadatos de `RepoDigest`. La referencia solo se persiste después de
+completar las verificaciones.
