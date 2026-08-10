@@ -54,7 +54,7 @@ FROM ${OPENMRS_RUNTIME_IMAGE}
 # The upstream Amazon Linux 2 image is immutable, so apply the security updates
 # that became available after its publication before dropping back to UID 1001.
 USER root
-RUN yum -y update expat glib2 libssh2 python python-libs vim-data vim-minimal && \
+RUN yum -y update acl expat glib2 libacl libssh2 python python-libs vim-data vim-minimal && \
     yum clean all && \
     rm -rf /var/cache/yum
 
