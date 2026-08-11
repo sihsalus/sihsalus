@@ -46,6 +46,12 @@ if [ ! -f docker-compose.yml ] || [ ! -f .env ]; then
   exit 2
 fi
 
+NODE_ID="${SIHSALUS_NODE_ID:-}"
+if [[ ! "$NODE_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+  echo "[redeploy-environment] SIHSALUS_NODE_ID is required and must be a lowercase UUID" >&2
+  exit 2
+fi
+
 write_env_value() {
   local key="$1"
   local value="$2"
@@ -332,7 +338,14 @@ if [[ ! "$FRONTEND_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   false
 fi
 
+FRONTEND_NODE_ID="$(docker inspect sihsalus-frontend --format '{{index .Config.Labels "org.sihsalus.node-id"}}')"
+if [ "$FRONTEND_NODE_ID" != "$NODE_ID" ]; then
+  echo "[redeploy-environment] frontend wrapper does not contain the expected node identity" >&2
+  false
+fi
+
 write_env_value BACKEND_TAG "$TARGET_BACKEND_REFERENCE"
+write_env_value SIHSALUS_NODE_ID "$NODE_ID"
 echo "[redeploy-environment] persisted immutable backend reference"
 
 trap - ERR HUP INT TERM
@@ -340,4 +353,5 @@ echo "[redeploy-environment] usable"
 echo "[redeploy-environment] distro=$(git rev-parse HEAD)"
 echo "[redeploy-environment] backend=${BACKEND_IMAGE}"
 echo "[redeploy-environment] frontend=${FRONTEND_SHA}"
+echo "[redeploy-environment] node=${FRONTEND_NODE_ID}"
 docker compose ps
