@@ -31,5 +31,14 @@ RUN test -n "$SPA_CONFIG_URLS" || { echo "SPA_CONFIG_URLS build arg is required;
 
 FROM nginx:1.28-alpine
 
+ARG SIHSALUS_NODE_ID=unconfigured
+
+LABEL org.sihsalus.node-id="${SIHSALUS_NODE_ID}"
+
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY --from=assemble /tmp/spa/ /usr/share/nginx/html/
+
+RUN { [ "$SIHSALUS_NODE_ID" = "unconfigured" ] || \
+      printf '%s\n' "$SIHSALUS_NODE_ID" | grep -Eq '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'; } \
+    && sed -i "s|__SIHSALUS_NODE_ID__|${SIHSALUS_NODE_ID}|g" /etc/nginx/nginx.conf \
+    && ! grep -Fq '__SIHSALUS_NODE_ID__' /etc/nginx/nginx.conf

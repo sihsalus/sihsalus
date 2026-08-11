@@ -30,6 +30,10 @@ jobs:
     if: inputs.confirm_full_redeploy
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      REDEPLOY_EXPECTED_REMOTE_MAC: '00:0c:29:ad:be:90'
+      REDEPLOY_EXPECTED_NODE_ID: '3eb58bb0-ff08-4e2d-839c-11cedca0b043'
+      REDEPLOY_TIMEOUT_SECONDS: '3000'
     environment:
       name: development
       url: https://gidis-hsc-dev.inf.pucp.edu.pe/openmrs/spa
@@ -52,6 +56,7 @@ jobs:
           ssh-keygen -y -f "${HOME}/.ssh/deploy_key" >/dev/null
 
       - name: Redeploy every active service
+        id: redeploy
         env:
           TARGET_BACKEND_SHA: ${{ inputs.backend_sha }}
           TARGET_BACKEND_DIGEST: ${{ inputs.backend_digest }}
@@ -65,26 +70,34 @@ jobs:
             echo "::error::The requested backend digest is invalid."
             exit 2
           fi
+          redeploy_output="${RUNNER_TEMP}/sihsalus-redeploy-dev.log"
           scripts/deploy/run-redeploy-remote.sh \
             "${HOME}/.ssh/deploy_key" \
             u.hsc.dev@200.16.7.137 \
             /home/u.hsc.dev/sihsalus \
             "${TARGET_BACKEND_SHA}" \
             "${TARGET_BACKEND_DIGEST}" \
-            "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-dev"
+            "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-dev" |
+            tee "${redeploy_output}"
+          frontend_sha="$(
+            sed -n 's/^\[redeploy-environment\] frontend=\([0-9a-f]\{40\}\)$/\1/p' \
+              "${redeploy_output}" |
+              tail -n 1
+          )"
+          if [[ ! "${frontend_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::The redeploy did not report a valid frontend SHA."
+            exit 1
+          fi
+          echo "frontend_sha=${frontend_sha}" >>"${GITHUB_OUTPUT}"
 
       - name: Verify DEV externally
+        env:
+          TARGET_SHA: ${{ steps.redeploy.outputs.frontend_sha }}
         run: |
           set -euo pipefail
           base='https://gidis-hsc-dev.inf.pucp.edu.pe'
-          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
-            "${base}/health" >/dev/null
-          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
-            "${base}/ready" >/dev/null
-          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
-            "${base}/openmrs/health/started" >/dev/null
-          curl --insecure --fail --silent --show-error \
-            "${base}/openmrs/spa/build-info.json"
+          scripts/deploy/verify-external-frontend.sh \
+            "${base}" "${TARGET_SHA}" "${REDEPLOY_EXPECTED_NODE_ID}" DEV
           curl --insecure --fail --silent --show-error \
             "${base}/openmrs/spa/sihsalus-spa-bootstrap.js" |
             grep -q 'initializeSpa'
@@ -102,6 +115,10 @@ jobs:
     needs: deploy-dev
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      REDEPLOY_EXPECTED_REMOTE_MAC: '00:0c:29:1c:f7:78'
+      REDEPLOY_EXPECTED_NODE_ID: '0cefb0c8-c860-48c5-856f-408594775cbb'
+      REDEPLOY_TIMEOUT_SECONDS: '3000'
     environment:
       name: quality
       url: https://gidis-hsc-qlty.inf.pucp.edu.pe/openmrs/spa
@@ -124,6 +141,7 @@ jobs:
           ssh-keygen -y -f "${HOME}/.ssh/deploy_key" >/dev/null
 
       - name: Redeploy every active service
+        id: redeploy
         env:
           TARGET_BACKEND_SHA: ${{ inputs.backend_sha }}
           TARGET_BACKEND_DIGEST: ${{ inputs.backend_digest }}
@@ -137,26 +155,34 @@ jobs:
             echo "::error::The requested backend digest is invalid."
             exit 2
           fi
+          redeploy_output="${RUNNER_TEMP}/sihsalus-redeploy-qlty.log"
           scripts/deploy/run-redeploy-remote.sh \
             "${HOME}/.ssh/deploy_key" \
             u.hsc.qlty@200.16.7.138 \
             /home/u.hsc.qlty/sihsalus \
             "${TARGET_BACKEND_SHA}" \
             "${TARGET_BACKEND_DIGEST}" \
-            "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-qlty"
+            "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-qlty" |
+            tee "${redeploy_output}"
+          frontend_sha="$(
+            sed -n 's/^\[redeploy-environment\] frontend=\([0-9a-f]\{40\}\)$/\1/p' \
+              "${redeploy_output}" |
+              tail -n 1
+          )"
+          if [[ ! "${frontend_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::The redeploy did not report a valid frontend SHA."
+            exit 1
+          fi
+          echo "frontend_sha=${frontend_sha}" >>"${GITHUB_OUTPUT}"
 
       - name: Verify QLTY externally
+        env:
+          TARGET_SHA: ${{ steps.redeploy.outputs.frontend_sha }}
         run: |
           set -euo pipefail
           base='https://gidis-hsc-qlty.inf.pucp.edu.pe'
-          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
-            "${base}/health" >/dev/null
-          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
-            "${base}/ready" >/dev/null
-          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
-            "${base}/openmrs/health/started" >/dev/null
-          curl --insecure --fail --silent --show-error \
-            "${base}/openmrs/spa/build-info.json"
+          scripts/deploy/verify-external-frontend.sh \
+            "${base}" "${TARGET_SHA}" "${REDEPLOY_EXPECTED_NODE_ID}" QLTY
           curl --insecure --fail --silent --show-error \
             "${base}/openmrs/spa/sihsalus-spa-bootstrap.js" |
             grep -q 'initializeSpa'

@@ -92,6 +92,9 @@ jobs:
       - name: Test frontend deployment and rollback
         run: ./tests/frontend/deploy-frontend.sh
 
+      - name: Test split-brain-resistant external verification
+        run: ./tests/deploy/verify-external-frontend-test.sh
+
       - name: Validate full environment redeploy policy
         run: ./tests/deploy/redeploy-environment-policy.sh
 

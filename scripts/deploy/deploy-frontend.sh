@@ -88,10 +88,23 @@ container_image() {
   docker inspect sihsalus-frontend --format '{{.Config.Image}}' 2>/dev/null || true
 }
 
+container_node_id() {
+  docker inspect sihsalus-frontend \
+    --format '{{index .Config.Labels "org.sihsalus.node-id"}}' \
+    2>/dev/null || true
+}
+
+NODE_ID="${SIHSALUS_NODE_ID:-}"
+if [[ ! "$NODE_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+  echo "[deploy-frontend] SIHSALUS_NODE_ID is required and must be a lowercase UUID" >&2
+  exit 2
+fi
+
 CURRENT_SHA="$(deployed_sha || true)"
 CURRENT_SOURCE_IMAGE="$(read_env_value FRONTEND_SOURCE_IMAGE)"
 CURRENT_SOURCE_TAG="$(read_env_value FRONTEND_SOURCE_TAG)"
 CURRENT_RUNTIME_TAG="$(read_env_value FRONTEND_RUNTIME_TAG)"
+CURRENT_NODE_ID="$(container_node_id)"
 CURRENT_HEALTH="$(container_health)"
 CURRENT_IMAGE="$(container_image)"
 RUNTIME_IMAGE_REPOSITORY="$(read_env_value FRONTEND_RUNTIME_IMAGE)"
@@ -134,6 +147,7 @@ if [ "$CURRENT_SHA" = "$TARGET_SHA" ] &&
   [ "$CURRENT_SOURCE_IMAGE" = "$SOURCE_IMAGE" ] &&
   [ "$CURRENT_SOURCE_TAG" = "$SOURCE_TAG" ] &&
   [ "$CURRENT_RUNTIME_TAG" = "$RUNTIME_TAG" ] &&
+  [ "$CURRENT_NODE_ID" = "$NODE_ID" ] &&
   [ "$CURRENT_IMAGE" = "$TARGET_RUNTIME_IMAGE" ] &&
   [ "$CURRENT_HEALTH" = "healthy" ]; then
   prune_stale_frontend_images
@@ -187,6 +201,7 @@ fi
 write_env_value FRONTEND_SOURCE_IMAGE "$SOURCE_IMAGE"
 write_env_value FRONTEND_SOURCE_TAG "$SOURCE_TAG"
 write_env_value FRONTEND_RUNTIME_TAG "$RUNTIME_TAG"
+write_env_value SIHSALUS_NODE_ID "$NODE_ID"
 
 docker compose config --quiet
 
@@ -225,6 +240,12 @@ fi
 ACTUAL_IMAGE="$(docker inspect sihsalus-frontend --format '{{.Config.Image}}')"
 if [ "$ACTUAL_IMAGE" != "$TARGET_RUNTIME_IMAGE" ]; then
   echo "[deploy-frontend] deployed runtime image is not ${TARGET_RUNTIME_IMAGE}" >&2
+  false
+fi
+
+ACTUAL_NODE_ID="$(container_node_id)"
+if [ "$ACTUAL_NODE_ID" != "$NODE_ID" ]; then
+  echo "[deploy-frontend] deployed wrapper does not contain the expected node identity" >&2
   false
 fi
 

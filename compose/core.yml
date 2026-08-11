@@ -48,6 +48,7 @@ services:
         SPA_CONFIG_URLS: /openmrs/spa/frontend.json
         SPA_DEFAULT_LOCALE: es
         STRIP_SOURCE_MAPS: ${STRIP_SOURCE_MAPS:-true}
+        SIHSALUS_NODE_ID: ${SIHSALUS_NODE_ID:-unconfigured}
     restart: "unless-stopped"
     healthcheck:
       # El shell actual externaliza initializeSpa para cumplir CSP. El fallback
