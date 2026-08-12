@@ -49,6 +49,8 @@ jobs:
           context: .
           file: backend/Dockerfile
           push: true
+          provenance: mode=max
+          sbom: true
           tags: ghcr.io/sihsalus/sihsalus-backend:sha-${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
