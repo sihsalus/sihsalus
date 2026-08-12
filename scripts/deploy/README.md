@@ -33,6 +33,33 @@ distro. El workflow exige que ese SHA y su digest correspondan a la imagen
 El sondeo programado de `latest` permanece como respaldo si falla la señal
 inmediata.
 
+Después de cada despliegue, `verify-external-frontend.sh` abre por defecto 12
+conexiones HTTP/1.1 independientes durante 55 segundos. En cada muestra valida
+`/health`, `/ready`, `/openmrs/health/started` y `build-info.json`, omite cachés
+y exige que todas las revisiones observadas coincidan con el SHA desplegado.
+También exige una única dirección remota y que `X-SIHSALUS-Node-ID` coincida
+exactamente con el UUID estable configurado para el ambiente. El runner solo
+entrega ese UUID al host cuya MAC fue validada y el wrapper frontend lo hornea
+en la imagen local. Esto hace fallar la promoción
+a QLTY si DEV alterna entre nodos o revisiones durante la ventana, en vez de
+aceptar la primera respuesta saludable. El conteo, intervalo y timeout pueden
+ajustarse con `EXTERNAL_VERIFY_SAMPLE_COUNT`,
+`EXTERNAL_VERIFY_SAMPLE_INTERVAL_SECONDS` y
+`EXTERNAL_VERIFY_CURL_TIMEOUT_SECONDS`; producción siempre debe conservar al
+menos dos muestras.
+
+Antes de subir, iniciar, monitorear o cancelar un despliegue remoto,
+`run-redeploy-remote.sh` exige y valida la MAC física esperada. Los workflows
+fijan la pareja MAC/UUID de DEV y QLTY; una VM clonada que comparta IP y claves
+SSH no puede recibir el script ni ejecutar Docker, y tampoco puede aprobar la
+verificación HTTP con otra identidad. La MAC se comprueba dentro de cada
+conexión SSH porque un preflight separado no protege la siguiente conexión.
+
+El sondeo es una defensa probabilística: una réplica que no reciba ninguna de
+las conexiones dentro de la ventana todavía puede escapar. La corrección
+definitiva de direcciones duplicadas y VMs clonadas sigue correspondiendo a la
+infraestructura o al hipervisor.
+
 Para una ejecución manual:
 
 ```bash

@@ -5,13 +5,30 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 WORKFLOW="$ROOT/.github/workflows/deploy-frontend.yml"
 REMOTE_RUNNER="$ROOT/scripts/deploy/run-redeploy-remote.sh"
+EXTERNAL_VERIFIER="$ROOT/scripts/deploy/verify-external-frontend.sh"
+EXTERNAL_VERIFIER_TEST="$ROOT/tests/deploy/verify-external-frontend-test.sh"
 TEST_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TEST_ROOT"' EXIT
 
 bash -n "$REMOTE_RUNNER"
+bash -n "$EXTERNAL_VERIFIER"
+bash -n "$EXTERNAL_VERIFIER_TEST"
 [ "$(grep -Fc 'REDEPLOY_SCRIPT_PATH=scripts/deploy/deploy-frontend.sh' "$WORKFLOW")" -eq 2 ]
+[ "$(grep -Fc 'REDEPLOY_EXPECTED_REMOTE_MAC:' "$WORKFLOW")" -eq 2 ]
+[ "$(grep -Fc 'REDEPLOY_EXPECTED_NODE_ID:' "$WORKFLOW")" -eq 2 ]
+[ "$(grep -Fc 'scripts/deploy/verify-external-frontend.sh' "$WORKFLOW")" -eq 4 ]
 grep -Fq 'Verify DEV externally' "$WORKFLOW"
 grep -Fq 'Verify QLTY externally' "$WORKFLOW"
+grep -Fq 'https://gidis-hsc-dev.inf.pucp.edu.pe' "$WORKFLOW"
+grep -Fq 'https://gidis-hsc-qlty.inf.pucp.edu.pe' "$WORKFLOW"
+grep -Fq "REDEPLOY_EXPECTED_REMOTE_MAC: '00:0c:29:ad:be:90'" "$WORKFLOW"
+grep -Fq "REDEPLOY_EXPECTED_REMOTE_MAC: '00:0c:29:1c:f7:78'" "$WORKFLOW"
+grep -Fq "REDEPLOY_EXPECTED_NODE_ID: '3eb58bb0-ff08-4e2d-839c-11cedca0b043'" "$WORKFLOW"
+grep -Fq "REDEPLOY_EXPECTED_NODE_ID: '0cefb0c8-c860-48c5-856f-408594775cbb'" "$WORKFLOW"
+if grep -Fq 'actual_sha=' "$WORKFLOW"; then
+  echo "frontend workflow still trusts a single external build-info response" >&2
+  exit 1
+fi
 if grep -Fq '<scripts/deploy/deploy-frontend.sh' "$WORKFLOW"; then
   echo "frontend workflow still streams a long deployment over one SSH session" >&2
   exit 1
@@ -32,6 +49,8 @@ OLD_SOURCE_ID='sha256:old-source-image'
 OLD_RUNTIME_ID='sha256:old-runtime-image'
 STALE_SOURCE_ID='sha256:stale-source-image'
 STALE_RUNTIME_ID='sha256:stale-runtime-image'
+OLD_NODE_ID='00000000-0000-4000-8000-000000000001'
+NODE_ID='00000000-0000-4000-8000-000000000002'
 
 make_fixture() {
   local fixture="$1"
@@ -41,11 +60,13 @@ make_fixture() {
 FRONTEND_SOURCE_IMAGE=${SOURCE_REPOSITORY}@${OLD_DIGEST}
 FRONTEND_SOURCE_TAG=sha-${OLD_SHA}
 FRONTEND_RUNTIME_TAG=sha-${OLD_SHA}
+SIHSALUS_NODE_ID=${OLD_NODE_ID}
 EOF
   printf '%s\n' "$OLD_SHA" >"$fixture/state/deployed_sha"
   printf '%s\n' "$TARGET_SHA" >"$fixture/state/source_sha"
   printf '%s\n' "healthy" >"$fixture/state/health"
   printf '%s\n' "sihsalus-frontend-runtime:sha-${OLD_SHA}" >"$fixture/state/image"
+  printf '%s\n' "$OLD_NODE_ID" >"$fixture/state/node_id"
   printf '%s\n' "$OLD_SOURCE_ID" "$TARGET_SOURCE_ID" "$STALE_SOURCE_ID" >"$fixture/state/source_image_ids"
   printf '%s\n' "$OLD_RUNTIME_ID" "$TARGET_RUNTIME_ID" "$STALE_RUNTIME_ID" >"$fixture/state/runtime_image_ids"
 
@@ -113,7 +134,9 @@ case "${1:-}" in
     printf '{\n  "gitSha": "%s"\n}\n' "$(cat "${FAKE_STATE_DIR}/deployed_sha")"
     ;;
   inspect)
-    if [[ "$*" == *'.Config.Image'* ]]; then
+    if [[ "$*" == *'org.sihsalus.node-id'* ]]; then
+      cat "${FAKE_STATE_DIR}/node_id"
+    elif [[ "$*" == *'.Config.Image'* ]]; then
       cat "${FAKE_STATE_DIR}/image"
     else
       cat "${FAKE_STATE_DIR}/health"
@@ -143,6 +166,7 @@ case "${1:-}" in
         printf '%s\n' "$deployed_sha" >"${FAKE_STATE_DIR}/deployed_sha"
         printf '%s\n' "healthy" >"${FAKE_STATE_DIR}/health"
         printf '%s\n' "sihsalus-frontend-runtime:${runtime_tag}" >"${FAKE_STATE_DIR}/image"
+        awk -F= '$1 == "SIHSALUS_NODE_ID" { print $2 }' .env >"${FAKE_STATE_DIR}/node_id"
         ;;
       *)
         echo "unexpected docker compose command: $*" >&2
@@ -174,6 +198,7 @@ run_deploy() {
       FAKE_SOURCE_REPOSITORY="$SOURCE_REPOSITORY" \
       FAKE_TARGET_SHA="$TARGET_SHA" \
       FAKE_BAD_SHA="$BAD_SHA" \
+      SIHSALUS_NODE_ID="$NODE_ID" \
       "$ROOT/scripts/deploy/deploy-frontend.sh" "$TARGET_SHA" "$TARGET_DIGEST"
   )
 }
@@ -284,9 +309,11 @@ make_fixture "$noop_fixture"
 sed -i.bak "s/${OLD_SHA}/${TARGET_SHA}/g" "$noop_fixture/.env"
 sed -i.bak "s/${OLD_DIGEST}/${TARGET_DIGEST}/g" "$noop_fixture/.env"
 sed -i.bak "s/FRONTEND_RUNTIME_TAG=sha-${TARGET_SHA}/FRONTEND_RUNTIME_TAG=${TARGET_RUNTIME_TAG}/" "$noop_fixture/.env"
+sed -i.bak "s/${OLD_NODE_ID}/${NODE_ID}/" "$noop_fixture/.env"
 rm -f "$noop_fixture/.env.bak"
 printf '%s\n' "$TARGET_SHA" >"$noop_fixture/state/deployed_sha"
 printf '%s\n' "sihsalus-frontend-runtime:${TARGET_RUNTIME_TAG}" >"$noop_fixture/state/image"
+printf '%s\n' "$NODE_ID" >"$noop_fixture/state/node_id"
 run_deploy "$noop_fixture"
 if grep -Eq 'docker (pull|compose build|compose up)' "$noop_fixture/state/commands"; then
   echo "idempotent deployment unexpectedly changed the frontend" >&2
@@ -306,9 +333,15 @@ assert_value "sha-${TARGET_SHA}" \
 assert_value "$TARGET_RUNTIME_TAG" \
   "$(awk -F= '$1 == "FRONTEND_RUNTIME_TAG" { print $2 }' "$success_fixture/.env")" \
   "runtime tag was not pinned to the source digest"
+assert_value "$NODE_ID" \
+  "$(awk -F= '$1 == "SIHSALUS_NODE_ID" { print $2 }' "$success_fixture/.env")" \
+  "node identity was not persisted"
 assert_value "$TARGET_SHA" \
   "$(cat "$success_fixture/state/deployed_sha")" \
   "deployed SHA was not updated"
+assert_value "$NODE_ID" \
+  "$(cat "$success_fixture/state/node_id")" \
+  "deployed wrapper did not contain the expected node identity"
 grep -Fqx "docker pull ${TARGET_SOURCE_IMAGE}" "$success_fixture/state/commands"
 grep -Fqx \
   "docker image inspect ${TARGET_SOURCE_IMAGE} --format {{index .Config.Labels \"org.opencontainers.image.revision\"}}" \
@@ -333,6 +366,7 @@ if ! (
     FAKE_TARGET_SHA="$TARGET_SHA" \
     FAKE_BAD_SHA="$BAD_SHA" \
     FAKE_FAIL_CLEANUP=true \
+    SIHSALUS_NODE_ID="$NODE_ID" \
     "$ROOT/scripts/deploy/deploy-frontend.sh" "$TARGET_SHA" "$TARGET_DIGEST"
 ); then
   echo "best-effort cleanup should not invalidate a verified deployment" >&2
@@ -371,6 +405,7 @@ if (
       FAKE_TARGET_SHA="$TARGET_SHA" \
       FAKE_BAD_SHA="$BAD_SHA" \
       FAKE_FAIL_BUILD=true \
+      SIHSALUS_NODE_ID="$NODE_ID" \
     "$ROOT/scripts/deploy/deploy-frontend.sh" "$TARGET_SHA" "$TARGET_DIGEST"
 ); then
   echo "deployment should have failed when the runtime build failed" >&2
@@ -403,6 +438,7 @@ if (
       FAKE_TARGET_SHA="$TARGET_SHA" \
       FAKE_BAD_SHA="$BAD_SHA" \
       FAKE_BAD_DEPLOY_SHA=true \
+      SIHSALUS_NODE_ID="$NODE_ID" \
     "$ROOT/scripts/deploy/deploy-frontend.sh" "$TARGET_SHA" "$TARGET_DIGEST"
 ); then
   echo "deployment should have failed when runtime verification failed" >&2
@@ -423,6 +459,7 @@ rendered_frontend="$(
   cd "$ROOT"
   FRONTEND_SOURCE_IMAGE="$TARGET_SOURCE_IMAGE" \
     FRONTEND_RUNTIME_TAG="$TARGET_RUNTIME_TAG" \
+    SIHSALUS_NODE_ID="$NODE_ID" \
     docker compose config --format json
 )"
 assert_value "$TARGET_SOURCE_IMAGE" \
@@ -431,5 +468,10 @@ assert_value "$TARGET_SOURCE_IMAGE" \
 assert_value "sihsalus-frontend-runtime:${TARGET_RUNTIME_TAG}" \
   "$(jq -r '.services.frontend.image' <<<"$rendered_frontend")" \
   "Compose did not assign the digest-derived runtime tag"
+assert_value "$NODE_ID" \
+  "$(jq -r '.services.frontend.build.args.SIHSALUS_NODE_ID' <<<"$rendered_frontend")" \
+  "Compose did not pass the node identity to the frontend build"
+grep -Fq 'X-SIHSALUS-Node-ID "__SIHSALUS_NODE_ID__"' "$ROOT/frontend/nginx.conf"
+grep -Fq 'LABEL org.sihsalus.node-id="${SIHSALUS_NODE_ID}"' "$ROOT/frontend/Dockerfile"
 
 echo "frontend deployment tests passed"

@@ -130,6 +130,9 @@ jobs:
     needs: resolve
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      REDEPLOY_EXPECTED_REMOTE_MAC: '00:0c:29:ad:be:90'
+      REDEPLOY_EXPECTED_NODE_ID: '3eb58bb0-ff08-4e2d-839c-11cedca0b043'
     environment:
       name: development
       url: https://gidis-hsc-dev.inf.pucp.edu.pe/openmrs/spa
@@ -152,6 +155,7 @@ jobs:
         run: |
           bash -n scripts/deploy/deploy-frontend.sh
           bash -n scripts/deploy/run-redeploy-remote.sh
+          bash -n scripts/deploy/verify-external-frontend.sh
 
       - name: Deploy verified frontend
         env:
@@ -174,27 +178,20 @@ jobs:
           TARGET_SHA: ${{ needs.resolve.outputs.sha }}
         run: |
           set -euo pipefail
-          base='https://gidis-hsc-dev.inf.pucp.edu.pe'
-          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
-            "${base}/health" >/dev/null
-          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
-            "${base}/ready" >/dev/null
-          actual_sha="$(
-            curl --insecure --fail --silent --show-error \
-              -H 'Cache-Control: no-cache' \
-              "${base}/openmrs/spa/build-info.json?release=${TARGET_SHA}" |
-              jq -r '.gitSha // empty'
-          )"
-          if [ "${actual_sha}" != "${TARGET_SHA}" ]; then
-            echo "::error::DEV serves frontend ${actual_sha:-unknown}, expected ${TARGET_SHA}."
-            exit 1
-          fi
+          scripts/deploy/verify-external-frontend.sh \
+            https://gidis-hsc-dev.inf.pucp.edu.pe \
+            "${TARGET_SHA}" \
+            "${REDEPLOY_EXPECTED_NODE_ID}" \
+            DEV
 
   deploy-qlty:
     name: Deploy QLTY
     needs: [resolve, deploy-dev]
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      REDEPLOY_EXPECTED_REMOTE_MAC: '00:0c:29:1c:f7:78'
+      REDEPLOY_EXPECTED_NODE_ID: '0cefb0c8-c860-48c5-856f-408594775cbb'
     environment:
       name: quality
       url: https://gidis-hsc-qlty.inf.pucp.edu.pe/openmrs/spa
@@ -217,6 +214,7 @@ jobs:
         run: |
           bash -n scripts/deploy/deploy-frontend.sh
           bash -n scripts/deploy/run-redeploy-remote.sh
+          bash -n scripts/deploy/verify-external-frontend.sh
 
       - name: Deploy verified frontend
         env:
@@ -239,18 +237,8 @@ jobs:
           TARGET_SHA: ${{ needs.resolve.outputs.sha }}
         run: |
           set -euo pipefail
-          base='https://gidis-hsc-qlty.inf.pucp.edu.pe'
-          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
-            "${base}/health" >/dev/null
-          curl --insecure --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
-            "${base}/ready" >/dev/null
-          actual_sha="$(
-            curl --insecure --fail --silent --show-error \
-              -H 'Cache-Control: no-cache' \
-              "${base}/openmrs/spa/build-info.json?release=${TARGET_SHA}" |
-              jq -r '.gitSha // empty'
-          )"
-          if [ "${actual_sha}" != "${TARGET_SHA}" ]; then
-            echo "::error::QLTY serves frontend ${actual_sha:-unknown}, expected ${TARGET_SHA}."
-            exit 1
-          fi
+          scripts/deploy/verify-external-frontend.sh \
+            https://gidis-hsc-qlty.inf.pucp.edu.pe \
+            "${TARGET_SHA}" \
+            "${REDEPLOY_EXPECTED_NODE_ID}" \
+            QLTY
