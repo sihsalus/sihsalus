@@ -13,6 +13,8 @@ TARGET_BACKEND_TAG="sha-${TARGET_BACKEND_SHA}"
 BACKEND_REPOSITORY="ghcr.io/sihsalus/sihsalus-backend"
 TARGET_BACKEND_REFERENCE="${TARGET_BACKEND_TAG}@${TARGET_BACKEND_DIGEST}"
 EXPECTED_BACKEND_IMAGE="${BACKEND_REPOSITORY}:${TARGET_BACKEND_REFERENCE}"
+SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLEAN_CHECKOUT_HELPER="$SCRIPT_DIRECTORY/check-clean-checkout.sh"
 
 if [[ ! "$TARGET_BACKEND_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   echo "[redeploy-environment] invalid backend SHA" >&2
@@ -82,10 +84,11 @@ write_env_value() {
   fi
 }
 
-if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-  echo "[redeploy-environment] tracked files contain local changes; refusing to overwrite them" >&2
-  exit 1
+if [ ! -r "$CLEAN_CHECKOUT_HELPER" ]; then
+  echo "[redeploy-environment] clean-checkout helper is not readable" >&2
+  exit 2
 fi
+bash "$CLEAN_CHECKOUT_HELPER" redeploy-environment
 
 diagnose_failure() {
   local exit_code="${1:-$?}"
@@ -240,6 +243,157 @@ wait_for_active_services() {
   return 1
 }
 
+resolve_fua_database_volume_name() {
+  docker compose config |
+    awk '
+      $0 == "volumes:" {
+        in_volumes = 1
+        next
+      }
+      in_volumes && $0 == "  db-fua-generator:" {
+        in_target_volume = 1
+        next
+      }
+      in_target_volume && $1 == "name:" {
+        print $2
+        in_target_volume = 0
+        next
+      }
+      in_target_volume && $0 ~ /^  [^[:space:]][^:]*:/ {
+        in_target_volume = 0
+      }
+      in_volumes && $0 ~ /^[^[:space:]]/ {
+        in_volumes = 0
+      }
+    '
+}
+
+preflight_fua_database_authentication() {
+  local check_code
+  local container_id
+  local existing_volumes
+  local state
+  local volume_exists=false
+  local volume_name
+
+  if ! service_is_active fua-generator-db; then
+    return 0
+  fi
+
+  if ! volume_name="$(resolve_fua_database_volume_name)" || [ -z "$volume_name" ]; then
+    echo "[redeploy-environment] could not resolve the FUA database volume from the active Compose configuration; refusing to recreate services" >&2
+    return 1
+  fi
+
+  if ! existing_volumes="$(docker volume ls --quiet 2>/dev/null)"; then
+    echo "[redeploy-environment] could not inspect Docker volumes before the FUA authentication check; refusing to recreate services" >&2
+    return 1
+  fi
+  if grep -Fxq "$volume_name" <<<"$existing_volumes"; then
+    volume_exists=true
+  fi
+
+  if ! container_id="$(docker compose ps --all --quiet fua-generator-db 2>/dev/null | head -n 1)"; then
+    echo "[redeploy-environment] could not inspect the FUA database container; refusing to recreate services" >&2
+    return 1
+  fi
+  if [ -z "$container_id" ]; then
+    if [ "$volume_exists" = false ]; then
+      echo "[redeploy-environment] no existing FUA database volume or container; first-install authentication is delegated to its healthcheck"
+      return 0
+    fi
+
+    echo "[redeploy-environment] the persistent FUA database volume exists without a database container; refusing to recreate services" >&2
+    echo "[redeploy-environment] recover or start the database with the last known configuration, verify a backup, and retry; never delete the FUA volume" >&2
+    return 1
+  fi
+
+  if [ "$volume_exists" = false ]; then
+    echo "[redeploy-environment] a FUA database container exists without its configured persistent volume; refusing to recreate services" >&2
+    return 1
+  fi
+
+  if ! state="$(docker inspect "$container_id" --format '{{.State.Status}}' 2>/dev/null)"; then
+    echo "[redeploy-environment] could not inspect the FUA database state; refusing to recreate services" >&2
+    return 1
+  fi
+  if [ "$state" != "running" ]; then
+    echo "[redeploy-environment] the persistent FUA database exists but its container is ${state}; refusing to recreate services" >&2
+    echo "[redeploy-environment] recover or start the database with the last known configuration, verify a backup, and retry; never delete the FUA volume" >&2
+    return 1
+  fi
+
+  echo "[redeploy-environment] verifying configured FUA database identity against the existing volume"
+  if docker compose run \
+    --quiet \
+    --rm \
+    --no-deps \
+    --pull never \
+    --cap-drop ALL \
+    --entrypoint node \
+    fua-generator \
+    - >/dev/null 2>&1 <<'NODE'
+const { Client } = require('pg');
+
+const IDENTITY_ERROR_CODES = new Set(['28000', '28P01', '3D000']);
+const OPERATION_TIMEOUT_MS = 10000;
+const HARD_TIMEOUT_MS = 15000;
+
+async function authenticate() {
+  const hardTimeout = setTimeout(() => process.exit(75), HARD_TIMEOUT_MS);
+  const client = new Client({
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT || '5432'),
+    database: process.env.DB_NAME,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    connectionTimeoutMillis: OPERATION_TIMEOUT_MS,
+    query_timeout: OPERATION_TIMEOUT_MS,
+  });
+
+  try {
+    await client.connect();
+    await client.query('SELECT 1');
+    await client.end();
+    clearTimeout(hardTimeout);
+  } catch (error) {
+    try {
+      client.end().catch(() => {});
+    } catch {
+      // The one-off process exits immediately below; cleanup is best-effort.
+    }
+    process.exit(IDENTITY_ERROR_CODES.has(error?.code) ? 78 : 75);
+  }
+}
+
+authenticate();
+NODE
+  then
+    echo "[redeploy-environment] configured FUA database identity authenticated successfully"
+    return 0
+  else
+    check_code="$?"
+  fi
+
+  if [ "$check_code" -eq 75 ]; then
+    echo "[redeploy-environment] the FUA authentication probe was inconclusive because the database was unavailable or timed out; refusing to recreate services" >&2
+    echo "[redeploy-environment] verify database reachability and authenticated health, then retry" >&2
+    return 1
+  fi
+
+  if [ "$check_code" -ne 78 ]; then
+    echo "[redeploy-environment] isolated FUA authentication probe is unavailable; refusing to recreate services" >&2
+    echo "[redeploy-environment] ensure the configured FUA image is present and the probe can run, then retry" >&2
+    return 1
+  fi
+
+  echo "[redeploy-environment] configured FUA database identity could not authenticate; refusing to recreate services" >&2
+  echo "[redeploy-environment] POSTGRES_PASSWORD initializes only an empty PostgreSQL volume; changing .env does not rotate the existing role" >&2
+  echo "[redeploy-environment] restore the last valid credential, take a backup, then rotate the role in an audited maintenance procedure; never delete the FUA volume" >&2
+  return 1
+}
+# End preflight_fua_database_authentication
+
 if [ "$REDEPLOY_OFFLINE" = true ]; then
   echo "[redeploy-environment] offline mode: using the prevalidated local checkout and images"
 else
@@ -270,6 +424,8 @@ if [ "$REDEPLOY_OFFLINE" = false ]; then
   echo "[redeploy-environment] pulling registry images for active non-buildable services"
   docker compose pull --ignore-buildable --ignore-pull-failures
 fi
+
+preflight_fua_database_authentication
 
 BACKEND_SOURCE_REVISION="$(
   docker image inspect "${BACKEND_REPOSITORY}@${TARGET_BACKEND_DIGEST}" \

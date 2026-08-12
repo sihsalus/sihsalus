@@ -36,6 +36,8 @@ con aprobación explícita.
 - Variables y secretos requeridos confirmados sin exponer valores.
 - `COMPOSE_FILE` y `COMPOSE_PROFILES` reflejan el stack real del servidor.
 - Si el entorno usa HTTPS, `COMPOSE_FILE` incluye `compose/ssl.yml` y `COMPOSE_PROFILES` incluye `ssl`.
+- El checkout del servidor no contiene parches en archivos versionados; todo
+  ajuste permanente tiene un pull request revisado.
 
 ## Ejecución
 
@@ -53,6 +55,38 @@ Si el servidor todavía no usa selección persistente, pasa los overrides en cad
 docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl config --quiet
 docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl ps
 ```
+
+### Credenciales del PostgreSQL de FUA
+
+La imagen oficial de PostgreSQL usa `POSTGRES_USER`, `POSTGRES_PASSWORD` y
+`POSTGRES_DB` solamente al inicializar un volumen vacío. Editar
+`SIHSALUS_FUA_GEN_DB_PASSWORD` en `.env` y recrear el contenedor no cambia la
+contraseña del rol almacenado en `db-fua-generator`.
+
+El redeploy integral comprueba la identidad FUA configurada con una consulta
+autenticada antes de recrear servicios. Una instalación realmente nueva se
+reconoce porque todavía no existen ni el volumen ni el contenedor. Si el
+volumen ya existe pero el contenedor está ausente o detenido, el proceso se
+detiene y exige recuperar primero la base de datos. Si la comprobación de
+identidad falla:
+
+Si la sonda no puede concluir por red o timeout, el redeploy también se detiene
+antes de recrear servicios; primero restablece la conectividad y confirma el
+healthcheck autenticado.
+
+1. No ejecutes `docker compose down -v`, `docker volume rm` ni recrees el
+   volumen; contiene datos persistentes.
+2. Restaura temporalmente en `.env` la última credencial que autenticaba y
+   confirma que el servicio vuelve a estar sano.
+3. Obtén y verifica un backup antes de cambiar el rol.
+4. Rota la contraseña dentro de PostgreSQL durante una ventana auditada, usando
+   un canal que no incluya el secreto en argumentos, historial ni logs.
+5. Actualiza `.env` con la misma credencial, ejecuta nuevamente el preflight y
+   verifica FUA de extremo a extremo.
+
+La automatización no intenta adivinar cuál contraseña es la correcta ni ejecuta
+`ALTER ROLE`: una rotación silenciosa podría bloquear al generador o separar la
+fuente de verdad del volumen persistente.
 
 Registrar:
 

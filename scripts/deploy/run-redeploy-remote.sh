@@ -4,6 +4,7 @@ set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REDEPLOY_SCRIPT_PATH="${REDEPLOY_SCRIPT_PATH:-$ROOT/redeploy-environment.sh}"
+CLEAN_CHECKOUT_HELPER_PATH="${CLEAN_CHECKOUT_HELPER_PATH:-$ROOT/check-clean-checkout.sh}"
 SSH_BIN="${SSH_BIN:-ssh}"
 POLL_INTERVAL_SECONDS="${REDEPLOY_POLL_INTERVAL_SECONDS:-10}"
 TIMEOUT_SECONDS="${REDEPLOY_TIMEOUT_SECONDS:-3300}"
@@ -38,6 +39,10 @@ if [ ! -r "$SSH_KEY" ]; then
 fi
 if [ ! -r "$REDEPLOY_SCRIPT_PATH" ]; then
   echo "[remote-redeploy] redeploy script is not readable" >&2
+  exit 2
+fi
+if [ ! -r "$CLEAN_CHECKOUT_HELPER_PATH" ]; then
+  echo "[remote-redeploy] clean-checkout helper is not readable" >&2
   exit 2
 fi
 if [[ ! "$REMOTE_TARGET" =~ ^[A-Za-z0-9._-]+@[A-Za-z0-9._:-]+$ ]]; then
@@ -106,6 +111,7 @@ SSH_COMMAND=(
 
 REMOTE_RUN_DIRECTORY="$REMOTE_REPOSITORY/.redeploy-runs/$RUN_TOKEN"
 REMOTE_SCRIPT="$REMOTE_RUN_DIRECTORY/redeploy-environment.sh"
+REMOTE_CLEAN_CHECKOUT_HELPER="$REMOTE_RUN_DIRECTORY/check-clean-checkout.sh"
 REMOTE_LOG="$REMOTE_RUN_DIRECTORY/redeploy.log"
 REMOTE_STATUS="$REMOTE_RUN_DIRECTORY/status"
 REMOTE_PID="$REMOTE_RUN_DIRECTORY/pid"
@@ -178,10 +184,17 @@ cleanup_initialization() {
 
 trap cleanup_initialization EXIT
 
-upload_remote_script() {
+upload_remote_file() {
+  local source_path="$1"
+  local destination_path="$2"
   "${SSH_COMMAND[@]}" "$REMOTE_TARGET" \
-    "expected_mac='$EXPECTED_REMOTE_MAC'; mac_path='$REMOTE_MAC_PATH'; if [ -n \"\$expected_mac\" ]; then if [ ! -r \"\$mac_path\" ]; then echo '[remote-redeploy] cannot read remote MAC address' >&2; exit $REMOTE_IDENTITY_MISMATCH_EXIT; fi; IFS= read -r actual_mac <\"\$mac_path\"; if [ \"\$actual_mac\" != \"\$expected_mac\" ]; then echo \"[remote-redeploy] remote MAC \$actual_mac does not match expected \$expected_mac\" >&2; exit $REMOTE_IDENTITY_MISMATCH_EXIT; fi; fi; umask 077; install -d -m 700 '$REMOTE_RUN_DIRECTORY'; cat >'$REMOTE_SCRIPT'; chmod 700 '$REMOTE_SCRIPT'" \
-    <"$REDEPLOY_SCRIPT_PATH"
+    "expected_mac='$EXPECTED_REMOTE_MAC'; mac_path='$REMOTE_MAC_PATH'; if [ -n \"\$expected_mac\" ]; then if [ ! -r \"\$mac_path\" ]; then echo '[remote-redeploy] cannot read remote MAC address' >&2; exit $REMOTE_IDENTITY_MISMATCH_EXIT; fi; IFS= read -r actual_mac <\"\$mac_path\"; if [ \"\$actual_mac\" != \"\$expected_mac\" ]; then echo \"[remote-redeploy] remote MAC \$actual_mac does not match expected \$expected_mac\" >&2; exit $REMOTE_IDENTITY_MISMATCH_EXIT; fi; fi; umask 077; install -d -m 700 '$REMOTE_RUN_DIRECTORY'; cat >'$destination_path'; chmod 700 '$destination_path'" \
+    <"$source_path"
+}
+
+upload_remote_scripts() {
+  upload_remote_file "$CLEAN_CHECKOUT_HELPER_PATH" "$REMOTE_CLEAN_CHECKOUT_HELPER" || return "$?"
+  upload_remote_file "$REDEPLOY_SCRIPT_PATH" "$REMOTE_SCRIPT"
 }
 
 start_remote_run() {
@@ -315,8 +328,8 @@ retry_initial_transport() {
   done
 }
 
-echo "[remote-redeploy] uploading the validated redeploy script"
-retry_initial_transport upload upload_remote_script
+echo "[remote-redeploy] uploading the validated deployment scripts"
+retry_initial_transport upload upload_remote_scripts
 
 echo "[remote-redeploy] starting detached run $RUN_TOKEN"
 retry_initial_transport launch start_remote_run
