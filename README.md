@@ -231,6 +231,35 @@ docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl pull backe
 docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d --no-deps --force-recreate backend
 ```
 
+#### Digests y attestations del backend
+
+El backend se publica como un índice OCI. Para despliegues usa siempre la
+referencia inmutable `sha-<commit>@sha256:<digest-del-indice>`: Docker elegirá
+automáticamente el manifiesto ejecutable correspondiente a la plataforma.
+
+GHCR también muestra entradas `unknown/unknown`. No son imágenes ejecutables:
+contienen la provenance SLSA y el SBOM SPDX asociados a la imagen. Del mismo
+modo, una versión con forma `sha256-<digest>` puede ser un artefacto de firma
+Cosign y no debe usarse para iniciar el backend.
+
+```bash
+IMAGE=ghcr.io/sihsalus/sihsalus-backend:sha-<commit>
+
+# Índice, plataformas y attestations publicadas
+docker buildx imagetools inspect "$IMAGE"
+
+# Evidencia sobre cómo fue construida la imagen
+docker buildx imagetools inspect "$IMAGE" --format '{{ json .Provenance.SLSA }}'
+
+# Inventario SPDX de componentes del runtime
+docker buildx imagetools inspect "$IMAGE" --format '{{ json .SBOM.SPDX }}'
+```
+
+La provenance de nivel máximo incluye el Dockerfile, los pasos de build y los
+valores de los build args. Nunca se deben pasar credenciales mediante `ARG` o
+`--build-arg`; para secretos de build se deben usar mounts de secretos de
+BuildKit.
+
 Cuando cambie la interfaz de API entre frontend y backend, actualiza primero backend y luego frontend en el mismo ciclo de despliegue.
 
 ### Gateway (si cambió Nginx, SSL o health/readiness)
