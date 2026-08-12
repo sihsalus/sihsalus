@@ -181,6 +181,22 @@ fua_healthcheck = "\n".join(map(str, fua_generator.get("healthcheck", {}).get("t
 if "http://localhost:3000/health" not in fua_healthcheck:
     fail("FUA healthcheck must use the database-aware readiness endpoint")
 
+fua_database_healthcheck = "\n".join(map(str, fua_database.get("healthcheck", {}).get("test", [])))
+required_fua_database_healthcheck_parts = (
+    'PGPASSWORD="$${POSTGRES_PASSWORD}"',
+    "psql",
+    "--host=127.0.0.1",
+    '$${POSTGRES_USER}',
+    '$${POSTGRES_DB}',
+    "--no-password",
+    "SELECT 1",
+)
+for required_part in required_fua_database_healthcheck_parts:
+    if required_part not in fua_database_healthcheck:
+        fail(f"FUA database healthcheck must authenticate over TCP: missing {required_part}")
+if "pg_isready" in fua_database_healthcheck:
+    fail("FUA database healthcheck must not use unauthenticated pg_isready")
+
 keycloak_backend = service(keycloak, "backend")
 keycloak_generator = service(keycloak, "backend-oauth2-config")
 service(keycloak, "keycloak")

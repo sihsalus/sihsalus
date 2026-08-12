@@ -74,6 +74,10 @@ EOF
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'git %s\n' "$*" >>"${FAKE_STATE_DIR}/commands"
+if [ "$*" = 'status --porcelain=v1 --untracked-files=no' ] &&
+  [ "${FAKE_TRACKED_DRIFT:-false}" = true ]; then
+  printf '%s\n' ' M compose/fua.yml'
+fi
 EOF
 
   cat >"$fixture/bin/docker" <<'EOF'
@@ -301,6 +305,26 @@ if (
 fi
 if [ -e "$invalid_fixture/state/commands" ]; then
   echo "invalid input unexpectedly invoked a deployment command" >&2
+  exit 1
+fi
+
+dirty_fixture="$TEST_ROOT/dirty-checkout"
+make_fixture "$dirty_fixture"
+if dirty_output="$(
+  cd "$dirty_fixture"
+  PATH="$dirty_fixture/bin:$PATH" \
+    FAKE_STATE_DIR="$dirty_fixture/state" \
+    FAKE_TRACKED_DRIFT=true \
+    SIHSALUS_NODE_ID="$NODE_ID" \
+    "$ROOT/scripts/deploy/deploy-frontend.sh" "$TARGET_SHA" "$TARGET_DIGEST" 2>&1
+)"; then
+  echo "deployment should have rejected tracked local changes" >&2
+  exit 1
+fi
+grep -Fq 'compose/fua.yml' <<<"$dirty_output"
+grep -Fq 'move these changes to a pull request' <<<"$dirty_output"
+if grep -Eq '^docker |^git (fetch|merge)' "$dirty_fixture/state/commands"; then
+  echo "dirty checkout was mutated before deployment stopped" >&2
   exit 1
 fi
 
