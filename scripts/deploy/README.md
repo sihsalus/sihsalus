@@ -74,6 +74,12 @@ verificación y la posibilidad de rollback automático. Una reversión posterior
 a un despliegue exitoso vuelve a descargar por digest y reconstruir el frontend
 anterior.
 
+Antes de consultar o modificar contenedores, el script rechaza cambios locales
+en archivos versionados y muestra únicamente su estado y ruta. La salida no
+muestra el contenido del archivo. Un ajuste operativo que deba persistir se
+incorpora mediante un pull request; no se mantiene como parche en el checkout
+del servidor.
+
 ## Redeploy integral no destructivo
 
 `redeploy-environment.sh` se usa para reconstruir y recrear un ambiente
@@ -90,19 +96,22 @@ antiguo en el servidor no pueda degradar el despliegue:
 Opera sobre los archivos y perfiles definidos por el `.env` del servidor:
 
 1. rechaza cambios locales en archivos versionados y el perfil destructivo
-   `seed`;
+   `seed`; si existe drift, muestra únicamente el estado y la ruta de cada
+   archivo para poder localizarlo sin volcar configuración ni secretos;
 2. actualiza `main` únicamente mediante fast-forward;
 3. descarga por digest la imagen solicitada del backend clásico
    `ghcr.io/sihsalus/sihsalus-backend`, construido desde `backend/pom.xml`, y
    valida que su revisión OCI coincida con el commit solicitado;
 4. descarga las imágenes de registry de todos los perfiles activos;
-5. reconstruye sin caché y de forma secuencial los runtimes locales activos
+5. si FUA ya está activo, prueba mediante una conexión autenticada que la
+   identidad configurada todavía corresponde al rol almacenado en el volumen;
+6. reconstruye sin caché y de forma secuencial los runtimes locales activos
    (`frontend`, `gateway`, `certbot` y/o `keycloak`) para limitar el consumo de
    CPU, memoria y red del host;
-6. recrea todos los servicios activos, pero conserva volúmenes y datos;
-7. espera MariaDB, frontend, OpenMRS y gateway, y verifica el estado de todos
+7. recrea todos los servicios activos, pero conserva volúmenes y datos;
+8. espera MariaDB, frontend, OpenMRS y gateway, y verifica el estado de todos
    los servicios antes de declarar el ambiente usable;
-8. solo entonces persiste en `.env` la referencia inmutable
+9. solo entonces persiste en `.env` la referencia inmutable
    `sha-<commit>@sha256:<digest>` usada por el backend.
 
 No ejecuta `docker compose down`, no usa `-v` y no elimina volúmenes. El
@@ -111,6 +120,25 @@ ejecuta primero DEV y solo promueve a QLTY si DEV y sus verificaciones HTTP
 terminan correctamente. La conexión usa keepalive con tolerancia de diez
 minutos y la espera de OpenMRS emite progreso periódico para tolerar arranques
 largos.
+
+El preflight FUA es deliberadamente de solo lectura: ejecuta `SELECT 1` con la
+configuración renderizada y no crea usuarios, no ejecuta `ALTER ROLE` y no
+modifica el volumen. `POSTGRES_PASSWORD` solo inicializa un volumen PostgreSQL
+vacío; cambiar `SIHSALUS_FUA_GEN_DB_PASSWORD` en `.env` no rota el rol que ya
+existe. Si ambas credenciales divergen, el despliegue se detiene antes de
+recrear servicios y remite al procedimiento de recuperación del checklist de
+operaciones. La conexión y la consulta tienen límites de tiempo y solo los
+errores PostgreSQL de autenticación o identidad se diagnostican como drift de
+credenciales; un error transitorio también detiene el redeploy antes de recrear
+servicios y exige verificar conectividad y salud autenticada.
+Si la sonda aislada no puede arrancar, el despliegue también se detiene cuando
+ya existe un volumen FUA; no se recrean servicios sobre una verificación
+inconclusa.
+En una primera instalación sin volumen ni contenedor FUA, la sonda aislada se
+omite y la autenticación queda a cargo del healthcheck durante el arranque. Si
+el volumen ya existe pero el contenedor está ausente o detenido, el redeploy
+falla cerrado para no convertir un estado de recuperación en una recreación
+general del ambiente.
 
 Si un establecimiento está temporalmente sin DNS o salida a Internet, se puede
 usar `REDEPLOY_OFFLINE=true` únicamente después de transferir y verificar el

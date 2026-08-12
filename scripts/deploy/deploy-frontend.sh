@@ -13,6 +13,8 @@ SOURCE_TAG="sha-${TARGET_SHA}"
 RUNTIME_TAG="digest-${TARGET_DIGEST#sha256:}"
 SOURCE_REPOSITORY="ghcr.io/sihsalus/sihsalus-frontend"
 SOURCE_IMAGE="${SOURCE_REPOSITORY}@${TARGET_DIGEST}"
+SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLEAN_CHECKOUT_HELPER="$SCRIPT_DIRECTORY/check-clean-checkout.sh"
 
 if [[ ! "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   echo "[deploy-frontend] invalid frontend SHA" >&2
@@ -99,6 +101,12 @@ if [[ ! "$NODE_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
   echo "[deploy-frontend] SIHSALUS_NODE_ID is required and must be a lowercase UUID" >&2
   exit 2
 fi
+
+if [ ! -r "$CLEAN_CHECKOUT_HELPER" ]; then
+  echo "[deploy-frontend] clean-checkout helper is not readable" >&2
+  exit 2
+fi
+bash "$CLEAN_CHECKOUT_HELPER" deploy-frontend
 
 CURRENT_SHA="$(deployed_sha || true)"
 CURRENT_SOURCE_IMAGE="$(read_env_value FRONTEND_SOURCE_IMAGE)"
