@@ -19,8 +19,8 @@ COPY backend/pom.xml ./backend/
 
 # Build the SIHSALUS Bed Management patch from an immutable source revision.
 # The checksum prevents a changed or substituted archive from entering the image.
-ARG BEDMANAGEMENT_SOURCE_SHA=4927f1ac9406f63717c92a71035fd9092ce01bab
-ADD --checksum=sha256:1a06525581a6eab8d2a2b3b7ff677f2e4695dca730b71a706c622ad79f8d9f31 \
+ARG BEDMANAGEMENT_SOURCE_SHA=f7ceac08204d4239814b9978eaf7dadd8e6a62c7
+ADD --checksum=sha256:428cddc778eb382f91eafa2156117b090fc75b11202919376bb615ff3d125874 \
     https://github.com/sihsalus/openmrs-module-bedmanagement/archive/${BEDMANAGEMENT_SOURCE_SHA}.tar.gz \
     /tmp/bedmanagement-source.tar.gz
 RUN --mount=type=cache,target=/root/.m2/repository \
