@@ -26,7 +26,7 @@ if [[ ! "$TARGET_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
   exit 2
 fi
 
-for command in docker git awk cat cp mktemp rm seq sleep; do
+for command in docker git awk cat cp df mktemp rm seq sleep; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "[deploy-frontend] missing command: $command" >&2
     exit 2
@@ -35,6 +35,17 @@ done
 
 if [ ! -f docker-compose.yml ] || [ ! -f .env ]; then
   echo "[deploy-frontend] run from the sihsalus repository root" >&2
+  exit 2
+fi
+
+# Disk preflight: on 2026-08-17 QLTY ran out of space mid layer-extraction and
+# every cron retry failed with a cryptic docker error. Fail fast, before any
+# fetch or pull, with an actionable message. Assumes the Docker data-root
+# shares the filesystem with this checkout (single LV on these hosts).
+MINIMUM_FREE_DISK_MIB="${DEPLOY_MINIMUM_FREE_DISK_MIB:-4096}"
+available_disk_mib="$(df -Pm . | awk 'NR == 2 { print $4 }')"
+if [ "${available_disk_mib:-0}" -lt "$MINIMUM_FREE_DISK_MIB" ]; then
+  echo "[deploy-frontend] insufficient disk space: ${available_disk_mib} MiB free, ${MINIMUM_FREE_DISK_MIB} MiB required; free space (e.g. docker builder prune -f) and retry" >&2
   exit 2
 fi
 
