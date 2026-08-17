@@ -26,6 +26,16 @@ for file in \
   printf '%s\n' "$file" > "$FIXTURE_DIR/$file"
 done
 
+# index.html realista: los metatags sociales viajan relativos en la imagen
+# inmutable y el nginx debe absolutizarlos con el Host de la peticion.
+cat > "$FIXTURE_DIR/index.html" <<'EOF_HTML'
+<!doctype html><html><head><title>SIH.SALUS</title>
+<meta property="og:url" content="/openmrs/spa">
+<meta property="og:image" content="/openmrs/spa/sihsalus-share.png">
+<meta name="twitter:image" content="/openmrs/spa/sihsalus-share.png">
+</head><body></body></html>
+EOF_HTML
+
 docker run --detach --rm \
   --name "$CONTAINER_NAME" \
   --publish 127.0.0.1::80 \
@@ -76,3 +86,19 @@ assert_cache_control /esm-odontologia-806-0123456789abcdef.js "$IMMUTABLE"
 assert_cache_control /patient/example/chart/atencion-odontologica "$NO_CACHE"
 
 echo "[OK] frontend cache policy"
+
+social_preview_html="$(curl --fail --silent --header 'Host: gidis-social.example' "$BASE_URL/patient/example/chart")"
+for expected in \
+  'content="https://gidis-social.example/openmrs/spa"' \
+  'content="https://gidis-social.example/openmrs/spa/sihsalus-share.png"'; do
+  if ! grep -Fq "$expected" <<< "$social_preview_html"; then
+    echo "[FAIL] social preview tags were not absolutized with the request host" >&2
+    printf '%s\n' "$social_preview_html" >&2
+    exit 1
+  fi
+done
+if grep -Fq 'content="/openmrs/spa' <<< "$social_preview_html"; then
+  echo "[FAIL] a relative social preview URL survived the rewrite" >&2
+  exit 1
+fi
+echo "[OK] social preview host rewrite"
