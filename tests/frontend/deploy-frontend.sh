@@ -498,4 +498,22 @@ assert_value "$NODE_ID" \
 grep -Fq 'X-SIHSALUS-Node-ID "__SIHSALUS_NODE_ID__"' "$ROOT/frontend/nginx.conf"
 grep -Fq 'LABEL org.sihsalus.node-id="${SIHSALUS_NODE_ID}"' "$ROOT/frontend/Dockerfile"
 
+low_disk_fixture="$TEST_ROOT/low-disk"
+make_fixture "$low_disk_fixture"
+cat >"$low_disk_fixture/bin/df" <<'EOF_DF'
+#!/usr/bin/env bash
+printf 'Filesystem 1048576-blocks Used Available Capacity Mounted on\n'
+printf '/dev/fake 46080 45568 512 99%% /\n'
+EOF_DF
+chmod +x "$low_disk_fixture/bin/df"
+if run_deploy "$low_disk_fixture"; then
+  echo "deployment should have refused to start with insufficient disk space" >&2
+  exit 1
+fi
+if [ -f "$low_disk_fixture/state/commands" ] &&
+  grep -Eq '^(docker pull|git fetch)' "$low_disk_fixture/state/commands"; then
+  echo "low-disk preflight must run before fetching or pulling anything" >&2
+  exit 1
+fi
+
 echo "frontend deployment tests passed"
