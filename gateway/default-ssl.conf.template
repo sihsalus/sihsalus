@@ -11,6 +11,16 @@ map $request_uri $csp_header {
   "~^/openmrs/owa" "default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; base-uri 'self'; font-src 'self' data:; img-src 'self' data:; frame-ancestors 'self';";
 }
 
+map $http_user_agent $sihsalus_social_scraper {
+  default 0;
+  "~*(facebookexternalhit|facebookcatalog|whatsapp|twitterbot|telegrambot|linkedinbot|slackbot|discordbot|pinterestbot|redditbot)" 1;
+}
+
+map "$sihsalus_social_scraper:$uri" $sihsalus_social_redirect {
+  default 0;
+  "~^1:/openmrs/?$" 1;
+}
+
 map $http_x_real_ip $forwarded_ip {
   "~.*"  $http_x_real_ip;
   default $remote_addr;
@@ -175,6 +185,7 @@ server {
 
   # OpenMRS Backend
   location /openmrs {
+    if ($sihsalus_social_redirect) { return 302 /openmrs/spa/home; }
     set $backend http://backend:8080;
     proxy_read_timeout 300s;
     proxy_pass $backend;
