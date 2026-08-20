@@ -31,14 +31,22 @@ RUN test -n "$SPA_CONFIG_URLS" || { echo "SPA_CONFIG_URLS build arg is required;
 
 FROM nginx:1.28-alpine
 
+ARG FRONTEND_SOURCE_IMAGE
 ARG SIHSALUS_NODE_ID=unconfigured
+ARG SIHSALUS_FRONTEND_SOURCE_DIGEST=unconfigured
 
-LABEL org.sihsalus.node-id="${SIHSALUS_NODE_ID}"
+LABEL org.sihsalus.node-id="${SIHSALUS_NODE_ID}" \
+      org.sihsalus.frontend.source-digest="${SIHSALUS_FRONTEND_SOURCE_DIGEST}"
 
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY --from=assemble /tmp/spa/ /usr/share/nginx/html/
 
 RUN { [ "$SIHSALUS_NODE_ID" = "unconfigured" ] || \
       printf '%s\n' "$SIHSALUS_NODE_ID" | grep -Eq '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'; } \
+    && { [ "$SIHSALUS_FRONTEND_SOURCE_DIGEST" = "unconfigured" ] || \
+         printf '%s\n' "$SIHSALUS_FRONTEND_SOURCE_DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'; } \
+    && { [ "$SIHSALUS_FRONTEND_SOURCE_DIGEST" = "unconfigured" ] || \
+         [ "$FRONTEND_SOURCE_IMAGE" = "${FRONTEND_SOURCE_IMAGE%@*}@${SIHSALUS_FRONTEND_SOURCE_DIGEST}" ]; } \
     && sed -i "s|__SIHSALUS_NODE_ID__|${SIHSALUS_NODE_ID}|g" /etc/nginx/nginx.conf \
-    && ! grep -Fq '__SIHSALUS_NODE_ID__' /etc/nginx/nginx.conf
+    && sed -i "s|__SIHSALUS_FRONTEND_SOURCE_DIGEST__|${SIHSALUS_FRONTEND_SOURCE_DIGEST}|g" /etc/nginx/nginx.conf \
+    && ! grep -Eq '__SIHSALUS_(NODE_ID|FRONTEND_SOURCE_DIGEST)__' /etc/nginx/nginx.conf

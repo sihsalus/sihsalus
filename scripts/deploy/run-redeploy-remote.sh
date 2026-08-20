@@ -5,6 +5,7 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REDEPLOY_SCRIPT_PATH="${REDEPLOY_SCRIPT_PATH:-$ROOT/redeploy-environment.sh}"
 CLEAN_CHECKOUT_HELPER_PATH="${CLEAN_CHECKOUT_HELPER_PATH:-$ROOT/check-clean-checkout.sh}"
+EXTERNAL_VERIFIER_PATH="${EXTERNAL_VERIFIER_PATH:-$ROOT/verify-external-frontend.sh}"
 SSH_BIN="${SSH_BIN:-ssh}"
 POLL_INTERVAL_SECONDS="${REDEPLOY_POLL_INTERVAL_SECONDS:-10}"
 TIMEOUT_SECONDS="${REDEPLOY_TIMEOUT_SECONDS:-3300}"
@@ -16,6 +17,14 @@ REMOTE_MAC_PATH="${REDEPLOY_REMOTE_MAC_PATH:-/sys/class/net/ens160/address}"
 CANCEL_ATTEMPTS="${REDEPLOY_CANCEL_ATTEMPTS:-6}"
 CANCEL_RETRY_INTERVAL_SECONDS="${REDEPLOY_CANCEL_RETRY_INTERVAL_SECONDS:-2}"
 REMOTE_IDENTITY_MISMATCH_EXIT=86
+FRONTEND_BASE_URL="${REDEPLOY_FRONTEND_BASE_URL:-}"
+FRONTEND_CURRENT_SHA="${REDEPLOY_FRONTEND_CURRENT_SHA:-}"
+FRONTEND_CURRENT_DIGEST="${REDEPLOY_FRONTEND_CURRENT_DIGEST:-}"
+FRONTEND_ENVIRONMENT_LABEL="${REDEPLOY_FRONTEND_ENVIRONMENT_LABEL:-REMOTE}"
+FRONTEND_TLS_INSECURE="${REDEPLOY_FRONTEND_TLS_INSECURE:-false}"
+FRONTEND_TLS_PINNED_PUBLIC_KEY="${REDEPLOY_FRONTEND_TLS_PINNED_PUBLIC_KEY:-}"
+FRONTEND_TRANSACTIONAL_VERIFY=false
+FRONTEND_TRANSACTION_FILE=""
 
 usage() {
   echo "Usage: $0 <ssh-key> <user@host> <remote-repository> <backend-sha> <backend-digest> <run-token>" >&2
@@ -73,6 +82,47 @@ if [[ ! "$EXPECTED_NODE_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-
   echo "[remote-redeploy] REDEPLOY_EXPECTED_NODE_ID is required and must be a lowercase UUID" >&2
   exit 2
 fi
+
+if [ -n "$FRONTEND_BASE_URL" ] || [ -n "$FRONTEND_CURRENT_SHA" ] || [ -n "$FRONTEND_CURRENT_DIGEST" ]; then
+  FRONTEND_TRANSACTIONAL_VERIFY=true
+  if [[ ! "$FRONTEND_BASE_URL" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]]; then
+    echo "[remote-redeploy] REDEPLOY_FRONTEND_BASE_URL must be an HTTPS origin" >&2
+    exit 2
+  fi
+  if [[ ! "$FRONTEND_CURRENT_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "[remote-redeploy] REDEPLOY_FRONTEND_CURRENT_SHA is required and invalid" >&2
+    exit 2
+  fi
+  if [[ ! "$FRONTEND_CURRENT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    echo "[remote-redeploy] REDEPLOY_FRONTEND_CURRENT_DIGEST is required and invalid" >&2
+    exit 2
+  fi
+  if [[ ! "$FRONTEND_ENVIRONMENT_LABEL" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    echo "[remote-redeploy] invalid REDEPLOY_FRONTEND_ENVIRONMENT_LABEL" >&2
+    exit 2
+  fi
+  case "$FRONTEND_TLS_INSECURE" in
+    true | false)
+      ;;
+    *)
+      echo "[remote-redeploy] REDEPLOY_FRONTEND_TLS_INSECURE must be true or false" >&2
+      exit 2
+      ;;
+  esac
+  if [ -n "$FRONTEND_TLS_PINNED_PUBLIC_KEY" ] &&
+    [[ ! "$FRONTEND_TLS_PINNED_PUBLIC_KEY" =~ ^sha256//[A-Za-z0-9+/]{43}=$ ]]; then
+    echo "[remote-redeploy] REDEPLOY_FRONTEND_TLS_PINNED_PUBLIC_KEY must be one sha256// SPKI pin" >&2
+    exit 2
+  fi
+  if [ "$FRONTEND_TLS_INSECURE" = true ] && [ -z "$FRONTEND_TLS_PINNED_PUBLIC_KEY" ]; then
+    echo "[remote-redeploy] insecure TLS requires a protected SPKI pin" >&2
+    exit 2
+  fi
+  if [ ! -r "$EXTERNAL_VERIFIER_PATH" ]; then
+    echo "[remote-redeploy] external frontend verifier is not readable" >&2
+    exit 2
+  fi
+fi
 if [[ ! "$REMOTE_MAC_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
   echo "[remote-redeploy] invalid remote MAC address path" >&2
   exit 2
@@ -112,6 +162,8 @@ SSH_COMMAND=(
 REMOTE_RUN_DIRECTORY="$REMOTE_REPOSITORY/.redeploy-runs/$RUN_TOKEN"
 REMOTE_SCRIPT="$REMOTE_RUN_DIRECTORY/redeploy-environment.sh"
 REMOTE_CLEAN_CHECKOUT_HELPER="$REMOTE_RUN_DIRECTORY/check-clean-checkout.sh"
+REMOTE_EXTERNAL_VERIFIER="$REMOTE_RUN_DIRECTORY/verify-external-frontend.sh"
+REMOTE_FRONTEND_TRANSACTION="$REMOTE_RUN_DIRECTORY/frontend-transaction.env"
 REMOTE_LOG="$REMOTE_RUN_DIRECTORY/redeploy.log"
 REMOTE_STATUS="$REMOTE_RUN_DIRECTORY/status"
 REMOTE_PID="$REMOTE_RUN_DIRECTORY/pid"
@@ -179,6 +231,9 @@ cleanup_initialization() {
     echo "[remote-redeploy] initialization failed; terminating a possible detached run" >&2
     cancel_remote_run || echo "[remote-redeploy] warning: remote cancellation was not confirmed" >&2
   fi
+  if [ -n "$FRONTEND_TRANSACTION_FILE" ]; then
+    rm -f "$FRONTEND_TRANSACTION_FILE"
+  fi
   exit "$exit_code"
 }
 
@@ -194,7 +249,11 @@ upload_remote_file() {
 
 upload_remote_scripts() {
   upload_remote_file "$CLEAN_CHECKOUT_HELPER_PATH" "$REMOTE_CLEAN_CHECKOUT_HELPER" || return "$?"
-  upload_remote_file "$REDEPLOY_SCRIPT_PATH" "$REMOTE_SCRIPT"
+  upload_remote_file "$REDEPLOY_SCRIPT_PATH" "$REMOTE_SCRIPT" || return "$?"
+  if [ "$FRONTEND_TRANSACTIONAL_VERIFY" = true ]; then
+    upload_remote_file "$EXTERNAL_VERIFIER_PATH" "$REMOTE_EXTERNAL_VERIFIER" || return "$?"
+    upload_remote_file "$FRONTEND_TRANSACTION_FILE" "$REMOTE_FRONTEND_TRANSACTION"
+  fi
 }
 
 start_remote_run() {
@@ -269,12 +328,14 @@ nohup setsid bash -c '
   log_path="$run_directory/redeploy.log"
   status_path="$run_directory/status"
   status_tmp="$run_directory/status.tmp"
+  frontend_transaction="$run_directory/frontend-transaction.env"
 
   exec >"$log_path" 2>&1
 
   write_status() {
     exit_code="$?"
     trap - EXIT
+    rm -f "$frontend_transaction"
     printf "%s\n" "$exit_code" >"$status_tmp"
     mv -f "$status_tmp" "$status_path"
   }
@@ -291,6 +352,13 @@ nohup setsid bash -c '
   fi
 
   export SIHSALUS_NODE_ID="$node_id"
+  if [ -f "$frontend_transaction" ]; then
+    set -a
+    # The file is uploaded into the identity-bound, mode-0700 run directory
+    # and contains only values validated by the local runner.
+    . "$frontend_transaction"
+    set +a
+  fi
   bash "$run_directory/redeploy-environment.sh" "$backend_sha" "$backend_digest"
   exit "$?"
 ' remote-redeploy-worker \
@@ -327,6 +395,24 @@ retry_initial_transport() {
     sleep "$POLL_INTERVAL_SECONDS"
   done
 }
+
+if [ "$FRONTEND_TRANSACTIONAL_VERIFY" = true ]; then
+  umask 077
+  FRONTEND_TRANSACTION_FILE="$(mktemp "${TMPDIR:-/tmp}/sihsalus-frontend-transaction.XXXXXX")"
+  {
+    printf 'FRONTEND_EXTERNAL_BASE_URL=%s\n' "$FRONTEND_BASE_URL"
+    printf 'FRONTEND_EXTERNAL_ENVIRONMENT_LABEL=%s\n' "$FRONTEND_ENVIRONMENT_LABEL"
+    printf 'FRONTEND_CURRENT_SHA=%s\n' "$FRONTEND_CURRENT_SHA"
+    printf 'FRONTEND_CURRENT_DIGEST=%s\n' "$FRONTEND_CURRENT_DIGEST"
+    printf 'DEPLOY_FRONTEND_EXTERNAL_VERIFIER_PATH=\n'
+    printf 'EXTERNAL_VERIFY_SAMPLE_COUNT=12\n'
+    printf 'EXTERNAL_VERIFY_SAMPLE_INTERVAL_SECONDS=5\n'
+    printf 'EXTERNAL_VERIFY_CURL_TIMEOUT_SECONDS=3\n'
+    printf 'EXTERNAL_VERIFY_TLS_CA_CERT_PATH=\n'
+    printf 'EXTERNAL_VERIFY_TLS_INSECURE=%s\n' "$FRONTEND_TLS_INSECURE"
+    printf 'EXTERNAL_VERIFY_TLS_PINNED_PUBLIC_KEY=%s\n' "$FRONTEND_TLS_PINNED_PUBLIC_KEY"
+  } >"$FRONTEND_TRANSACTION_FILE"
+fi
 
 echo "[remote-redeploy] uploading the validated deployment scripts"
 retry_initial_transport upload upload_remote_scripts
@@ -389,6 +475,9 @@ finish_local() {
   trap - EXIT
   if [ -n "$CURRENT_TEMP_FILE" ]; then
     rm -f "$CURRENT_TEMP_FILE"
+  fi
+  if [ -n "$FRONTEND_TRANSACTION_FILE" ]; then
+    rm -f "$FRONTEND_TRANSACTION_FILE"
   fi
   if [ "$REMOTE_FINISHED" != true ]; then
     echo "[remote-redeploy] local monitor stopped; terminating the detached remote run" >&2

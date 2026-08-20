@@ -175,12 +175,14 @@ jobs:
 
       - name: Verify DEV externally
         env:
+          TARGET_DIGEST: ${{ needs.resolve.outputs.digest }}
           TARGET_SHA: ${{ needs.resolve.outputs.sha }}
         run: |
           set -euo pipefail
           scripts/deploy/verify-external-frontend.sh \
             https://gidis-hsc-dev.inf.pucp.edu.pe \
             "${TARGET_SHA}" \
+            "${TARGET_DIGEST}" \
             "${REDEPLOY_EXPECTED_NODE_ID}" \
             DEV
 
@@ -234,11 +236,13 @@ jobs:
 
       - name: Verify QLTY externally
         env:
+          TARGET_DIGEST: ${{ needs.resolve.outputs.digest }}
           TARGET_SHA: ${{ needs.resolve.outputs.sha }}
         run: |
           set -euo pipefail
           scripts/deploy/verify-external-frontend.sh \
             https://gidis-hsc-qlty.inf.pucp.edu.pe \
             "${TARGET_SHA}" \
+            "${TARGET_DIGEST}" \
             "${REDEPLOY_EXPECTED_NODE_ID}" \
             QLTY

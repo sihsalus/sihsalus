@@ -49,6 +49,7 @@ services:
         SPA_DEFAULT_LOCALE: es
         STRIP_SOURCE_MAPS: ${STRIP_SOURCE_MAPS:-true}
         SIHSALUS_NODE_ID: ${SIHSALUS_NODE_ID:-unconfigured}
+        SIHSALUS_FRONTEND_SOURCE_DIGEST: ${FRONTEND_SOURCE_DIGEST:-unconfigured}
     restart: "unless-stopped"
     healthcheck:
       # El shell actual externaliza initializeSpa para cumplir CSP. El fallback

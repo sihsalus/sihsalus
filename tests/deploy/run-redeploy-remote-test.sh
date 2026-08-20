@@ -122,8 +122,12 @@ exec "$@"
 FAKE_SSH
 
 cat >"$FAKE_BIN/setsid" <<'FAKE_SETSID'
-#!/usr/bin/env bash
-exec "$@"
+#!/usr/bin/env python3
+import os
+import sys
+
+os.setsid()
+os.execvp(sys.argv[1], sys.argv[1:])
 FAKE_SETSID
 
 cat >"$FAKE_BIN/flock" <<'FAKE_FLOCK'
@@ -151,7 +155,43 @@ echo "fixture failed as requested"
 exit 42
 FAILURE_SCRIPT
 
-chmod 700 "$SUCCESS_FIXTURE" "$FAILURE_FIXTURE"
+TRANSACTION_FIXTURE="$TEMP_ROOT/transaction.sh"
+cat >"$TRANSACTION_FIXTURE" <<'TRANSACTION_SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+[ "${FRONTEND_EXTERNAL_BASE_URL:-}" = 'https://prod.example.test' ]
+[ "${FRONTEND_EXTERNAL_ENVIRONMENT_LABEL:-}" = 'PROD' ]
+[ "${FRONTEND_CURRENT_SHA:-}" = '2222222222222222222222222222222222222222' ]
+[ "${FRONTEND_CURRENT_DIGEST:-}" = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' ]
+[ "${EXTERNAL_VERIFY_TLS_INSECURE:-}" = true ]
+[ "${EXTERNAL_VERIFY_TLS_PINNED_PUBLIC_KEY:-}" = 'sha256//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' ]
+[ -z "${EXTERNAL_VERIFY_TLS_CA_CERT_PATH:-}" ]
+[ "${EXTERNAL_VERIFY_SAMPLE_COUNT:-}" = 12 ]
+[ "${EXTERNAL_VERIFY_SAMPLE_INTERVAL_SECONDS:-}" = 5 ]
+[ "${EXTERNAL_VERIFY_CURL_TIMEOUT_SECONDS:-}" = 3 ]
+[ -z "${DEPLOY_FRONTEND_EXTERNAL_VERIFIER_PATH:-}" ]
+[ -x "$(dirname "$0")/verify-external-frontend.sh" ]
+echo 'transaction fixture completed'
+TRANSACTION_SCRIPT
+
+DUMMY_VERIFIER="$TEMP_ROOT/verify-external-frontend.sh"
+cat >"$DUMMY_VERIFIER" <<'VERIFIER_SCRIPT'
+#!/usr/bin/env bash
+exit 0
+VERIFIER_SCRIPT
+
+CANCELLATION_FIXTURE="$TEMP_ROOT/cancellation.sh"
+cat >"$CANCELLATION_FIXTURE" <<'CANCELLATION_SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "fixture canceled"; exit 143' TERM HUP
+echo 'cancellation fixture started'
+while true; do
+  sleep 1
+done
+CANCELLATION_SCRIPT
+
+chmod 700 "$SUCCESS_FIXTURE" "$FAILURE_FIXTURE" "$TRANSACTION_FIXTURE" "$DUMMY_VERIFIER" "$CANCELLATION_FIXTURE"
 
 BACKEND_SHA="1111111111111111111111111111111111111111"
 BACKEND_DIGEST="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -216,6 +256,141 @@ grep -Fq 'detached run completed successfully' "$SUCCESS_OUTPUT"
 [ -x "$REMOTE_REPOSITORY/.redeploy-runs/success-run/check-clean-checkout.sh" ]
 cmp "$ROOT/scripts/deploy/check-clean-checkout.sh" \
   "$REMOTE_REPOSITORY/.redeploy-runs/success-run/check-clean-checkout.sh"
+
+TRANSACTION_OUTPUT="$TEMP_ROOT/transaction-output.log"
+PATH="$FAKE_BIN:$PATH" \
+  SSH_BIN="$FAKE_BIN/ssh" \
+  REDEPLOY_SCRIPT_PATH="$TRANSACTION_FIXTURE" \
+  EXTERNAL_VERIFIER_PATH="$DUMMY_VERIFIER" \
+  REDEPLOY_POLL_INTERVAL_SECONDS=1 \
+  REDEPLOY_TIMEOUT_SECONDS=15 \
+  REDEPLOY_EXPECTED_REMOTE_MAC="$EXPECTED_REMOTE_MAC" \
+  REDEPLOY_EXPECTED_NODE_ID="$EXPECTED_NODE_ID" \
+  REDEPLOY_REMOTE_MAC_PATH="$REMOTE_MAC_PATH" \
+  REDEPLOY_FRONTEND_BASE_URL=https://prod.example.test \
+  REDEPLOY_FRONTEND_CURRENT_SHA=2222222222222222222222222222222222222222 \
+  REDEPLOY_FRONTEND_CURRENT_DIGEST=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+  REDEPLOY_FRONTEND_ENVIRONMENT_LABEL=PROD \
+  REDEPLOY_FRONTEND_TLS_INSECURE=true \
+  REDEPLOY_FRONTEND_TLS_PINNED_PUBLIC_KEY=sha256//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= \
+  bash "$RUNNER" \
+  "$SSH_KEY" deploy@example.test "$REMOTE_REPOSITORY" \
+  "$BACKEND_SHA" "$BACKEND_DIGEST" transaction-run >"$TRANSACTION_OUTPUT" 2>&1
+
+grep -Fq 'transaction fixture completed' "$TRANSACTION_OUTPUT"
+[ "$(cat "$REMOTE_REPOSITORY/.redeploy-runs/transaction-run/status")" = 0 ]
+[ -x "$REMOTE_REPOSITORY/.redeploy-runs/transaction-run/verify-external-frontend.sh" ]
+if grep -Fq 'sha256//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' "$TRANSACTION_OUTPUT"; then
+  echo 'protected TLS pin leaked to deployment logs' >&2
+  exit 1
+fi
+
+UNPINNED_OUTPUT="$TEMP_ROOT/unpinned-output.log"
+set +e
+PATH="$FAKE_BIN:$PATH" \
+  SSH_BIN="$FAKE_BIN/ssh" \
+  REDEPLOY_SCRIPT_PATH="$TRANSACTION_FIXTURE" \
+  EXTERNAL_VERIFIER_PATH="$DUMMY_VERIFIER" \
+  REDEPLOY_EXPECTED_REMOTE_MAC="$EXPECTED_REMOTE_MAC" \
+  REDEPLOY_EXPECTED_NODE_ID="$EXPECTED_NODE_ID" \
+  REDEPLOY_REMOTE_MAC_PATH="$REMOTE_MAC_PATH" \
+  REDEPLOY_FRONTEND_BASE_URL=https://prod.example.test \
+  REDEPLOY_FRONTEND_CURRENT_SHA=2222222222222222222222222222222222222222 \
+  REDEPLOY_FRONTEND_CURRENT_DIGEST=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+  REDEPLOY_FRONTEND_TLS_INSECURE=true \
+  bash "$RUNNER" \
+  "$SSH_KEY" deploy@example.test "$REMOTE_REPOSITORY" \
+  "$BACKEND_SHA" "$BACKEND_DIGEST" unpinned-run >"$UNPINNED_OUTPUT" 2>&1
+unpinned_code="$?"
+set -e
+[ "$unpinned_code" -eq 2 ]
+grep -Fq 'insecure TLS requires a protected SPKI pin' "$UNPINNED_OUTPUT"
+[ ! -e "$REMOTE_REPOSITORY/.redeploy-runs/unpinned-run" ]
+
+CANCELLATION_OUTPUT="$TEMP_ROOT/cancellation-output.log"
+PATH="$FAKE_BIN:$PATH" \
+  SSH_BIN="$FAKE_BIN/ssh" \
+  REDEPLOY_SCRIPT_PATH="$CANCELLATION_FIXTURE" \
+  REDEPLOY_POLL_INTERVAL_SECONDS=1 \
+  REDEPLOY_TIMEOUT_SECONDS=30 \
+  REDEPLOY_EXPECTED_REMOTE_MAC="$EXPECTED_REMOTE_MAC" \
+  REDEPLOY_EXPECTED_NODE_ID="$EXPECTED_NODE_ID" \
+  REDEPLOY_REMOTE_MAC_PATH="$REMOTE_MAC_PATH" \
+  bash "$RUNNER" \
+  "$SSH_KEY" deploy@example.test "$REMOTE_REPOSITORY" \
+  "$BACKEND_SHA" "$BACKEND_DIGEST" cancellation-run >"$CANCELLATION_OUTPUT" 2>&1 &
+cancellation_monitor_pid="$!"
+
+cancellation_started=false
+for _ in $(seq 1 100); do
+  if [ -f "$REMOTE_REPOSITORY/.redeploy-runs/cancellation-run/redeploy.log" ] &&
+    grep -Fq 'cancellation fixture started' "$REMOTE_REPOSITORY/.redeploy-runs/cancellation-run/redeploy.log"; then
+    cancellation_started=true
+    break
+  fi
+  sleep 0.1
+done
+if [ "$cancellation_started" != true ]; then
+  echo 'remote cancellation fixture did not start' >&2
+  exit 1
+fi
+
+kill -TERM "$cancellation_monitor_pid"
+set +e
+wait "$cancellation_monitor_pid"
+cancellation_monitor_code="$?"
+set -e
+[ "$cancellation_monitor_code" -eq 143 ]
+
+cancellation_finished=false
+for _ in $(seq 1 100); do
+  if [ -f "$REMOTE_REPOSITORY/.redeploy-runs/cancellation-run/status" ]; then
+    cancellation_finished=true
+    break
+  fi
+  sleep 0.1
+done
+if [ "$cancellation_finished" != true ]; then
+  echo 'remote cancellation did not produce a terminal status' >&2
+  exit 1
+fi
+[ "$(cat "$REMOTE_REPOSITORY/.redeploy-runs/cancellation-run/status")" = 143 ]
+grep -Fq 'fixture canceled' "$REMOTE_REPOSITORY/.redeploy-runs/cancellation-run/redeploy.log"
+grep -Fq 'local monitor stopped; terminating the detached remote run' "$CANCELLATION_OUTPUT"
+
+TIMEOUT_OUTPUT="$TEMP_ROOT/timeout-output.log"
+set +e
+PATH="$FAKE_BIN:$PATH" \
+  SSH_BIN="$FAKE_BIN/ssh" \
+  REDEPLOY_SCRIPT_PATH="$CANCELLATION_FIXTURE" \
+  REDEPLOY_POLL_INTERVAL_SECONDS=1 \
+  REDEPLOY_TIMEOUT_SECONDS=2 \
+  REDEPLOY_EXPECTED_REMOTE_MAC="$EXPECTED_REMOTE_MAC" \
+  REDEPLOY_EXPECTED_NODE_ID="$EXPECTED_NODE_ID" \
+  REDEPLOY_REMOTE_MAC_PATH="$REMOTE_MAC_PATH" \
+  bash "$RUNNER" \
+  "$SSH_KEY" deploy@example.test "$REMOTE_REPOSITORY" \
+  "$BACKEND_SHA" "$BACKEND_DIGEST" timeout-run >"$TIMEOUT_OUTPUT" 2>&1
+timeout_code="$?"
+set -e
+[ "$timeout_code" -eq 124 ]
+grep -Fq 'remote run exceeded 2s' "$TIMEOUT_OUTPUT"
+grep -Fq 'local monitor stopped; terminating the detached remote run' "$TIMEOUT_OUTPUT"
+
+timeout_finished=false
+for _ in $(seq 1 100); do
+  if [ -f "$REMOTE_REPOSITORY/.redeploy-runs/timeout-run/status" ]; then
+    timeout_finished=true
+    break
+  fi
+  sleep 0.1
+done
+if [ "$timeout_finished" != true ]; then
+  echo 'timed-out remote run did not produce a terminal status' >&2
+  exit 1
+fi
+[ "$(cat "$REMOTE_REPOSITORY/.redeploy-runs/timeout-run/status")" = 143 ]
+grep -Fq 'fixture canceled' "$REMOTE_REPOSITORY/.redeploy-runs/timeout-run/redeploy.log"
 
 FAILURE_OUTPUT="$TEMP_ROOT/failure-output.log"
 set +e

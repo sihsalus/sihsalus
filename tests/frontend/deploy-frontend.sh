@@ -58,6 +58,7 @@ make_fixture() {
   touch "$fixture/docker-compose.yml"
   cat >"$fixture/.env" <<EOF
 FRONTEND_SOURCE_IMAGE=${SOURCE_REPOSITORY}@${OLD_DIGEST}
+FRONTEND_SOURCE_DIGEST=${OLD_DIGEST}
 FRONTEND_SOURCE_TAG=sha-${OLD_SHA}
 FRONTEND_RUNTIME_TAG=sha-${OLD_SHA}
 SIHSALUS_NODE_ID=${OLD_NODE_ID}
@@ -67,6 +68,7 @@ EOF
   printf '%s\n' "healthy" >"$fixture/state/health"
   printf '%s\n' "sihsalus-frontend-runtime:sha-${OLD_SHA}" >"$fixture/state/image"
   printf '%s\n' "$OLD_NODE_ID" >"$fixture/state/node_id"
+  printf '%s\n' "$OLD_DIGEST" >"$fixture/state/source_digest"
   printf '%s\n' "$OLD_SOURCE_ID" "$TARGET_SOURCE_ID" "$STALE_SOURCE_ID" >"$fixture/state/source_image_ids"
   printf '%s\n' "$OLD_RUNTIME_ID" "$TARGET_RUNTIME_ID" "$STALE_RUNTIME_ID" >"$fixture/state/runtime_image_ids"
 
@@ -84,13 +86,22 @@ EOF
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'docker %s\n' "$*" >>"${FAKE_STATE_DIR}/commands"
+if [ -n "${FAKE_EVENT_LOG:-}" ]; then
+  printf 'docker %s\n' "$*" >>"${FAKE_EVENT_LOG}"
+fi
 
 case "${1:-}" in
   image)
     case "${2:-}" in
       inspect)
         if [[ "$*" == *'org.opencontainers.image.revision'* ]]; then
-          cat "${FAKE_STATE_DIR}/source_sha"
+          if [ -n "${FAKE_OLD_SOURCE_IMAGE:-}" ] && [ "${3:-}" = "${FAKE_OLD_SOURCE_IMAGE}" ]; then
+            printf '%s\n' "${FAKE_OLD_SHA:-}"
+          else
+            cat "${FAKE_STATE_DIR}/source_sha"
+          fi
+        elif [[ "$*" == *'.RepoDigests'* ]]; then
+          printf '%s\n' "${3:-}"
         elif [[ "$*" == *'{{.Id}}'* ]]; then
           case "${3:-}" in
             "${FAKE_TARGET_SOURCE_IMAGE}")
@@ -140,6 +151,8 @@ case "${1:-}" in
   inspect)
     if [[ "$*" == *'org.sihsalus.node-id'* ]]; then
       cat "${FAKE_STATE_DIR}/node_id"
+    elif [[ "$*" == *'org.sihsalus.frontend.source-digest'* ]]; then
+      cat "${FAKE_STATE_DIR}/source_digest"
     elif [[ "$*" == *'.Config.Image'* ]]; then
       cat "${FAKE_STATE_DIR}/image"
     else
@@ -171,6 +184,7 @@ case "${1:-}" in
         printf '%s\n' "healthy" >"${FAKE_STATE_DIR}/health"
         printf '%s\n' "sihsalus-frontend-runtime:${runtime_tag}" >"${FAKE_STATE_DIR}/image"
         awk -F= '$1 == "SIHSALUS_NODE_ID" { print $2 }' .env >"${FAKE_STATE_DIR}/node_id"
+        awk -F= '$1 == "FRONTEND_SOURCE_DIGEST" { print $2 }' .env >"${FAKE_STATE_DIR}/source_digest"
         ;;
       *)
         echo "unexpected docker compose command: $*" >&2
@@ -197,12 +211,97 @@ run_deploy() {
       FAKE_TARGET_RUNTIME_TAG="$TARGET_RUNTIME_TAG" \
       FAKE_TARGET_RUNTIME_IMAGE="$TARGET_RUNTIME_IMAGE" \
       FAKE_TARGET_SOURCE_IMAGE="$TARGET_SOURCE_IMAGE" \
+      FAKE_OLD_SOURCE_IMAGE="${SOURCE_REPOSITORY}@${OLD_DIGEST}" \
+      FAKE_OLD_SHA="$OLD_SHA" \
       FAKE_TARGET_RUNTIME_ID="$TARGET_RUNTIME_ID" \
       FAKE_TARGET_SOURCE_ID="$TARGET_SOURCE_ID" \
       FAKE_SOURCE_REPOSITORY="$SOURCE_REPOSITORY" \
       FAKE_TARGET_SHA="$TARGET_SHA" \
       FAKE_BAD_SHA="$BAD_SHA" \
       SIHSALUS_NODE_ID="$NODE_ID" \
+      "$ROOT/scripts/deploy/deploy-frontend.sh" "$TARGET_SHA" "$TARGET_DIGEST"
+  )
+}
+
+make_external_verifier() {
+  local verifier="$1"
+
+  cat >"$verifier" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+base_url="$1"
+sha="$2"
+digest="$3"
+node_id="$4"
+label="$5"
+printf 'verify %s %s %s %s %s\n' "$base_url" "$sha" "$digest" "$node_id" "$label" >>"$FAKE_EVENT_LOG"
+
+if [ "$sha" = "$FAKE_OLD_SHA" ]; then
+  old_count=0
+  if [ -f "$FAKE_STATE_DIR/old-verifications" ]; then
+    old_count="$(cat "$FAKE_STATE_DIR/old-verifications")"
+  fi
+  old_count=$((old_count + 1))
+  printf '%s\n' "$old_count" >"$FAKE_STATE_DIR/old-verifications"
+  if [ "${FAKE_OLD_VERIFY_MODE:-success}" = missing-digest ]; then
+    exit 3
+  fi
+  if [ "${FAKE_OLD_VERIFY_MODE:-success}" = fail-on-rollback ] && [ "$old_count" -ge 2 ]; then
+    exit 42
+  fi
+  exit 0
+fi
+
+case "${FAKE_TARGET_VERIFY_MODE:-success}" in
+  success)
+    exit 0
+    ;;
+  failure)
+    exit 41
+    ;;
+  cancel)
+    kill -TERM "$PPID"
+    sleep 1
+    exit 143
+    ;;
+  *)
+    exit 99
+    ;;
+esac
+EOF
+  chmod 700 "$verifier"
+}
+
+run_transactional_deploy() {
+  local fixture="$1"
+  local verifier="$2"
+  local target_verify_mode="${3:-success}"
+  local old_verify_mode="${4:-success}"
+
+  (
+    cd "$fixture"
+    PATH="$fixture/bin:$PATH" \
+      DEPLOY_FRONTEND_EXTERNAL_VERIFIER_PATH="$verifier" \
+      FAKE_EVENT_LOG="$fixture/state/events" \
+      FAKE_STATE_DIR="$fixture/state" \
+      FAKE_TARGET_RUNTIME_TAG="$TARGET_RUNTIME_TAG" \
+      FAKE_TARGET_RUNTIME_IMAGE="$TARGET_RUNTIME_IMAGE" \
+      FAKE_TARGET_SOURCE_IMAGE="$TARGET_SOURCE_IMAGE" \
+      FAKE_OLD_SOURCE_IMAGE="${SOURCE_REPOSITORY}@${OLD_DIGEST}" \
+      FAKE_OLD_SHA="$OLD_SHA" \
+      FAKE_OLD_VERIFY_MODE="$old_verify_mode" \
+      FAKE_TARGET_VERIFY_MODE="$target_verify_mode" \
+      FAKE_TARGET_RUNTIME_ID="$TARGET_RUNTIME_ID" \
+      FAKE_TARGET_SOURCE_ID="$TARGET_SOURCE_ID" \
+      FAKE_SOURCE_REPOSITORY="$SOURCE_REPOSITORY" \
+      FAKE_TARGET_SHA="$TARGET_SHA" \
+      FAKE_BAD_SHA="$BAD_SHA" \
+      FRONTEND_EXTERNAL_BASE_URL=https://prod.example.test \
+      FRONTEND_EXTERNAL_ENVIRONMENT_LABEL=PROD \
+      FRONTEND_CURRENT_SHA="$OLD_SHA" \
+      FRONTEND_CURRENT_DIGEST="$OLD_DIGEST" \
+      SIHSALUS_NODE_ID="$OLD_NODE_ID" \
       "$ROOT/scripts/deploy/deploy-frontend.sh" "$TARGET_SHA" "$TARGET_DIGEST"
   )
 }
@@ -338,6 +437,7 @@ rm -f "$noop_fixture/.env.bak"
 printf '%s\n' "$TARGET_SHA" >"$noop_fixture/state/deployed_sha"
 printf '%s\n' "sihsalus-frontend-runtime:${TARGET_RUNTIME_TAG}" >"$noop_fixture/state/image"
 printf '%s\n' "$NODE_ID" >"$noop_fixture/state/node_id"
+printf '%s\n' "$TARGET_DIGEST" >"$noop_fixture/state/source_digest"
 run_deploy "$noop_fixture"
 if grep -Eq 'docker (pull|compose build|compose up)' "$noop_fixture/state/commands"; then
   echo "idempotent deployment unexpectedly changed the frontend" >&2
@@ -351,6 +451,9 @@ run_deploy "$success_fixture"
 assert_value "$TARGET_SOURCE_IMAGE" \
   "$(awk -F= '$1 == "FRONTEND_SOURCE_IMAGE" { print $2 }' "$success_fixture/.env")" \
   "source image digest was not pinned"
+assert_value "$TARGET_DIGEST" \
+  "$(awk -F= '$1 == "FRONTEND_SOURCE_DIGEST" { print $2 }' "$success_fixture/.env")" \
+  "source digest build identity was not persisted"
 assert_value "sha-${TARGET_SHA}" \
   "$(awk -F= '$1 == "FRONTEND_SOURCE_TAG" { print $2 }' "$success_fixture/.env")" \
   "source tag was not updated"
@@ -479,9 +582,74 @@ assert_value "2" \
   "verification rollback did not recreate only the new and previous frontend"
 assert_frontend_only_mutations "$verification_fixture/state/commands"
 
+transaction_verifier="$TEST_ROOT/transaction-verifier.sh"
+make_external_verifier "$transaction_verifier"
+
+bootstrap_fixture="$TEST_ROOT/transaction-bootstrap"
+make_fixture "$bootstrap_fixture"
+bootstrap_output="$(run_transactional_deploy "$bootstrap_fixture" "$transaction_verifier" success missing-digest 2>&1)"
+grep -Fq "exact remote bootstrap evidence matches SHA ${OLD_SHA}, digest ${OLD_DIGEST}, and node ${OLD_NODE_ID}" \
+  <<<"$bootstrap_output"
+
+transaction_success_fixture="$TEST_ROOT/transaction-success"
+make_fixture "$transaction_success_fixture"
+run_transactional_deploy "$transaction_success_fixture" "$transaction_verifier"
+target_verify_line="$(grep -n "^verify .* ${TARGET_SHA} ${TARGET_DIGEST} " "$transaction_success_fixture/state/events" | head -n 1 | cut -d: -f1)"
+first_prune_line="$(grep -n '^docker image rm ' "$transaction_success_fixture/state/events" | head -n 1 | cut -d: -f1)"
+if [ -z "$target_verify_line" ] || [ -z "$first_prune_line" ] ||
+  [ "$target_verify_line" -ge "$first_prune_line" ]; then
+  echo 'frontend images were not retained through exact public verification' >&2
+  exit 1
+fi
+
+transaction_failure_fixture="$TEST_ROOT/transaction-verification-failure"
+make_fixture "$transaction_failure_fixture"
+if run_transactional_deploy "$transaction_failure_fixture" "$transaction_verifier" failure; then
+  echo 'transaction accepted a failed exact public verification' >&2
+  exit 1
+fi
+assert_value "$OLD_SHA" \
+  "$(cat "$transaction_failure_fixture/state/deployed_sha")" \
+  'transaction did not restore the previous frontend after public verification failure'
+[ "$(cat "$transaction_failure_fixture/state/old-verifications")" -eq 2 ]
+if grep -q '^docker image rm ' "$transaction_failure_fixture/state/commands"; then
+  echo 'failed transaction pruned rollback images before verification completed' >&2
+  exit 1
+fi
+
+rollback_verification_fixture="$TEST_ROOT/transaction-rollback-verification-failure"
+make_fixture "$rollback_verification_fixture"
+set +e
+rollback_verification_output="$(run_transactional_deploy "$rollback_verification_fixture" "$transaction_verifier" failure fail-on-rollback 2>&1)"
+rollback_verification_code="$?"
+set -e
+[ "$rollback_verification_code" -eq 41 ]
+grep -Fq 'rollback verification failed; immediate operator intervention is required' <<<"$rollback_verification_output"
+if grep -q '^docker image rm ' "$rollback_verification_fixture/state/commands"; then
+  echo 'failed rollback verification pruned retained recovery images' >&2
+  exit 1
+fi
+
+transaction_cancel_fixture="$TEST_ROOT/transaction-cancellation"
+make_fixture "$transaction_cancel_fixture"
+set +e
+run_transactional_deploy "$transaction_cancel_fixture" "$transaction_verifier" cancel
+transaction_cancel_code="$?"
+set -e
+[ "$transaction_cancel_code" -eq 143 ]
+assert_value "$OLD_SHA" \
+  "$(cat "$transaction_cancel_fixture/state/deployed_sha")" \
+  'canceled transaction did not restore the previous frontend'
+[ "$(cat "$transaction_cancel_fixture/state/old-verifications")" -eq 2 ]
+if grep -q '^docker image rm ' "$transaction_cancel_fixture/state/commands"; then
+  echo 'canceled transaction pruned rollback images' >&2
+  exit 1
+fi
+
 rendered_frontend="$(
   cd "$ROOT"
   FRONTEND_SOURCE_IMAGE="$TARGET_SOURCE_IMAGE" \
+    FRONTEND_SOURCE_DIGEST="$TARGET_DIGEST" \
     FRONTEND_RUNTIME_TAG="$TARGET_RUNTIME_TAG" \
     SIHSALUS_NODE_ID="$NODE_ID" \
     docker compose config --format json
@@ -489,6 +657,9 @@ rendered_frontend="$(
 assert_value "$TARGET_SOURCE_IMAGE" \
   "$(jq -r '.services.frontend.build.args.FRONTEND_SOURCE_IMAGE' <<<"$rendered_frontend")" \
   "Compose did not pass the immutable digest to the frontend build"
+assert_value "$TARGET_DIGEST" \
+  "$(jq -r '.services.frontend.build.args.SIHSALUS_FRONTEND_SOURCE_DIGEST' <<<"$rendered_frontend")" \
+  "Compose did not bind the source digest into the runtime wrapper"
 assert_value "sihsalus-frontend-runtime:${TARGET_RUNTIME_TAG}" \
   "$(jq -r '.services.frontend.image' <<<"$rendered_frontend")" \
   "Compose did not assign the digest-derived runtime tag"
@@ -497,6 +668,9 @@ assert_value "$NODE_ID" \
   "Compose did not pass the node identity to the frontend build"
 grep -Fq 'X-SIHSALUS-Node-ID "__SIHSALUS_NODE_ID__"' "$ROOT/frontend/nginx.conf"
 grep -Fq 'LABEL org.sihsalus.node-id="${SIHSALUS_NODE_ID}"' "$ROOT/frontend/Dockerfile"
+grep -Fq 'org.sihsalus.frontend.source-digest="${SIHSALUS_FRONTEND_SOURCE_DIGEST}"' "$ROOT/frontend/Dockerfile"
+grep -Fq '${FRONTEND_SOURCE_IMAGE%@*}@${SIHSALUS_FRONTEND_SOURCE_DIGEST}' "$ROOT/frontend/Dockerfile"
+grep -Fq 'X-SIHSALUS-Frontend-Digest "__SIHSALUS_FRONTEND_SOURCE_DIGEST__"' "$ROOT/frontend/nginx.conf"
 
 low_disk_fixture="$TEST_ROOT/low-disk"
 make_fixture "$low_disk_fixture"

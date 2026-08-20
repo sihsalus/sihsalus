@@ -150,12 +150,14 @@ jobs:
       - name: Require the promotion candidate to be live in QLTY
         if: inputs.operation == 'promote'
         env:
+          TARGET_DIGEST: ${{ steps.release.outputs.digest }}
           TARGET_SHA: ${{ steps.release.outputs.sha }}
         run: |
           set -euo pipefail
           scripts/deploy/verify-external-frontend.sh \
             https://gidis-hsc-qlty.inf.pucp.edu.pe \
             "${TARGET_SHA}" \
+            "${TARGET_DIGEST}" \
             0cefb0c8-c860-48c5-856f-408594775cbb \
             QLTY
 
@@ -163,13 +165,14 @@ jobs:
     name: ${{ needs.qualify.outputs.operation == 'rollback' && 'Roll back PROD frontend' || 'Promote PROD frontend' }}
     needs: qualify
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     environment:
       name: production
     env:
       PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
       PRODUCTION_REMOTE_REPOSITORY: ${{ vars.PRODUCTION_REMOTE_REPOSITORY }}
       PRODUCTION_SSH_TARGET: ${{ vars.PRODUCTION_SSH_TARGET }}
+      PRODUCTION_TLS_MODE: ${{ vars.PRODUCTION_TLS_MODE }}
       REDEPLOY_EXPECTED_NODE_ID: ${{ vars.PRODUCTION_EXPECTED_NODE_ID }}
       REDEPLOY_EXPECTED_REMOTE_MAC: ${{ vars.PRODUCTION_EXPECTED_REMOTE_MAC }}
     steps:
@@ -179,6 +182,7 @@ jobs:
         env:
           DEPLOY_KEY: ${{ secrets.SSH_PRIVATE_KEY_PROD }}
           KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS_PROD }}
+          TLS_SPKI_PIN: ${{ secrets.PRODUCTION_TLS_SPKI_PIN }}
         run: |
           set -euo pipefail
 
@@ -189,6 +193,7 @@ jobs:
             PRODUCTION_BASE_URL \
             PRODUCTION_REMOTE_REPOSITORY \
             PRODUCTION_SSH_TARGET \
+            PRODUCTION_TLS_MODE \
             REDEPLOY_EXPECTED_NODE_ID \
             REDEPLOY_EXPECTED_REMOTE_MAC; do
             if [[ -z "${!name:-}" ]]; then
@@ -221,6 +226,21 @@ jobs:
             exit 2
           fi
 
+          case "${PRODUCTION_TLS_MODE}" in
+            system-ca)
+              ;;
+            pinned-spki)
+              if [[ ! "${TLS_SPKI_PIN}" =~ ^sha256//[A-Za-z0-9+/]{43}=$ ]]; then
+                echo '::error::PRODUCTION_TLS_SPKI_PIN must contain one protected sha256// SPKI pin in pinned-spki mode.'
+                exit 2
+              fi
+              ;;
+            *)
+              echo '::error::PRODUCTION_TLS_MODE must be system-ca or pinned-spki.'
+              exit 2
+              ;;
+          esac
+
           bash -n scripts/deploy/deploy-frontend.sh
           bash -n scripts/deploy/run-redeploy-remote.sh
           bash -n scripts/deploy/verify-external-frontend.sh
@@ -237,26 +257,31 @@ jobs:
           chmod 600 "${HOME}/.ssh/deploy_key" "${HOME}/.ssh/known_hosts"
           ssh-keygen -y -f "${HOME}/.ssh/deploy_key" >/dev/null
 
-      - name: Verify declared current production release
+      - name: Deploy and verify exact frontend release transactionally
         env:
+          CURRENT_DIGEST: ${{ needs.qualify.outputs.current_digest }}
           CURRENT_SHA: ${{ needs.qualify.outputs.current_sha }}
-        run: |
-          set -euo pipefail
-          scripts/deploy/verify-external-frontend.sh \
-            "${PRODUCTION_BASE_URL}" \
-            "${CURRENT_SHA}" \
-            "${REDEPLOY_EXPECTED_NODE_ID}" \
-            PROD-PREFLIGHT
-
-      - name: Deploy exact frontend release
-        id: deploy
-        env:
           TARGET_DIGEST: ${{ needs.qualify.outputs.digest }}
           TARGET_SHA: ${{ needs.qualify.outputs.sha }}
+          TLS_SPKI_PIN: ${{ secrets.PRODUCTION_TLS_SPKI_PIN }}
         run: |
           set -euo pipefail
+
+          tls_insecure=false
+          tls_pin=''
+          if [[ "${PRODUCTION_TLS_MODE}" == 'pinned-spki' ]]; then
+            tls_insecure=true
+            tls_pin="${TLS_SPKI_PIN}"
+          fi
+
           REDEPLOY_SCRIPT_PATH=scripts/deploy/deploy-frontend.sh \
-            REDEPLOY_TIMEOUT_SECONDS=1200 \
+            REDEPLOY_TIMEOUT_SECONDS=3000 \
+            REDEPLOY_FRONTEND_BASE_URL="${PRODUCTION_BASE_URL}" \
+            REDEPLOY_FRONTEND_CURRENT_SHA="${CURRENT_SHA}" \
+            REDEPLOY_FRONTEND_CURRENT_DIGEST="${CURRENT_DIGEST}" \
+            REDEPLOY_FRONTEND_ENVIRONMENT_LABEL=PROD \
+            REDEPLOY_FRONTEND_TLS_INSECURE="${tls_insecure}" \
+            REDEPLOY_FRONTEND_TLS_PINNED_PUBLIC_KEY="${tls_pin}" \
             scripts/deploy/run-redeploy-remote.sh \
             "${HOME}/.ssh/deploy_key" \
             "${PRODUCTION_SSH_TARGET}" \
@@ -264,54 +289,6 @@ jobs:
             "${TARGET_SHA}" \
             "${TARGET_DIGEST}" \
             "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-frontend-production"
-
-      - name: Verify production externally
-        id: target-verify
-        continue-on-error: true
-        env:
-          TARGET_SHA: ${{ needs.qualify.outputs.sha }}
-        run: |
-          set -euo pipefail
-          scripts/deploy/verify-external-frontend.sh \
-            "${PRODUCTION_BASE_URL}" \
-            "${TARGET_SHA}" \
-            "${REDEPLOY_EXPECTED_NODE_ID}" \
-            PROD
-
-      - name: Restore previous release after deployment or verification failure
-        if: always() && (steps.deploy.outcome == 'failure' || steps.target-verify.outcome == 'failure')
-        env:
-          CURRENT_DIGEST: ${{ needs.qualify.outputs.current_digest }}
-          CURRENT_SHA: ${{ needs.qualify.outputs.current_sha }}
-        run: |
-          set -euo pipefail
-          REDEPLOY_SCRIPT_PATH=scripts/deploy/deploy-frontend.sh \
-            REDEPLOY_TIMEOUT_SECONDS=1200 \
-            scripts/deploy/run-redeploy-remote.sh \
-            "${HOME}/.ssh/deploy_key" \
-            "${PRODUCTION_SSH_TARGET}" \
-            "${PRODUCTION_REMOTE_REPOSITORY}" \
-            "${CURRENT_SHA}" \
-            "${CURRENT_DIGEST}" \
-            "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-frontend-production-rollback"
-
-      - name: Verify restored production release
-        if: always() && (steps.deploy.outcome == 'failure' || steps.target-verify.outcome == 'failure')
-        env:
-          CURRENT_SHA: ${{ needs.qualify.outputs.current_sha }}
-        run: |
-          set -euo pipefail
-          scripts/deploy/verify-external-frontend.sh \
-            "${PRODUCTION_BASE_URL}" \
-            "${CURRENT_SHA}" \
-            "${REDEPLOY_EXPECTED_NODE_ID}" \
-            PROD-ROLLBACK
-
-      - name: Fail the operation after automatic rollback
-        if: always() && (steps.deploy.outcome == 'failure' || steps.target-verify.outcome == 'failure')
-        run: |
-          echo '::error::The target deployment or external verification failed; the automatic rollback path was invoked. Review the restoration verification above.'
-          exit 1
 
       - name: Record immutable deployment evidence
         env:
@@ -322,9 +299,9 @@ jobs:
           {
             echo '## Production frontend evidence'
             echo ''
-            echo "- Operation: ${TARGET_OPERATION}"
-            echo "- Source SHA: ${TARGET_SHA}"
-            echo "- Source digest: ${TARGET_DIGEST}"
+            printf '%s\n' "- Operation: ${TARGET_OPERATION}"
+            printf '%s\n' "- Source SHA: ${TARGET_SHA}"
+            printf '%s\n' "- Source digest: ${TARGET_DIGEST}"
             echo "- Environment: production"
             echo "- External verification: passed"
           } >>"${GITHUB_STEP_SUMMARY}"

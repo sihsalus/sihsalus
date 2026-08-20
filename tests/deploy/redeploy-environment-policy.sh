@@ -47,6 +47,8 @@ grep -Fq 'BACKEND_SOURCE_REVISION' "$SCRIPT"
 grep -Fq 'write_env_value BACKEND_TAG "$TARGET_BACKEND_REFERENCE"' "$SCRIPT"
 grep -Fq 'FRONTEND_NODE_ID=' "$SCRIPT"
 grep -Fq 'frontend wrapper does not contain the expected node identity' "$SCRIPT"
+grep -Fq 'frontend wrapper does not contain the expected source digest' "$SCRIPT"
+grep -Fq 'FRONTEND_SOURCE_IMAGE must already pin the frontend source by digest' "$SCRIPT"
 grep -Fq 'mktemp ./.env.redeploy.XXXXXX' "$SCRIPT"
 grep -Fq 'chmod --reference=.env "$temporary_file"' "$SCRIPT"
 grep -Fq 'mv -f "$temporary_file" .env' "$SCRIPT"
@@ -66,7 +68,13 @@ grep -Fq 'backend_digest:' "$WORKFLOW"
 [ "$(grep -Fc '0cefb0c8-c860-48c5-856f-408594775cbb' "$WORKFLOW")" -eq 1 ]
 [ "$(grep -Fc 'scripts/deploy/verify-external-frontend.sh' "$WORKFLOW")" -eq 2 ]
 [ "$(grep -Fc 'frontend_sha=${frontend_sha}' "$WORKFLOW")" -eq 2 ]
+[ "$(grep -Fc 'frontend_digest=${frontend_digest}' "$WORKFLOW")" -eq 2 ]
 grep -Fq 'TARGET_SHA: ${{ steps.redeploy.outputs.frontend_sha }}' "$WORKFLOW"
+grep -Fq 'TARGET_DIGEST: ${{ steps.redeploy.outputs.frontend_digest }}' "$WORKFLOW"
+if grep -Fq 'curl --insecure' "$WORKFLOW"; then
+  echo '[FAIL] non-production external evidence bypasses TLS authentication' >&2
+  exit 1
+fi
 grep -Fq 'nohup setsid bash -c' "$REMOTE_RUNNER"
 grep -Fq 'tail -n "+${next_log_line}"' "$REMOTE_RUNNER"
 grep -Fq 'kill -TERM -- "-${remote_pid}"' "$REMOTE_RUNNER"

@@ -84,24 +84,35 @@ jobs:
               "${redeploy_output}" |
               tail -n 1
           )"
+          frontend_digest="$(
+            sed -n 's/^\[redeploy-environment\] frontend_digest=\(sha256:[0-9a-f]\{64\}\)$/\1/p' \
+              "${redeploy_output}" |
+              tail -n 1
+          )"
           if [[ ! "${frontend_sha}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::The redeploy did not report a valid frontend SHA."
             exit 1
           fi
+          if [[ ! "${frontend_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::The redeploy did not report a valid frontend digest."
+            exit 1
+          fi
           echo "frontend_sha=${frontend_sha}" >>"${GITHUB_OUTPUT}"
+          echo "frontend_digest=${frontend_digest}" >>"${GITHUB_OUTPUT}"
 
       - name: Verify DEV externally
         env:
+          TARGET_DIGEST: ${{ steps.redeploy.outputs.frontend_digest }}
           TARGET_SHA: ${{ steps.redeploy.outputs.frontend_sha }}
         run: |
           set -euo pipefail
           base='https://gidis-hsc-dev.inf.pucp.edu.pe'
           scripts/deploy/verify-external-frontend.sh \
-            "${base}" "${TARGET_SHA}" "${REDEPLOY_EXPECTED_NODE_ID}" DEV
-          curl --insecure --fail --silent --show-error \
+            "${base}" "${TARGET_SHA}" "${TARGET_DIGEST}" "${REDEPLOY_EXPECTED_NODE_ID}" DEV
+          curl --fail --silent --show-error \
             "${base}/openmrs/spa/sihsalus-spa-bootstrap.js" |
             grep -q 'initializeSpa'
-          csp="$(curl --insecure --fail --silent --show-error --head "${base}/openmrs/spa/" |
+          csp="$(curl --fail --silent --show-error --head "${base}/openmrs/spa/" |
             awk 'BEGIN { IGNORECASE=1 } /^content-security-policy:/ { sub(/\r$/, ""); print; exit }')"
           grep -Fq "script-src 'self';" <<<"${csp}"
           if grep -Fq "script-src 'self' 'unsafe-inline'" <<<"${csp}"; then
@@ -169,24 +180,35 @@ jobs:
               "${redeploy_output}" |
               tail -n 1
           )"
+          frontend_digest="$(
+            sed -n 's/^\[redeploy-environment\] frontend_digest=\(sha256:[0-9a-f]\{64\}\)$/\1/p' \
+              "${redeploy_output}" |
+              tail -n 1
+          )"
           if [[ ! "${frontend_sha}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::The redeploy did not report a valid frontend SHA."
             exit 1
           fi
+          if [[ ! "${frontend_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::The redeploy did not report a valid frontend digest."
+            exit 1
+          fi
           echo "frontend_sha=${frontend_sha}" >>"${GITHUB_OUTPUT}"
+          echo "frontend_digest=${frontend_digest}" >>"${GITHUB_OUTPUT}"
 
       - name: Verify QLTY externally
         env:
+          TARGET_DIGEST: ${{ steps.redeploy.outputs.frontend_digest }}
           TARGET_SHA: ${{ steps.redeploy.outputs.frontend_sha }}
         run: |
           set -euo pipefail
           base='https://gidis-hsc-qlty.inf.pucp.edu.pe'
           scripts/deploy/verify-external-frontend.sh \
-            "${base}" "${TARGET_SHA}" "${REDEPLOY_EXPECTED_NODE_ID}" QLTY
-          curl --insecure --fail --silent --show-error \
+            "${base}" "${TARGET_SHA}" "${TARGET_DIGEST}" "${REDEPLOY_EXPECTED_NODE_ID}" QLTY
+          curl --fail --silent --show-error \
             "${base}/openmrs/spa/sihsalus-spa-bootstrap.js" |
             grep -q 'initializeSpa'
-          csp="$(curl --insecure --fail --silent --show-error --head "${base}/openmrs/spa/" |
+          csp="$(curl --fail --silent --show-error --head "${base}/openmrs/spa/" |
             awk 'BEGIN { IGNORECASE=1 } /^content-security-policy:/ { sub(/\r$/, ""); print; exit }')"
           grep -Fq "script-src 'self';" <<<"${csp}"
           if grep -Fq "script-src 'self' 'unsafe-inline'" <<<"${csp}"; then

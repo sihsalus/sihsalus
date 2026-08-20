@@ -27,7 +27,6 @@ grep -Fq 'sha256:[0-9a-f]{64}' "$WORKFLOW"
 grep -Fq 'org.opencontainers.image.revision' "$WORKFLOW"
 grep -Fq 'current_production_sha:' "$WORKFLOW"
 grep -Fq 'current_production_digest:' "$WORKFLOW"
-grep -Fq 'Verify declared current production release' "$WORKFLOW"
 grep -Fq 'A production promotion must use the currently promoted latest SHA and digest.' "$WORKFLOW"
 grep -Fq "if: inputs.operation == 'promote'" "$WORKFLOW"
 grep -Fq 'https://gidis-hsc-qlty.inf.pucp.edu.pe' "$WORKFLOW"
@@ -42,18 +41,32 @@ for variable in \
   PRODUCTION_EXPECTED_NODE_ID \
   PRODUCTION_EXPECTED_REMOTE_MAC \
   PRODUCTION_REMOTE_REPOSITORY \
-  PRODUCTION_SSH_TARGET; do
+  PRODUCTION_SSH_TARGET \
+  PRODUCTION_TLS_MODE; do
   grep -Fq "$variable" "$WORKFLOW"
 done
+grep -Fq '${{ secrets.PRODUCTION_TLS_SPKI_PIN }}' "$WORKFLOW"
+grep -Fq 'system-ca)' "$WORKFLOW"
+grep -Fq 'pinned-spki)' "$WORKFLOW"
+grep -Fq 'insecure TLS requires a protected SPKI pin' "$ROOT/scripts/deploy/run-redeploy-remote.sh"
 
-# Deployment must reuse the scoped, identity-bound frontend script and verify
-# the public endpoint. It must not mutate the full stack.
+# Deployment must reuse the scoped, identity-bound frontend script. Exact
+# public verification and rollback stay inside the same detached transaction,
+# so cancellation and the job budget cannot strand a successful-looking step.
 grep -Fq 'REDEPLOY_SCRIPT_PATH=scripts/deploy/deploy-frontend.sh' "$WORKFLOW"
+grep -Fq 'REDEPLOY_TIMEOUT_SECONDS=3000' "$WORKFLOW"
+grep -Fq 'timeout-minutes: 60' "$WORKFLOW"
+grep -Fq 'REDEPLOY_FRONTEND_CURRENT_SHA="${CURRENT_SHA}"' "$WORKFLOW"
+grep -Fq 'REDEPLOY_FRONTEND_CURRENT_DIGEST="${CURRENT_DIGEST}"' "$WORKFLOW"
+grep -Fq 'REDEPLOY_FRONTEND_BASE_URL="${PRODUCTION_BASE_URL}"' "$WORKFLOW"
+grep -Fq 'REDEPLOY_FRONTEND_TLS_PINNED_PUBLIC_KEY="${tls_pin}"' "$WORKFLOW"
 grep -Fq 'scripts/deploy/run-redeploy-remote.sh' "$WORKFLOW"
 grep -Fq 'scripts/deploy/verify-external-frontend.sh' "$WORKFLOW"
-grep -Fq 'Restore previous release after deployment or verification failure' "$WORKFLOW"
-grep -Fq "steps.deploy.outcome == 'failure' || steps.target-verify.outcome == 'failure'" "$WORKFLOW"
-grep -Fq 'PROD-ROLLBACK' "$WORKFLOW"
+grep -Fq 'Deploy and verify exact frontend release transactionally' "$WORKFLOW"
+if grep -Eq 'continue-on-error:|Restore previous release|target-verify|PROD-ROLLBACK' "$WORKFLOW"; then
+  echo 'production workflow still depends on a post-transaction rollback step' >&2
+  exit 1
+fi
 if grep -Eq 'docker compose (up|down|restart|pull)' "$WORKFLOW"; then
   echo 'production workflow bypasses the scoped deployment policy' >&2
   exit 1

@@ -22,6 +22,10 @@ following controls:
 - keep the environment secret `SSH_PRIVATE_KEY_PROD` scoped to a
   least-privilege account that can update this repository checkout and the
   frontend container only.
+- when `PRODUCTION_TLS_MODE` is `pinned-spki`, store exactly one
+  `sha256//...` curl-compatible pin in the environment secret
+  `PRODUCTION_TLS_SPKI_PIN`. Derive and verify it through an independent
+  infrastructure channel; never copy it from an unauthenticated connection.
 
 Configure these environment variables without putting their values in Git:
 
@@ -33,6 +37,14 @@ Configure these environment variables without putting their values in Git:
 | `PRODUCTION_BASE_URL`            | Public HTTPS origin without a path                    |
 | `PRODUCTION_EXPECTED_REMOTE_MAC` | Lowercase MAC of the intended production interface    |
 | `PRODUCTION_EXPECTED_NODE_ID`    | Stable lowercase UUID exposed as `X-SIHSALUS-Node-ID` |
+| `PRODUCTION_TLS_MODE`            | `system-ca` or `pinned-spki`                          |
+
+Use `system-ca` only when the production certificate chains to the runner and
+production host trust stores. Use `pinned-spki` for an approved private or
+self-signed endpoint: the verifier then combines `--insecure` with the
+protected SPKI pin, so certificate-chain verification is bypassed but server
+identity is still cryptographically authenticated. Unpinned insecure TLS is
+rejected by both the workflow and the remote runner.
 
 Before enabling the environment, verify the SSH host key and physical MAC from
 an independent infrastructure inventory. Generate a new production node UUID;
@@ -76,20 +88,34 @@ release, candidate not live in QLTY, or incorrect confirmation. The protected
 production job then:
 
 1. validates every environment value and the pinned SSH key;
-2. confirms the declared current SHA through repeated public requests;
+2. confirms the declared current SHA, source digest, and node through repeated
+   TLS-authenticated public requests;
 3. validates the remote MAC before every SSH operation;
 4. deploys the candidate by digest and recreates only `frontend`;
-5. verifies health, source revision, runtime image, and node identity locally;
-6. samples the public endpoint repeatedly and requires one SHA, one remote
-   address, and the expected node identity;
+5. verifies health, source revision, source digest, runtime image, and node
+   identity locally;
+6. samples the public endpoint repeatedly and requires one exact SHA, source
+   digest, remote address, and node identity;
 7. records the operation, SHA, digest, and successful external verification in
    the workflow summary.
 
-If local deployment fails, `deploy-frontend.sh` restores the prior container.
-If deployment or public verification fails, the workflow additionally
-re-deploys the supplied current SHA/digest, verifies it publicly, and fails the
-run. A failed rollback remains an incident even if the endpoint later appears
-healthy.
+The public target verification is part of the detached remote deployment
+transaction. The prior `.env`, runtime image, and source image remain retained
+until that verification succeeds. A deployment error, external mismatch,
+runner timeout, or workflow cancellation sends `TERM` to the remote process
+group; `deploy-frontend.sh` restores and verifies the supplied current release
+before the transaction exits. There is no later workflow step on which
+rollback depends. A failed rollback remains an incident even if the endpoint
+later appears healthy.
+
+The first promotion after this digest-header change has one narrow bootstrap
+path. If every otherwise valid public sample lacks only
+`X-SIHSALUS-Frontend-Digest`, the identity-bound remote process must prove the
+declared SHA and digest from the running container configuration and the local
+OCI source image. A missing image, different digest, different revision,
+different node, unhealthy container, or any other external mismatch fails
+closed. Once the new wrapper is live, all later checks require the public
+digest header.
 
 ## Roll back after a completed promotion
 

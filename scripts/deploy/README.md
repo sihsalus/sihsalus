@@ -11,9 +11,11 @@ El script:
    metadato operativo; el runtime local recibe un tag derivado del mismo digest
    para que un rebuild del mismo commit no destruya la ruta de rollback;
 4. reconstruye el wrapper runtime y recrea solo `frontend`;
-5. verifica salud, imagen y `build-info.json`;
-6. restaura la configuración y el contenedor anterior si falla;
-7. solo después de verificar el frontend, elimina imágenes antiguas de los dos
+5. verifica salud, imagen, digest fuente y `build-info.json`;
+6. en producción mantiene la transacción abierta durante la verificación
+   pública exacta de SHA, digest y nodo, y restaura/verifica el release anterior
+   ante fallo, timeout o cancelación;
+7. solo después de verificar públicamente el frontend, elimina imágenes antiguas de los dos
    repositorios exclusivos del frontend y conserva las imágenes fuente y
    runtime activas.
 
@@ -42,7 +44,8 @@ del entorno protegido `production`. La configuración y operación están en el
 Después de cada despliegue, `verify-external-frontend.sh` abre por defecto 12
 conexiones HTTP/1.1 independientes durante 55 segundos. En cada muestra valida
 `/health`, `/ready`, `/openmrs/health/started` y `build-info.json`, omite cachés
-y exige que todas las revisiones observadas coincidan con el SHA desplegado.
+y exige que todas las revisiones y digests fuente observados coincidan con el
+artefacto desplegado.
 También exige una única dirección remota y que `X-SIHSALUS-Node-ID` coincida
 exactamente con el UUID estable configurado para el ambiente. El runner solo
 entrega ese UUID al host cuya MAC fue validada y el wrapper frontend lo hornea
@@ -53,6 +56,12 @@ ajustarse con `EXTERNAL_VERIFY_SAMPLE_COUNT`,
 `EXTERNAL_VERIFY_SAMPLE_INTERVAL_SECONDS` y
 `EXTERNAL_VERIFY_CURL_TIMEOUT_SECONDS`; producción siempre debe conservar al
 menos dos muestras.
+
+TLS usa la cadena de confianza normal por defecto. Un endpoint con certificado
+privado puede usar un pin SPKI `sha256//...`; desactivar la validación de cadena
+sin ese pin se rechaza. En producción el modo y el pin, cuando aplica, viven en
+el environment protegido de GitHub y se transportan al proceso remoto en un
+archivo de ejecución con permisos restrictivos, sin imprimir el pin.
 
 Antes de subir, iniciar, monitorear o cancelar un despliegue remoto,
 `run-redeploy-remote.sh` exige y valida la MAC física esperada. Los workflows

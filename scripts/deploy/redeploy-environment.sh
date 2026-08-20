@@ -84,6 +84,17 @@ write_env_value() {
   fi
 }
 
+read_env_value() {
+  local key="$1"
+  awk -F= -v key="$key" '
+    $1 == key {
+      sub(/^[^=]*=/, "")
+      value = $0
+    }
+    END { print value }
+  ' .env
+}
+
 if [ ! -r "$CLEAN_CHECKOUT_HELPER" ]; then
   echo "[redeploy-environment] clean-checkout helper is not readable" >&2
   exit 2
@@ -406,6 +417,14 @@ fi
 # reference is persisted only after the complete environment is healthy.
 export BACKEND_TAG="$TARGET_BACKEND_REFERENCE"
 
+FRONTEND_SOURCE_IMAGE="$(read_env_value FRONTEND_SOURCE_IMAGE)"
+if [[ ! "$FRONTEND_SOURCE_IMAGE" =~ ^ghcr\.io/sihsalus/sihsalus-frontend@sha256:[0-9a-f]{64}$ ]]; then
+  echo "[redeploy-environment] FRONTEND_SOURCE_IMAGE must already pin the frontend source by digest before a full redeploy" >&2
+  false
+fi
+FRONTEND_SOURCE_DIGEST="${FRONTEND_SOURCE_IMAGE##*@}"
+export FRONTEND_SOURCE_DIGEST
+
 docker compose config --quiet
 ACTIVE_SERVICES="$(docker compose config --services)"
 
@@ -500,7 +519,14 @@ if [ "$FRONTEND_NODE_ID" != "$NODE_ID" ]; then
   false
 fi
 
+FRONTEND_RUNTIME_DIGEST="$(docker inspect sihsalus-frontend --format '{{index .Config.Labels "org.sihsalus.frontend.source-digest"}}')"
+if [ "$FRONTEND_RUNTIME_DIGEST" != "$FRONTEND_SOURCE_DIGEST" ]; then
+  echo "[redeploy-environment] frontend wrapper does not contain the expected source digest" >&2
+  false
+fi
+
 write_env_value BACKEND_TAG "$TARGET_BACKEND_REFERENCE"
+write_env_value FRONTEND_SOURCE_DIGEST "$FRONTEND_SOURCE_DIGEST"
 write_env_value SIHSALUS_NODE_ID "$NODE_ID"
 echo "[redeploy-environment] persisted immutable backend reference"
 
@@ -509,5 +535,6 @@ echo "[redeploy-environment] usable"
 echo "[redeploy-environment] distro=$(git rev-parse HEAD)"
 echo "[redeploy-environment] backend=${BACKEND_IMAGE}"
 echo "[redeploy-environment] frontend=${FRONTEND_SHA}"
+echo "[redeploy-environment] frontend_digest=${FRONTEND_RUNTIME_DIGEST}"
 echo "[redeploy-environment] node=${FRONTEND_NODE_ID}"
 docker compose ps
