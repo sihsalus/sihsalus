@@ -23,8 +23,11 @@ imagen fuente del frontend.
 El workflow también acepta `repository_dispatch` de tipo `frontend-published` y
 ejecución manual. La deploy key de señal no contiene credenciales de los
 servidores; esas permanecen exclusivamente en los entornos protegidos del
-distro. Producción queda fuera de esta automatización y conserva el checklist
-con aprobación explícita.
+distro. Producción nunca recibe la señal automática: usa el workflow manual
+`Promote Frontend to Production`, el entorno protegido `production` y el
+[runbook específico](production-frontend-promotion.md). La ruta no queda
+habilitada hasta configurar y verificar todas las identidades, secretos,
+variables y revisores requeridos.
 
 ## Antes del despliegue
 

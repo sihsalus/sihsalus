@@ -143,21 +143,16 @@ Mientras el runtime del frontend no se publique en un registry, el flujo actual 
 
 ### Frontend (flujo actual)
 
-Actualmente el frontend se despliega como una imagen runtime local (`sihsalus-frontend-runtime`) construida desde la imagen fuente publicada en GHCR (`ghcr.io/sihsalus/sihsalus-frontend`). Por eso, mientras no se publique una imagen runtime en el registry, la actualización de frontend en producción requiere reconstruir solo ese wrapper runtime.
+La ruta operativa es el workflow manual y protegido `Promote Frontend to
+Production`. Recibe el SHA y digest inmutables del candidato y del release
+actual, exige que una promoción normal ya esté viva en QLTY, verifica la
+identidad del host y del nodo, recrea exclusivamente `frontend` y restaura el
+artefacto anterior si el despliegue o la verificación pública fallan.
 
-```bash
-# 2) Definir tag fuente del frontend publicado en GHCR
-export FRONTEND_SOURCE_TAG=sha-<digest>
-docker pull "ghcr.io/sihsalus/sihsalus-frontend:${FRONTEND_SOURCE_TAG}"
-
-# 3) Reconstruir y recrear solo frontend
-docker compose build frontend
-docker compose up -d --no-deps --no-build --force-recreate frontend
-docker compose ps frontend
-docker compose logs --tail 100 frontend
-```
-
-Si necesitas rollback, vuelve a exportar el tag anterior en `FRONTEND_SOURCE_TAG`, reconstruye `frontend` y recrea el servicio.
+No reconstruyas esta secuencia manualmente ni despliegues por un tag mutable.
+La configuración inicial, aprobación, ejecución, evidencia y rollback se
+documentan en el
+[runbook de promoción del frontend](docs/operations/production-frontend-promotion.md).
 
 ### Frontend (sin build, cuando exista runtime publicado)
 

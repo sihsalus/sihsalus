@@ -92,6 +92,9 @@ jobs:
       - name: Test frontend deployment and rollback
         run: ./tests/frontend/deploy-frontend.sh
 
+      - name: Validate production frontend promotion policy
+        run: ./tests/frontend/promote-frontend-production.sh
+
       - name: Test split-brain-resistant external verification
         run: ./tests/deploy/verify-external-frontend-test.sh
 

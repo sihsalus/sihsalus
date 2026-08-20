@@ -33,6 +33,12 @@ distro. El workflow exige que ese SHA y su digest correspondan a la imagen
 El sondeo programado de `latest` permanece como respaldo si falla la señal
 inmediata.
 
+Producción no forma parte de esa ruta automática. El workflow manual
+`Promote Frontend to Production` exige el SHA/digest objetivo y el artefacto
+actual de rollback, se ejecuta únicamente desde el tip de `main` y queda detrás
+del entorno protegido `production`. La configuración y operación están en el
+[runbook de promoción a producción](../../docs/operations/production-frontend-promotion.md).
+
 Después de cada despliegue, `verify-external-frontend.sh` abre por defecto 12
 conexiones HTTP/1.1 independientes durante 55 segundos. En cada muestra valida
 `/health`, `/ready`, `/openmrs/health/started` y `build-info.json`, omite cachés

@@ -1,0 +1,330 @@
+name: Promote Frontend to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Promote the QLTY-accepted release or roll back to a previously accepted immutable release
+        required: true
+        default: promote
+        type: choice
+        options:
+          - promote
+          - rollback
+      frontend_sha:
+        description: Frontend source commit (40 lowercase hexadecimal characters)
+        required: true
+        type: string
+      frontend_digest:
+        description: "Immutable frontend image digest (sha256: followed by 64 lowercase hexadecimal characters)"
+        required: true
+        type: string
+      current_production_sha:
+        description: Currently deployed production frontend commit (used for preflight and automatic rollback)
+        required: true
+        type: string
+      current_production_digest:
+        description: Currently deployed immutable production digest (used for automatic rollback)
+        required: true
+        type: string
+      confirmation:
+        description: "Type PROMOTE <sha> TO PRODUCTION or ROLLBACK <sha> IN PRODUCTION"
+        required: true
+        type: string
+
+concurrency:
+  group: promote-frontend-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  qualify:
+    name: Qualify immutable release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      current_digest: ${{ steps.release.outputs.current_digest }}
+      current_sha: ${{ steps.release.outputs.current_sha }}
+      digest: ${{ steps.release.outputs.digest }}
+      operation: ${{ steps.release.outputs.operation }}
+      sha: ${{ steps.release.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+
+      - name: Validate requested immutable release
+        id: release
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          CURRENT_DIGEST: ${{ inputs.current_production_digest }}
+          CURRENT_SHA: ${{ inputs.current_production_sha }}
+          OPERATION: ${{ inputs.operation }}
+          REQUESTED_DIGEST: ${{ inputs.frontend_digest }}
+          REQUESTED_SHA: ${{ inputs.frontend_sha }}
+        run: |
+          set -euo pipefail
+
+          image='ghcr.io/sihsalus/sihsalus-frontend'
+          main_sha="$(git ls-remote --exit-code origin refs/heads/main | awk 'NR == 1 { print $1 }')"
+          if [[ "${GITHUB_REF}" != 'refs/heads/main' || "${GITHUB_SHA}" != "${main_sha}" ]]; then
+            echo '::error::Production promotion must run from the current main branch tip.'
+            exit 2
+          fi
+
+          if [[ ! "${REQUESTED_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error::The requested frontend SHA is invalid.'
+            exit 2
+          fi
+          if [[ ! "${REQUESTED_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo '::error::The requested frontend digest is invalid.'
+            exit 2
+          fi
+          if [[ ! "${CURRENT_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error::The current production frontend SHA is invalid.'
+            exit 2
+          fi
+          if [[ ! "${CURRENT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo '::error::The current production frontend digest is invalid.'
+            exit 2
+          fi
+          if [[ "${CURRENT_SHA}" == "${REQUESTED_SHA}" && "${CURRENT_DIGEST}" == "${REQUESTED_DIGEST}" ]]; then
+            echo '::error::The target and current production artifacts are identical.'
+            exit 2
+          fi
+
+          case "${OPERATION}" in
+            promote)
+              expected_confirmation="PROMOTE ${REQUESTED_SHA} TO PRODUCTION"
+              ;;
+            rollback)
+              expected_confirmation="ROLLBACK ${REQUESTED_SHA} IN PRODUCTION"
+              ;;
+            *)
+              echo '::error::Unsupported production operation.'
+              exit 2
+              ;;
+          esac
+          if [[ "${CONFIRMATION}" != "${expected_confirmation}" ]]; then
+            echo '::error::The production confirmation does not exactly match the requested operation and SHA.'
+            exit 2
+          fi
+
+          immutable_json="$(docker buildx imagetools inspect "${image}:sha-${REQUESTED_SHA}" --format '{{json .}}')"
+          immutable_sha="$(jq -r '.image.config.Labels["org.opencontainers.image.revision"] // empty' <<<"${immutable_json}")"
+          immutable_digest="$(jq -r '.manifest.digest // empty' <<<"${immutable_json}")"
+          if [[ "${immutable_sha}" != "${REQUESTED_SHA}" || "${immutable_digest}" != "${REQUESTED_DIGEST}" ]]; then
+            echo '::error::The immutable image does not match the requested SHA and digest.'
+            exit 1
+          fi
+
+          current_json="$(docker buildx imagetools inspect "${image}:sha-${CURRENT_SHA}" --format '{{json .}}')"
+          current_image_sha="$(jq -r '.image.config.Labels["org.opencontainers.image.revision"] // empty' <<<"${current_json}")"
+          current_image_digest="$(jq -r '.manifest.digest // empty' <<<"${current_json}")"
+          if [[ "${current_image_sha}" != "${CURRENT_SHA}" || "${current_image_digest}" != "${CURRENT_DIGEST}" ]]; then
+            echo '::error::The declared current production rollback image does not match its SHA and digest.'
+            exit 1
+          fi
+
+          if [[ "${OPERATION}" == 'promote' ]]; then
+            latest_json="$(docker buildx imagetools inspect "${image}:latest" --format '{{json .}}')"
+            latest_sha="$(jq -r '.image.config.Labels["org.opencontainers.image.revision"] // empty' <<<"${latest_json}")"
+            latest_digest="$(jq -r '.manifest.digest // empty' <<<"${latest_json}")"
+            if [[ "${latest_sha}" != "${REQUESTED_SHA}" || "${latest_digest}" != "${REQUESTED_DIGEST}" ]]; then
+              echo '::error::A production promotion must use the currently promoted latest SHA and digest.'
+              exit 1
+            fi
+          fi
+
+          {
+            echo "current_digest=${CURRENT_DIGEST}"
+            echo "current_sha=${CURRENT_SHA}"
+            echo "digest=${REQUESTED_DIGEST}"
+            echo "operation=${OPERATION}"
+            echo "sha=${REQUESTED_SHA}"
+          } >>"${GITHUB_OUTPUT}"
+
+      - name: Require the promotion candidate to be live in QLTY
+        if: inputs.operation == 'promote'
+        env:
+          TARGET_SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          set -euo pipefail
+          scripts/deploy/verify-external-frontend.sh \
+            https://gidis-hsc-qlty.inf.pucp.edu.pe \
+            "${TARGET_SHA}" \
+            0cefb0c8-c860-48c5-856f-408594775cbb \
+            QLTY
+
+  deploy-production:
+    name: ${{ needs.qualify.outputs.operation == 'rollback' && 'Roll back PROD frontend' || 'Promote PROD frontend' }}
+    needs: qualify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+    env:
+      PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+      PRODUCTION_REMOTE_REPOSITORY: ${{ vars.PRODUCTION_REMOTE_REPOSITORY }}
+      PRODUCTION_SSH_TARGET: ${{ vars.PRODUCTION_SSH_TARGET }}
+      REDEPLOY_EXPECTED_NODE_ID: ${{ vars.PRODUCTION_EXPECTED_NODE_ID }}
+      REDEPLOY_EXPECTED_REMOTE_MAC: ${{ vars.PRODUCTION_EXPECTED_REMOTE_MAC }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate protected production configuration
+        env:
+          DEPLOY_KEY: ${{ secrets.SSH_PRIVATE_KEY_PROD }}
+          KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS_PROD }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+          for name in \
+            DEPLOY_KEY \
+            KNOWN_HOSTS \
+            PRODUCTION_BASE_URL \
+            PRODUCTION_REMOTE_REPOSITORY \
+            PRODUCTION_SSH_TARGET \
+            REDEPLOY_EXPECTED_NODE_ID \
+            REDEPLOY_EXPECTED_REMOTE_MAC; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("${name}")
+            fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            printf '::error::Missing protected production configuration: %s\n' "${missing[*]}"
+            exit 2
+          fi
+
+          if [[ ! "${PRODUCTION_BASE_URL}" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]]; then
+            echo '::error::PRODUCTION_BASE_URL must be an HTTPS origin without a path.'
+            exit 2
+          fi
+          if [[ ! "${PRODUCTION_SSH_TARGET}" =~ ^[A-Za-z0-9._-]+@[A-Za-z0-9._:-]+$ ]]; then
+            echo '::error::PRODUCTION_SSH_TARGET must be a user@host target.'
+            exit 2
+          fi
+          if [[ ! "${PRODUCTION_REMOTE_REPOSITORY}" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+            echo '::error::PRODUCTION_REMOTE_REPOSITORY must be an absolute path.'
+            exit 2
+          fi
+          if [[ ! "${REDEPLOY_EXPECTED_REMOTE_MAC}" =~ ^([0-9a-f]{2}:){5}[0-9a-f]{2}$ ]]; then
+            echo '::error::PRODUCTION_EXPECTED_REMOTE_MAC must be a lowercase MAC address.'
+            exit 2
+          fi
+          if [[ ! "${REDEPLOY_EXPECTED_NODE_ID}" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+            echo '::error::PRODUCTION_EXPECTED_NODE_ID must be a lowercase UUID.'
+            exit 2
+          fi
+
+          bash -n scripts/deploy/deploy-frontend.sh
+          bash -n scripts/deploy/run-redeploy-remote.sh
+          bash -n scripts/deploy/verify-external-frontend.sh
+
+      - name: Configure SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.SSH_PRIVATE_KEY_PROD }}
+          KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS_PROD }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "${HOME}/.ssh"
+          printf '%s\n' "${DEPLOY_KEY}" >"${HOME}/.ssh/deploy_key"
+          printf '%s\n' "${KNOWN_HOSTS}" >"${HOME}/.ssh/known_hosts"
+          chmod 600 "${HOME}/.ssh/deploy_key" "${HOME}/.ssh/known_hosts"
+          ssh-keygen -y -f "${HOME}/.ssh/deploy_key" >/dev/null
+
+      - name: Verify declared current production release
+        env:
+          CURRENT_SHA: ${{ needs.qualify.outputs.current_sha }}
+        run: |
+          set -euo pipefail
+          scripts/deploy/verify-external-frontend.sh \
+            "${PRODUCTION_BASE_URL}" \
+            "${CURRENT_SHA}" \
+            "${REDEPLOY_EXPECTED_NODE_ID}" \
+            PROD-PREFLIGHT
+
+      - name: Deploy exact frontend release
+        id: deploy
+        env:
+          TARGET_DIGEST: ${{ needs.qualify.outputs.digest }}
+          TARGET_SHA: ${{ needs.qualify.outputs.sha }}
+        run: |
+          set -euo pipefail
+          REDEPLOY_SCRIPT_PATH=scripts/deploy/deploy-frontend.sh \
+            REDEPLOY_TIMEOUT_SECONDS=1200 \
+            scripts/deploy/run-redeploy-remote.sh \
+            "${HOME}/.ssh/deploy_key" \
+            "${PRODUCTION_SSH_TARGET}" \
+            "${PRODUCTION_REMOTE_REPOSITORY}" \
+            "${TARGET_SHA}" \
+            "${TARGET_DIGEST}" \
+            "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-frontend-production"
+
+      - name: Verify production externally
+        id: target-verify
+        continue-on-error: true
+        env:
+          TARGET_SHA: ${{ needs.qualify.outputs.sha }}
+        run: |
+          set -euo pipefail
+          scripts/deploy/verify-external-frontend.sh \
+            "${PRODUCTION_BASE_URL}" \
+            "${TARGET_SHA}" \
+            "${REDEPLOY_EXPECTED_NODE_ID}" \
+            PROD
+
+      - name: Restore previous release after deployment or verification failure
+        if: always() && (steps.deploy.outcome == 'failure' || steps.target-verify.outcome == 'failure')
+        env:
+          CURRENT_DIGEST: ${{ needs.qualify.outputs.current_digest }}
+          CURRENT_SHA: ${{ needs.qualify.outputs.current_sha }}
+        run: |
+          set -euo pipefail
+          REDEPLOY_SCRIPT_PATH=scripts/deploy/deploy-frontend.sh \
+            REDEPLOY_TIMEOUT_SECONDS=1200 \
+            scripts/deploy/run-redeploy-remote.sh \
+            "${HOME}/.ssh/deploy_key" \
+            "${PRODUCTION_SSH_TARGET}" \
+            "${PRODUCTION_REMOTE_REPOSITORY}" \
+            "${CURRENT_SHA}" \
+            "${CURRENT_DIGEST}" \
+            "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-frontend-production-rollback"
+
+      - name: Verify restored production release
+        if: always() && (steps.deploy.outcome == 'failure' || steps.target-verify.outcome == 'failure')
+        env:
+          CURRENT_SHA: ${{ needs.qualify.outputs.current_sha }}
+        run: |
+          set -euo pipefail
+          scripts/deploy/verify-external-frontend.sh \
+            "${PRODUCTION_BASE_URL}" \
+            "${CURRENT_SHA}" \
+            "${REDEPLOY_EXPECTED_NODE_ID}" \
+            PROD-ROLLBACK
+
+      - name: Fail the operation after automatic rollback
+        if: always() && (steps.deploy.outcome == 'failure' || steps.target-verify.outcome == 'failure')
+        run: |
+          echo '::error::The target deployment or external verification failed; the automatic rollback path was invoked. Review the restoration verification above.'
+          exit 1
+
+      - name: Record immutable deployment evidence
+        env:
+          TARGET_DIGEST: ${{ needs.qualify.outputs.digest }}
+          TARGET_OPERATION: ${{ needs.qualify.outputs.operation }}
+          TARGET_SHA: ${{ needs.qualify.outputs.sha }}
+        run: |
+          {
+            echo '## Production frontend evidence'
+            echo ''
+            echo "- Operation: ${TARGET_OPERATION}"
+            echo "- Source SHA: ${TARGET_SHA}"
+            echo "- Source digest: ${TARGET_DIGEST}"
+            echo "- Environment: production"
+            echo "- External verification: passed"
+          } >>"${GITHUB_STEP_SUMMARY}"
