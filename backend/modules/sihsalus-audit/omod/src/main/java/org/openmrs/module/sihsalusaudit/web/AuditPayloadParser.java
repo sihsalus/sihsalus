@@ -27,12 +27,13 @@ import org.openmrs.module.sihsalusaudit.api.ClinicalAuditSubmission;
 
 public class AuditPayloadParser {
 
-    private static final int MAX_METADATA_BYTES = 4096;
+    private static final int MAX_STORED_METADATA_BYTES = 4096;
 
     private static final int MAX_METADATA_KEYS = 10;
 
-    // Keep the client claim inside a conservative range supported by the module's MariaDB
-    // DATETIME column in every deployment timezone. The value remains non-authoritative.
+    // Keep a parseable client claim inside a conservative range supported by the module's
+    // MariaDB DATETIME column in every deployment timezone. Invalid client clocks are discarded
+    // because this field is non-authoritative and must not block the offline queue.
     private static final Instant MIN_CLIENT_OCCURRED_AT = Instant.parse("2000-01-01T00:00:00Z");
 
     private static final Instant MAX_CLIENT_OCCURRED_AT = Instant.parse("2100-01-01T00:00:00Z");
@@ -112,14 +113,18 @@ public class AuditPayloadParser {
     }
 
     public JsonNode parseStoredMetadata(String metadataJson) {
-        if (metadataJson == null) {
+        if (metadataJson == null
+                || metadataJson.getBytes(StandardCharsets.UTF_8).length > MAX_STORED_METADATA_BYTES) {
             return null;
         }
         try {
-            return objectMapper.readTree(metadataJson);
+            JsonNode metadata = objectMapper.readTree(metadataJson);
+            return canonicalizeMetadata(metadata);
         }
-        catch (JsonProcessingException ex) {
-            throw new IllegalStateException("Stored audit metadata is invalid", ex);
+        catch (JsonProcessingException | RuntimeException ex) {
+            // Rows created by an older or partially deployed module must never make review fail
+            // or re-expose legacy free text. Review omits metadata that cannot be canonicalized.
+            return null;
         }
     }
 
@@ -164,21 +169,22 @@ public class AuditPayloadParser {
             throw new AuditValidationException();
         }
 
-        String timestamp = optionalText(node, "timestamp", 40);
-        if (timestamp != null) {
-            try {
-                Instant clientOccurredAt = Instant.parse(timestamp);
-                if (clientOccurredAt.isBefore(MIN_CLIENT_OCCURRED_AT)
-                        || !clientOccurredAt.isBefore(MAX_CLIENT_OCCURRED_AT)) {
-                    throw new AuditValidationException();
-                }
-                return Date.from(clientOccurredAt);
-            }
-            catch (DateTimeParseException ex) {
-                throw new AuditValidationException();
-            }
+        JsonNode timestamp = node.get("timestamp");
+        if (timestamp == null || timestamp.isNull() || !timestamp.isTextual()
+                || timestamp.textValue().length() > 40) {
+            return null;
         }
-        return null;
+        try {
+            Instant clientOccurredAt = Instant.parse(timestamp.textValue());
+            if (clientOccurredAt.isBefore(MIN_CLIENT_OCCURRED_AT)
+                    || !clientOccurredAt.isBefore(MAX_CLIENT_OCCURRED_AT)) {
+                return null;
+            }
+            return Date.from(clientOccurredAt);
+        }
+        catch (DateTimeParseException ex) {
+            return null;
+        }
     }
 
     private String validateAndNormalizeClinicalTarget(String eventType, String patientUuid, String encounterUuid,
@@ -270,9 +276,7 @@ public class AuditPayloadParser {
             if (!value.isTextual()) {
                 throw new AuditValidationException();
             }
-            int maxLength = "componentStack".equals(field.getKey()) ? 2048
-                    : "message".equals(field.getKey()) ? 512 : 128;
-            if (value.textValue().length() > maxLength) {
+            if (!isDiscardedCompatibilityField(field.getKey()) && value.textValue().length() > 128) {
                 throw new AuditValidationException();
             }
             if ("locationUuid".equals(field.getKey())) {
@@ -280,28 +284,44 @@ public class AuditPayloadParser {
             }
         }
 
-        String validatedMetadata = objectMapper.writeValueAsString(metadata);
-        if (validatedMetadata.getBytes(StandardCharsets.UTF_8).length > MAX_METADATA_BYTES) {
+        JsonNode canonicalMetadata = canonicalizeMetadata(metadata);
+        if (canonicalMetadata == null) {
+            return null;
+        }
+        String serializedMetadata = objectMapper.writeValueAsString(canonicalMetadata);
+        if (serializedMetadata.getBytes(StandardCharsets.UTF_8).length > MAX_STORED_METADATA_BYTES) {
             throw new AuditValidationException();
+        }
+        return serializedMetadata;
+    }
+
+    private JsonNode canonicalizeMetadata(JsonNode metadata) {
+        if (metadata == null || !metadata.isObject()) {
+            return null;
         }
 
         ObjectNode canonicalMetadata = objectMapper.createObjectNode();
-        if (metadata.has("appName") && APP_NAMES.contains(metadata.get("appName").textValue())) {
-            canonicalMetadata.set("appName", metadata.get("appName"));
+        JsonNode appName = metadata.get("appName");
+        if (appName != null && appName.isTextual() && APP_NAMES.contains(appName.textValue())) {
+            canonicalMetadata.set("appName", appName);
         }
-        if (metadata.has("outcome") && OUTCOMES.contains(metadata.get("outcome").textValue())) {
-            canonicalMetadata.set("outcome", metadata.get("outcome"));
+        JsonNode outcome = metadata.get("outcome");
+        if (outcome != null && outcome.isTextual() && OUTCOMES.contains(outcome.textValue())) {
+            canonicalMetadata.set("outcome", outcome);
         }
-        if (metadata.has("offline")) {
-            canonicalMetadata.set("offline", metadata.get("offline"));
+        JsonNode offline = metadata.get("offline");
+        if (offline != null && offline.isBoolean()) {
+            canonicalMetadata.set("offline", offline);
         }
-        if (metadata.has("locationUuid")) {
-            canonicalMetadata.set("locationUuid", metadata.get("locationUuid"));
+        JsonNode locationUuid = metadata.get("locationUuid");
+        if (locationUuid != null && locationUuid.isTextual() && isUuid(locationUuid.textValue())) {
+            canonicalMetadata.set("locationUuid", locationUuid);
         }
-        if (canonicalMetadata.isEmpty()) {
-            return null;
-        }
-        return objectMapper.writeValueAsString(canonicalMetadata);
+        return canonicalMetadata.isEmpty() ? null : canonicalMetadata;
+    }
+
+    private static boolean isDiscardedCompatibilityField(String field) {
+        return "message".equals(field) || "componentStack".equals(field);
     }
 
     private static void rejectUnknownFields(JsonNode object, Set<String> allowedFields) {
@@ -339,16 +359,20 @@ public class AuditPayloadParser {
     }
 
     private static void validateUuid(String value) {
-        if (value == null || value.length() != 36) {
+        if (!isUuid(value)) {
             throw new AuditValidationException();
+        }
+    }
+
+    private static boolean isUuid(String value) {
+        if (value == null || value.length() != 36) {
+            return false;
         }
         try {
-            if (!UUID.fromString(value).toString().equalsIgnoreCase(value)) {
-                throw new AuditValidationException();
-            }
+            return UUID.fromString(value).toString().equalsIgnoreCase(value);
         }
         catch (IllegalArgumentException ex) {
-            throw new AuditValidationException();
+            return false;
         }
     }
 

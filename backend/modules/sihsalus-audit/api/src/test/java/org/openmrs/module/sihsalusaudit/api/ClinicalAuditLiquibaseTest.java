@@ -1,6 +1,7 @@
 package org.openmrs.module.sihsalusaudit.api;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -35,14 +36,24 @@ public class ClinicalAuditLiquibaseTest {
         NodeList changeSets = document.getElementsByTagName("changeSet");
         assertEquals(10, changeSets.getLength());
 
-        for (int i = 0; i < 8; i++) {
-            Element changeSet = (Element) changeSets.item(i);
+        String[] recoverableChangeSets = {
+                "sihsalusaudit-20260819-01-table",
+                "sihsalusaudit-20260819-02-client-time",
+                "sihsalusaudit-20260819-03-actor-fk",
+                "sihsalusaudit-20260819-04-idempotency",
+                "sihsalusaudit-20260819-05-timestamp-index",
+                "sihsalusaudit-20260819-06-patient-index",
+                "sihsalusaudit-20260819-07-no-update",
+                "sihsalusaudit-20260819-08-no-delete"
+        };
+        for (String id : recoverableChangeSets) {
+            Element changeSet = changeSet(document, id);
             NodeList preconditions = changeSet.getElementsByTagName("preConditions");
             assertEquals(1, preconditions.getLength());
             assertEquals("MARK_RAN", ((Element) preconditions.item(0)).getAttribute("onFail"));
         }
 
-        Element validation = (Element) changeSets.item(8);
+        Element validation = changeSet(document, "sihsalusaudit-20260819-09-validate");
         assertEquals("true", validation.getAttribute("runAlways"));
         assertEquals("HALT", ((Element) validation.getElementsByTagName("preConditions").item(0))
                 .getAttribute("onFail"));
@@ -55,18 +66,38 @@ public class ClinicalAuditLiquibaseTest {
         String xmlText = document.getDocumentElement().getTextContent();
         assertTrue(xmlText.contains("CREATE TRIGGER sihsalus_audit_no_update"));
         assertTrue(xmlText.contains("CREATE TRIGGER sihsalus_audit_no_delete"));
+        assertTrue(xmlText.contains("ACTION_STATEMENT"));
+        assertTrue(xmlText.contains("signalsqlstate''45000''setmessage_text="));
+        assertFalse(xmlText.contains("DROP TRIGGER"));
 
-        NodeList changeSets = document.getElementsByTagName("changeSet");
-        for (int i = 6; i <= 7; i++) {
-            Element trigger = (Element) changeSets.item(i);
+        String[] triggerChangeSets = {
+                "sihsalusaudit-20260819-07-no-update",
+                "sihsalusaudit-20260819-08-no-delete"
+        };
+        for (String id : triggerChangeSets) {
+            Element trigger = changeSet(document, id);
             assertEquals("mysql,mariadb", trigger.getAttribute("dbms"));
             assertEquals("true", trigger.getAttribute("runAlways"));
         }
-        Element databaseValidation = (Element) changeSets.item(9);
+        Element databaseValidation = changeSet(document, "sihsalusaudit-20260819-10-mariadb-validate");
         assertEquals("mysql,mariadb", databaseValidation.getAttribute("dbms"));
         assertEquals("true", databaseValidation.getAttribute("runAlways"));
         assertEquals("HALT", ((Element) databaseValidation.getElementsByTagName("preConditions").item(0))
                 .getAttribute("onFail"));
+    }
+
+    @Test
+    public void validatesTheMariaDbPrimaryKeyByItsPortablePrimaryNameAndColumn() throws Exception {
+        Document document = changelog();
+        NodeList primaryKeyChecks = document.getElementsByTagName("primaryKeyExists");
+        assertEquals(1, primaryKeyChecks.getLength());
+        Element portableCheck = (Element) primaryKeyChecks.item(0);
+        assertEquals("sihsalus_clinical_audit_event", portableCheck.getAttribute("tableName"));
+        assertFalse(portableCheck.hasAttribute("primaryKeyName"));
+
+        String xmlText = document.getDocumentElement().getTextContent();
+        assertTrue(xmlText.contains("CONSTRAINT_NAME = 'PRIMARY'"));
+        assertTrue(xmlText.contains("ORDINAL_POSITION = 1 AND COLUMN_NAME = 'audit_event_id'"));
     }
 
     private Document changelog() throws Exception {
@@ -89,5 +120,16 @@ public class ClinicalAuditLiquibaseTest {
             }
         }
         return false;
+    }
+
+    private Element changeSet(Document document, String id) {
+        NodeList changeSets = document.getElementsByTagName("changeSet");
+        for (int i = 0; i < changeSets.getLength(); i++) {
+            Element changeSet = (Element) changeSets.item(i);
+            if (id.equals(changeSet.getAttribute("id"))) {
+                return changeSet;
+            }
+        }
+        throw new AssertionError("Missing changeSet " + id);
     }
 }

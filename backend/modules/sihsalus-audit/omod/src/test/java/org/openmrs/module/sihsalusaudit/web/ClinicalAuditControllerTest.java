@@ -155,7 +155,10 @@ public class ClinicalAuditControllerTest {
         ClinicalAuditEvent stored = new ClinicalAuditEvent();
         stored.setClientEventId(id);
         stored.setEventType("UNHANDLED_ERROR");
-        stored.setMetadataJson(sanitized.getMetadataJson());
+        // Simulate a row written by the initial 17a format before free text was discarded.
+        stored.setMetadataJson("{\"appName\":\"patient-chart\","
+                + "\"message\":\"patient-name secret-token\","
+                + "\"componentStack\":\"/srv/openmrs/PatientChart.java:42\"}");
         stored.setClientOccurredAt(new Date(1_787_099_690_000L));
         stored.setServerTimestamp(new Date(1_787_099_696_000L));
         User actor = new User();

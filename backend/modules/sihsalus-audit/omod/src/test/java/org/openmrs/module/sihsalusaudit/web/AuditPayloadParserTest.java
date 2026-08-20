@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.Test;
 import org.openmrs.module.sihsalusaudit.api.ClinicalAuditSubmission;
 
@@ -82,7 +83,7 @@ public class AuditPayloadParserTest {
         AuditValidationException exception = assertThrows(AuditValidationException.class, () -> parse("[{"
                 + "\"id\":\"99999999-9999-4999-8999-999999999999\","
                 + "\"eventType\":\"PATIENT_SEARCH\","
-                + "\"timestamp\":\"patient-name-secret-token\"}]"));
+                + "\"userUuid\":\"patient-name-secret-token\"}]"));
 
         assertNull(exception.getCause());
         assertFalse(exception.getMessage().contains("patient-name"));
@@ -90,15 +91,28 @@ public class AuditPayloadParserTest {
     }
 
     @Test
-    public void rejectsClientTimesOutsideThePersistableOperationalRange() {
-        assertThrows(AuditValidationException.class, () -> parse("[{"
+    public void discardsInvalidClientTimesWithoutPoisoningTheBatch() {
+        ClinicalAuditSubmission tooEarly = parse("[{"
                 + "\"id\":\"99999999-9999-4999-8999-999999999999\","
                 + "\"eventType\":\"PATIENT_SEARCH\","
-                + "\"timestamp\":\"0001-01-01T00:00:00Z\"}]"));
-        assertThrows(AuditValidationException.class, () -> parse("[{"
+                + "\"timestamp\":\"0001-01-01T00:00:00Z\"}]").get(0);
+        ClinicalAuditSubmission tooLate = parse("[{"
                 + "\"id\":\"99999999-9999-4999-8999-999999999999\","
                 + "\"eventType\":\"PATIENT_SEARCH\","
-                + "\"timestamp\":\"9999-12-31T23:59:59Z\"}]"));
+                + "\"timestamp\":\"9999-12-31T23:59:59Z\"}]").get(0);
+        ClinicalAuditSubmission malformed = parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"PATIENT_SEARCH\","
+                + "\"timestamp\":\"not-a-time\"}]").get(0);
+        ClinicalAuditSubmission wrongType = parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"PATIENT_SEARCH\","
+                + "\"timestamp\":42}]").get(0);
+
+        assertNull(tooEarly.getClientOccurredAt());
+        assertNull(tooLate.getClientOccurredAt());
+        assertNull(malformed.getClientOccurredAt());
+        assertNull(wrongType.getClientOccurredAt());
     }
 
     @Test
@@ -130,6 +144,71 @@ public class AuditPayloadParserTest {
         assertFalse(submission.getMetadataJson().contains("componentStack"));
         assertFalse(submission.getMetadataJson().contains("patient-name"));
         assertFalse(submission.getMetadataJson().contains("secret-token"));
+    }
+
+    @Test
+    public void acceptsLongCompatibilityFreeTextWithinTheGlobalRequestLimitAndDiscardsIt() {
+        String message = repeat('m', 10_000);
+        String componentStack = repeat('s', 40_000);
+        String json = "[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"UNHANDLED_ERROR\","
+                + "\"metadata\":{\"appName\":\"patient-chart\","
+                + "\"message\":\"" + message + "\","
+                + "\"componentStack\":\"" + componentStack + "\"}}]";
+
+        assertTrue(json.getBytes(StandardCharsets.UTF_8).length < AuditRequestBodyReader.MAX_REQUEST_BYTES);
+        ClinicalAuditSubmission submission = parse(json).get(0);
+
+        assertEquals("{\"appName\":\"patient-chart\"}", submission.getMetadataJson());
+    }
+
+    @Test
+    public void redactsMetadataStoredByTheInitial17aFormatDuringReview() {
+        JsonNode metadata = parser.parseStoredMetadata("{"
+                + "\"appName\":\"patient-chart\","
+                + "\"module\":\"patient-name secret-token\","
+                + "\"action\":\"patient-name secret-token\","
+                + "\"outcome\":\"SUCCESS\","
+                + "\"offline\":true,"
+                + "\"reasonCode\":\"patient-name secret-token\","
+                + "\"message\":\"patient-name secret-token\","
+                + "\"componentStack\":\"/srv/openmrs/PatientChart.java:42\","
+                + "\"locationUuid\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\"}");
+
+        assertEquals("{\"appName\":\"patient-chart\",\"outcome\":\"SUCCESS\","
+                + "\"offline\":true,\"locationUuid\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\"}",
+                metadata.toString());
+        assertFalse(metadata.toString().contains("patient-name"));
+        assertFalse(metadata.toString().contains("secret-token"));
+        assertFalse(metadata.has("message"));
+        assertFalse(metadata.has("componentStack"));
+    }
+
+    @Test
+    public void redactsMetadataStoredByThe26dFormatDuringReview() {
+        JsonNode metadata = parser.parseStoredMetadata("{"
+                + "\"appName\":\"patient-name\","
+                + "\"module\":\"patient-name secret-token\","
+                + "\"action\":\"patient-name secret-token\","
+                + "\"outcome\":\"secret-token\","
+                + "\"offline\":false,"
+                + "\"reasonCode\":\"patient-name secret-token\","
+                + "\"locationUuid\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\"}");
+
+        assertEquals("{\"offline\":false,"
+                + "\"locationUuid\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\"}", metadata.toString());
+        assertFalse(metadata.toString().contains("patient-name"));
+        assertFalse(metadata.toString().contains("secret-token"));
+    }
+
+    @Test
+    public void omitsMalformedOrUnsafeStoredMetadataDuringReview() {
+        assertNull(parser.parseStoredMetadata("{not-json"));
+        assertNull(parser.parseStoredMetadata("[\"not-an-object\"]"));
+        assertNull(parser.parseStoredMetadata("{\"appName\":{},\"offline\":\"true\","
+                + "\"locationUuid\":\"not-a-uuid\"}"));
+        assertNull(parser.parseStoredMetadata(repeat('x', 4097)));
     }
 
     @Test
@@ -230,5 +309,11 @@ public class AuditPayloadParserTest {
                 + "\"id\":\"99999999-9999-4999-8999-999999999999\","
                 + "\"eventType\":\"PATIENT_VIEW\","
                 + "\"patientUuid\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\"}]";
+    }
+
+    private String repeat(char value, int count) {
+        char[] chars = new char[count];
+        java.util.Arrays.fill(chars, value);
+        return new String(chars);
     }
 }

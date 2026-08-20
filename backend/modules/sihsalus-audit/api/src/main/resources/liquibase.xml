@@ -131,8 +131,9 @@
   <changeSet id="sihsalusaudit-20260819-09-validate" author="sihsalus" runAlways="true">
     <preConditions onFail="HALT" onError="HALT">
       <tableExists tableName="sihsalus_clinical_audit_event" />
-      <primaryKeyExists tableName="sihsalus_clinical_audit_event"
-        primaryKeyName="pk_sihsalus_clinical_audit" />
+      <!-- MariaDB/MySQL expose the primary key name as PRIMARY even when createTable receives
+           a custom symbolic name, so portable validation must not compare that name. -->
+      <primaryKeyExists tableName="sihsalus_clinical_audit_event" />
       <columnExists tableName="sihsalus_clinical_audit_event" columnName="audit_event_id" />
       <columnExists tableName="sihsalus_clinical_audit_event" columnName="client_event_id" />
       <columnExists tableName="sihsalus_clinical_audit_event" columnName="event_type" />
@@ -157,6 +158,18 @@
     <preConditions onFail="HALT" onError="HALT">
       <sqlCheck expectedResult="1"><![CDATA[
         SELECT CASE
+          WHEN COUNT(*) = 1
+            AND SUM(CASE WHEN ORDINAL_POSITION = 1 AND COLUMN_NAME = 'audit_event_id'
+              THEN 1 ELSE 0 END) = 1
+          THEN 1 ELSE 0 END
+        FROM information_schema.KEY_COLUMN_USAGE
+        WHERE CONSTRAINT_SCHEMA = DATABASE()
+          AND TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'sihsalus_clinical_audit_event'
+          AND CONSTRAINT_NAME = 'PRIMARY'
+      ]]></sqlCheck>
+      <sqlCheck expectedResult="1"><![CDATA[
+        SELECT CASE
           WHEN COUNT(*) = 2
             AND MAX(NON_UNIQUE) = 0
             AND SUM(CASE WHEN SEQ_IN_INDEX = 1 AND COLUMN_NAME = 'actor_id' THEN 1 ELSE 0 END) = 1
@@ -171,17 +184,27 @@
         SELECT COUNT(*) FROM information_schema.TRIGGERS
         WHERE TRIGGER_SCHEMA = DATABASE()
           AND TRIGGER_NAME = 'sihsalus_audit_no_update'
+          AND EVENT_OBJECT_SCHEMA = DATABASE()
           AND EVENT_OBJECT_TABLE = 'sihsalus_clinical_audit_event'
           AND ACTION_TIMING = 'BEFORE'
           AND EVENT_MANIPULATION = 'UPDATE'
+          AND ACTION_ORIENTATION = 'ROW'
+          AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(ACTION_STATEMENT,
+            ' ', ''), CHAR(9), ''), CHAR(10), ''), CHAR(13), '')) =
+            'signalsqlstate''45000''setmessage_text=''clinicalauditrowsareappend-only'''
       ]]></sqlCheck>
       <sqlCheck expectedResult="1"><![CDATA[
         SELECT COUNT(*) FROM information_schema.TRIGGERS
         WHERE TRIGGER_SCHEMA = DATABASE()
           AND TRIGGER_NAME = 'sihsalus_audit_no_delete'
+          AND EVENT_OBJECT_SCHEMA = DATABASE()
           AND EVENT_OBJECT_TABLE = 'sihsalus_clinical_audit_event'
           AND ACTION_TIMING = 'BEFORE'
           AND EVENT_MANIPULATION = 'DELETE'
+          AND ACTION_ORIENTATION = 'ROW'
+          AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(ACTION_STATEMENT,
+            ' ', ''), CHAR(9), ''), CHAR(10), ''), CHAR(13), '')) =
+            'signalsqlstate''45000''setmessage_text=''clinicalauditrowsareappend-only'''
       ]]></sqlCheck>
     </preConditions>
     <sql>SELECT 1</sql>

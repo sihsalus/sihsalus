@@ -45,6 +45,9 @@ public class RestErrorSanitizingFilter implements Filter {
         }
 
         HttpServletResponse httpResponse = (HttpServletResponse) response;
+        // This filter is mapped only to the audit endpoint. Apply the clinical-data cache policy
+        // before invoking the chain so it also covers authentication, mapping and late failures.
+        httpResponse.setHeader("Cache-Control", "no-store");
         BufferingResponseWrapper wrapper = new BufferingResponseWrapper(httpResponse);
         try {
             chain.doFilter(request, wrapper);
@@ -66,6 +69,8 @@ public class RestErrorSanitizingFilter implements Filter {
             }
         }
         else {
+            // A downstream reset may have cleared the header set before the chain.
+            httpResponse.setHeader("Cache-Control", "no-store");
             wrapper.copyBodyToResponse();
         }
     }

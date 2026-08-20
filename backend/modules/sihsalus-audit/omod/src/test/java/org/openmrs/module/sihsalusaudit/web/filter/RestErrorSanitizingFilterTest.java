@@ -100,6 +100,22 @@ public class RestErrorSanitizingFilterTest {
 
         assertEquals(200, response.getStatus());
         assertEquals("{\"ok\":true}", response.getContentAsString(StandardCharsets.UTF_8));
+        assertEquals("no-store", response.getHeader("Cache-Control"));
+    }
+
+    @Test
+    public void restoresNoStoreAfterADownstreamResponseReset() throws Exception {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(new MockHttpServletRequest(), response, (request, wrappedResponse) -> {
+            HttpServletResponse http = (HttpServletResponse) wrappedResponse;
+            http.reset();
+            http.setStatus(200);
+            http.getWriter().write("{\"ok\":true}");
+        });
+
+        assertEquals(200, response.getStatus());
+        assertEquals("no-store", response.getHeader("Cache-Control"));
     }
 
     @Test

@@ -5,8 +5,10 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
@@ -28,7 +30,6 @@ import org.openmrs.module.sihsalusaudit.api.AuditSecurityContext;
 import org.openmrs.module.sihsalusaudit.api.ClinicalAuditSubmission;
 import org.openmrs.module.sihsalusaudit.api.db.ClinicalAuditDao;
 import org.openmrs.module.sihsalusaudit.model.ClinicalAuditEvent;
-import org.openmrs.util.PrivilegeConstants;
 
 public class ClinicalAuditServiceImplTest {
 
@@ -140,31 +141,19 @@ public class ClinicalAuditServiceImplTest {
     }
 
     @Test
-    public void permissionChangeRequiresTheOpenmrsTargetPrivilege() {
-        ClinicalAuditSubmission submission = new ClinicalAuditSubmission(
+    public void permissionChangeIsAcceptedOnlyAsNonAuthoritativeClientTelemetry() {
+        ClinicalAuditSubmission roleChange = new ClinicalAuditSubmission(
                 "88888888-8888-4888-8888-888888888888", "PERMISSION_CHANGE",
                 null, null, "Role", null, new Date(1_787_099_690_000L));
-        when(securityContext.requireAuthenticatedUserWithPrivilege(PrivilegeConstants.MANAGE_ROLES))
-                .thenReturn(serverActor);
-
-        service.recordEvents(Collections.singletonList(submission));
-
-        verify(securityContext).requireAuthenticatedUserWithPrivilege(PrivilegeConstants.MANAGE_ROLES);
-        verify(dao).appendIdempotently(any(ClinicalAuditEvent.class));
-    }
-
-    @Test
-    public void permissionChangeIsRejectedWithoutTheOpenmrsTargetPrivilege() {
-        ClinicalAuditSubmission submission = new ClinicalAuditSubmission(
+        ClinicalAuditSubmission userChange = new ClinicalAuditSubmission(
                 "99999999-9999-4999-8999-999999999999", "PERMISSION_CHANGE",
                 null, null, "User", null, new Date(1_787_099_690_000L));
-        when(securityContext.requireAuthenticatedUserWithPrivilege(PrivilegeConstants.EDIT_USERS))
-                .thenThrow(new APIAuthenticationException("forbidden"));
 
-        assertThrows(APIAuthenticationException.class,
-                () -> service.recordEvents(Collections.singletonList(submission)));
+        service.recordEvents(Arrays.asList(roleChange, userChange));
 
-        verify(dao, never()).appendIdempotently(any(ClinicalAuditEvent.class));
+        verify(securityContext).requireAuthenticatedUserWithPrivilege(ClinicalAuditConstants.PRIVILEGE_RECORD);
+        verifyNoMoreInteractions(securityContext);
+        verify(dao, times(2)).appendIdempotently(any(ClinicalAuditEvent.class));
     }
 
     @Test
