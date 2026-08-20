@@ -20,6 +20,7 @@ EXTERNAL_BASE_URL="${FRONTEND_EXTERNAL_BASE_URL:-}"
 EXTERNAL_ENVIRONMENT_LABEL="${FRONTEND_EXTERNAL_ENVIRONMENT_LABEL:-REMOTE}"
 EXPECTED_CURRENT_SHA="${FRONTEND_CURRENT_SHA:-}"
 EXPECTED_CURRENT_DIGEST="${FRONTEND_CURRENT_DIGEST:-}"
+TRANSACTION_STATE_PATH="${FRONTEND_TRANSACTION_STATE_PATH:-}"
 TRANSACTIONAL_EXTERNAL_VERIFY=false
 
 if [[ ! "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]; then
@@ -50,9 +51,13 @@ if [ -n "$EXTERNAL_BASE_URL" ] || [ -n "$EXPECTED_CURRENT_SHA" ] || [ -n "$EXPEC
     echo "[deploy-frontend] external frontend verifier is not executable" >&2
     exit 2
   fi
+  if [[ ! "$TRANSACTION_STATE_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+    echo "[deploy-frontend] FRONTEND_TRANSACTION_STATE_PATH must be an absolute path" >&2
+    exit 2
+  fi
 fi
 
-for command in docker git awk cat cp df mktemp rm seq sleep; do
+for command in docker git awk cat chmod cp df mktemp mv rm seq sleep; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "[deploy-frontend] missing command: $command" >&2
     exit 2
@@ -139,6 +144,20 @@ container_source_digest() {
     2>/dev/null || true
 }
 
+write_transaction_state() {
+  local state="$1"
+  local temporary_state
+
+  if [ "$TRANSACTIONAL_EXTERNAL_VERIFY" != true ]; then
+    return 0
+  fi
+
+  temporary_state="$(mktemp "${TRANSACTION_STATE_PATH}.tmp.XXXXXX")"
+  printf '%s\n' "$state" >"$temporary_state"
+  chmod 600 "$temporary_state"
+  mv -f "$temporary_state" "$TRANSACTION_STATE_PATH"
+}
+
 wait_for_frontend_health() {
   local health
 
@@ -194,64 +213,6 @@ RUNTIME_IMAGE_REPOSITORY="$(read_env_value FRONTEND_RUNTIME_IMAGE)"
 RUNTIME_IMAGE_REPOSITORY="${RUNTIME_IMAGE_REPOSITORY:-sihsalus-frontend-runtime}"
 TARGET_RUNTIME_IMAGE="${RUNTIME_IMAGE_REPOSITORY}:${RUNTIME_TAG}"
 
-verify_remote_bootstrap_identity() {
-  local expected_sha="$1"
-  local expected_digest="$2"
-  local expected_source_image="${SOURCE_REPOSITORY}@${expected_digest}"
-  local actual_sha
-  local actual_source_digest
-  local actual_source_image
-  local actual_source_tag
-  local actual_runtime_tag
-  local actual_node_id
-  local actual_health
-  local actual_image
-  local expected_runtime_image
-  local source_revision
-  local source_repo_digests
-
-  actual_sha="$(deployed_sha || true)"
-  actual_source_image="$(read_env_value FRONTEND_SOURCE_IMAGE)"
-  actual_source_digest="$(read_env_value FRONTEND_SOURCE_DIGEST)"
-  actual_source_tag="$(read_env_value FRONTEND_SOURCE_TAG)"
-  actual_runtime_tag="$(read_env_value FRONTEND_RUNTIME_TAG)"
-  actual_node_id="$(container_node_id)"
-  actual_health="$(container_health)"
-  actual_image="$(container_image)"
-  expected_runtime_image="${RUNTIME_IMAGE_REPOSITORY}:${actual_runtime_tag}"
-
-  if [ "$actual_sha" != "$expected_sha" ] ||
-    [ "$actual_source_image" != "$expected_source_image" ] ||
-    [ "$actual_source_tag" != "sha-${expected_sha}" ] ||
-    [ "$actual_node_id" != "$NODE_ID" ] ||
-    [ "$actual_health" != healthy ] ||
-    [ "$actual_image" != "$expected_runtime_image" ]; then
-    echo "[deploy-frontend] current remote frontend does not match the declared bootstrap SHA, digest, node, health, and runtime configuration" >&2
-    return 1
-  fi
-
-  if [ -n "$actual_source_digest" ] && [ "$actual_source_digest" != "$expected_digest" ]; then
-    echo "[deploy-frontend] current remote FRONTEND_SOURCE_DIGEST conflicts with the declared digest" >&2
-    return 1
-  fi
-
-  source_revision="$(
-    docker image inspect "$expected_source_image" \
-      --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' 2>/dev/null || true
-  )"
-  source_repo_digests="$(
-    docker image inspect "$expected_source_image" \
-      --format '{{range .RepoDigests}}{{println .}}{{end}}' 2>/dev/null || true
-  )"
-  if [ "$source_revision" != "$expected_sha" ] ||
-    ! grep -Fxq "$expected_source_image" <<<"$source_repo_digests"; then
-    echo "[deploy-frontend] current remote source image does not prove the declared SHA and digest" >&2
-    return 1
-  fi
-
-  echo "[deploy-frontend] exact remote bootstrap evidence matches SHA ${expected_sha}, digest ${expected_digest}, and node ${NODE_ID}"
-}
-
 verify_external_release() {
   local expected_sha="$1"
   local expected_digest="$2"
@@ -266,21 +227,10 @@ verify_external_release() {
 }
 
 verify_current_release_preflight() {
-  local verify_code
-
-  if verify_external_release "$EXPECTED_CURRENT_SHA" "$EXPECTED_CURRENT_DIGEST" "${EXTERNAL_ENVIRONMENT_LABEL}-PREFLIGHT"; then
-    return 0
-  else
-    verify_code="$?"
+  if ! verify_external_release "$EXPECTED_CURRENT_SHA" "$EXPECTED_CURRENT_DIGEST" "${EXTERNAL_ENVIRONMENT_LABEL}-PREFLIGHT"; then
+    echo "[deploy-frontend] current public release failed exact SHA, digest, and node preflight" >&2
+    return 1
   fi
-
-  if [ "$verify_code" -ne 3 ]; then
-    echo "[deploy-frontend] current public release failed exact external preflight" >&2
-    return "$verify_code"
-  fi
-
-  echo "[deploy-frontend] current release predates the digest header; requiring exact remote bootstrap evidence"
-  verify_remote_bootstrap_identity "$EXPECTED_CURRENT_SHA" "$EXPECTED_CURRENT_DIGEST"
 }
 
 prune_repository_images_except() {
@@ -315,36 +265,22 @@ prune_stale_frontend_images() {
   prune_repository_images_except "$RUNTIME_IMAGE_REPOSITORY" "$TARGET_RUNTIME_IMAGE"
 }
 
-if [ "$TRANSACTIONAL_EXTERNAL_VERIFY" = true ]; then
-  verify_current_release_preflight
-fi
-
-if [ "$CURRENT_SHA" = "$TARGET_SHA" ] &&
-  [ "$CURRENT_SOURCE_IMAGE" = "$SOURCE_IMAGE" ] &&
-  [ "$CURRENT_SOURCE_DIGEST" = "$TARGET_DIGEST" ] &&
-  [ "$CURRENT_SOURCE_TAG" = "$SOURCE_TAG" ] &&
-  [ "$CURRENT_RUNTIME_TAG" = "$RUNTIME_TAG" ] &&
-  [ "$CURRENT_NODE_ID" = "$NODE_ID" ] &&
-  [ "$CURRENT_CONTAINER_SOURCE_DIGEST" = "$TARGET_DIGEST" ] &&
-  [ "$CURRENT_IMAGE" = "$TARGET_RUNTIME_IMAGE" ] &&
-  [ "$CURRENT_HEALTH" = "healthy" ]; then
-  if [ "$TRANSACTIONAL_EXTERNAL_VERIFY" = true ]; then
-    verify_external_release "$TARGET_SHA" "$TARGET_DIGEST" "$EXTERNAL_ENVIRONMENT_LABEL"
-  fi
-  prune_stale_frontend_images
-  echo "[deploy-frontend] ${SOURCE_TAG} at ${TARGET_DIGEST} is already healthy; nothing to do"
-  exit 0
-fi
-
 ENV_BACKUP="$(mktemp)"
 cp -p .env "$ENV_BACKUP"
 ROLLBACK_REQUIRED=true
 FRONTEND_RECREATE_ATTEMPTED=false
+TRANSACTION_COMMITTED=false
 
 rollback() {
   local exit_code="${1:-$?}"
   local rollback_failed=false
   trap - ERR HUP INT TERM
+
+  if [ "$TRANSACTION_COMMITTED" = true ]; then
+    rm -f "$ENV_BACKUP" || true
+    echo "[deploy-frontend] committed transaction received a late failure or signal; the verified release remains active" >&2
+    exit 0
+  fi
 
   if [ "$ROLLBACK_REQUIRED" = true ]; then
     echo "[deploy-frontend] deployment failed; restoring previous frontend configuration" >&2
@@ -369,15 +305,62 @@ rollback() {
 
   rm -f "$ENV_BACKUP" || true
   if [ "$rollback_failed" = true ]; then
+    write_transaction_state rollback-failed || true
     echo "[deploy-frontend] rollback verification failed; immediate operator intervention is required" >&2
+  elif [ "$FRONTEND_RECREATE_ATTEMPTED" = true ]; then
+    if ! write_transaction_state rolled-back; then
+      echo "[deploy-frontend] rollback completed but its terminal state could not be persisted" >&2
+    fi
+  else
+    if ! write_transaction_state unchanged; then
+      echo "[deploy-frontend] frontend was unchanged but its terminal state could not be persisted" >&2
+    fi
   fi
   exit "$exit_code"
+}
+
+commit_transaction() {
+  # Ignore termination only across this short critical section. A signal before
+  # it rolls back; a signal after it observes the durable committed marker and
+  # exits successfully without reverting a publicly verified release.
+  trap '' HUP INT TERM
+  write_transaction_state committed
+  TRANSACTION_COMMITTED=true
+  ROLLBACK_REQUIRED=false
+  trap 'rollback 129' HUP
+  trap 'rollback 130' INT
+  trap 'rollback 143' TERM
 }
 
 trap 'rollback $?' ERR
 trap 'rollback 129' HUP
 trap 'rollback 130' INT
 trap 'rollback 143' TERM
+
+write_transaction_state active
+
+if [ "$TRANSACTIONAL_EXTERNAL_VERIFY" = true ]; then
+  verify_current_release_preflight
+fi
+
+if [ "$CURRENT_SHA" = "$TARGET_SHA" ] &&
+  [ "$CURRENT_SOURCE_IMAGE" = "$SOURCE_IMAGE" ] &&
+  [ "$CURRENT_SOURCE_DIGEST" = "$TARGET_DIGEST" ] &&
+  [ "$CURRENT_SOURCE_TAG" = "$SOURCE_TAG" ] &&
+  [ "$CURRENT_RUNTIME_TAG" = "$RUNTIME_TAG" ] &&
+  [ "$CURRENT_NODE_ID" = "$NODE_ID" ] &&
+  [ "$CURRENT_CONTAINER_SOURCE_DIGEST" = "$TARGET_DIGEST" ] &&
+  [ "$CURRENT_IMAGE" = "$TARGET_RUNTIME_IMAGE" ] &&
+  [ "$CURRENT_HEALTH" = "healthy" ]; then
+  if [ "$TRANSACTIONAL_EXTERNAL_VERIFY" = true ]; then
+    verify_external_release "$TARGET_SHA" "$TARGET_DIGEST" "$EXTERNAL_ENVIRONMENT_LABEL"
+  fi
+  commit_transaction
+  rm -f "$ENV_BACKUP" || true
+  prune_stale_frontend_images
+  echo "[deploy-frontend] ${SOURCE_TAG} at ${TARGET_DIGEST} is already healthy; nothing to do"
+  exit 0
+fi
 
 echo "[deploy-frontend] updating distro checkout"
 git fetch origin main
@@ -441,8 +424,7 @@ if [ "$TRANSACTIONAL_EXTERNAL_VERIFY" = true ]; then
   verify_external_release "$TARGET_SHA" "$TARGET_DIGEST" "$EXTERNAL_ENVIRONMENT_LABEL"
 fi
 
-ROLLBACK_REQUIRED=false
-trap - ERR HUP INT TERM
+commit_transaction
 if ! rm -f "$ENV_BACKUP"; then
   echo "[deploy-frontend] warning: could not remove the local transaction backup" >&2
 fi
@@ -450,3 +432,4 @@ fi
 prune_stale_frontend_images
 
 echo "[deploy-frontend] deployed ${SOURCE_TAG} from ${SOURCE_IMAGE}"
+trap - ERR HUP INT TERM

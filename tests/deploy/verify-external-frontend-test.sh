@@ -241,8 +241,8 @@ set +e
 run_verifier no-digest "$missing_digest_output"
 missing_digest_code="$?"
 set -e
-[ "$missing_digest_code" -eq 3 ]
-grep -Fq 'digest header is not yet exposed; exact remote bootstrap evidence is required' "$missing_digest_output"
+[ "$missing_digest_code" -eq 1 ]
+grep -Fq 'digest identity is not exposed; the running wrapper cannot be bound to the requested artifact' "$missing_digest_output"
 
 assert_fails split-sha
 grep -Fq "observed frontend SHA(s): $TARGET_SHA $BAD_SHA" "$TEST_ROOT/split-sha.log"

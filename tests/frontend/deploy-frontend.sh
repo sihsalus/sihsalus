@@ -121,6 +121,12 @@ case "${1:-}" in
         fi
         ;;
       ls)
+        if [ "${FAKE_CANCEL_DURING_CLEANUP:-false}" = true ] &&
+          [ ! -f "${FAKE_STATE_DIR}/cleanup-cancel-sent" ]; then
+          : >"${FAKE_STATE_DIR}/cleanup-cancel-sent"
+          kill -TERM "$PPID"
+          sleep 1
+        fi
         case "${3:-}" in
           "${FAKE_SOURCE_REPOSITORY}")
             cat "${FAKE_STATE_DIR}/source_image_ids"
@@ -292,6 +298,7 @@ run_transactional_deploy() {
       FAKE_OLD_SHA="$OLD_SHA" \
       FAKE_OLD_VERIFY_MODE="$old_verify_mode" \
       FAKE_TARGET_VERIFY_MODE="$target_verify_mode" \
+      FAKE_CANCEL_DURING_CLEANUP="${FAKE_CANCEL_DURING_CLEANUP:-false}" \
       FAKE_TARGET_RUNTIME_ID="$TARGET_RUNTIME_ID" \
       FAKE_TARGET_SOURCE_ID="$TARGET_SOURCE_ID" \
       FAKE_SOURCE_REPOSITORY="$SOURCE_REPOSITORY" \
@@ -301,6 +308,7 @@ run_transactional_deploy() {
       FRONTEND_EXTERNAL_ENVIRONMENT_LABEL=PROD \
       FRONTEND_CURRENT_SHA="$OLD_SHA" \
       FRONTEND_CURRENT_DIGEST="$OLD_DIGEST" \
+      FRONTEND_TRANSACTION_STATE_PATH="$fixture/state/transaction-state" \
       SIHSALUS_NODE_ID="$OLD_NODE_ID" \
       "$ROOT/scripts/deploy/deploy-frontend.sh" "$TARGET_SHA" "$TARGET_DIGEST"
   )
@@ -585,15 +593,29 @@ assert_frontend_only_mutations "$verification_fixture/state/commands"
 transaction_verifier="$TEST_ROOT/transaction-verifier.sh"
 make_external_verifier "$transaction_verifier"
 
-bootstrap_fixture="$TEST_ROOT/transaction-bootstrap"
-make_fixture "$bootstrap_fixture"
-bootstrap_output="$(run_transactional_deploy "$bootstrap_fixture" "$transaction_verifier" success missing-digest 2>&1)"
-grep -Fq "exact remote bootstrap evidence matches SHA ${OLD_SHA}, digest ${OLD_DIGEST}, and node ${OLD_NODE_ID}" \
-  <<<"$bootstrap_output"
+legacy_wrapper_fixture="$TEST_ROOT/transaction-legacy-wrapper"
+make_fixture "$legacy_wrapper_fixture"
+# Model a same-SHA wrapper whose runtime content came from a different digest
+# than the mutable .env declaration. Without a served digest, it is unprovable.
+printf '%s\n' "$TARGET_DIGEST" >"$legacy_wrapper_fixture/state/source_digest"
+set +e
+legacy_wrapper_output="$(run_transactional_deploy "$legacy_wrapper_fixture" "$transaction_verifier" success missing-digest 2>&1)"
+legacy_wrapper_code="$?"
+set -e
+[ "$legacy_wrapper_code" -ne 0 ]
+grep -Fq 'current public release failed exact SHA, digest, and node preflight' <<<"$legacy_wrapper_output"
+assert_value unchanged "$(cat "$legacy_wrapper_fixture/state/transaction-state")" \
+  'legacy wrapper without runtime digest evidence did not fail closed'
+if grep -Eq '^(docker pull|docker compose build|docker compose up)' "$legacy_wrapper_fixture/state/commands"; then
+  echo 'legacy wrapper preflight failure mutated the frontend' >&2
+  exit 1
+fi
 
 transaction_success_fixture="$TEST_ROOT/transaction-success"
 make_fixture "$transaction_success_fixture"
 run_transactional_deploy "$transaction_success_fixture" "$transaction_verifier"
+assert_value committed "$(cat "$transaction_success_fixture/state/transaction-state")" \
+  'successful transaction did not persist committed state'
 target_verify_line="$(grep -n "^verify .* ${TARGET_SHA} ${TARGET_DIGEST} " "$transaction_success_fixture/state/events" | head -n 1 | cut -d: -f1)"
 first_prune_line="$(grep -n '^docker image rm ' "$transaction_success_fixture/state/events" | head -n 1 | cut -d: -f1)"
 if [ -z "$target_verify_line" ] || [ -z "$first_prune_line" ] ||
@@ -645,6 +667,18 @@ if grep -q '^docker image rm ' "$transaction_cancel_fixture/state/commands"; the
   echo 'canceled transaction pruned rollback images' >&2
   exit 1
 fi
+assert_value rolled-back "$(cat "$transaction_cancel_fixture/state/transaction-state")" \
+  'canceled transaction did not persist rolled-back state'
+
+post_commit_cancel_fixture="$TEST_ROOT/transaction-post-commit-cancellation"
+make_fixture "$post_commit_cancel_fixture"
+FAKE_CANCEL_DURING_CLEANUP=true \
+  run_transactional_deploy "$post_commit_cancel_fixture" "$transaction_verifier"
+assert_value "$TARGET_SHA" "$(cat "$post_commit_cancel_fixture/state/deployed_sha")" \
+  'post-commit cancellation reverted the publicly verified frontend'
+assert_value committed "$(cat "$post_commit_cancel_fixture/state/transaction-state")" \
+  'post-commit cancellation lost durable committed state'
+[ -f "$post_commit_cancel_fixture/state/cleanup-cancel-sent" ]
 
 rendered_frontend="$(
   cd "$ROOT"

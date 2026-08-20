@@ -171,6 +171,8 @@ set -euo pipefail
 [ "${EXTERNAL_VERIFY_CURL_TIMEOUT_SECONDS:-}" = 3 ]
 [ -z "${DEPLOY_FRONTEND_EXTERNAL_VERIFIER_PATH:-}" ]
 [ -x "$(dirname "$0")/verify-external-frontend.sh" ]
+[ "${FRONTEND_TRANSACTION_STATE_PATH:-}" = "$(dirname "$0")/frontend-transaction.state" ]
+printf '%s\n' committed >"$FRONTEND_TRANSACTION_STATE_PATH"
 echo 'transaction fixture completed'
 TRANSACTION_SCRIPT
 
@@ -191,7 +193,20 @@ while true; do
 done
 CANCELLATION_SCRIPT
 
-chmod 700 "$SUCCESS_FIXTURE" "$FAILURE_FIXTURE" "$TRANSACTION_FIXTURE" "$DUMMY_VERIFIER" "$CANCELLATION_FIXTURE"
+COMMITTED_CLEANUP_FIXTURE="$TEMP_ROOT/committed-cleanup.sh"
+cat >"$COMMITTED_CLEANUP_FIXTURE" <<'COMMITTED_CLEANUP_SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "committed cleanup interrupted"; exit 0' TERM HUP
+printf '%s\n' committed >"$FRONTEND_TRANSACTION_STATE_PATH"
+echo 'public verification passed and transaction committed'
+while true; do
+  sleep 1
+done
+COMMITTED_CLEANUP_SCRIPT
+
+chmod 700 "$SUCCESS_FIXTURE" "$FAILURE_FIXTURE" "$TRANSACTION_FIXTURE" "$DUMMY_VERIFIER" \
+  "$CANCELLATION_FIXTURE" "$COMMITTED_CLEANUP_FIXTURE"
 
 BACKEND_SHA="1111111111111111111111111111111111111111"
 BACKEND_DIGEST="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -391,6 +406,28 @@ if [ "$timeout_finished" != true ]; then
 fi
 [ "$(cat "$REMOTE_REPOSITORY/.redeploy-runs/timeout-run/status")" = 143 ]
 grep -Fq 'fixture canceled' "$REMOTE_REPOSITORY/.redeploy-runs/timeout-run/redeploy.log"
+
+COMMITTED_TIMEOUT_OUTPUT="$TEMP_ROOT/committed-timeout-output.log"
+PATH="$FAKE_BIN:$PATH" \
+  SSH_BIN="$FAKE_BIN/ssh" \
+  REDEPLOY_SCRIPT_PATH="$COMMITTED_CLEANUP_FIXTURE" \
+  EXTERNAL_VERIFIER_PATH="$DUMMY_VERIFIER" \
+  REDEPLOY_POLL_INTERVAL_SECONDS=1 \
+  REDEPLOY_TIMEOUT_SECONDS=2 \
+  REDEPLOY_CANCEL_RETRY_INTERVAL_SECONDS=1 \
+  REDEPLOY_EXPECTED_REMOTE_MAC="$EXPECTED_REMOTE_MAC" \
+  REDEPLOY_EXPECTED_NODE_ID="$EXPECTED_NODE_ID" \
+  REDEPLOY_REMOTE_MAC_PATH="$REMOTE_MAC_PATH" \
+  REDEPLOY_FRONTEND_BASE_URL=https://prod.example.test \
+  REDEPLOY_FRONTEND_CURRENT_SHA=2222222222222222222222222222222222222222 \
+  REDEPLOY_FRONTEND_CURRENT_DIGEST=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+  bash "$RUNNER" \
+  "$SSH_KEY" deploy@example.test "$REMOTE_REPOSITORY" \
+  "$BACKEND_SHA" "$BACKEND_DIGEST" committed-timeout-run >"$COMMITTED_TIMEOUT_OUTPUT" 2>&1
+[ "$(cat "$REMOTE_REPOSITORY/.redeploy-runs/committed-timeout-run/status")" = 0 ]
+grep -Fq 'public verification passed and transaction committed' "$COMMITTED_TIMEOUT_OUTPUT"
+grep -Fq 'confirmed durable committed transaction' "$COMMITTED_TIMEOUT_OUTPUT"
+grep -Fq 'treating the transaction as successful' "$COMMITTED_TIMEOUT_OUTPUT"
 
 FAILURE_OUTPUT="$TEMP_ROOT/failure-output.log"
 set +e

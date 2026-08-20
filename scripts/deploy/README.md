@@ -14,7 +14,9 @@ El script:
 5. verifica salud, imagen, digest fuente y `build-info.json`;
 6. en producción mantiene la transacción abierta durante la verificación
    pública exacta de SHA, digest y nodo, y restaura/verifica el release anterior
-   ante fallo, timeout o cancelación;
+   ante fallo, timeout o cancelación; el proceso remoto persiste y el runner
+   confirma un estado terminal `committed`, `rolled-back`, `unchanged` o
+   `rollback-failed`;
 7. solo después de verificar públicamente el frontend, elimina imágenes antiguas de los dos
    repositorios exclusivos del frontend y conserva las imágenes fuente y
    runtime activas.
@@ -46,6 +48,8 @@ conexiones HTTP/1.1 independientes durante 55 segundos. En cada muestra valida
 `/health`, `/ready`, `/openmrs/health/started` y `build-info.json`, omite cachés
 y exige que todas las revisiones y digests fuente observados coincidan con el
 artefacto desplegado.
+La ausencia del header de digest falla cerrado: ni `.env` ni una imagen local
+demuestran qué digest produjo un wrapper legacy actualmente servido.
 También exige una única dirección remota y que `X-SIHSALUS-Node-ID` coincida
 exactamente con el UUID estable configurado para el ambiente. El runner solo
 entrega ese UUID al host cuya MAC fue validada y el wrapper frontend lo hornea

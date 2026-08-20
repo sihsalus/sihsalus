@@ -63,6 +63,13 @@ grep -Fq 'REDEPLOY_FRONTEND_TLS_PINNED_PUBLIC_KEY="${tls_pin}"' "$WORKFLOW"
 grep -Fq 'scripts/deploy/run-redeploy-remote.sh' "$WORKFLOW"
 grep -Fq 'scripts/deploy/verify-external-frontend.sh' "$WORKFLOW"
 grep -Fq 'Deploy and verify exact frontend release transactionally' "$WORKFLOW"
+grep -Fq 'FRONTEND_TRANSACTION_STATE_PATH' "$ROOT/scripts/deploy/run-redeploy-remote.sh"
+grep -Fq 'confirmed durable committed transaction' "$ROOT/scripts/deploy/run-redeploy-remote.sh"
+grep -Fq 'write_transaction_state rolled-back' "$ROOT/scripts/deploy/deploy-frontend.sh"
+if grep -Fq 'exact remote bootstrap evidence' "$ROOT/scripts/deploy/deploy-frontend.sh"; then
+  echo 'production promotion still trusts mutable legacy bootstrap evidence' >&2
+  exit 1
+fi
 if grep -Eq 'continue-on-error:|Restore previous release|target-verify|PROD-ROLLBACK' "$WORKFLOW"; then
   echo 'production workflow still depends on a post-transaction rollback step' >&2
   exit 1

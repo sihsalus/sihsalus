@@ -104,18 +104,23 @@ transaction. The prior `.env`, runtime image, and source image remain retained
 until that verification succeeds. A deployment error, external mismatch,
 runner timeout, or workflow cancellation sends `TERM` to the remote process
 group; `deploy-frontend.sh` restores and verifies the supplied current release
-before the transaction exits. There is no later workflow step on which
-rollback depends. A failed rollback remains an incident even if the endpoint
-later appears healthy.
+before the transaction exits. The remote process persists one terminal state:
+`rolled-back`, `unchanged`, `rollback-failed`, or `committed`. The runner waits
+for that state and the detached process status instead of treating delivery of
+`TERM` as rollback evidence. If public verification completed first, a durable
+`committed` state makes a late cancellation successful and leaves the verified
+release active; cleanup is best-effort after that commit point. There is no
+later workflow step on which rollback depends. A missing terminal state or
+failed rollback remains an incident even if the endpoint later appears
+healthy.
 
-The first promotion after this digest-header change has one narrow bootstrap
-path. If every otherwise valid public sample lacks only
-`X-SIHSALUS-Frontend-Digest`, the identity-bound remote process must prove the
-declared SHA and digest from the running container configuration and the local
-OCI source image. A missing image, different digest, different revision,
-different node, unhealthy container, or any other external mismatch fails
-closed. Once the new wrapper is live, all later checks require the public
-digest header.
+Production must already expose `X-SIHSALUS-Frontend-Digest` for the currently
+running release before this workflow can promote or roll back anything. A
+legacy wrapper without that runtime evidence fails closed, even when `.env`, a
+local OCI image, and `build-info.json` claim the same SHA: those mutable inputs
+cannot prove which digest produced the served files. Upgrade and verify the
+current wrapper through a separately approved maintenance procedure before
+enabling this workflow; do not use the promotion run itself as a bootstrap.
 
 ## Roll back after a completed promotion
 

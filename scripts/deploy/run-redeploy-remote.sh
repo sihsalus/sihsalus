@@ -16,6 +16,7 @@ EXPECTED_NODE_ID="${REDEPLOY_EXPECTED_NODE_ID:-}"
 REMOTE_MAC_PATH="${REDEPLOY_REMOTE_MAC_PATH:-/sys/class/net/ens160/address}"
 CANCEL_ATTEMPTS="${REDEPLOY_CANCEL_ATTEMPTS:-6}"
 CANCEL_RETRY_INTERVAL_SECONDS="${REDEPLOY_CANCEL_RETRY_INTERVAL_SECONDS:-2}"
+CANCEL_CONFIRM_ATTEMPTS="${REDEPLOY_CANCEL_CONFIRM_ATTEMPTS:-30}"
 REMOTE_IDENTITY_MISMATCH_EXIT=86
 FRONTEND_BASE_URL="${REDEPLOY_FRONTEND_BASE_URL:-}"
 FRONTEND_CURRENT_SHA="${REDEPLOY_FRONTEND_CURRENT_SHA:-}"
@@ -25,6 +26,7 @@ FRONTEND_TLS_INSECURE="${REDEPLOY_FRONTEND_TLS_INSECURE:-false}"
 FRONTEND_TLS_PINNED_PUBLIC_KEY="${REDEPLOY_FRONTEND_TLS_PINNED_PUBLIC_KEY:-}"
 FRONTEND_TRANSACTIONAL_VERIFY=false
 FRONTEND_TRANSACTION_FILE=""
+CONFIRMED_REMOTE_OUTCOME=""
 
 usage() {
   echo "Usage: $0 <ssh-key> <user@host> <remote-repository> <backend-sha> <backend-digest> <run-token>" >&2
@@ -134,6 +136,7 @@ for numeric_value in \
   "$MAX_TRANSPORT_FAILURES" \
   "$INITIAL_TRANSPORT_ATTEMPTS" \
   "$CANCEL_ATTEMPTS" \
+  "$CANCEL_CONFIRM_ATTEMPTS" \
   "$CANCEL_RETRY_INTERVAL_SECONDS"; do
   if [[ ! "$numeric_value" =~ ^[1-9][0-9]*$ ]]; then
     echo "[remote-redeploy] polling and timeout values must be positive integers" >&2
@@ -164,6 +167,7 @@ REMOTE_SCRIPT="$REMOTE_RUN_DIRECTORY/redeploy-environment.sh"
 REMOTE_CLEAN_CHECKOUT_HELPER="$REMOTE_RUN_DIRECTORY/check-clean-checkout.sh"
 REMOTE_EXTERNAL_VERIFIER="$REMOTE_RUN_DIRECTORY/verify-external-frontend.sh"
 REMOTE_FRONTEND_TRANSACTION="$REMOTE_RUN_DIRECTORY/frontend-transaction.env"
+REMOTE_FRONTEND_TRANSACTION_STATE="$REMOTE_RUN_DIRECTORY/frontend-transaction.state"
 REMOTE_LOG="$REMOTE_RUN_DIRECTORY/redeploy.log"
 REMOTE_STATUS="$REMOTE_RUN_DIRECTORY/status"
 REMOTE_PID="$REMOTE_RUN_DIRECTORY/pid"
@@ -191,6 +195,11 @@ if [ -n "$expected_mac" ]; then
 fi
 
 if [ -f "$status_path" ] || [ ! -f "$pid_path" ]; then
+  if [ -f "$status_path" ]; then
+    echo terminal
+  else
+    echo not-started
+  fi
   exit 0
 fi
 
@@ -198,16 +207,130 @@ remote_pid="$(cat "$pid_path")"
 if [[ "$remote_pid" =~ ^[1-9][0-9]*$ ]]; then
   kill -TERM -- "-${remote_pid}" 2>/dev/null || kill -TERM "$remote_pid" 2>/dev/null || true
 fi
+echo signaled
 REMOTE_CANCEL
+}
+
+read_remote_terminal_state_once() {
+  "${SSH_COMMAND[@]}" "$REMOTE_TARGET" bash -s -- \
+    "$EXPECTED_REMOTE_MAC" "$REMOTE_MAC_PATH" \
+    "$REMOTE_STATUS" "$REMOTE_PID" "$REMOTE_FRONTEND_TRANSACTION_STATE" <<'REMOTE_TERMINAL_STATE'
+set -euo pipefail
+expected_mac="$1"
+mac_path="$2"
+status_path="$3"
+pid_path="$4"
+transaction_state_path="$5"
+
+if [ -n "$expected_mac" ]; then
+  if [ ! -r "$mac_path" ]; then
+    echo "[remote-redeploy] cannot read remote MAC address at $mac_path" >&2
+    exit 86
+  fi
+  IFS= read -r actual_mac <"$mac_path"
+  if [ "$actual_mac" != "$expected_mac" ]; then
+    echo "[remote-redeploy] remote MAC $actual_mac does not match expected $expected_mac" >&2
+    exit 86
+  fi
+fi
+
+remote_status=missing
+transaction_state=missing
+running=false
+if [ -f "$status_path" ]; then
+  IFS= read -r remote_status <"$status_path"
+fi
+if [ -f "$transaction_state_path" ]; then
+  IFS= read -r transaction_state <"$transaction_state_path"
+fi
+if [ -f "$pid_path" ]; then
+  IFS= read -r remote_pid <"$pid_path"
+  if [[ "$remote_pid" =~ ^[1-9][0-9]*$ ]] && kill -0 "$remote_pid" 2>/dev/null; then
+    running=true
+  fi
+fi
+printf '%s|%s|%s\n' "$remote_status" "$transaction_state" "$running"
+REMOTE_TERMINAL_STATE
+}
+
+wait_for_remote_terminal_state() {
+  local attempt=1
+  local observation
+  local remote_status
+  local transaction_state
+  local running
+
+  while [ "$attempt" -le "$CANCEL_CONFIRM_ATTEMPTS" ]; do
+    if observation="$(read_remote_terminal_state_once)"; then
+      IFS='|' read -r remote_status transaction_state running <<<"$observation"
+      if { [ "$remote_status" != missing ] && [[ ! "$remote_status" =~ ^[0-9]+$ ]]; } ||
+        [[ ! "$transaction_state" =~ ^(missing|starting|active|committed|rolled-back|rollback-failed|unchanged)$ ]] ||
+        [[ ! "$running" =~ ^(true|false)$ ]]; then
+        echo "[remote-redeploy] invalid terminal-state evidence from remote run" >&2
+        return 1
+      fi
+      if [ "$remote_status" != missing ] && [ "$remote_status" -gt 255 ]; then
+        echo "[remote-redeploy] invalid terminal status from remote run" >&2
+        return 1
+      fi
+
+      if [ "$FRONTEND_TRANSACTIONAL_VERIFY" = true ]; then
+        case "$transaction_state" in
+          committed)
+            if [ "$remote_status" = 0 ]; then
+              CONFIRMED_REMOTE_OUTCOME=committed
+              echo "[remote-redeploy] confirmed durable committed transaction"
+              return 0
+            fi
+            ;;
+          starting | rolled-back | unchanged)
+            if [ "$remote_status" != missing ] && [ "$remote_status" -ne 0 ]; then
+              if [ "$transaction_state" = starting ]; then
+                CONFIRMED_REMOTE_OUTCOME=unchanged
+                echo "[remote-redeploy] confirmed the deployment stopped before frontend mutation"
+              else
+                CONFIRMED_REMOTE_OUTCOME="$transaction_state"
+                echo "[remote-redeploy] confirmed terminal frontend state: ${transaction_state}"
+              fi
+              return 0
+            fi
+            ;;
+          rollback-failed)
+            CONFIRMED_REMOTE_OUTCOME=rollback-failed
+            echo "[remote-redeploy] remote frontend rollback failed and requires operator intervention" >&2
+            return 1
+            ;;
+        esac
+      elif [ "$remote_status" != missing ]; then
+        CONFIRMED_REMOTE_OUTCOME=completed
+        echo "[remote-redeploy] confirmed terminal remote status ${remote_status}"
+        return 0
+      fi
+    fi
+
+    if [ "$attempt" -lt "$CANCEL_CONFIRM_ATTEMPTS" ]; then
+      sleep "$CANCEL_RETRY_INTERVAL_SECONDS"
+    fi
+    attempt=$((attempt + 1))
+  done
+
+  echo "[remote-redeploy] remote run did not publish a verifiable terminal state after cancellation" >&2
+  return 1
 }
 
 cancel_remote_run() {
   local attempt=1
   local cancel_code=0
+  local cancel_result
 
   while true; do
-    if cancel_remote_run_once; then
-      return 0
+    if cancel_result="$(cancel_remote_run_once)"; then
+      if [ "$cancel_result" = not-started ]; then
+        CONFIRMED_REMOTE_OUTCOME=not-started
+        return 0
+      fi
+      wait_for_remote_terminal_state
+      return "$?"
     else
       cancel_code="$?"
     fi
@@ -329,6 +452,8 @@ nohup setsid bash -c '
   status_path="$run_directory/status"
   status_tmp="$run_directory/status.tmp"
   frontend_transaction="$run_directory/frontend-transaction.env"
+  frontend_transaction_state="$run_directory/frontend-transaction.state"
+  termination_requested=false
 
   exec >"$log_path" 2>&1
 
@@ -340,9 +465,12 @@ nohup setsid bash -c '
     mv -f "$status_tmp" "$status_path"
   }
 
+  request_interrupt() {
+    termination_requested=true
+  }
+
   trap write_status EXIT
-  trap "exit 130" INT
-  trap "exit 143" TERM HUP
+  trap request_interrupt INT TERM HUP
 
   cd "$repository" || exit 1
   exec 9>"$repository/.redeploy-runs/redeploy.lock"
@@ -358,9 +486,19 @@ nohup setsid bash -c '
     # and contains only values validated by the local runner.
     . "$frontend_transaction"
     set +a
+    printf '%s\n' starting >"$frontend_transaction_state"
+    chmod 600 "$frontend_transaction_state"
   fi
   bash "$run_directory/redeploy-environment.sh" "$backend_sha" "$backend_digest"
-  exit "$?"
+  deploy_code="$?"
+  if [ "$termination_requested" = true ] && [ "$deploy_code" -eq 0 ]; then
+    if [ -f "$frontend_transaction_state" ] &&
+      [ "$(cat "$frontend_transaction_state")" = committed ]; then
+      exit 0
+    fi
+    exit 143
+  fi
+  exit "$deploy_code"
 ' remote-redeploy-worker \
   "$repository" \
   "$run_directory" \
@@ -404,6 +542,7 @@ if [ "$FRONTEND_TRANSACTIONAL_VERIFY" = true ]; then
     printf 'FRONTEND_EXTERNAL_ENVIRONMENT_LABEL=%s\n' "$FRONTEND_ENVIRONMENT_LABEL"
     printf 'FRONTEND_CURRENT_SHA=%s\n' "$FRONTEND_CURRENT_SHA"
     printf 'FRONTEND_CURRENT_DIGEST=%s\n' "$FRONTEND_CURRENT_DIGEST"
+    printf 'FRONTEND_TRANSACTION_STATE_PATH=%s\n' "$REMOTE_FRONTEND_TRANSACTION_STATE"
     printf 'DEPLOY_FRONTEND_EXTERNAL_VERIFIER_PATH=\n'
     printf 'EXTERNAL_VERIFY_SAMPLE_COUNT=12\n'
     printf 'EXTERNAL_VERIFY_SAMPLE_INTERVAL_SECONDS=5\n'
@@ -481,7 +620,14 @@ finish_local() {
   fi
   if [ "$REMOTE_FINISHED" != true ]; then
     echo "[remote-redeploy] local monitor stopped; terminating the detached remote run" >&2
-    cancel_remote_run || echo "[remote-redeploy] warning: remote cancellation was not confirmed" >&2
+    if cancel_remote_run; then
+      if [ "$CONFIRMED_REMOTE_OUTCOME" = committed ]; then
+        echo "[remote-redeploy] the exact release committed before cancellation; treating the transaction as successful"
+        exit_code=0
+      fi
+    else
+      echo "[remote-redeploy] warning: remote cancellation was not confirmed" >&2
+    fi
   fi
   exit "$exit_code"
 }
@@ -538,6 +684,10 @@ REMOTE_STATUS_CHECK
           if [ "$final_log_code" -eq "$REMOTE_IDENTITY_MISMATCH_EXIT" ]; then
             IDENTITY_MISMATCH_OBSERVED=true
           fi
+        fi
+        if ! wait_for_remote_terminal_state; then
+          echo "[remote-redeploy] detached run ended without verifiable terminal transaction evidence" >&2
+          exit 1
         fi
         REMOTE_FINISHED=true
         if [ "$remote_status" -ne 0 ]; then

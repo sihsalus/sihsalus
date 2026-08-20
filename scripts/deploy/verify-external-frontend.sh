@@ -321,13 +321,10 @@ if [ "$other_failure_count" -ne 0 ]; then
   exit 1
 fi
 
-# Exit 3 is deliberately narrow: it permits the production bootstrap path to
-# replace only missing digest-header evidence with an exact, identity-bound
-# remote inspection. Invalid, mixed, or mismatched digest observations fail.
 if [ "$missing_digest_count" -eq "$SAMPLE_COUNT" ] &&
   [ "$unique_digests" = '<not-exposed>' ]; then
-  echo "[external-verify] ${ENVIRONMENT_LABEL}: digest header is not yet exposed; exact remote bootstrap evidence is required" >&2
-  exit 3
+  echo "[external-verify] ${ENVIRONMENT_LABEL}: digest identity is not exposed; the running wrapper cannot be bound to the requested artifact" >&2
+  exit 1
 fi
 
 if [ "$missing_digest_count" -ne 0 ]; then
