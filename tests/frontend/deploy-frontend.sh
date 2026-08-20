@@ -43,14 +43,18 @@ SOURCE_REPOSITORY='ghcr.io/sihsalus/sihsalus-frontend'
 TARGET_SOURCE_IMAGE="${SOURCE_REPOSITORY}@${TARGET_DIGEST}"
 TARGET_RUNTIME_TAG="digest-${TARGET_DIGEST#sha256:}"
 TARGET_RUNTIME_IMAGE="sihsalus-frontend-runtime:${TARGET_RUNTIME_TAG}"
-TARGET_SOURCE_ID='sha256:target-source-image'
-TARGET_RUNTIME_ID='sha256:target-runtime-image'
-OLD_SOURCE_ID='sha256:old-source-image'
-OLD_RUNTIME_ID='sha256:old-runtime-image'
-STALE_SOURCE_ID='sha256:stale-source-image'
-STALE_RUNTIME_ID='sha256:stale-runtime-image'
+TARGET_SOURCE_ID='sha256:1111111111111111111111111111111111111111111111111111111111111111'
+TARGET_RUNTIME_ID='sha256:2222222222222222222222222222222222222222222222222222222222222222'
+OLD_SOURCE_ID='sha256:3333333333333333333333333333333333333333333333333333333333333333'
+OLD_RUNTIME_ID='sha256:4444444444444444444444444444444444444444444444444444444444444444'
+STALE_SOURCE_ID='sha256:5555555555555555555555555555555555555555555555555555555555555555'
+STALE_RUNTIME_ID='sha256:6666666666666666666666666666666666666666666666666666666666666666'
 OLD_NODE_ID='00000000-0000-4000-8000-000000000001'
 NODE_ID='00000000-0000-4000-8000-000000000002'
+DISTRO_SHA='7777777777777777777777777777777777777777'
+BAD_DISTRO_SHA='8888888888888888888888888888888888888888'
+ROLLBACK_RUNTIME_TAG="rollback-${OLD_DIGEST#sha256:}"
+ROLLBACK_RUNTIME_IMAGE="sihsalus-frontend-runtime:${ROLLBACK_RUNTIME_TAG}"
 
 make_fixture() {
   local fixture="$1"
@@ -67,6 +71,8 @@ EOF
   printf '%s\n' "$TARGET_SHA" >"$fixture/state/source_sha"
   printf '%s\n' "healthy" >"$fixture/state/health"
   printf '%s\n' "sihsalus-frontend-runtime:sha-${OLD_SHA}" >"$fixture/state/image"
+  printf '%s\n' "$OLD_RUNTIME_ID" >"$fixture/state/image_id"
+  printf '%s\n' "$OLD_RUNTIME_ID" >"$fixture/state/old_runtime_id"
   printf '%s\n' "$OLD_NODE_ID" >"$fixture/state/node_id"
   printf '%s\n' "$OLD_DIGEST" >"$fixture/state/source_digest"
   printf '%s\n' "$OLD_SOURCE_ID" "$TARGET_SOURCE_ID" "$STALE_SOURCE_ID" >"$fixture/state/source_image_ids"
@@ -79,6 +85,12 @@ printf 'git %s\n' "$*" >>"${FAKE_STATE_DIR}/commands"
 if [ "$*" = 'status --porcelain=v1 --untracked-files=no' ] &&
   [ "${FAKE_TRACKED_DRIFT:-false}" = true ]; then
   printf '%s\n' ' M compose/fua.yml'
+fi
+if [ "$*" = 'rev-parse FETCH_HEAD' ]; then
+  printf '%s\n' "${FAKE_FETCHED_DISTRO_SHA:-$FAKE_DISTRO_SHA}"
+fi
+if [ "$*" = 'rev-parse HEAD' ]; then
+  printf '%s\n' "$FAKE_DISTRO_SHA"
 fi
 EOF
 
@@ -110,6 +122,9 @@ case "${1:-}" in
             "${FAKE_TARGET_RUNTIME_IMAGE}")
               printf '%s\n' "${FAKE_TARGET_RUNTIME_ID}"
               ;;
+            "${FAKE_CURRENT_RUNTIME_IMAGE}" | "${FAKE_CURRENT_RUNTIME_ID}" | "${FAKE_ROLLBACK_RUNTIME_IMAGE}")
+              printf '%s\n' "${FAKE_CURRENT_RUNTIME_ID}"
+              ;;
             *)
               echo "unexpected image inspection: $*" >&2
               exit 88
@@ -119,6 +134,10 @@ case "${1:-}" in
           echo "unexpected image inspection: $*" >&2
           exit 88
         fi
+        ;;
+      tag)
+        [ "${3:-}" = "${FAKE_CURRENT_RUNTIME_ID}" ]
+        [ "${4:-}" = "${FAKE_ROLLBACK_RUNTIME_IMAGE}" ]
         ;;
       ls)
         if [ "${FAKE_CANCEL_DURING_CLEANUP:-false}" = true ] &&
@@ -155,7 +174,9 @@ case "${1:-}" in
     printf '{\n  "gitSha": "%s"\n}\n' "$(cat "${FAKE_STATE_DIR}/deployed_sha")"
     ;;
   inspect)
-    if [[ "$*" == *'org.sihsalus.node-id'* ]]; then
+    if [[ "$*" == *'{{.Image}}'* ]]; then
+      cat "${FAKE_STATE_DIR}/image_id"
+    elif [[ "$*" == *'org.sihsalus.node-id'* ]]; then
       cat "${FAKE_STATE_DIR}/node_id"
     elif [[ "$*" == *'org.sihsalus.frontend.source-digest'* ]]; then
       cat "${FAKE_STATE_DIR}/source_digest"
@@ -179,8 +200,13 @@ case "${1:-}" in
       up)
         runtime_tag="$(awk -F= '$1 == "FRONTEND_RUNTIME_TAG" { print $2 }' .env)"
         deployed_sha="${runtime_tag#sha-}"
+        image_id="$(cat "${FAKE_STATE_DIR}/old_runtime_id")"
         if [ "$runtime_tag" = "${FAKE_TARGET_RUNTIME_TAG}" ]; then
           deployed_sha="${FAKE_TARGET_SHA}"
+          image_id="${FAKE_TARGET_RUNTIME_ID}"
+        elif [ "$runtime_tag" = "${FAKE_ROLLBACK_RUNTIME_TAG:-__no-rollback-tag__}" ]; then
+          deployed_sha="${FAKE_OLD_SHA}"
+          image_id="$(cat "${FAKE_STATE_DIR}/old_runtime_id")"
         fi
         if [ "${FAKE_BAD_DEPLOY_SHA:-false}" = true ] &&
           [ "$runtime_tag" = "${FAKE_TARGET_RUNTIME_TAG}" ]; then
@@ -189,6 +215,7 @@ case "${1:-}" in
         printf '%s\n' "$deployed_sha" >"${FAKE_STATE_DIR}/deployed_sha"
         printf '%s\n' "healthy" >"${FAKE_STATE_DIR}/health"
         printf '%s\n' "sihsalus-frontend-runtime:${runtime_tag}" >"${FAKE_STATE_DIR}/image"
+        printf '%s\n' "$image_id" >"${FAKE_STATE_DIR}/image_id"
         awk -F= '$1 == "SIHSALUS_NODE_ID" { print $2 }' .env >"${FAKE_STATE_DIR}/node_id"
         awk -F= '$1 == "FRONTEND_SOURCE_DIGEST" { print $2 }' .env >"${FAKE_STATE_DIR}/source_digest"
         ;;
@@ -219,6 +246,11 @@ run_deploy() {
       FAKE_TARGET_SOURCE_IMAGE="$TARGET_SOURCE_IMAGE" \
       FAKE_OLD_SOURCE_IMAGE="${SOURCE_REPOSITORY}@${OLD_DIGEST}" \
       FAKE_OLD_SHA="$OLD_SHA" \
+      FAKE_CURRENT_RUNTIME_IMAGE="sihsalus-frontend-runtime:sha-${OLD_SHA}" \
+      FAKE_CURRENT_RUNTIME_ID="$OLD_RUNTIME_ID" \
+      FAKE_ROLLBACK_RUNTIME_IMAGE="$ROLLBACK_RUNTIME_IMAGE" \
+      FAKE_ROLLBACK_RUNTIME_TAG="$ROLLBACK_RUNTIME_TAG" \
+      FAKE_DISTRO_SHA="$DISTRO_SHA" \
       FAKE_TARGET_RUNTIME_ID="$TARGET_RUNTIME_ID" \
       FAKE_TARGET_SOURCE_ID="$TARGET_SOURCE_ID" \
       FAKE_SOURCE_REPOSITORY="$SOURCE_REPOSITORY" \
@@ -296,6 +328,12 @@ run_transactional_deploy() {
       FAKE_TARGET_SOURCE_IMAGE="$TARGET_SOURCE_IMAGE" \
       FAKE_OLD_SOURCE_IMAGE="${SOURCE_REPOSITORY}@${OLD_DIGEST}" \
       FAKE_OLD_SHA="$OLD_SHA" \
+      FAKE_CURRENT_RUNTIME_IMAGE="sihsalus-frontend-runtime:sha-${OLD_SHA}" \
+      FAKE_CURRENT_RUNTIME_ID="$OLD_RUNTIME_ID" \
+      FAKE_ROLLBACK_RUNTIME_IMAGE="$ROLLBACK_RUNTIME_IMAGE" \
+      FAKE_ROLLBACK_RUNTIME_TAG="$ROLLBACK_RUNTIME_TAG" \
+      FAKE_DISTRO_SHA="$DISTRO_SHA" \
+      FAKE_FETCHED_DISTRO_SHA="${FAKE_FETCHED_DISTRO_SHA:-$DISTRO_SHA}" \
       FAKE_OLD_VERIFY_MODE="$old_verify_mode" \
       FAKE_TARGET_VERIFY_MODE="$target_verify_mode" \
       FAKE_CANCEL_DURING_CLEANUP="${FAKE_CANCEL_DURING_CLEANUP:-false}" \
@@ -308,6 +346,7 @@ run_transactional_deploy() {
       FRONTEND_EXTERNAL_ENVIRONMENT_LABEL=PROD \
       FRONTEND_CURRENT_SHA="$OLD_SHA" \
       FRONTEND_CURRENT_DIGEST="$OLD_DIGEST" \
+      DEPLOY_FRONTEND_DISTRO_SHA="$DISTRO_SHA" \
       FRONTEND_TRANSACTION_STATE_PATH="$fixture/state/transaction-state" \
       SIHSALUS_NODE_ID="$OLD_NODE_ID" \
       "$ROOT/scripts/deploy/deploy-frontend.sh" "$TARGET_SHA" "$TARGET_DIGEST"
@@ -616,6 +655,10 @@ make_fixture "$transaction_success_fixture"
 run_transactional_deploy "$transaction_success_fixture" "$transaction_verifier"
 assert_value committed "$(cat "$transaction_success_fixture/state/transaction-state")" \
   'successful transaction did not persist committed state'
+grep -Fqx "git merge --ff-only ${DISTRO_SHA}" "$transaction_success_fixture/state/commands"
+grep -Fqx "git rev-parse HEAD" "$transaction_success_fixture/state/commands"
+grep -Fqx "docker image tag ${OLD_RUNTIME_ID} ${ROLLBACK_RUNTIME_IMAGE}" \
+  "$transaction_success_fixture/state/commands"
 target_verify_line="$(grep -n "^verify .* ${TARGET_SHA} ${TARGET_DIGEST} " "$transaction_success_fixture/state/events" | head -n 1 | cut -d: -f1)"
 first_prune_line="$(grep -n '^docker image rm ' "$transaction_success_fixture/state/events" | head -n 1 | cut -d: -f1)"
 if [ -z "$target_verify_line" ] || [ -z "$first_prune_line" ] ||
@@ -633,9 +676,55 @@ fi
 assert_value "$OLD_SHA" \
   "$(cat "$transaction_failure_fixture/state/deployed_sha")" \
   'transaction did not restore the previous frontend after public verification failure'
+assert_value "$OLD_RUNTIME_ID" \
+  "$(cat "$transaction_failure_fixture/state/image_id")" \
+  'transaction did not restore the captured immutable runtime image ID'
+assert_value "$ROLLBACK_RUNTIME_TAG" \
+  "$(awk -F= '$1 == "FRONTEND_RUNTIME_TAG" { print $2 }' "$transaction_failure_fixture/.env")" \
+  'transaction rollback did not bind Compose to the captured runtime image'
+assert_value rolled-back "$(cat "$transaction_failure_fixture/state/transaction-state")" \
+  'transaction rollback did not persist its terminal state'
+grep -Fqx "docker image tag ${OLD_RUNTIME_ID} ${ROLLBACK_RUNTIME_IMAGE}" \
+  "$transaction_failure_fixture/state/commands"
 [ "$(cat "$transaction_failure_fixture/state/old-verifications")" -eq 2 ]
 if grep -q '^docker image rm ' "$transaction_failure_fixture/state/commands"; then
   echo 'failed transaction pruned rollback images before verification completed' >&2
+  exit 1
+fi
+
+configuration_drift_fixture="$TEST_ROOT/transaction-current-configuration-drift"
+make_fixture "$configuration_drift_fixture"
+sed -i.bak "s/FRONTEND_SOURCE_DIGEST=${OLD_DIGEST}/FRONTEND_SOURCE_DIGEST=${TARGET_DIGEST}/" \
+  "$configuration_drift_fixture/.env"
+rm -f "$configuration_drift_fixture/.env.bak"
+set +e
+configuration_drift_output="$(run_transactional_deploy "$configuration_drift_fixture" "$transaction_verifier" 2>&1)"
+configuration_drift_code="$?"
+set -e
+[ "$configuration_drift_code" -ne 0 ]
+grep -Fq 'current local runtime/configuration does not match the declared rollback' \
+  <<<"$configuration_drift_output"
+assert_value unchanged "$(cat "$configuration_drift_fixture/state/transaction-state")" \
+  'current configuration drift did not fail before frontend mutation'
+if grep -Eq '^(git fetch|docker pull|docker compose build|docker compose up|docker image tag)' \
+  "$configuration_drift_fixture/state/commands"; then
+  echo 'current configuration drift reached a deployment mutation' >&2
+  exit 1
+fi
+
+stale_distro_fixture="$TEST_ROOT/transaction-stale-distro"
+make_fixture "$stale_distro_fixture"
+set +e
+stale_distro_output="$(FAKE_FETCHED_DISTRO_SHA="$BAD_DISTRO_SHA" \
+  run_transactional_deploy "$stale_distro_fixture" "$transaction_verifier" 2>&1)"
+stale_distro_code="$?"
+set -e
+[ "$stale_distro_code" -ne 0 ]
+grep -Fq 'protected distro SHA is no longer the fetched main branch tip' <<<"$stale_distro_output"
+assert_value unchanged "$(cat "$stale_distro_fixture/state/transaction-state")" \
+  'stale protected distro SHA did not fail before frontend mutation'
+if grep -Eq '^(docker pull|docker compose build|docker compose up)' "$stale_distro_fixture/state/commands"; then
+  echo 'stale protected distro SHA reached a frontend deployment mutation' >&2
   exit 1
 fi
 

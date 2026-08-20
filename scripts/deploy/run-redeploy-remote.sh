@@ -14,6 +14,7 @@ INITIAL_TRANSPORT_ATTEMPTS="${REDEPLOY_INITIAL_TRANSPORT_ATTEMPTS:-12}"
 EXPECTED_REMOTE_MAC="${REDEPLOY_EXPECTED_REMOTE_MAC:-}"
 EXPECTED_NODE_ID="${REDEPLOY_EXPECTED_NODE_ID:-}"
 REMOTE_MAC_PATH="${REDEPLOY_REMOTE_MAC_PATH:-/sys/class/net/ens160/address}"
+REMOTE_PROC_ROOT="${REDEPLOY_REMOTE_PROC_ROOT:-/proc}"
 CANCEL_ATTEMPTS="${REDEPLOY_CANCEL_ATTEMPTS:-6}"
 CANCEL_RETRY_INTERVAL_SECONDS="${REDEPLOY_CANCEL_RETRY_INTERVAL_SECONDS:-2}"
 CANCEL_CONFIRM_ATTEMPTS="${REDEPLOY_CANCEL_CONFIRM_ATTEMPTS:-30}"
@@ -21,6 +22,7 @@ REMOTE_IDENTITY_MISMATCH_EXIT=86
 FRONTEND_BASE_URL="${REDEPLOY_FRONTEND_BASE_URL:-}"
 FRONTEND_CURRENT_SHA="${REDEPLOY_FRONTEND_CURRENT_SHA:-}"
 FRONTEND_CURRENT_DIGEST="${REDEPLOY_FRONTEND_CURRENT_DIGEST:-}"
+FRONTEND_DISTRO_SHA="${REDEPLOY_FRONTEND_DISTRO_SHA:-}"
 FRONTEND_ENVIRONMENT_LABEL="${REDEPLOY_FRONTEND_ENVIRONMENT_LABEL:-REMOTE}"
 FRONTEND_TLS_INSECURE="${REDEPLOY_FRONTEND_TLS_INSECURE:-false}"
 FRONTEND_TLS_PINNED_PUBLIC_KEY="${REDEPLOY_FRONTEND_TLS_PINNED_PUBLIC_KEY:-}"
@@ -99,6 +101,10 @@ if [ -n "$FRONTEND_BASE_URL" ] || [ -n "$FRONTEND_CURRENT_SHA" ] || [ -n "$FRONT
     echo "[remote-redeploy] REDEPLOY_FRONTEND_CURRENT_DIGEST is required and invalid" >&2
     exit 2
   fi
+  if [[ ! "$FRONTEND_DISTRO_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "[remote-redeploy] REDEPLOY_FRONTEND_DISTRO_SHA is required and invalid" >&2
+    exit 2
+  fi
   if [[ ! "$FRONTEND_ENVIRONMENT_LABEL" =~ ^[A-Za-z0-9._-]+$ ]]; then
     echo "[remote-redeploy] invalid REDEPLOY_FRONTEND_ENVIRONMENT_LABEL" >&2
     exit 2
@@ -127,6 +133,10 @@ if [ -n "$FRONTEND_BASE_URL" ] || [ -n "$FRONTEND_CURRENT_SHA" ] || [ -n "$FRONT
 fi
 if [[ ! "$REMOTE_MAC_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
   echo "[remote-redeploy] invalid remote MAC address path" >&2
+  exit 2
+fi
+if [[ ! "$REMOTE_PROC_ROOT" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+  echo "[remote-redeploy] invalid remote proc filesystem path" >&2
   exit 2
 fi
 
@@ -168,6 +178,7 @@ REMOTE_CLEAN_CHECKOUT_HELPER="$REMOTE_RUN_DIRECTORY/check-clean-checkout.sh"
 REMOTE_EXTERNAL_VERIFIER="$REMOTE_RUN_DIRECTORY/verify-external-frontend.sh"
 REMOTE_FRONTEND_TRANSACTION="$REMOTE_RUN_DIRECTORY/frontend-transaction.env"
 REMOTE_FRONTEND_TRANSACTION_STATE="$REMOTE_RUN_DIRECTORY/frontend-transaction.state"
+REMOTE_LAUNCH_CLAIM="$REMOTE_RUN_DIRECTORY/launch.claim"
 REMOTE_LOG="$REMOTE_RUN_DIRECTORY/redeploy.log"
 REMOTE_STATUS="$REMOTE_RUN_DIRECTORY/status"
 REMOTE_PID="$REMOTE_RUN_DIRECTORY/pid"
@@ -175,12 +186,44 @@ REMOTE_PID="$REMOTE_RUN_DIRECTORY/pid"
 cancel_remote_run_once() {
   "${SSH_COMMAND[@]}" "$REMOTE_TARGET" bash -s -- \
     "$EXPECTED_REMOTE_MAC" "$REMOTE_MAC_PATH" \
-    "$REMOTE_STATUS" "$REMOTE_PID" <<'REMOTE_CANCEL'
+    "$REMOTE_STATUS" "$REMOTE_PID" "$REMOTE_PROC_ROOT" \
+    "$REMOTE_LAUNCH_CLAIM" <<'REMOTE_CANCEL'
 set -euo pipefail
 expected_mac="$1"
 mac_path="$2"
 status_path="$3"
 pid_path="$4"
+proc_root="$5"
+launch_claim_path="$6"
+
+load_verified_worker_identity() {
+  local identity_extra=""
+  local identity_starttime=""
+  local stat_line
+  local stat_rest
+  local -a stat_fields
+
+  verified_pid=""
+  [ -r "$pid_path" ] || return 1
+  IFS=' ' read -r verified_pid identity_starttime identity_extra <"$pid_path" || return 1
+  if [[ ! "$verified_pid" =~ ^[1-9][0-9]*$ ]] ||
+    [[ ! "$identity_starttime" =~ ^[1-9][0-9]*$ ]] ||
+    [ -n "$identity_extra" ] ||
+    [ ! -r "${proc_root}/${verified_pid}/stat" ] ||
+    ! kill -0 "$verified_pid" 2>/dev/null; then
+    return 1
+  fi
+
+  IFS= read -r stat_line <"${proc_root}/${verified_pid}/stat" || return 1
+  stat_rest="${stat_line#*) }"
+  [ "$stat_rest" != "$stat_line" ] || return 1
+  read -r -a stat_fields <<<"$stat_rest"
+  [ "${#stat_fields[@]}" -ge 20 ] || return 1
+  [ "${stat_fields[0]}" != Z ] || return 1
+  [ "${stat_fields[2]}" = "$verified_pid" ] || return 1
+  [ "${stat_fields[3]}" = "$verified_pid" ] || return 1
+  [ "${stat_fields[19]}" = "$identity_starttime" ]
+}
 
 if [ -n "$expected_mac" ]; then
   if [ ! -r "$mac_path" ]; then
@@ -194,7 +237,7 @@ if [ -n "$expected_mac" ]; then
   fi
 fi
 
-if [ -f "$status_path" ] || [ ! -f "$pid_path" ]; then
+if [ -f "$status_path" ] || { [ ! -f "$pid_path" ] && [ ! -f "$launch_claim_path" ]; }; then
   if [ -f "$status_path" ]; then
     echo terminal
   else
@@ -203,9 +246,20 @@ if [ -f "$status_path" ] || [ ! -f "$pid_path" ]; then
   exit 0
 fi
 
-remote_pid="$(cat "$pid_path")"
-if [[ "$remote_pid" =~ ^[1-9][0-9]*$ ]]; then
-  kill -TERM -- "-${remote_pid}" 2>/dev/null || kill -TERM "$remote_pid" 2>/dev/null || true
+if [ ! -f "$pid_path" ] && [ -f "$launch_claim_path" ]; then
+  echo "[remote-redeploy] detached worker identity is still being published" >&2
+  exit 88
+fi
+
+if ! load_verified_worker_identity; then
+  echo "[remote-redeploy] refusing to signal an unverified or stale remote worker PID" >&2
+  exit 87
+fi
+remote_pid="$verified_pid"
+if ! kill -TERM -- "-${remote_pid}" 2>/dev/null; then
+  if load_verified_worker_identity && [ "$verified_pid" = "$remote_pid" ]; then
+    kill -TERM "$remote_pid" 2>/dev/null || true
+  fi
 fi
 echo signaled
 REMOTE_CANCEL
@@ -214,13 +268,44 @@ REMOTE_CANCEL
 read_remote_terminal_state_once() {
   "${SSH_COMMAND[@]}" "$REMOTE_TARGET" bash -s -- \
     "$EXPECTED_REMOTE_MAC" "$REMOTE_MAC_PATH" \
-    "$REMOTE_STATUS" "$REMOTE_PID" "$REMOTE_FRONTEND_TRANSACTION_STATE" <<'REMOTE_TERMINAL_STATE'
+    "$REMOTE_STATUS" "$REMOTE_PID" "$REMOTE_FRONTEND_TRANSACTION_STATE" \
+    "$REMOTE_PROC_ROOT" <<'REMOTE_TERMINAL_STATE'
 set -euo pipefail
 expected_mac="$1"
 mac_path="$2"
 status_path="$3"
 pid_path="$4"
 transaction_state_path="$5"
+proc_root="$6"
+
+worker_identity_is_live() {
+  local identity_extra=""
+  local identity_pid=""
+  local identity_starttime=""
+  local stat_line
+  local stat_rest
+  local -a stat_fields
+
+  [ -r "$pid_path" ] || return 1
+  IFS=' ' read -r identity_pid identity_starttime identity_extra <"$pid_path" || return 1
+  if [[ ! "$identity_pid" =~ ^[1-9][0-9]*$ ]] ||
+    [[ ! "$identity_starttime" =~ ^[1-9][0-9]*$ ]] ||
+    [ -n "$identity_extra" ] ||
+    [ ! -r "${proc_root}/${identity_pid}/stat" ] ||
+    ! kill -0 "$identity_pid" 2>/dev/null; then
+    return 1
+  fi
+
+  IFS= read -r stat_line <"${proc_root}/${identity_pid}/stat" || return 1
+  stat_rest="${stat_line#*) }"
+  [ "$stat_rest" != "$stat_line" ] || return 1
+  read -r -a stat_fields <<<"$stat_rest"
+  [ "${#stat_fields[@]}" -ge 20 ] || return 1
+  [ "${stat_fields[0]}" != Z ] || return 1
+  [ "${stat_fields[2]}" = "$identity_pid" ] || return 1
+  [ "${stat_fields[3]}" = "$identity_pid" ] || return 1
+  [ "${stat_fields[19]}" = "$identity_starttime" ]
+}
 
 if [ -n "$expected_mac" ]; then
   if [ ! -r "$mac_path" ]; then
@@ -243,11 +328,8 @@ fi
 if [ -f "$transaction_state_path" ]; then
   IFS= read -r transaction_state <"$transaction_state_path"
 fi
-if [ -f "$pid_path" ]; then
-  IFS= read -r remote_pid <"$pid_path"
-  if [[ "$remote_pid" =~ ^[1-9][0-9]*$ ]] && kill -0 "$remote_pid" 2>/dev/null; then
-    running=true
-  fi
+if worker_identity_is_live; then
+  running=true
 fi
 printf '%s|%s|%s\n' "$remote_status" "$transaction_state" "$running"
 REMOTE_TERMINAL_STATE
@@ -283,15 +365,10 @@ wait_for_remote_terminal_state() {
               return 0
             fi
             ;;
-          starting | rolled-back | unchanged)
+          rolled-back | unchanged)
             if [ "$remote_status" != missing ] && [ "$remote_status" -ne 0 ]; then
-              if [ "$transaction_state" = starting ]; then
-                CONFIRMED_REMOTE_OUTCOME=unchanged
-                echo "[remote-redeploy] confirmed the deployment stopped before frontend mutation"
-              else
-                CONFIRMED_REMOTE_OUTCOME="$transaction_state"
-                echo "[remote-redeploy] confirmed terminal frontend state: ${transaction_state}"
-              fi
+              CONFIRMED_REMOTE_OUTCOME="$transaction_state"
+              echo "[remote-redeploy] confirmed terminal frontend state: ${transaction_state}"
               return 0
             fi
             ;;
@@ -335,13 +412,14 @@ cancel_remote_run() {
       cancel_code="$?"
     fi
 
-    if { [ "$cancel_code" -ne "$REMOTE_IDENTITY_MISMATCH_EXIT" ] && [ "$cancel_code" -ne 255 ]; } ||
+    if { [ "$cancel_code" -ne "$REMOTE_IDENTITY_MISMATCH_EXIT" ] &&
+      [ "$cancel_code" -ne 88 ] && [ "$cancel_code" -ne 255 ]; } ||
       [ "$attempt" -ge "$CANCEL_ATTEMPTS" ]; then
       echo "[remote-redeploy] could not cancel the expected remote run after ${attempt} attempt(s)" >&2
       return "$cancel_code"
     fi
 
-    echo "[remote-redeploy] cancel reached the wrong host or lost transport; retrying ${attempt}/${CANCEL_ATTEMPTS}" >&2
+    echo "[remote-redeploy] cancel reached an initializing run, the wrong host, or lost transport; retrying ${attempt}/${CANCEL_ATTEMPTS}" >&2
     attempt=$((attempt + 1))
     sleep "$CANCEL_RETRY_INTERVAL_SECONDS"
   done
@@ -361,6 +439,8 @@ cleanup_initialization() {
 }
 
 trap cleanup_initialization EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM HUP
 
 upload_remote_file() {
   local source_path="$1"
@@ -387,7 +467,8 @@ start_remote_run() {
     "$REMOTE_REPOSITORY" \
     "$RUN_TOKEN" \
     "$TARGET_BACKEND_SHA" \
-    "$TARGET_BACKEND_DIGEST" <<'REMOTE_LAUNCHER'
+    "$TARGET_BACKEND_DIGEST" \
+    "$REMOTE_PROC_ROOT" <<'REMOTE_LAUNCHER'
 set -Eeuo pipefail
 
 expected_mac="$1"
@@ -397,11 +478,42 @@ repository="$4"
 run_token="$5"
 backend_sha="$6"
 backend_digest="$7"
+proc_root="$8"
 run_directory="$repository/.redeploy-runs/$run_token"
 script_path="$run_directory/redeploy-environment.sh"
 log_path="$run_directory/redeploy.log"
 status_path="$run_directory/status"
 pid_path="$run_directory/pid"
+launch_claim_path="$run_directory/launch.claim"
+
+load_verified_worker_identity() {
+  local identity_extra=""
+  local identity_starttime=""
+  local stat_line
+  local stat_rest
+  local -a stat_fields
+
+  verified_worker_pid=""
+  [ -r "$pid_path" ] || return 1
+  IFS=' ' read -r verified_worker_pid identity_starttime identity_extra <"$pid_path" || return 1
+  if [[ ! "$verified_worker_pid" =~ ^[1-9][0-9]*$ ]] ||
+    [[ ! "$identity_starttime" =~ ^[1-9][0-9]*$ ]] ||
+    [ -n "$identity_extra" ] ||
+    [ ! -r "${proc_root}/${verified_worker_pid}/stat" ] ||
+    ! kill -0 "$verified_worker_pid" 2>/dev/null; then
+    return 1
+  fi
+
+  IFS= read -r stat_line <"${proc_root}/${verified_worker_pid}/stat" || return 1
+  stat_rest="${stat_line#*) }"
+  [ "$stat_rest" != "$stat_line" ] || return 1
+  read -r -a stat_fields <<<"$stat_rest"
+  [ "${#stat_fields[@]}" -ge 20 ] || return 1
+  [ "${stat_fields[0]}" != Z ] || return 1
+  [ "${stat_fields[2]}" = "$verified_worker_pid" ] || return 1
+  [ "${stat_fields[3]}" = "$verified_worker_pid" ] || return 1
+  [ "${stat_fields[19]}" = "$identity_starttime" ]
+}
 
 if [ -n "$expected_mac" ]; then
   if [ ! -r "$mac_path" ]; then
@@ -415,7 +527,7 @@ if [ -n "$expected_mac" ]; then
   fi
 fi
 
-for command in bash flock nohup setsid; do
+for command in bash flock mv nohup setsid sleep; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "[remote-redeploy] missing remote command: $command" >&2
     exit 2
@@ -431,15 +543,49 @@ if [ -e "$status_path" ]; then
   exit 0
 fi
 if [ -f "$pid_path" ]; then
-  previous_pid="$(cat "$pid_path")"
-  if [[ "$previous_pid" =~ ^[1-9][0-9]*$ ]] && kill -0 "$previous_pid" 2>/dev/null; then
+  if load_verified_worker_identity; then
     echo "[remote-redeploy] run token is already active; resuming its monitor"
     exit 0
   fi
+  echo "[remote-redeploy] run token has a stale worker identity without terminal status; refusing to signal or restart it" >&2
+  exit 76
+fi
+if [ -f "$launch_claim_path" ]; then
+  for _ in {1..50}; do
+    if [ -e "$status_path" ] || load_verified_worker_identity; then
+      echo "[remote-redeploy] existing launch claim published the run identity; resuming its monitor"
+      exit 0
+    fi
+    sleep 0.1
+  done
+  echo "[remote-redeploy] run token has an incomplete launch claim without a worker identity; refusing to restart it" >&2
+  exit 76
 fi
 
+exec 8>"$run_directory/launch.lock"
+if ! flock -n 8; then
+  for _ in {1..50}; do
+    if [ -e "$status_path" ] || load_verified_worker_identity; then
+      echo "[remote-redeploy] concurrent launcher published the run identity; resuming its monitor"
+      exit 0
+    fi
+    sleep 0.1
+  done
+  echo "[remote-redeploy] another launcher holds the run token without publishing a verifiable worker identity" >&2
+  exit 76
+fi
+
+if [ -e "$status_path" ] || load_verified_worker_identity; then
+  echo "[remote-redeploy] run token became active or terminal while acquiring its launch lock; resuming its monitor"
+  exit 0
+fi
+
+printf "%s\n" launching >"${launch_claim_path}.tmp"
+chmod 600 "${launch_claim_path}.tmp"
+mv -f "${launch_claim_path}.tmp" "$launch_claim_path"
+
 : >"$log_path"
-rm -f "$run_directory/status.tmp"
+rm -f "$run_directory/status.tmp" "$run_directory/pid.tmp"
 
 nohup setsid bash -c '
   set +e
@@ -448,18 +594,29 @@ nohup setsid bash -c '
   backend_sha="$3"
   backend_digest="$4"
   node_id="$5"
+  proc_root="$6"
   log_path="$run_directory/redeploy.log"
   status_path="$run_directory/status"
   status_tmp="$run_directory/status.tmp"
+  pid_path="$run_directory/pid"
+  pid_tmp="$run_directory/pid.tmp"
+  launch_claim_path="$run_directory/launch.claim"
   frontend_transaction="$run_directory/frontend-transaction.env"
   frontend_transaction_state="$run_directory/frontend-transaction.state"
   termination_requested=false
+  deploy_pid=""
 
   exec >"$log_path" 2>&1
 
   write_status() {
     exit_code="$?"
     trap - EXIT
+    if [ "$exit_code" -ne 0 ] && [ -f "$frontend_transaction_state" ] &&
+      [ "$(cat "$frontend_transaction_state")" = starting ]; then
+      printf "%s\n" unchanged >"${frontend_transaction_state}.tmp"
+      chmod 600 "${frontend_transaction_state}.tmp"
+      mv -f "${frontend_transaction_state}.tmp" "$frontend_transaction_state"
+    fi
     rm -f "$frontend_transaction"
     printf "%s\n" "$exit_code" >"$status_tmp"
     mv -f "$status_tmp" "$status_path"
@@ -467,10 +624,48 @@ nohup setsid bash -c '
 
   request_interrupt() {
     termination_requested=true
+    if [[ "$deploy_pid" =~ ^[1-9][0-9]*$ ]]; then
+      kill -TERM "$deploy_pid" 2>/dev/null || true
+    fi
   }
 
   trap write_status EXIT
   trap request_interrupt INT TERM HUP
+
+  worker_pid="$$"
+  if [ ! -r "${proc_root}/${worker_pid}/stat" ]; then
+    echo "[remote-redeploy] cannot read detached worker process identity" >&2
+    exit 76
+  fi
+  IFS= read -r worker_stat <"${proc_root}/${worker_pid}/stat"
+  worker_stat_rest="${worker_stat#*) }"
+  if [ "$worker_stat_rest" = "$worker_stat" ]; then
+    echo "[remote-redeploy] invalid detached worker process identity" >&2
+    exit 76
+  fi
+  read -r -a worker_stat_fields <<<"$worker_stat_rest"
+  if [ "${#worker_stat_fields[@]}" -lt 20 ] ||
+    [ "${worker_stat_fields[2]}" != "$worker_pid" ] ||
+    [ "${worker_stat_fields[3]}" != "$worker_pid" ] ||
+    [[ ! "${worker_stat_fields[19]}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "[remote-redeploy] detached worker is not the leader of its expected session" >&2
+    exit 76
+  fi
+  printf "%s %s\n" "$worker_pid" "${worker_stat_fields[19]}" >"$pid_tmp"
+  chmod 600 "$pid_tmp"
+  mv -f "$pid_tmp" "$pid_path"
+  rm -f "$launch_claim_path"
+  exec 8>&-
+
+  if [ -f "$frontend_transaction" ]; then
+    printf "%s\n" starting >"$frontend_transaction_state"
+    chmod 600 "$frontend_transaction_state"
+    set -a
+    # The file is uploaded into the identity-bound, mode-0700 run directory
+    # and contains only values validated by the local runner.
+    . "$frontend_transaction"
+    set +a
+  fi
 
   cd "$repository" || exit 1
   exec 9>"$repository/.redeploy-runs/redeploy.lock"
@@ -480,17 +675,26 @@ nohup setsid bash -c '
   fi
 
   export SIHSALUS_NODE_ID="$node_id"
-  if [ -f "$frontend_transaction" ]; then
-    set -a
-    # The file is uploaded into the identity-bound, mode-0700 run directory
-    # and contains only values validated by the local runner.
-    . "$frontend_transaction"
-    set +a
-    printf '%s\n' starting >"$frontend_transaction_state"
-    chmod 600 "$frontend_transaction_state"
+  if [ "$termination_requested" = true ]; then
+    echo "[remote-redeploy] cancellation was requested before deployment started"
+    exit 143
   fi
-  bash "$run_directory/redeploy-environment.sh" "$backend_sha" "$backend_digest"
-  deploy_code="$?"
+
+  bash "$run_directory/redeploy-environment.sh" "$backend_sha" "$backend_digest" &
+  deploy_pid="$!"
+  if [ "$termination_requested" = true ]; then
+    kill -TERM "$deploy_pid" 2>/dev/null || true
+  fi
+  while true; do
+    wait "$deploy_pid"
+    deploy_code="$?"
+    if [ "$termination_requested" = true ] && kill -0 "$deploy_pid" 2>/dev/null; then
+      kill -TERM "$deploy_pid" 2>/dev/null || true
+      continue
+    fi
+    break
+  done
+  deploy_pid=""
   if [ "$termination_requested" = true ] && [ "$deploy_code" -eq 0 ]; then
     if [ -f "$frontend_transaction_state" ] &&
       [ "$(cat "$frontend_transaction_state")" = committed ]; then
@@ -505,9 +709,23 @@ nohup setsid bash -c '
   "$backend_sha" \
   "$backend_digest" \
   "$node_id" \
+  "$proc_root" \
   </dev/null >/dev/null 2>&1 &
 
-printf '%s\n' "$!" >"$pid_path"
+launched_pid="$!"
+for _ in {1..50}; do
+  if load_verified_worker_identity && [ "$verified_worker_pid" = "$launched_pid" ]; then
+    exit 0
+  fi
+  if [ -e "$status_path" ]; then
+    exit 0
+  fi
+  sleep 0.1
+done
+
+echo "[remote-redeploy] detached worker did not publish a verifiable process identity" >&2
+kill -TERM "$launched_pid" 2>/dev/null || true
+exit 76
 REMOTE_LAUNCHER
 }
 
@@ -542,6 +760,7 @@ if [ "$FRONTEND_TRANSACTIONAL_VERIFY" = true ]; then
     printf 'FRONTEND_EXTERNAL_ENVIRONMENT_LABEL=%s\n' "$FRONTEND_ENVIRONMENT_LABEL"
     printf 'FRONTEND_CURRENT_SHA=%s\n' "$FRONTEND_CURRENT_SHA"
     printf 'FRONTEND_CURRENT_DIGEST=%s\n' "$FRONTEND_CURRENT_DIGEST"
+    printf 'DEPLOY_FRONTEND_DISTRO_SHA=%s\n' "$FRONTEND_DISTRO_SHA"
     printf 'FRONTEND_TRANSACTION_STATE_PATH=%s\n' "$REMOTE_FRONTEND_TRANSACTION_STATE"
     printf 'DEPLOY_FRONTEND_EXTERNAL_VERIFIER_PATH=\n'
     printf 'EXTERNAL_VERIFY_SAMPLE_COUNT=12\n'
@@ -622,8 +841,13 @@ finish_local() {
     echo "[remote-redeploy] local monitor stopped; terminating the detached remote run" >&2
     if cancel_remote_run; then
       if [ "$CONFIRMED_REMOTE_OUTCOME" = committed ]; then
-        echo "[remote-redeploy] the exact release committed before cancellation; treating the transaction as successful"
-        exit_code=0
+        if [ "$IDENTITY_MISMATCH_OBSERVED" = true ]; then
+          echo "[remote-redeploy] the release committed on the expected host, but another host also answered for the same target" >&2
+          exit_code="$REMOTE_IDENTITY_MISMATCH_EXIT"
+        else
+          echo "[remote-redeploy] the exact release committed before cancellation; treating the transaction as successful"
+          exit_code=0
+        fi
       fi
     else
       echo "[remote-redeploy] warning: remote cancellation was not confirmed" >&2

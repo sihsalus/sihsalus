@@ -84,24 +84,37 @@ current `main` branch. Supply:
 
 The workflow rejects any non-`main` invocation, malformed identifier,
 mismatched SHA/digest, candidate that is not the current scanned `latest`
-release, candidate not live in QLTY, or incorrect confirmation. The protected
-production job then:
+release, candidate not live in QLTY, or incorrect confirmation. Qualification
+before an approval is not reused as deployment authority: after the protected
+environment reviewer approves the job, it rechecks the current `main` tip,
+both immutable images, the `latest` alias, and QLTY. The exact approved distro
+SHA is then passed to the remote transaction; if `main` moves before the remote
+fetch, the run stops before frontend mutation. The protected production job
+then:
 
 1. validates every environment value and the pinned SSH key;
 2. confirms the declared current SHA, source digest, and node through repeated
    TLS-authenticated public requests;
 3. validates the remote MAC before every SSH operation;
-4. deploys the candidate by digest and recreates only `frontend`;
-5. verifies health, source revision, source digest, runtime image, and node
+4. proves that the local running container, ignored `.env` configuration, and
+   declared current release all identify the same SHA, digest, node, health,
+   runtime tag, and immutable image ID;
+5. adds a temporary rollback tag to that exact running image ID, deploys the
+   candidate by digest from the protected distro SHA, and recreates only
+   `frontend`;
+6. verifies health, source revision, source digest, runtime image, and node
    identity locally;
-6. samples the public endpoint repeatedly and requires one exact SHA, source
+7. samples the public endpoint repeatedly and requires one exact SHA, source
    digest, remote address, and node identity;
-7. records the operation, SHA, digest, and successful external verification in
+8. records the operation, SHA, digest, and successful external verification in
    the workflow summary.
 
 The public target verification is part of the detached remote deployment
-transaction. The prior `.env`, runtime image, and source image remain retained
-until that verification succeeds. A deployment error, external mismatch,
+transaction. The prior `.env`, the captured runtime image ID, and source image
+remain retained until that verification succeeds. Rollback never resolves a
+mutable tag opportunistically: it recreates `frontend` from the temporary tag
+that was bound to the running image ID before mutation, then rechecks the image
+ID and public release identity. A deployment error, external mismatch,
 runner timeout, or workflow cancellation sends `TERM` to the remote process
 group; `deploy-frontend.sh` restores and verifies the supplied current release
 before the transaction exits. The remote process persists one terminal state:
@@ -113,6 +126,12 @@ release active; cleanup is best-effort after that commit point. There is no
 later workflow step on which rollback depends. A missing terminal state or
 failed rollback remains an incident even if the endpoint later appears
 healthy.
+
+The detached runner records both the Linux PID start time and its session and
+process-group identity. Cancellation refuses to signal a missing, malformed,
+exited, or recycled process identity. A cancellation received before the
+deployment child exists is persisted as `unchanged`; it cannot be consumed and
+followed by a new deployment.
 
 Production must already expose `X-SIHSALUS-Frontend-Digest` for the currently
 running release before this workflow can promote or roll back anything. A

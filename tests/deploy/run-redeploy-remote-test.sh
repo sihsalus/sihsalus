@@ -9,15 +9,18 @@ unset REDEPLOY_EXPECTED_REMOTE_MAC REDEPLOY_EXPECTED_NODE_ID REDEPLOY_REMOTE_MAC
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 RUNNER="$ROOT/scripts/deploy/run-redeploy-remote.sh"
 TEMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/sihsalus-remote-redeploy-test.XXXXXX")"
-trap 'rm -rf "$TEMP_ROOT"' EXIT
+trap 'if [ "${KEEP_TEST_ROOT:-false}" = true ]; then echo "test files retained at $TEMP_ROOT" >&2; else rm -rf "$TEMP_ROOT"; fi' EXIT
 
 FAKE_BIN="$TEMP_ROOT/bin"
 REMOTE_REPOSITORY="$TEMP_ROOT/remote/sihsalus"
 SSH_KEY="$TEMP_ROOT/deploy-key"
 REMOTE_MAC_PATH="$TEMP_ROOT/remote-mac"
+FAKE_PROC_ROOT="$TEMP_ROOT/proc"
 EXPECTED_REMOTE_MAC='00:0c:29:ad:be:90'
 EXPECTED_NODE_ID='3eb58bb0-ff08-4e2d-839c-11cedca0b043'
-mkdir -p "$FAKE_BIN" "$REMOTE_REPOSITORY"
+mkdir -p "$FAKE_BIN" "$REMOTE_REPOSITORY" "$FAKE_PROC_ROOT"
+export FAKE_PROC_ROOT
+export REDEPLOY_REMOTE_PROC_ROOT="$FAKE_PROC_ROOT"
 : >"$SSH_KEY"
 printf '%s\n' "$EXPECTED_REMOTE_MAC" >"$REMOTE_MAC_PATH"
 
@@ -56,7 +59,7 @@ if [ "$#" -eq 1 ]; then
   exec bash -c "$1"
 fi
 
-if [ "$#" -eq 10 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
+if [ "$#" -eq 11 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
   [ "${FAKE_SSH_LAUNCH_MAC_MISMATCH:-false}" = true ]; then
   printf '%s\n' '00:0c:29:86:a3:3b' >"${FAKE_REMOTE_MAC_PATH}"
   set +e
@@ -85,13 +88,14 @@ if [ "$#" -eq 7 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
   fi
 fi
 
-if [ "$#" -eq 10 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
+if [ "$#" -eq 11 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
   [ -n "${FAKE_SSH_FORCE_LAUNCH_ERROR:-}" ]; then
   echo 'simulated launch failure' >&2
   exit "$FAKE_SSH_FORCE_LAUNCH_ERROR"
 fi
 
-if [ "$#" -eq 7 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
+if [ "$#" -eq 9 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
+  [[ "${9:-}" == */launch.claim ]] &&
   [ -n "${FAKE_SSH_CANCEL_FAILURES:-}" ]; then
   cancel_attempt=0
   if [ -f "${FAKE_SSH_CANCEL_COUNTER_FILE}" ]; then
@@ -104,7 +108,7 @@ if [ "$#" -eq 7 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
   fi
 fi
 
-if [ "$#" -eq 10 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
+if [ "$#" -eq 11 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
   [ -n "${FAKE_SSH_BREAK_LAUNCH_FILE:-}" ] && [ ! -f "$FAKE_SSH_BREAK_LAUNCH_FILE" ]; then
   set +e
   "$@"
@@ -127,11 +131,32 @@ import os
 import sys
 
 os.setsid()
+pid = os.getpid()
+fields = [
+    str(pid),
+    "(remote-redeploy-worker)",
+    "S",
+    str(os.getppid()),
+    str(os.getpgrp()),
+    str(os.getsid(0)),
+] + ["0"] * 15 + [str(pid * 1000)]
+proc_dir = os.path.join(os.environ["FAKE_PROC_ROOT"], str(pid))
+os.makedirs(proc_dir, exist_ok=True)
+with open(os.path.join(proc_dir, "stat"), "w", encoding="utf-8") as stat_file:
+    stat_file.write(" ".join(fields) + "\n")
 os.execvp(sys.argv[1], sys.argv[1:])
 FAKE_SETSID
 
 cat >"$FAKE_BIN/flock" <<'FAKE_FLOCK'
 #!/usr/bin/env bash
+set -euo pipefail
+if [ "$*" = '-n 9' ] && [ -n "${FAKE_FLOCK_PRE_DEPLOY_MARKER:-}" ]; then
+  : >"$FAKE_FLOCK_PRE_DEPLOY_MARKER"
+  trap 'exit 0' TERM HUP
+  while [ ! -e "${FAKE_FLOCK_PRE_DEPLOY_RELEASE}" ]; do
+    sleep 0.1
+  done
+fi
 exit 0
 FAKE_FLOCK
 
@@ -163,6 +188,7 @@ set -euo pipefail
 [ "${FRONTEND_EXTERNAL_ENVIRONMENT_LABEL:-}" = 'PROD' ]
 [ "${FRONTEND_CURRENT_SHA:-}" = '2222222222222222222222222222222222222222' ]
 [ "${FRONTEND_CURRENT_DIGEST:-}" = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' ]
+[ "${DEPLOY_FRONTEND_DISTRO_SHA:-}" = 'dddddddddddddddddddddddddddddddddddddddd' ]
 [ "${EXTERNAL_VERIFY_TLS_INSECURE:-}" = true ]
 [ "${EXTERNAL_VERIFY_TLS_PINNED_PUBLIC_KEY:-}" = 'sha256//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' ]
 [ -z "${EXTERNAL_VERIFY_TLS_CA_CERT_PATH:-}" ]
@@ -205,11 +231,20 @@ while true; do
 done
 COMMITTED_CLEANUP_SCRIPT
 
+EARLY_CANCEL_FIXTURE="$TEMP_ROOT/early-cancel.sh"
+cat >"$EARLY_CANCEL_FIXTURE" <<'EARLY_CANCEL_SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+: >"${FAKE_EARLY_CANCEL_EXECUTED}"
+printf '%s\n' committed >"$FRONTEND_TRANSACTION_STATE_PATH"
+EARLY_CANCEL_SCRIPT
+
 chmod 700 "$SUCCESS_FIXTURE" "$FAILURE_FIXTURE" "$TRANSACTION_FIXTURE" "$DUMMY_VERIFIER" \
-  "$CANCELLATION_FIXTURE" "$COMMITTED_CLEANUP_FIXTURE"
+  "$CANCELLATION_FIXTURE" "$COMMITTED_CLEANUP_FIXTURE" "$EARLY_CANCEL_FIXTURE"
 
 BACKEND_SHA="1111111111111111111111111111111111111111"
 BACKEND_DIGEST="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+DISTRO_SHA="dddddddddddddddddddddddddddddddddddddddd"
 
 MISSING_IDENTITY_OUTPUT="$TEMP_ROOT/missing-identity-output.log"
 set +e
@@ -268,6 +303,7 @@ grep -Fq 'fixture started' "$SUCCESS_OUTPUT"
 grep -Fq 'fixture completed' "$SUCCESS_OUTPUT"
 grep -Fq 'detached run completed successfully' "$SUCCESS_OUTPUT"
 [ "$(cat "$REMOTE_REPOSITORY/.redeploy-runs/success-run/status")" = 0 ]
+grep -Eq '^[1-9][0-9]* [1-9][0-9]*$' "$REMOTE_REPOSITORY/.redeploy-runs/success-run/pid"
 [ -x "$REMOTE_REPOSITORY/.redeploy-runs/success-run/check-clean-checkout.sh" ]
 cmp "$ROOT/scripts/deploy/check-clean-checkout.sh" \
   "$REMOTE_REPOSITORY/.redeploy-runs/success-run/check-clean-checkout.sh"
@@ -285,6 +321,7 @@ PATH="$FAKE_BIN:$PATH" \
   REDEPLOY_FRONTEND_BASE_URL=https://prod.example.test \
   REDEPLOY_FRONTEND_CURRENT_SHA=2222222222222222222222222222222222222222 \
   REDEPLOY_FRONTEND_CURRENT_DIGEST=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+  REDEPLOY_FRONTEND_DISTRO_SHA="$DISTRO_SHA" \
   REDEPLOY_FRONTEND_ENVIRONMENT_LABEL=PROD \
   REDEPLOY_FRONTEND_TLS_INSECURE=true \
   REDEPLOY_FRONTEND_TLS_PINNED_PUBLIC_KEY=sha256//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= \
@@ -312,6 +349,7 @@ PATH="$FAKE_BIN:$PATH" \
   REDEPLOY_FRONTEND_BASE_URL=https://prod.example.test \
   REDEPLOY_FRONTEND_CURRENT_SHA=2222222222222222222222222222222222222222 \
   REDEPLOY_FRONTEND_CURRENT_DIGEST=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+  REDEPLOY_FRONTEND_DISTRO_SHA="$DISTRO_SHA" \
   REDEPLOY_FRONTEND_TLS_INSECURE=true \
   bash "$RUNNER" \
   "$SSH_KEY" deploy@example.test "$REMOTE_REPOSITORY" \
@@ -371,7 +409,8 @@ if [ "$cancellation_finished" != true ]; then
 fi
 [ "$(cat "$REMOTE_REPOSITORY/.redeploy-runs/cancellation-run/status")" = 143 ]
 grep -Fq 'fixture canceled' "$REMOTE_REPOSITORY/.redeploy-runs/cancellation-run/redeploy.log"
-grep -Fq 'local monitor stopped; terminating the detached remote run' "$CANCELLATION_OUTPUT"
+grep -Eq '(local monitor stopped; terminating the detached remote run|initialization failed; terminating a possible detached run)' \
+  "$CANCELLATION_OUTPUT"
 
 TIMEOUT_OUTPUT="$TEMP_ROOT/timeout-output.log"
 set +e
@@ -421,6 +460,7 @@ PATH="$FAKE_BIN:$PATH" \
   REDEPLOY_FRONTEND_BASE_URL=https://prod.example.test \
   REDEPLOY_FRONTEND_CURRENT_SHA=2222222222222222222222222222222222222222 \
   REDEPLOY_FRONTEND_CURRENT_DIGEST=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+  REDEPLOY_FRONTEND_DISTRO_SHA="$DISTRO_SHA" \
   bash "$RUNNER" \
   "$SSH_KEY" deploy@example.test "$REMOTE_REPOSITORY" \
   "$BACKEND_SHA" "$BACKEND_DIGEST" committed-timeout-run >"$COMMITTED_TIMEOUT_OUTPUT" 2>&1
@@ -428,6 +468,145 @@ PATH="$FAKE_BIN:$PATH" \
 grep -Fq 'public verification passed and transaction committed' "$COMMITTED_TIMEOUT_OUTPUT"
 grep -Fq 'confirmed durable committed transaction' "$COMMITTED_TIMEOUT_OUTPUT"
 grep -Fq 'treating the transaction as successful' "$COMMITTED_TIMEOUT_OUTPUT"
+
+COMMITTED_IDENTITY_MISMATCH_OUTPUT="$TEMP_ROOT/committed-identity-mismatch-output.log"
+set +e
+PATH="$FAKE_BIN:$PATH" \
+  SSH_BIN="$FAKE_BIN/ssh" \
+  FAKE_SSH_LOG_MISMATCHES=1 \
+  FAKE_SSH_LOG_COUNTER_FILE="$TEMP_ROOT/committed-identity-log-mismatches" \
+  FAKE_REMOTE_MAC_PATH="$REMOTE_MAC_PATH" \
+  FAKE_EXPECTED_REMOTE_MAC="$EXPECTED_REMOTE_MAC" \
+  REDEPLOY_SCRIPT_PATH="$COMMITTED_CLEANUP_FIXTURE" \
+  EXTERNAL_VERIFIER_PATH="$DUMMY_VERIFIER" \
+  REDEPLOY_POLL_INTERVAL_SECONDS=1 \
+  REDEPLOY_TIMEOUT_SECONDS=2 \
+  REDEPLOY_CANCEL_RETRY_INTERVAL_SECONDS=1 \
+  REDEPLOY_EXPECTED_REMOTE_MAC="$EXPECTED_REMOTE_MAC" \
+  REDEPLOY_EXPECTED_NODE_ID="$EXPECTED_NODE_ID" \
+  REDEPLOY_REMOTE_MAC_PATH="$REMOTE_MAC_PATH" \
+  REDEPLOY_FRONTEND_BASE_URL=https://prod.example.test \
+  REDEPLOY_FRONTEND_CURRENT_SHA=2222222222222222222222222222222222222222 \
+  REDEPLOY_FRONTEND_CURRENT_DIGEST=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+  REDEPLOY_FRONTEND_DISTRO_SHA="$DISTRO_SHA" \
+  bash "$RUNNER" \
+  "$SSH_KEY" deploy@example.test "$REMOTE_REPOSITORY" \
+  "$BACKEND_SHA" "$BACKEND_DIGEST" committed-identity-mismatch-run \
+  >"$COMMITTED_IDENTITY_MISMATCH_OUTPUT" 2>&1
+committed_identity_mismatch_code="$?"
+set -e
+[ "$committed_identity_mismatch_code" -eq 86 ]
+[ "$(cat "$REMOTE_REPOSITORY/.redeploy-runs/committed-identity-mismatch-run/status")" = 0 ]
+grep -Fq 'remote identity mismatch observed while reading logs' "$COMMITTED_IDENTITY_MISMATCH_OUTPUT"
+grep -Fq 'the release committed on the expected host, but another host also answered' \
+  "$COMMITTED_IDENTITY_MISMATCH_OUTPUT"
+if grep -Fq 'treating the transaction as successful' "$COMMITTED_IDENTITY_MISMATCH_OUTPUT"; then
+  echo 'committed cancellation ignored an observed remote identity mismatch' >&2
+  exit 1
+fi
+
+EARLY_CANCEL_OUTPUT="$TEMP_ROOT/early-cancel-output.log"
+EARLY_CANCEL_MARKER="$TEMP_ROOT/early-cancel-flock-entered"
+EARLY_CANCEL_RELEASE="$TEMP_ROOT/early-cancel-flock-release"
+EARLY_CANCEL_EXECUTED="$TEMP_ROOT/early-cancel-executed"
+PATH="$FAKE_BIN:$PATH" \
+  SSH_BIN="$FAKE_BIN/ssh" \
+  REDEPLOY_SCRIPT_PATH="$EARLY_CANCEL_FIXTURE" \
+  EXTERNAL_VERIFIER_PATH="$DUMMY_VERIFIER" \
+  FAKE_FLOCK_PRE_DEPLOY_MARKER="$EARLY_CANCEL_MARKER" \
+  FAKE_FLOCK_PRE_DEPLOY_RELEASE="$EARLY_CANCEL_RELEASE" \
+  FAKE_EARLY_CANCEL_EXECUTED="$EARLY_CANCEL_EXECUTED" \
+  REDEPLOY_POLL_INTERVAL_SECONDS=1 \
+  REDEPLOY_TIMEOUT_SECONDS=30 \
+  REDEPLOY_EXPECTED_REMOTE_MAC="$EXPECTED_REMOTE_MAC" \
+  REDEPLOY_EXPECTED_NODE_ID="$EXPECTED_NODE_ID" \
+  REDEPLOY_REMOTE_MAC_PATH="$REMOTE_MAC_PATH" \
+  REDEPLOY_FRONTEND_BASE_URL=https://prod.example.test \
+  REDEPLOY_FRONTEND_CURRENT_SHA=2222222222222222222222222222222222222222 \
+  REDEPLOY_FRONTEND_CURRENT_DIGEST=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+  REDEPLOY_FRONTEND_DISTRO_SHA="$DISTRO_SHA" \
+  bash "$RUNNER" \
+  "$SSH_KEY" deploy@example.test "$REMOTE_REPOSITORY" \
+  "$BACKEND_SHA" "$BACKEND_DIGEST" early-cancel-run >"$EARLY_CANCEL_OUTPUT" 2>&1 &
+early_cancel_monitor_pid="$!"
+
+early_cancel_ready=false
+for _ in $(seq 1 100); do
+  if [ -e "$EARLY_CANCEL_MARKER" ]; then
+    early_cancel_ready=true
+    break
+  fi
+  sleep 0.1
+done
+if [ "$early_cancel_ready" != true ]; then
+  echo 'early-cancellation worker did not reach its pre-deploy boundary' >&2
+  exit 1
+fi
+
+kill -TERM "$early_cancel_monitor_pid"
+set +e
+wait "$early_cancel_monitor_pid"
+early_cancel_code="$?"
+set -e
+[ "$early_cancel_code" -eq 143 ]
+[ ! -e "$EARLY_CANCEL_EXECUTED" ]
+[ "$(cat "$REMOTE_REPOSITORY/.redeploy-runs/early-cancel-run/status")" = 143 ]
+[ "$(cat "$REMOTE_REPOSITORY/.redeploy-runs/early-cancel-run/frontend-transaction.state")" = unchanged ]
+grep -Fq 'cancellation was requested before deployment started' \
+  "$REMOTE_REPOSITORY/.redeploy-runs/early-cancel-run/redeploy.log"
+
+STALE_STARTTIME_OUTPUT="$TEMP_ROOT/stale-starttime-output.log"
+sleep 60 &
+stale_pid_sentinel="$!"
+mkdir -p "$REMOTE_REPOSITORY/.redeploy-runs/stale-starttime-run"
+mkdir -p "$FAKE_PROC_ROOT/$stale_pid_sentinel"
+printf '%s (unrelated-sentinel) S %s %s %s 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12345\n' \
+  "$stale_pid_sentinel" "$$" "$stale_pid_sentinel" "$stale_pid_sentinel" \
+  >"$FAKE_PROC_ROOT/$stale_pid_sentinel/stat"
+printf '%s %s\n' "$stale_pid_sentinel" 54321 \
+  >"$REMOTE_REPOSITORY/.redeploy-runs/stale-starttime-run/pid"
+set +e
+PATH="$FAKE_BIN:$PATH" \
+  SSH_BIN="$FAKE_BIN/ssh" \
+  FAKE_SSH_FORCE_LAUNCH_ERROR=87 \
+  REDEPLOY_SCRIPT_PATH="$SUCCESS_FIXTURE" \
+  REDEPLOY_EXPECTED_REMOTE_MAC="$EXPECTED_REMOTE_MAC" \
+  REDEPLOY_EXPECTED_NODE_ID="$EXPECTED_NODE_ID" \
+  REDEPLOY_REMOTE_MAC_PATH="$REMOTE_MAC_PATH" \
+  bash "$RUNNER" \
+  "$SSH_KEY" deploy@example.test "$REMOTE_REPOSITORY" \
+  "$BACKEND_SHA" "$BACKEND_DIGEST" stale-starttime-run >"$STALE_STARTTIME_OUTPUT" 2>&1
+stale_starttime_code="$?"
+set -e
+[ "$stale_starttime_code" -eq 87 ]
+kill -0 "$stale_pid_sentinel"
+grep -Fq 'refusing to signal an unverified or stale remote worker PID' "$STALE_STARTTIME_OUTPUT"
+
+STALE_SESSION_OUTPUT="$TEMP_ROOT/stale-session-output.log"
+mkdir -p "$REMOTE_REPOSITORY/.redeploy-runs/stale-session-run"
+printf '%s (unrelated-sentinel) S %s %s %s 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 12345\n' \
+  "$stale_pid_sentinel" "$$" "$$" "$$" \
+  >"$FAKE_PROC_ROOT/$stale_pid_sentinel/stat"
+printf '%s %s\n' "$stale_pid_sentinel" 12345 \
+  >"$REMOTE_REPOSITORY/.redeploy-runs/stale-session-run/pid"
+set +e
+PATH="$FAKE_BIN:$PATH" \
+  SSH_BIN="$FAKE_BIN/ssh" \
+  FAKE_SSH_FORCE_LAUNCH_ERROR=87 \
+  REDEPLOY_SCRIPT_PATH="$SUCCESS_FIXTURE" \
+  REDEPLOY_EXPECTED_REMOTE_MAC="$EXPECTED_REMOTE_MAC" \
+  REDEPLOY_EXPECTED_NODE_ID="$EXPECTED_NODE_ID" \
+  REDEPLOY_REMOTE_MAC_PATH="$REMOTE_MAC_PATH" \
+  bash "$RUNNER" \
+  "$SSH_KEY" deploy@example.test "$REMOTE_REPOSITORY" \
+  "$BACKEND_SHA" "$BACKEND_DIGEST" stale-session-run >"$STALE_SESSION_OUTPUT" 2>&1
+stale_session_code="$?"
+set -e
+[ "$stale_session_code" -eq 87 ]
+kill -0 "$stale_pid_sentinel"
+kill "$stale_pid_sentinel"
+wait "$stale_pid_sentinel" 2>/dev/null || true
+grep -Fq 'refusing to signal an unverified or stale remote worker PID' "$STALE_SESSION_OUTPUT"
 
 FAILURE_OUTPUT="$TEMP_ROOT/failure-output.log"
 set +e
@@ -543,7 +722,8 @@ set -e
 
 [ "$cancel_retry_code" -eq 87 ]
 [ "$(cat "$TEMP_ROOT/cancel-attempts")" -eq 1 ]
-grep -Fq 'cancel reached the wrong host or lost transport; retrying 1/3' "$CANCEL_RETRY_OUTPUT"
+grep -Fq 'cancel reached an initializing run, the wrong host, or lost transport; retrying 1/3' \
+  "$CANCEL_RETRY_OUTPUT"
 if grep -Fq 'remote cancellation was not confirmed' "$CANCEL_RETRY_OUTPUT"; then
   echo 'cancellation retry did not reach the expected host' >&2
   exit 1

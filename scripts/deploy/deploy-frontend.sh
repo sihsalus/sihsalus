@@ -20,6 +20,7 @@ EXTERNAL_BASE_URL="${FRONTEND_EXTERNAL_BASE_URL:-}"
 EXTERNAL_ENVIRONMENT_LABEL="${FRONTEND_EXTERNAL_ENVIRONMENT_LABEL:-REMOTE}"
 EXPECTED_CURRENT_SHA="${FRONTEND_CURRENT_SHA:-}"
 EXPECTED_CURRENT_DIGEST="${FRONTEND_CURRENT_DIGEST:-}"
+EXPECTED_DISTRO_SHA="${DEPLOY_FRONTEND_DISTRO_SHA:-}"
 TRANSACTION_STATE_PATH="${FRONTEND_TRANSACTION_STATE_PATH:-}"
 TRANSACTIONAL_EXTERNAL_VERIFY=false
 
@@ -47,6 +48,10 @@ if [ -n "$EXTERNAL_BASE_URL" ] || [ -n "$EXPECTED_CURRENT_SHA" ] || [ -n "$EXPEC
     echo "[deploy-frontend] FRONTEND_CURRENT_DIGEST is required for transactional external verification" >&2
     exit 2
   fi
+  if [[ ! "$EXPECTED_DISTRO_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "[deploy-frontend] DEPLOY_FRONTEND_DISTRO_SHA is required for transactional external verification" >&2
+    exit 2
+  fi
   if [ ! -x "$EXTERNAL_VERIFIER" ]; then
     echo "[deploy-frontend] external frontend verifier is not executable" >&2
     exit 2
@@ -55,6 +60,11 @@ if [ -n "$EXTERNAL_BASE_URL" ] || [ -n "$EXPECTED_CURRENT_SHA" ] || [ -n "$EXPEC
     echo "[deploy-frontend] FRONTEND_TRANSACTION_STATE_PATH must be an absolute path" >&2
     exit 2
   fi
+fi
+
+if [ -n "$EXPECTED_DISTRO_SHA" ] && [[ ! "$EXPECTED_DISTRO_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "[deploy-frontend] invalid DEPLOY_FRONTEND_DISTRO_SHA" >&2
+  exit 2
 fi
 
 for command in docker git awk cat chmod cp df mktemp mv rm seq sleep; do
@@ -132,6 +142,10 @@ container_image() {
   docker inspect sihsalus-frontend --format '{{.Config.Image}}' 2>/dev/null || true
 }
 
+container_image_id() {
+  docker inspect sihsalus-frontend --format '{{.Image}}' 2>/dev/null || true
+}
+
 container_node_id() {
   docker inspect sihsalus-frontend \
     --format '{{index .Config.Labels "org.sihsalus.node-id"}}' \
@@ -205,13 +219,19 @@ CURRENT_SOURCE_IMAGE="$(read_env_value FRONTEND_SOURCE_IMAGE)"
 CURRENT_SOURCE_DIGEST="$(read_env_value FRONTEND_SOURCE_DIGEST)"
 CURRENT_SOURCE_TAG="$(read_env_value FRONTEND_SOURCE_TAG)"
 CURRENT_RUNTIME_TAG="$(read_env_value FRONTEND_RUNTIME_TAG)"
+CURRENT_ENV_NODE_ID="$(read_env_value SIHSALUS_NODE_ID)"
 CURRENT_NODE_ID="$(container_node_id)"
 CURRENT_CONTAINER_SOURCE_DIGEST="$(container_source_digest)"
 CURRENT_HEALTH="$(container_health)"
 CURRENT_IMAGE="$(container_image)"
+CURRENT_IMAGE_ID="$(container_image_id)"
 RUNTIME_IMAGE_REPOSITORY="$(read_env_value FRONTEND_RUNTIME_IMAGE)"
 RUNTIME_IMAGE_REPOSITORY="${RUNTIME_IMAGE_REPOSITORY:-sihsalus-frontend-runtime}"
 TARGET_RUNTIME_IMAGE="${RUNTIME_IMAGE_REPOSITORY}:${RUNTIME_TAG}"
+EXPECTED_CURRENT_SOURCE_IMAGE="${SOURCE_REPOSITORY}@${EXPECTED_CURRENT_DIGEST}"
+ROLLBACK_RUNTIME_TAG="rollback-${EXPECTED_CURRENT_DIGEST#sha256:}"
+ROLLBACK_RUNTIME_IMAGE="${RUNTIME_IMAGE_REPOSITORY}:${ROLLBACK_RUNTIME_TAG}"
+ROLLBACK_IMAGE_SAVED=false
 
 verify_external_release() {
   local expected_sha="$1"
@@ -230,6 +250,78 @@ verify_current_release_preflight() {
   if ! verify_external_release "$EXPECTED_CURRENT_SHA" "$EXPECTED_CURRENT_DIGEST" "${EXTERNAL_ENVIRONMENT_LABEL}-PREFLIGHT"; then
     echo "[deploy-frontend] current public release failed exact SHA, digest, and node preflight" >&2
     return 1
+  fi
+}
+
+capture_current_runtime_identity() {
+  CURRENT_SHA="$(deployed_sha || true)"
+  CURRENT_SOURCE_IMAGE="$(read_env_value FRONTEND_SOURCE_IMAGE)"
+  CURRENT_SOURCE_DIGEST="$(read_env_value FRONTEND_SOURCE_DIGEST)"
+  CURRENT_SOURCE_TAG="$(read_env_value FRONTEND_SOURCE_TAG)"
+  CURRENT_RUNTIME_TAG="$(read_env_value FRONTEND_RUNTIME_TAG)"
+  CURRENT_ENV_NODE_ID="$(read_env_value SIHSALUS_NODE_ID)"
+  CURRENT_NODE_ID="$(container_node_id)"
+  CURRENT_CONTAINER_SOURCE_DIGEST="$(container_source_digest)"
+  CURRENT_HEALTH="$(container_health)"
+  CURRENT_IMAGE="$(container_image)"
+  CURRENT_IMAGE_ID="$(container_image_id)"
+}
+
+validate_current_runtime_identity() {
+  local configured_runtime_image
+  local configured_runtime_image_id
+  local current_image_id
+
+  if [[ ! "$CURRENT_RUNTIME_TAG" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    echo "[deploy-frontend] current FRONTEND_RUNTIME_TAG is invalid; refusing an unprovable rollback" >&2
+    return 1
+  fi
+  configured_runtime_image="${RUNTIME_IMAGE_REPOSITORY}:${CURRENT_RUNTIME_TAG}"
+
+  if [ "$CURRENT_SHA" != "$EXPECTED_CURRENT_SHA" ] ||
+    [ "$CURRENT_SOURCE_IMAGE" != "$EXPECTED_CURRENT_SOURCE_IMAGE" ] ||
+    [ "$CURRENT_SOURCE_DIGEST" != "$EXPECTED_CURRENT_DIGEST" ] ||
+    [ "$CURRENT_SOURCE_TAG" != "sha-${EXPECTED_CURRENT_SHA}" ] ||
+    [ "$CURRENT_ENV_NODE_ID" != "$NODE_ID" ] ||
+    [ "$CURRENT_NODE_ID" != "$NODE_ID" ] ||
+    [ "$CURRENT_CONTAINER_SOURCE_DIGEST" != "$EXPECTED_CURRENT_DIGEST" ] ||
+    [ "$CURRENT_HEALTH" != healthy ] ||
+    [ "$CURRENT_IMAGE" != "$configured_runtime_image" ] ||
+    [[ ! "$CURRENT_IMAGE_ID" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    echo "[deploy-frontend] current local runtime/configuration does not match the declared rollback SHA, digest, node, health, and image" >&2
+    return 1
+  fi
+
+  configured_runtime_image_id="$(docker image inspect "$configured_runtime_image" --format '{{.Id}}' 2>/dev/null || true)"
+  current_image_id="$(docker image inspect "$CURRENT_IMAGE_ID" --format '{{.Id}}' 2>/dev/null || true)"
+  if [ "$configured_runtime_image_id" != "$CURRENT_IMAGE_ID" ] ||
+    [ "$current_image_id" != "$CURRENT_IMAGE_ID" ]; then
+    echo "[deploy-frontend] current runtime tag is not bound to the running immutable image ID" >&2
+    return 1
+  fi
+}
+
+save_current_runtime_for_rollback() {
+  local saved_image_id
+
+  docker image tag "$CURRENT_IMAGE_ID" "$ROLLBACK_RUNTIME_IMAGE"
+  saved_image_id="$(docker image inspect "$ROLLBACK_RUNTIME_IMAGE" --format '{{.Id}}' 2>/dev/null || true)"
+  if [ "$saved_image_id" != "$CURRENT_IMAGE_ID" ]; then
+    echo "[deploy-frontend] could not bind the rollback tag to the running immutable image ID" >&2
+    return 1
+  fi
+  ROLLBACK_IMAGE_SAVED=true
+}
+
+discard_saved_rollback_image() {
+  if [ "$ROLLBACK_IMAGE_SAVED" != true ]; then
+    return 0
+  fi
+
+  if docker image rm "$ROLLBACK_RUNTIME_IMAGE" >/dev/null 2>&1; then
+    ROLLBACK_IMAGE_SAVED=false
+  else
+    echo "[deploy-frontend] warning: could not remove the temporary rollback image tag ${ROLLBACK_RUNTIME_IMAGE}" >&2
   fi
 }
 
@@ -287,11 +379,41 @@ rollback() {
     cp -p "$ENV_BACKUP" .env
     if [ "$FRONTEND_RECREATE_ATTEMPTED" = true ]; then
       echo "[deploy-frontend] restoring previous frontend container" >&2
-      if ! docker compose up -d --no-deps --no-build --pull never --force-recreate frontend; then
+      if [ "$TRANSACTIONAL_EXTERNAL_VERIFY" = true ]; then
+        if [ "$ROLLBACK_IMAGE_SAVED" != true ]; then
+          echo "[deploy-frontend] immutable rollback image was not retained" >&2
+          rollback_failed=true
+        elif ! write_env_value FRONTEND_SOURCE_IMAGE "$EXPECTED_CURRENT_SOURCE_IMAGE" ||
+          ! write_env_value FRONTEND_SOURCE_DIGEST "$EXPECTED_CURRENT_DIGEST" ||
+          ! write_env_value FRONTEND_SOURCE_TAG "sha-${EXPECTED_CURRENT_SHA}" ||
+          ! write_env_value FRONTEND_RUNTIME_TAG "$ROLLBACK_RUNTIME_TAG" ||
+          ! write_env_value SIHSALUS_NODE_ID "$NODE_ID"; then
+          echo "[deploy-frontend] previous frontend configuration could not be rebound to the saved rollback image" >&2
+          rollback_failed=true
+        elif [ "$(docker image inspect "$ROLLBACK_RUNTIME_IMAGE" --format '{{.Id}}' 2>/dev/null || true)" != "$CURRENT_IMAGE_ID" ]; then
+          echo "[deploy-frontend] saved rollback tag no longer resolves to the captured immutable image ID" >&2
+          rollback_failed=true
+        elif ! docker compose config --quiet; then
+          echo "[deploy-frontend] saved rollback configuration is invalid" >&2
+          rollback_failed=true
+        fi
+      fi
+
+      if [ "$rollback_failed" != true ] &&
+        ! docker compose up -d --no-deps --no-build --pull never --force-recreate frontend; then
         echo "[deploy-frontend] previous frontend container could not be recreated" >&2
         rollback_failed=true
-      elif ! wait_for_frontend_health; then
+      elif [ "$rollback_failed" != true ] && ! wait_for_frontend_health; then
         echo "[deploy-frontend] previous frontend container did not recover health" >&2
+        rollback_failed=true
+      elif [ "$rollback_failed" != true ] &&
+        [ "$TRANSACTIONAL_EXTERNAL_VERIFY" = true ] && {
+          [ "$(container_image_id)" != "$CURRENT_IMAGE_ID" ] ||
+            [ "$(deployed_sha || true)" != "$EXPECTED_CURRENT_SHA" ] ||
+            [ "$(container_source_digest)" != "$EXPECTED_CURRENT_DIGEST" ] ||
+            [ "$(container_node_id)" != "$NODE_ID" ];
+        }; then
+        echo "[deploy-frontend] restored container does not match the captured rollback image and declared release identity" >&2
         rollback_failed=true
       fi
     fi
@@ -312,6 +434,7 @@ rollback() {
       echo "[deploy-frontend] rollback completed but its terminal state could not be persisted" >&2
     fi
   else
+    discard_saved_rollback_image || true
     if ! write_transaction_state unchanged; then
       echo "[deploy-frontend] frontend was unchanged but its terminal state could not be persisted" >&2
     fi
@@ -341,6 +464,9 @@ write_transaction_state active
 
 if [ "$TRANSACTIONAL_EXTERNAL_VERIFY" = true ]; then
   verify_current_release_preflight
+  capture_current_runtime_identity
+  validate_current_runtime_identity
+  save_current_runtime_for_rollback
 fi
 
 if [ "$CURRENT_SHA" = "$TARGET_SHA" ] &&
@@ -357,6 +483,7 @@ if [ "$CURRENT_SHA" = "$TARGET_SHA" ] &&
   fi
   commit_transaction
   rm -f "$ENV_BACKUP" || true
+  discard_saved_rollback_image
   prune_stale_frontend_images
   echo "[deploy-frontend] ${SOURCE_TAG} at ${TARGET_DIGEST} is already healthy; nothing to do"
   exit 0
@@ -364,7 +491,20 @@ fi
 
 echo "[deploy-frontend] updating distro checkout"
 git fetch origin main
-git merge --ff-only origin/main
+if [ -n "$EXPECTED_DISTRO_SHA" ]; then
+  FETCHED_DISTRO_SHA="$(git rev-parse FETCH_HEAD)"
+  if [ "$FETCHED_DISTRO_SHA" != "$EXPECTED_DISTRO_SHA" ]; then
+    echo "[deploy-frontend] protected distro SHA is no longer the fetched main branch tip" >&2
+    false
+  fi
+  git merge --ff-only "$EXPECTED_DISTRO_SHA"
+  if [ "$(git rev-parse HEAD)" != "$EXPECTED_DISTRO_SHA" ]; then
+    echo "[deploy-frontend] remote checkout is not the protected workflow distro SHA" >&2
+    false
+  fi
+else
+  git merge --ff-only origin/main
+fi
 
 echo "[deploy-frontend] pulling immutable source image ${SOURCE_IMAGE}"
 docker pull "$SOURCE_IMAGE"
@@ -429,6 +569,7 @@ if ! rm -f "$ENV_BACKUP"; then
   echo "[deploy-frontend] warning: could not remove the local transaction backup" >&2
 fi
 
+discard_saved_rollback_image
 prune_stale_frontend_images
 
 echo "[deploy-frontend] deployed ${SOURCE_TAG} from ${SOURCE_IMAGE}"

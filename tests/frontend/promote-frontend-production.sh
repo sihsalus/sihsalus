@@ -30,10 +30,17 @@ grep -Fq 'current_production_digest:' "$WORKFLOW"
 grep -Fq 'A production promotion must use the currently promoted latest SHA and digest.' "$WORKFLOW"
 grep -Fq "if: inputs.operation == 'promote'" "$WORKFLOW"
 grep -Fq 'https://gidis-hsc-qlty.inf.pucp.edu.pe' "$WORKFLOW"
+[ "$(grep -Fc 'https://gidis-hsc-qlty.inf.pucp.edu.pe' "$WORKFLOW")" -eq 2 ]
 
 # GitHub's protected environment remains the authority boundary. All host
 # identity and routing details are environment-scoped and fail closed.
 grep -Fq 'name: production' "$WORKFLOW"
+grep -Fq 'Requalify immutable release after production approval' "$WORKFLOW"
+grep -Fq 'Production approval is stale because the workflow code is no longer the current main branch tip.' "$WORKFLOW"
+grep -Fq 'The approved target image no longer matches its SHA and digest.' "$WORKFLOW"
+grep -Fq 'The approved rollback image no longer matches its SHA and digest.' "$WORKFLOW"
+grep -Fq 'Production approval is stale because the target is no longer the promoted latest release.' "$WORKFLOW"
+grep -Fq 'QLTY-PROTECTED' "$WORKFLOW"
 grep -Fq '${{ secrets.SSH_PRIVATE_KEY_PROD }}' "$WORKFLOW"
 for variable in \
   SSH_KNOWN_HOSTS_PROD \
@@ -58,6 +65,7 @@ grep -Fq 'REDEPLOY_TIMEOUT_SECONDS=3000' "$WORKFLOW"
 grep -Fq 'timeout-minutes: 60' "$WORKFLOW"
 grep -Fq 'REDEPLOY_FRONTEND_CURRENT_SHA="${CURRENT_SHA}"' "$WORKFLOW"
 grep -Fq 'REDEPLOY_FRONTEND_CURRENT_DIGEST="${CURRENT_DIGEST}"' "$WORKFLOW"
+grep -Fq 'REDEPLOY_FRONTEND_DISTRO_SHA="${GITHUB_SHA}"' "$WORKFLOW"
 grep -Fq 'REDEPLOY_FRONTEND_BASE_URL="${PRODUCTION_BASE_URL}"' "$WORKFLOW"
 grep -Fq 'REDEPLOY_FRONTEND_TLS_PINNED_PUBLIC_KEY="${tls_pin}"' "$WORKFLOW"
 grep -Fq 'scripts/deploy/run-redeploy-remote.sh' "$WORKFLOW"
@@ -66,6 +74,10 @@ grep -Fq 'Deploy and verify exact frontend release transactionally' "$WORKFLOW"
 grep -Fq 'FRONTEND_TRANSACTION_STATE_PATH' "$ROOT/scripts/deploy/run-redeploy-remote.sh"
 grep -Fq 'confirmed durable committed transaction' "$ROOT/scripts/deploy/run-redeploy-remote.sh"
 grep -Fq 'write_transaction_state rolled-back' "$ROOT/scripts/deploy/deploy-frontend.sh"
+grep -Fq 'git merge --ff-only "$EXPECTED_DISTRO_SHA"' "$ROOT/scripts/deploy/deploy-frontend.sh"
+grep -Fq 'save_current_runtime_for_rollback' "$ROOT/scripts/deploy/deploy-frontend.sh"
+grep -Fq 'current runtime tag is not bound to the running immutable image ID' \
+  "$ROOT/scripts/deploy/deploy-frontend.sh"
 if grep -Fq 'exact remote bootstrap evidence' "$ROOT/scripts/deploy/deploy-frontend.sh"; then
   echo 'production promotion still trusts mutable legacy bootstrap evidence' >&2
   exit 1
@@ -76,6 +88,20 @@ if grep -Eq 'continue-on-error:|Restore previous release|target-verify|PROD-ROLL
 fi
 if grep -Eq 'docker compose (up|down|restart|pull)' "$WORKFLOW"; then
   echo 'production workflow bypasses the scoped deployment policy' >&2
+  exit 1
+fi
+
+production_job_line="$(grep -n '^  deploy-production:' "$WORKFLOW" | cut -d: -f1)"
+production_environment_line="$(awk -v start="$production_job_line" \
+  'NR > start && /^    environment:/ { print NR; exit }' "$WORKFLOW")"
+protected_requalification_line="$(grep -n 'Requalify immutable release after production approval' "$WORKFLOW" | cut -d: -f1)"
+protected_qlty_line="$(grep -n 'Reconfirm the approved promotion candidate in QLTY' "$WORKFLOW" | cut -d: -f1)"
+production_deploy_line="$(grep -n 'Deploy and verify exact frontend release transactionally' "$WORKFLOW" | cut -d: -f1)"
+if [ -z "$production_environment_line" ] ||
+  [ "$production_environment_line" -ge "$protected_requalification_line" ] ||
+  [ "$protected_requalification_line" -ge "$protected_qlty_line" ] ||
+  [ "$protected_qlty_line" -ge "$production_deploy_line" ]; then
+  echo 'production release is not requalified inside the protected job before mutation' >&2
   exit 1
 fi
 

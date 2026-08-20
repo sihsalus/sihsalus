@@ -14,8 +14,10 @@ El script:
 5. verifica salud, imagen, digest fuente y `build-info.json`;
 6. en producción mantiene la transacción abierta durante la verificación
    pública exacta de SHA, digest y nodo, y restaura/verifica el release anterior
-   ante fallo, timeout o cancelación; el proceso remoto persiste y el runner
-   confirma un estado terminal `committed`, `rolled-back`, `unchanged` o
+   ante fallo, timeout o cancelación; antes de mutar exige que el contenedor,
+   `.env` y el release público actual coincidan, y conserva un tag temporal del
+   ID inmutable que realmente está corriendo; el proceso remoto persiste y el
+   runner confirma un estado terminal `committed`, `rolled-back`, `unchanged` o
    `rollback-failed`;
 7. solo después de verificar públicamente el frontend, elimina imágenes antiguas de los dos
    repositorios exclusivos del frontend y conserva las imágenes fuente y
@@ -50,6 +52,9 @@ y exige que todas las revisiones y digests fuente observados coincidan con el
 artefacto desplegado.
 La ausencia del header de digest falla cerrado: ni `.env` ni una imagen local
 demuestran qué digest produjo un wrapper legacy actualmente servido.
+La promoción protegida vuelve a calificar `main`, ambas imágenes y QLTY después
+de la aprobación humana, fija ese SHA del distro para el fetch remoto y falla
+antes de mutar si `main` vuelve a cambiar.
 También exige una única dirección remota y que `X-SIHSALUS-Node-ID` coincida
 exactamente con el UUID estable configurado para el ambiente. El runner solo
 entrega ese UUID al host cuya MAC fue validada y el wrapper frontend lo hornea
@@ -73,6 +78,10 @@ fijan la pareja MAC/UUID de DEV y QLTY; una VM clonada que comparta IP y claves
 SSH no puede recibir el script ni ejecutar Docker, y tampoco puede aprobar la
 verificación HTTP con otra identidad. La MAC se comprueba dentro de cada
 conexión SSH porque un preflight separado no protege la siguiente conexión.
+El proceso separado publica atómicamente su PID, tiempo de inicio Linux y
+sesión/process group. Reanudar o cancelar verifica los tres valores contra
+`/proc`; un PID reciclado o un lanzamiento incompleto nunca se señaliza como si
+fuera el despliegue esperado.
 
 El sondeo es una defensa probabilística: una réplica que no reciba ninguna de
 las conexiones dentro de la ventana todavía puede escapar. La corrección

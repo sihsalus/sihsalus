@@ -178,6 +178,65 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+
+      - name: Requalify immutable release after production approval
+        env:
+          CURRENT_DIGEST: ${{ needs.qualify.outputs.current_digest }}
+          CURRENT_SHA: ${{ needs.qualify.outputs.current_sha }}
+          OPERATION: ${{ needs.qualify.outputs.operation }}
+          TARGET_DIGEST: ${{ needs.qualify.outputs.digest }}
+          TARGET_SHA: ${{ needs.qualify.outputs.sha }}
+        run: |
+          set -euo pipefail
+
+          image='ghcr.io/sihsalus/sihsalus-frontend'
+          main_sha="$(git ls-remote --exit-code origin refs/heads/main | awk 'NR == 1 { print $1 }')"
+          if [[ "${GITHUB_REF}" != 'refs/heads/main' || "${GITHUB_SHA}" != "${main_sha}" ]]; then
+            echo '::error::Production approval is stale because the workflow code is no longer the current main branch tip.'
+            exit 2
+          fi
+
+          target_json="$(docker buildx imagetools inspect "${image}:sha-${TARGET_SHA}" --format '{{json .}}')"
+          target_image_sha="$(jq -r '.image.config.Labels["org.opencontainers.image.revision"] // empty' <<<"${target_json}")"
+          target_image_digest="$(jq -r '.manifest.digest // empty' <<<"${target_json}")"
+          if [[ "${target_image_sha}" != "${TARGET_SHA}" || "${target_image_digest}" != "${TARGET_DIGEST}" ]]; then
+            echo '::error::The approved target image no longer matches its SHA and digest.'
+            exit 1
+          fi
+
+          current_json="$(docker buildx imagetools inspect "${image}:sha-${CURRENT_SHA}" --format '{{json .}}')"
+          current_image_sha="$(jq -r '.image.config.Labels["org.opencontainers.image.revision"] // empty' <<<"${current_json}")"
+          current_image_digest="$(jq -r '.manifest.digest // empty' <<<"${current_json}")"
+          if [[ "${current_image_sha}" != "${CURRENT_SHA}" || "${current_image_digest}" != "${CURRENT_DIGEST}" ]]; then
+            echo '::error::The approved rollback image no longer matches its SHA and digest.'
+            exit 1
+          fi
+
+          if [[ "${OPERATION}" == 'promote' ]]; then
+            latest_json="$(docker buildx imagetools inspect "${image}:latest" --format '{{json .}}')"
+            latest_sha="$(jq -r '.image.config.Labels["org.opencontainers.image.revision"] // empty' <<<"${latest_json}")"
+            latest_digest="$(jq -r '.manifest.digest // empty' <<<"${latest_json}")"
+            if [[ "${latest_sha}" != "${TARGET_SHA}" || "${latest_digest}" != "${TARGET_DIGEST}" ]]; then
+              echo '::error::Production approval is stale because the target is no longer the promoted latest release.'
+              exit 1
+            fi
+          fi
+
+      - name: Reconfirm the approved promotion candidate in QLTY
+        if: needs.qualify.outputs.operation == 'promote'
+        env:
+          TARGET_DIGEST: ${{ needs.qualify.outputs.digest }}
+          TARGET_SHA: ${{ needs.qualify.outputs.sha }}
+        run: |
+          set -euo pipefail
+          scripts/deploy/verify-external-frontend.sh \
+            https://gidis-hsc-qlty.inf.pucp.edu.pe \
+            "${TARGET_SHA}" \
+            "${TARGET_DIGEST}" \
+            0cefb0c8-c860-48c5-856f-408594775cbb \
+            QLTY-PROTECTED
+
       - name: Validate protected production configuration
         env:
           DEPLOY_KEY: ${{ secrets.SSH_PRIVATE_KEY_PROD }}
@@ -279,6 +338,7 @@ jobs:
             REDEPLOY_FRONTEND_BASE_URL="${PRODUCTION_BASE_URL}" \
             REDEPLOY_FRONTEND_CURRENT_SHA="${CURRENT_SHA}" \
             REDEPLOY_FRONTEND_CURRENT_DIGEST="${CURRENT_DIGEST}" \
+            REDEPLOY_FRONTEND_DISTRO_SHA="${GITHUB_SHA}" \
             REDEPLOY_FRONTEND_ENVIRONMENT_LABEL=PROD \
             REDEPLOY_FRONTEND_TLS_INSECURE="${tls_insecure}" \
             REDEPLOY_FRONTEND_TLS_PINNED_PUBLIC_KEY="${tls_pin}" \
