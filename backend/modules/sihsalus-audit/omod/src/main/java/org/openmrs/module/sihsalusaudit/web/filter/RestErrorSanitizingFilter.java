@@ -20,8 +20,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Last-line response sanitizer for the whole OpenMRS REST surface. Technical exceptions remain in
- * server logs, while public 4xx/5xx responses are replaced with a stable generic envelope.
+ * Last-line response sanitizer for the clinical audit endpoint. Its exact URL mapping is defined
+ * in config.xml; technical exceptions remain in server logs, while public 4xx/5xx responses are
+ * replaced with a stable generic envelope.
  */
 public class RestErrorSanitizingFilter implements Filter {
 

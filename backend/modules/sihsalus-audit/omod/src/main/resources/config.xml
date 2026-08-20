@@ -32,11 +32,11 @@
   </mappingFiles>
 
   <filter>
-    <filter-name>SIHSALUS REST error sanitizer</filter-name>
+    <filter-name>SIHSALUS audit error sanitizer</filter-name>
     <filter-class>org.openmrs.module.sihsalusaudit.web.filter.RestErrorSanitizingFilter</filter-class>
   </filter>
   <filter-mapping>
-    <filter-name>SIHSALUS REST error sanitizer</filter-name>
-    <url-pattern>/ws/rest/*</url-pattern>
+    <filter-name>SIHSALUS audit error sanitizer</filter-name>
+    <url-pattern>/ws/rest/v1/sihsalus/audit</url-pattern>
   </filter-mapping>
 </module>

@@ -179,17 +179,25 @@ public class AuditPayloadParser {
             }
         }
 
+        String validatedMetadata = objectMapper.writeValueAsString(metadata);
+        if (validatedMetadata.getBytes(StandardCharsets.UTF_8).length > MAX_METADATA_BYTES) {
+            throw new AuditValidationException();
+        }
+
         ObjectNode canonicalMetadata = objectMapper.createObjectNode();
         for (String field : METADATA_FIELDS) {
-            if (metadata.has(field)) {
+            if (metadata.has(field) && !isDiscardedFreeTextField(field)) {
                 canonicalMetadata.set(field, metadata.get(field));
             }
         }
-        String serialized = objectMapper.writeValueAsString(canonicalMetadata);
-        if (serialized.getBytes(StandardCharsets.UTF_8).length > MAX_METADATA_BYTES) {
-            throw new AuditValidationException();
+        if (canonicalMetadata.isEmpty()) {
+            return null;
         }
-        return serialized;
+        return objectMapper.writeValueAsString(canonicalMetadata);
+    }
+
+    private boolean isDiscardedFreeTextField(String field) {
+        return "message".equals(field) || "componentStack".equals(field);
     }
 
     private static void rejectUnknownFields(JsonNode object, Set<String> allowedFields) {

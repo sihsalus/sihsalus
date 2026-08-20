@@ -5,18 +5,34 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 import javax.servlet.http.HttpServletResponse;
+import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.junit.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.w3c.dom.NodeList;
 
 public class RestErrorSanitizingFilterTest {
 
     private final RestErrorSanitizingFilter filter = new RestErrorSanitizingFilter();
+
+    @Test
+    public void moduleMapsSanitizerOnlyToExactAuditEndpoint() throws Exception {
+        try (InputStream config = getClass().getResourceAsStream("/config.xml")) {
+            assertTrue("Packaged config.xml must be available", config != null);
+            NodeList patterns = DocumentBuilderFactory.newInstance().newDocumentBuilder()
+                    .parse(config)
+                    .getElementsByTagName("url-pattern");
+
+            assertEquals(1, patterns.getLength());
+            assertEquals("/ws/rest/v1/sihsalus/audit", patterns.item(0).getTextContent().trim());
+        }
+    }
 
     @Test
     public void replacesLeakingServerErrorBody() throws Exception {

@@ -84,6 +84,23 @@ public class AuditPayloadParserTest {
     }
 
     @Test
+    public void acceptsButDiscardsFreeTextThatCouldContainPhiOrSecrets() {
+        ClinicalAuditSubmission submission = parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"UNHANDLED_ERROR\","
+                + "\"metadata\":{"
+                + "\"appName\":\"patient-chart\","
+                + "\"message\":\"patient-name secret-token\","
+                + "\"componentStack\":\"/srv/openmrs/PatientChart.java:42\"}}]").get(0);
+
+        assertEquals("{\"appName\":\"patient-chart\"}", submission.getMetadataJson());
+        assertFalse(submission.getMetadataJson().contains("message"));
+        assertFalse(submission.getMetadataJson().contains("componentStack"));
+        assertFalse(submission.getMetadataJson().contains("patient-name"));
+        assertFalse(submission.getMetadataJson().contains("secret-token"));
+    }
+
+    @Test
     public void rejectsBatchLargerThanFrontendFlushLimit() {
         StringBuilder json = new StringBuilder("[");
         for (int i = 0; i < 51; i++) {
