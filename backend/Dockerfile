@@ -16,6 +16,9 @@ ARG MVN_ARGS="install"
 # Copy build files
 COPY pom.xml ./
 COPY backend/pom.xml ./backend/
+COPY backend/modules/sihsalus-audit/pom.xml ./backend/modules/sihsalus-audit/
+COPY backend/modules/sihsalus-audit/api/pom.xml ./backend/modules/sihsalus-audit/api/
+COPY backend/modules/sihsalus-audit/omod/pom.xml ./backend/modules/sihsalus-audit/omod/
 
 # Build the SIHSALUS Bed Management patch from an immutable source revision.
 # The checksum prevents a changed or substituted archive from entering the image.

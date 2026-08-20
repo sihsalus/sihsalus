@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.5.xsd">
+
+  <changeSet id="sihsalusaudit-20260819-01" author="sihsalus">
+    <preConditions onFail="HALT">
+      <not>
+        <tableExists tableName="sihsalus_clinical_audit_event" />
+      </not>
+    </preConditions>
+    <comment>Create the append-only SIHSALUS clinical audit event table.</comment>
+    <createTable tableName="sihsalus_clinical_audit_event">
+      <column name="audit_event_id" type="bigint" autoIncrement="true">
+        <constraints nullable="false" primaryKey="true" primaryKeyName="pk_sihsalus_clinical_audit" />
+      </column>
+      <column name="client_event_id" type="char(36)">
+        <constraints nullable="false" />
+      </column>
+      <column name="event_type" type="varchar(64)">
+        <constraints nullable="false" />
+      </column>
+      <column name="patient_uuid" type="char(38)" />
+      <column name="encounter_uuid" type="char(38)" />
+      <column name="resource_type" type="varchar(64)" />
+      <column name="metadata_json" type="text" />
+      <column name="actor_id" type="int">
+        <constraints nullable="false" />
+      </column>
+      <column name="server_timestamp" type="datetime">
+        <constraints nullable="false" />
+      </column>
+    </createTable>
+    <addForeignKeyConstraint constraintName="fk_sihsalus_audit_actor"
+      baseTableName="sihsalus_clinical_audit_event" baseColumnNames="actor_id"
+      referencedTableName="users" referencedColumnNames="user_id" />
+    <addUniqueConstraint constraintName="uq_sihsalus_audit_actor_client"
+      tableName="sihsalus_clinical_audit_event" columnNames="actor_id, client_event_id" />
+    <createIndex indexName="idx_sihsalus_audit_timestamp" tableName="sihsalus_clinical_audit_event">
+      <column name="server_timestamp" />
+    </createIndex>
+    <createIndex indexName="idx_sihsalus_audit_patient" tableName="sihsalus_clinical_audit_event">
+      <column name="patient_uuid" />
+      <column name="server_timestamp" />
+    </createIndex>
+  </changeSet>
+</databaseChangeLog>

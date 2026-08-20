@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module configVersion="1.2">
+  <id>${project.parent.artifactId}</id>
+  <name>${project.parent.name}</name>
+  <version>${project.parent.version}</version>
+  <package>org.openmrs.module.sihsalusaudit</package>
+  <author>SIHSALUS</author>
+  <description>${project.parent.description}</description>
+  <require_version>2.8.0</require_version>
+
+  <require_modules>
+    <require_module version="${webservices.rest.version}">org.openmrs.module.webservices.rest</require_module>
+  </require_modules>
+
+  <privilege>
+    <name>Record Clinical Audit Events</name>
+    <description>Allows an authenticated user to append clinical audit events.</description>
+  </privilege>
+  <privilege>
+    <name>View Clinical Audit Events</name>
+    <description>Allows an authenticated audit reviewer to view clinical audit events.</description>
+  </privilege>
+
+  <globalProperty>
+    <property>sihsalusaudit.retentionDays</property>
+    <defaultValue></defaultValue>
+    <description>Approved retention period in days. Empty disables deletion until a clinical/legal policy is approved.</description>
+  </globalProperty>
+
+  <mappingFiles>
+    ClinicalAuditEvent.hbm.xml
+  </mappingFiles>
+
+  <filter>
+    <filter-name>SIHSALUS REST error sanitizer</filter-name>
+    <filter-class>org.openmrs.module.sihsalusaudit.web.filter.RestErrorSanitizingFilter</filter-class>
+  </filter>
+  <filter-mapping>
+    <filter-name>SIHSALUS REST error sanitizer</filter-name>
+    <url-pattern>/ws/rest/*</url-pattern>
+  </filter-mapping>
+</module>

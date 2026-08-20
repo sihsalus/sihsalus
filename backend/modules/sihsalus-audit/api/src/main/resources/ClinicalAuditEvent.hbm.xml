@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC
+  "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+  "http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd">
+<hibernate-mapping package="org.openmrs.module.sihsalusaudit.model">
+  <class name="ClinicalAuditEvent" table="sihsalus_clinical_audit_event" mutable="false">
+    <id name="auditEventId" type="long" column="audit_event_id">
+      <generator class="native" />
+    </id>
+    <property name="clientEventId" column="client_event_id" type="string" not-null="true" length="36" />
+    <property name="eventType" column="event_type" type="string" not-null="true" length="64" />
+    <property name="patientUuid" column="patient_uuid" type="string" length="38" />
+    <property name="encounterUuid" column="encounter_uuid" type="string" length="38" />
+    <property name="resourceType" column="resource_type" type="string" length="64" />
+    <property name="metadataJson" column="metadata_json" type="text" />
+    <many-to-one name="actor" class="org.openmrs.User" column="actor_id" not-null="true" lazy="false" />
+    <property name="serverTimestamp" column="server_timestamp" type="timestamp" not-null="true" />
+  </class>
+</hibernate-mapping>
