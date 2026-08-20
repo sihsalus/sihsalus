@@ -22,15 +22,16 @@ public class RestErrorSanitizingFilterTest {
     private final RestErrorSanitizingFilter filter = new RestErrorSanitizingFilter();
 
     @Test
-    public void moduleMapsSanitizerOnlyToExactAuditEndpoint() throws Exception {
+    public void moduleMapsSanitizerToAuditEndpointWithOrWithoutTrailingSlash() throws Exception {
         try (InputStream config = getClass().getResourceAsStream("/config.xml")) {
             assertTrue("Packaged config.xml must be available", config != null);
             NodeList patterns = DocumentBuilderFactory.newInstance().newDocumentBuilder()
                     .parse(config)
                     .getElementsByTagName("url-pattern");
 
-            assertEquals(1, patterns.getLength());
+            assertEquals(2, patterns.getLength());
             assertEquals("/ws/rest/v1/sihsalus/audit", patterns.item(0).getTextContent().trim());
+            assertEquals("/ws/rest/v1/sihsalus/audit/*", patterns.item(1).getTextContent().trim());
         }
     }
 
@@ -102,7 +103,7 @@ public class RestErrorSanitizingFilterTest {
     }
 
     @Test
-    public void streamsLargeSuccessfulResponseWithoutChangingIt() throws Exception {
+    public void preservesLargeSuccessfulResponseWithinSafetyBound() throws Exception {
         MockHttpServletResponse response = new MockHttpServletResponse();
         byte[] payload = new byte[70 * 1024];
         Arrays.fill(payload, (byte) 'a');
@@ -118,7 +119,7 @@ public class RestErrorSanitizingFilterTest {
     }
 
     @Test
-    public void streamsLargeSuccessfulWriterResponseWithoutChangingIt() throws Exception {
+    public void preservesLargeSuccessfulWriterResponseWithinSafetyBound() throws Exception {
         MockHttpServletResponse response = new MockHttpServletResponse();
         char[] chars = new char[70 * 1024];
         Arrays.fill(chars, 'b');
@@ -131,6 +132,20 @@ public class RestErrorSanitizingFilterTest {
         });
 
         assertEquals(payload, response.getContentAsString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void sanitizesResponseThatExceedsTheEndpointSafetyBound() throws Exception {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        byte[] payload = new byte[513 * 1024];
+        Arrays.fill(payload, (byte) 's');
+
+        filter.doFilter(new MockHttpServletRequest(), response, (request, wrappedResponse) ->
+                ((HttpServletResponse) wrappedResponse).getOutputStream().write(payload));
+
+        assertEquals(500, response.getStatus());
+        assertTrue(response.getContentAsString(StandardCharsets.UTF_8).contains("SERVER_ERROR"));
+        assertFalse(response.getContentAsString(StandardCharsets.UTF_8).contains("ssssssss"));
     }
 
     @Test

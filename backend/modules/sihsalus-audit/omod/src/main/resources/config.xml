@@ -38,5 +38,6 @@
   <filter-mapping>
     <filter-name>SIHSALUS audit error sanitizer</filter-name>
     <url-pattern>/ws/rest/v1/sihsalus/audit</url-pattern>
+    <url-pattern>/ws/rest/v1/sihsalus/audit/*</url-pattern>
   </filter-mapping>
 </module>

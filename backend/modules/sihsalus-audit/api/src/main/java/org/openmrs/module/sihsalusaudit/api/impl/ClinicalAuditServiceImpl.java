@@ -16,6 +16,7 @@ import org.openmrs.module.sihsalusaudit.api.ClinicalAuditService;
 import org.openmrs.module.sihsalusaudit.api.ClinicalAuditSubmission;
 import org.openmrs.module.sihsalusaudit.api.db.ClinicalAuditDao;
 import org.openmrs.module.sihsalusaudit.model.ClinicalAuditEvent;
+import org.openmrs.util.PrivilegeConstants;
 
 public class ClinicalAuditServiceImpl implements ClinicalAuditService {
 
@@ -29,25 +30,25 @@ public class ClinicalAuditServiceImpl implements ClinicalAuditService {
     public List<String> recordEvents(List<ClinicalAuditSubmission> submissions) {
         User actor = securityContext.requireAuthenticatedUserWithPrivilege(ClinicalAuditConstants.PRIVILEGE_RECORD);
         validateBatch(submissions);
+        requireEventSpecificPrivileges(submissions);
 
         Date recordedAt = clock.now();
         List<String> confirmedIds = new ArrayList<String>(submissions.size());
         for (ClinicalAuditSubmission submission : submissions) {
             String clientEventId = submission.getClientEventId();
-            ClinicalAuditEvent existing = dao.getByClientEventId(actor, clientEventId);
-            if (existing == null) {
-                ClinicalAuditEvent event = new ClinicalAuditEvent();
-                event.setClientEventId(clientEventId);
-                event.setEventType(submission.getEventType());
-                event.setPatientUuid(submission.getPatientUuid());
-                event.setEncounterUuid(submission.getEncounterUuid());
-                event.setResourceType(submission.getResourceType());
-                event.setMetadataJson(submission.getMetadataJson());
-                event.setActor(actor);
-                event.setServerTimestamp(new Date(recordedAt.getTime()));
-                dao.append(event);
-            }
-            else if (!matches(existing, submission)) {
+            ClinicalAuditEvent event = new ClinicalAuditEvent();
+            event.setClientEventId(clientEventId);
+            event.setEventType(submission.getEventType());
+            event.setPatientUuid(submission.getPatientUuid());
+            event.setEncounterUuid(submission.getEncounterUuid());
+            event.setResourceType(submission.getResourceType());
+            event.setMetadataJson(submission.getMetadataJson());
+            event.setClientOccurredAt(submission.getClientOccurredAt());
+            event.setActor(actor);
+            event.setServerTimestamp(new Date(recordedAt.getTime()));
+
+            ClinicalAuditEvent persisted = dao.appendIdempotently(event);
+            if (!matches(persisted, submission)) {
                 throw new ValidationException("Audit event id conflicts with the stored event");
             }
             confirmedIds.add(clientEventId);
@@ -60,7 +61,25 @@ public class ClinicalAuditServiceImpl implements ClinicalAuditService {
                 && Objects.equals(existing.getPatientUuid(), submission.getPatientUuid())
                 && Objects.equals(existing.getEncounterUuid(), submission.getEncounterUuid())
                 && Objects.equals(existing.getResourceType(), submission.getResourceType())
-                && Objects.equals(existing.getMetadataJson(), submission.getMetadataJson());
+                && Objects.equals(existing.getMetadataJson(), submission.getMetadataJson())
+                && Objects.equals(existing.getClientOccurredAt(), submission.getClientOccurredAt());
+    }
+
+    private void requireEventSpecificPrivileges(List<ClinicalAuditSubmission> submissions) {
+        for (ClinicalAuditSubmission submission : submissions) {
+            if (!"PERMISSION_CHANGE".equals(submission.getEventType())) {
+                continue;
+            }
+            if ("Role".equals(submission.getResourceType())) {
+                securityContext.requireAuthenticatedUserWithPrivilege(PrivilegeConstants.MANAGE_ROLES);
+            }
+            else if ("User".equals(submission.getResourceType())) {
+                securityContext.requireAuthenticatedUserWithPrivilege(PrivilegeConstants.EDIT_USERS);
+            }
+            else {
+                throw new IllegalArgumentException("Invalid permission audit target");
+            }
+        }
     }
 
     @Override

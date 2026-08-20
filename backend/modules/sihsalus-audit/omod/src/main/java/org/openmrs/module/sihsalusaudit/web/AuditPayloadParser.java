@@ -7,6 +7,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -17,6 +18,7 @@ import java.util.UUID;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -28,6 +30,12 @@ public class AuditPayloadParser {
     private static final int MAX_METADATA_BYTES = 4096;
 
     private static final int MAX_METADATA_KEYS = 10;
+
+    // Keep the client claim inside a conservative range supported by the module's MariaDB
+    // DATETIME column in every deployment timezone. The value remains non-authoritative.
+    private static final Instant MIN_CLIENT_OCCURRED_AT = Instant.parse("2000-01-01T00:00:00Z");
+
+    private static final Instant MAX_CLIENT_OCCURRED_AT = Instant.parse("2100-01-01T00:00:00Z");
 
     private static final Set<String> ROOT_FIELDS = immutableSet("id", "eventType", "patientUuid",
             "encounterUuid", "resourceType", "metadata", "timestamp", "userUuid", "sessionId");
@@ -42,11 +50,26 @@ public class AuditPayloadParser {
 
     private static final Set<String> RESOURCE_TYPES = immutableSet(
             "Patient", "Encounter", "Visit", "Obs", "Order", "MedicationDispense",
-            "DiagnosticReport", "ImagingStudy", "Invoice", "StockOperation", "User", "Role");
+            "DiagnosticReport", "DocumentReference", "ImagingStudy", "Invoice", "StockOperation", "User", "Role");
 
     private static final Set<String> METADATA_FIELDS = immutableSet(
             "appName", "module", "action", "outcome", "offline", "reasonCode", "message",
             "componentStack", "locationUuid");
+
+    // Only values owned by the deployed frontend are persisted. Unknown values remain accepted
+    // for forward-compatible ingestion but are discarded, preventing arbitrary strings from
+    // becoming a durable PHI/secret side channel.
+    private static final Set<String> APP_NAMES = immutableSet(
+            "esm-appointments-app", "esm-bed-management-app", "esm-billing-app", "esm-care-logbook-app",
+            "esm-coststructure-app", "esm-emergency-app", "esm-form-builder-app", "esm-fua-app",
+            "esm-help-menu-app", "esm-home-app", "esm-indicadores-app", "esm-interconsultas-app",
+            "esm-laboratory-app", "esm-login-app", "esm-odontologia-app", "esm-offline-tools-app",
+            "esm-openconceptlab-app", "esm-patient-chart-app", "esm-patient-list-management-app",
+            "esm-patient-registration-app", "esm-patient-search-app", "esm-primary-navigation-app",
+            "esm-service-queues-app", "esm-system-admin-app", "esm-user-onboarding-app", "patient-chart");
+
+    private static final Set<String> OUTCOMES = immutableSet(
+            "SUCCESS", "FAILURE", "DENIED", "CANCELLED", "QUEUED", "SYNCED");
 
     private final ObjectMapper objectMapper;
 
@@ -55,7 +78,8 @@ public class AuditPayloadParser {
     }
 
     AuditPayloadParser(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
+        this.objectMapper = objectMapper.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
+                .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
     }
 
     public List<ClinicalAuditSubmission> parse(byte[] body) {
@@ -81,7 +105,9 @@ public class AuditPayloadParser {
             throw ex;
         }
         catch (IOException | RuntimeException ex) {
-            throw new AuditValidationException(ex);
+            // Do not attach parser exceptions: UUID/date/JSON messages may echo untrusted input
+            // into OpenMRS logs even though the HTTP response itself is sanitized.
+            throw new AuditValidationException();
         }
     }
 
@@ -120,14 +146,16 @@ public class AuditPayloadParser {
         if (resourceType != null && !RESOURCE_TYPES.contains(resourceType)) {
             throw new AuditValidationException();
         }
+        resourceType = validateAndNormalizeClinicalTarget(eventType, patientUuid, encounterUuid, resourceType);
 
-        validateUntrustedEnvelopeFields(node);
+        Date clientOccurredAt = validateUntrustedEnvelopeFields(node);
         String metadataJson = validateAndSerializeMetadata(node.get("metadata"));
 
-        return new ClinicalAuditSubmission(id, eventType, patientUuid, encounterUuid, resourceType, metadataJson);
+        return new ClinicalAuditSubmission(id, eventType, patientUuid, encounterUuid, resourceType, metadataJson,
+                clientOccurredAt);
     }
 
-    private void validateUntrustedEnvelopeFields(JsonNode node) {
+    private Date validateUntrustedEnvelopeFields(JsonNode node) {
         String userUuid = optionalText(node, "userUuid", 38);
         validateOptionalUuid(userUuid);
 
@@ -139,11 +167,84 @@ public class AuditPayloadParser {
         String timestamp = optionalText(node, "timestamp", 40);
         if (timestamp != null) {
             try {
-                Instant.parse(timestamp);
+                Instant clientOccurredAt = Instant.parse(timestamp);
+                if (clientOccurredAt.isBefore(MIN_CLIENT_OCCURRED_AT)
+                        || !clientOccurredAt.isBefore(MAX_CLIENT_OCCURRED_AT)) {
+                    throw new AuditValidationException();
+                }
+                return Date.from(clientOccurredAt);
             }
             catch (DateTimeParseException ex) {
-                throw new AuditValidationException(ex);
+                throw new AuditValidationException();
             }
+        }
+        return null;
+    }
+
+    private String validateAndNormalizeClinicalTarget(String eventType, String patientUuid, String encounterUuid,
+            String resourceType) {
+        if ("PATIENT_SEARCH".equals(eventType) || "INTEGRATION_ERROR".equals(eventType)
+                || "UNHANDLED_ERROR".equals(eventType)) {
+            return resourceType;
+        }
+        if (eventType.startsWith("PATIENT_")) {
+            requireReference(patientUuid);
+            return requireOrDefaultResource(resourceType, "Patient");
+        }
+        if (eventType.startsWith("ENCOUNTER_")) {
+            requireReference(encounterUuid);
+            return requireOrDefaultResource(resourceType, "Encounter");
+        }
+        if (eventType.startsWith("OBS_")) {
+            requireReference(patientUuid);
+            requireReference(encounterUuid);
+            return requireOrDefaultResource(resourceType, "Obs");
+        }
+        if (eventType.startsWith("ORDER_")) {
+            requireReference(patientUuid);
+            requireReference(encounterUuid);
+            return requireOrDefaultResource(resourceType, "Order");
+        }
+        if (eventType.startsWith("DOCUMENT_")) {
+            requireReference(patientUuid);
+            if (resourceType == null) {
+                return "DocumentReference";
+            }
+            if (!"DocumentReference".equals(resourceType) && !"DiagnosticReport".equals(resourceType)
+                    && !"ImagingStudy".equals(resourceType)) {
+                throw new AuditValidationException();
+            }
+            return resourceType;
+        }
+        if ("MEDICATION_DISPENSE".equals(eventType)) {
+            requireReference(patientUuid);
+            return requireOrDefaultResource(resourceType, "MedicationDispense");
+        }
+        if ("PERMISSION_CHANGE".equals(eventType)) {
+            if (!"User".equals(resourceType) && !"Role".equals(resourceType)) {
+                throw new AuditValidationException();
+            }
+            if (patientUuid != null || encounterUuid != null) {
+                throw new AuditValidationException();
+            }
+            return resourceType;
+        }
+        throw new AuditValidationException();
+    }
+
+    private String requireOrDefaultResource(String resourceType, String requiredResourceType) {
+        if (resourceType == null) {
+            return requiredResourceType;
+        }
+        if (!requiredResourceType.equals(resourceType)) {
+            throw new AuditValidationException();
+        }
+        return resourceType;
+    }
+
+    private void requireReference(String reference) {
+        if (reference == null) {
+            throw new AuditValidationException();
         }
     }
 
@@ -185,19 +286,22 @@ public class AuditPayloadParser {
         }
 
         ObjectNode canonicalMetadata = objectMapper.createObjectNode();
-        for (String field : METADATA_FIELDS) {
-            if (metadata.has(field) && !isDiscardedFreeTextField(field)) {
-                canonicalMetadata.set(field, metadata.get(field));
-            }
+        if (metadata.has("appName") && APP_NAMES.contains(metadata.get("appName").textValue())) {
+            canonicalMetadata.set("appName", metadata.get("appName"));
+        }
+        if (metadata.has("outcome") && OUTCOMES.contains(metadata.get("outcome").textValue())) {
+            canonicalMetadata.set("outcome", metadata.get("outcome"));
+        }
+        if (metadata.has("offline")) {
+            canonicalMetadata.set("offline", metadata.get("offline"));
+        }
+        if (metadata.has("locationUuid")) {
+            canonicalMetadata.set("locationUuid", metadata.get("locationUuid"));
         }
         if (canonicalMetadata.isEmpty()) {
             return null;
         }
         return objectMapper.writeValueAsString(canonicalMetadata);
-    }
-
-    private boolean isDiscardedFreeTextField(String field) {
-        return "message".equals(field) || "componentStack".equals(field);
     }
 
     private static void rejectUnknownFields(JsonNode object, Set<String> allowedFields) {
@@ -244,7 +348,7 @@ public class AuditPayloadParser {
             }
         }
         catch (IllegalArgumentException ex) {
-            throw new AuditValidationException(ex);
+            throw new AuditValidationException();
         }
     }
 

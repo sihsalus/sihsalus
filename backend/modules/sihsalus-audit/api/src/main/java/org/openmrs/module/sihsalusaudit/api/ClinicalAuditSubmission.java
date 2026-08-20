@@ -1,8 +1,11 @@
 package org.openmrs.module.sihsalusaudit.api;
 
+import java.util.Date;
+
 /**
- * Validated, client-supplied audit data. Actor and timestamp are deliberately absent: the service
- * derives both from the authenticated OpenMRS context and the server clock.
+ * Validated, client-supplied audit data. The authoritative actor and receive time are deliberately
+ * absent: the service derives both from the authenticated OpenMRS context and server clock. The
+ * optional occurrence time remains an explicitly non-authoritative client claim.
  */
 public class ClinicalAuditSubmission {
 
@@ -18,14 +21,21 @@ public class ClinicalAuditSubmission {
 
     private final String metadataJson;
 
+    /**
+     * Client-claimed occurrence time. This is useful for ordering offline events, but is never an
+     * authoritative server timestamp.
+     */
+    private final Date clientOccurredAt;
+
     public ClinicalAuditSubmission(String clientEventId, String eventType, String patientUuid, String encounterUuid,
-            String resourceType, String metadataJson) {
+            String resourceType, String metadataJson, Date clientOccurredAt) {
         this.clientEventId = clientEventId;
         this.eventType = eventType;
         this.patientUuid = patientUuid;
         this.encounterUuid = encounterUuid;
         this.resourceType = resourceType;
         this.metadataJson = metadataJson;
+        this.clientOccurredAt = clientOccurredAt == null ? null : new Date(clientOccurredAt.getTime());
     }
 
     public String getClientEventId() {
@@ -50,5 +60,9 @@ public class ClinicalAuditSubmission {
 
     public String getMetadataJson() {
         return metadataJson;
+    }
+
+    public Date getClientOccurredAt() {
+        return clientOccurredAt == null ? null : new Date(clientOccurredAt.getTime());
     }
 }

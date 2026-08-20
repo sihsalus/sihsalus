@@ -4,7 +4,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -29,6 +28,7 @@ import org.openmrs.module.sihsalusaudit.api.AuditSecurityContext;
 import org.openmrs.module.sihsalusaudit.api.ClinicalAuditSubmission;
 import org.openmrs.module.sihsalusaudit.api.db.ClinicalAuditDao;
 import org.openmrs.module.sihsalusaudit.model.ClinicalAuditEvent;
+import org.openmrs.util.PrivilegeConstants;
 
 public class ClinicalAuditServiceImplTest {
 
@@ -59,6 +59,7 @@ public class ClinicalAuditServiceImplTest {
         when(securityContext.requireAuthenticatedUserWithPrivilege(ClinicalAuditConstants.PRIVILEGE_RECORD))
                 .thenReturn(serverActor);
         when(clock.now()).thenReturn(new Date(1_787_099_696_000L));
+        when(dao.appendIdempotently(any(ClinicalAuditEvent.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
@@ -69,10 +70,11 @@ public class ClinicalAuditServiceImplTest {
 
         assertEquals(Collections.singletonList(submission.getClientEventId()), confirmed);
         ArgumentCaptor<ClinicalAuditEvent> eventCaptor = ArgumentCaptor.forClass(ClinicalAuditEvent.class);
-        verify(dao).append(eventCaptor.capture());
+        verify(dao).appendIdempotently(eventCaptor.capture());
         ClinicalAuditEvent stored = eventCaptor.getValue();
         assertSame(serverActor, stored.getActor());
         assertEquals(new Date(1_787_099_696_000L), stored.getServerTimestamp());
+        assertEquals(submission.getClientOccurredAt(), stored.getClientOccurredAt());
         assertEquals("PATIENT_VIEW", stored.getEventType());
     }
 
@@ -80,12 +82,12 @@ public class ClinicalAuditServiceImplTest {
     public void recordEventsConfirmsIdempotentRetryWithoutAppendingAgain() {
         ClinicalAuditSubmission submission = submission("22222222-2222-4222-8222-222222222222");
         ClinicalAuditEvent stored = storedEvent(submission);
-        when(dao.getByClientEventId(serverActor, submission.getClientEventId())).thenReturn(stored);
+        when(dao.appendIdempotently(any(ClinicalAuditEvent.class))).thenReturn(stored);
 
         assertEquals(Collections.singletonList(submission.getClientEventId()),
                 service.recordEvents(Collections.singletonList(submission)));
 
-        verify(dao, never()).append(any(ClinicalAuditEvent.class));
+        verify(dao).appendIdempotently(any(ClinicalAuditEvent.class));
     }
 
     @Test
@@ -93,12 +95,12 @@ public class ClinicalAuditServiceImplTest {
         ClinicalAuditSubmission submission = submission("77777777-7777-4777-8777-777777777777");
         ClinicalAuditEvent stored = storedEvent(submission);
         stored.setEventType("ENCOUNTER_VIEW");
-        when(dao.getByClientEventId(serverActor, submission.getClientEventId())).thenReturn(stored);
+        when(dao.appendIdempotently(any(ClinicalAuditEvent.class))).thenReturn(stored);
 
         assertThrows(ValidationException.class,
                 () -> service.recordEvents(Collections.singletonList(submission)));
 
-        verify(dao, never()).append(any(ClinicalAuditEvent.class));
+        verify(dao).appendIdempotently(any(ClinicalAuditEvent.class));
     }
 
     @Test
@@ -138,18 +140,47 @@ public class ClinicalAuditServiceImplTest {
     }
 
     @Test
+    public void permissionChangeRequiresTheOpenmrsTargetPrivilege() {
+        ClinicalAuditSubmission submission = new ClinicalAuditSubmission(
+                "88888888-8888-4888-8888-888888888888", "PERMISSION_CHANGE",
+                null, null, "Role", null, new Date(1_787_099_690_000L));
+        when(securityContext.requireAuthenticatedUserWithPrivilege(PrivilegeConstants.MANAGE_ROLES))
+                .thenReturn(serverActor);
+
+        service.recordEvents(Collections.singletonList(submission));
+
+        verify(securityContext).requireAuthenticatedUserWithPrivilege(PrivilegeConstants.MANAGE_ROLES);
+        verify(dao).appendIdempotently(any(ClinicalAuditEvent.class));
+    }
+
+    @Test
+    public void permissionChangeIsRejectedWithoutTheOpenmrsTargetPrivilege() {
+        ClinicalAuditSubmission submission = new ClinicalAuditSubmission(
+                "99999999-9999-4999-8999-999999999999", "PERMISSION_CHANGE",
+                null, null, "User", null, new Date(1_787_099_690_000L));
+        when(securityContext.requireAuthenticatedUserWithPrivilege(PrivilegeConstants.EDIT_USERS))
+                .thenThrow(new APIAuthenticationException("forbidden"));
+
+        assertThrows(APIAuthenticationException.class,
+                () -> service.recordEvents(Collections.singletonList(submission)));
+
+        verify(dao, never()).appendIdempotently(any(ClinicalAuditEvent.class));
+    }
+
+    @Test
     public void recordEventsRejectsDuplicateIdsAsAnAtomicInvalidBatch() {
         ClinicalAuditSubmission duplicate = submission("55555555-5555-4555-8555-555555555555");
 
         assertThrows(IllegalArgumentException.class,
                 () -> service.recordEvents(Arrays.asList(duplicate, duplicate)));
 
-        verify(dao, never()).getByClientEventId(any(User.class), eq(duplicate.getClientEventId()));
+        verify(dao, never()).appendIdempotently(any(ClinicalAuditEvent.class));
     }
 
     private ClinicalAuditSubmission submission(String id) {
         return new ClinicalAuditSubmission(id, "PATIENT_VIEW",
-                "66666666-6666-4666-8666-666666666666", null, "Patient", "{\"offline\":false}");
+                "66666666-6666-4666-8666-666666666666", null, "Patient", "{\"offline\":false}",
+                new Date(1_787_099_690_000L));
     }
 
     private ClinicalAuditEvent storedEvent(ClinicalAuditSubmission submission) {
@@ -160,6 +191,7 @@ public class ClinicalAuditServiceImplTest {
         event.setEncounterUuid(submission.getEncounterUuid());
         event.setResourceType(submission.getResourceType());
         event.setMetadataJson(submission.getMetadataJson());
+        event.setClientOccurredAt(submission.getClientOccurredAt());
         event.setActor(serverActor);
         event.setServerTimestamp(new Date(1_787_099_696_000L));
         return event;

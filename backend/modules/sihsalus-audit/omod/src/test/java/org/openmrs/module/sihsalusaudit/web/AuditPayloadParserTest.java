@@ -7,6 +7,7 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 
 import org.junit.Test;
@@ -17,7 +18,7 @@ public class AuditPayloadParserTest {
     private final AuditPayloadParser parser = new AuditPayloadParser();
 
     @Test
-    public void acceptsFrontendEnvelopeButDropsClientActorSessionAndTimestamp() {
+    public void acceptsFrontendEnvelopeAndKeepsClientTimeAsASeparateClaim() {
         String json = "[{"
                 + "\"id\":\"11111111-1111-4111-8111-111111111111\","
                 + "\"eventType\":\"UNHANDLED_ERROR\","
@@ -36,6 +37,8 @@ public class AuditPayloadParserTest {
         assertEquals("UNHANDLED_ERROR", submission.getEventType());
         assertTrue(submission.getMetadataJson().contains("patient-chart"));
         assertFalse(submission.getMetadataJson().contains("attacker-controlled-session"));
+        assertEquals(Instant.parse("2020-01-01T00:00:00Z").toEpochMilli(),
+                submission.getClientOccurredAt().getTime());
     }
 
     @Test
@@ -70,6 +73,35 @@ public class AuditPayloadParserTest {
     }
 
     @Test
+    public void rejectsTrailingJsonDocuments() {
+        assertThrows(AuditValidationException.class, () -> parse(baseEvent() + " {}"));
+    }
+
+    @Test
+    public void validationExceptionsDoNotRetainUntrustedInputInTheirCause() {
+        AuditValidationException exception = assertThrows(AuditValidationException.class, () -> parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"PATIENT_SEARCH\","
+                + "\"timestamp\":\"patient-name-secret-token\"}]"));
+
+        assertNull(exception.getCause());
+        assertFalse(exception.getMessage().contains("patient-name"));
+        assertFalse(exception.getMessage().contains("secret-token"));
+    }
+
+    @Test
+    public void rejectsClientTimesOutsideThePersistableOperationalRange() {
+        assertThrows(AuditValidationException.class, () -> parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"PATIENT_SEARCH\","
+                + "\"timestamp\":\"0001-01-01T00:00:00Z\"}]"));
+        assertThrows(AuditValidationException.class, () -> parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"PATIENT_SEARCH\","
+                + "\"timestamp\":\"9999-12-31T23:59:59Z\"}]"));
+    }
+
+    @Test
     public void canonicalizesMetadataForSafeIdempotentRetries() {
         ClinicalAuditSubmission first = parse("[{"
                 + "\"id\":\"99999999-9999-4999-8999-999999999999\","
@@ -101,6 +133,67 @@ public class AuditPayloadParserTest {
     }
 
     @Test
+    public void persistsOnlyEnumeratedMetadataValuesAndIdentifiers() {
+        ClinicalAuditSubmission submission = parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"UNHANDLED_ERROR\","
+                + "\"metadata\":{"
+                + "\"appName\":\"esm-patient-chart-app\","
+                + "\"module\":\"patient-name secret-token\","
+                + "\"action\":\"patient-name secret-token\","
+                + "\"outcome\":\"SUCCESS\","
+                + "\"reasonCode\":\"patient-name secret-token\","
+                + "\"offline\":true,"
+                + "\"locationUuid\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\"}}]").get(0);
+
+        assertEquals("{\"appName\":\"esm-patient-chart-app\",\"outcome\":\"SUCCESS\","
+                + "\"offline\":true,\"locationUuid\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\"}",
+                submission.getMetadataJson());
+        assertFalse(submission.getMetadataJson().contains("patient-name"));
+        assertFalse(submission.getMetadataJson().contains("secret-token"));
+    }
+
+    @Test
+    public void discardsUnknownMachineValuesRatherThanPersistingClientText() {
+        ClinicalAuditSubmission submission = parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"UNHANDLED_ERROR\","
+                + "\"metadata\":{\"appName\":\"patient-name\",\"outcome\":\"secret-token\"}}]").get(0);
+
+        assertNull(submission.getMetadataJson());
+    }
+
+    @Test
+    public void requiresAndNormalizesClinicalTargetsByEventType() {
+        ClinicalAuditSubmission patientView = parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"PATIENT_VIEW\","
+                + "\"patientUuid\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\"}]").get(0);
+        assertEquals("Patient", patientView.getResourceType());
+
+        assertThrows(AuditValidationException.class, () -> parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"PATIENT_VIEW\"}]"));
+        assertThrows(AuditValidationException.class, () -> parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"PATIENT_VIEW\","
+                + "\"patientUuid\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\","
+                + "\"resourceType\":\"Order\"}]"));
+    }
+
+    @Test
+    public void permissionChangesRequireAUserOrRoleTargetWithoutClinicalReferences() {
+        ClinicalAuditSubmission permissionChange = parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"PERMISSION_CHANGE\",\"resourceType\":\"Role\"}]").get(0);
+        assertEquals("Role", permissionChange.getResourceType());
+
+        assertThrows(AuditValidationException.class, () -> parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"PERMISSION_CHANGE\",\"resourceType\":\"Patient\"}]"));
+    }
+
+    @Test
     public void rejectsBatchLargerThanFrontendFlushLimit() {
         StringBuilder json = new StringBuilder("[");
         for (int i = 0; i < 51; i++) {
@@ -109,7 +202,7 @@ public class AuditPayloadParserTest {
             }
             json.append("{\"id\":\"")
                     .append(String.format("00000000-0000-4000-8000-%012d", i))
-                    .append("\",\"eventType\":\"PATIENT_VIEW\"}");
+                    .append("\",\"eventType\":\"PATIENT_SEARCH\"}");
         }
         json.append(']');
 
@@ -118,7 +211,8 @@ public class AuditPayloadParserTest {
 
     @Test
     public void acceptsAbsentOptionalClinicalReferencesAndMetadata() {
-        ClinicalAuditSubmission submission = parse(baseEvent()).get(0);
+        ClinicalAuditSubmission submission = parse(baseEvent().replace("PATIENT_VIEW", "PATIENT_SEARCH")
+                .replace(",\"patientUuid\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\"", "")).get(0);
         assertNull(submission.getPatientUuid());
         assertNull(submission.getMetadataJson());
     }
@@ -134,6 +228,7 @@ public class AuditPayloadParserTest {
     private String baseEvent(String extraField) {
         return "[{" + extraField
                 + "\"id\":\"99999999-9999-4999-8999-999999999999\","
-                + "\"eventType\":\"PATIENT_VIEW\"}]";
+                + "\"eventType\":\"PATIENT_VIEW\","
+                + "\"patientUuid\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\"}]";
     }
 }

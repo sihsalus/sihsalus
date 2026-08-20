@@ -6,8 +6,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import org.openmrs.User;
 import org.openmrs.module.sihsalusaudit.ClinicalAuditConstants;
 import org.openmrs.module.sihsalusaudit.api.AuditSecurityContext;
 import org.openmrs.module.sihsalusaudit.api.ClinicalAuditService;
@@ -36,20 +38,28 @@ public class ClinicalAuditController extends BaseRestController {
 
     private final AuditSecurityContext securityContext;
 
+    private final AuditRateLimiter rateLimiter;
+
     @Autowired
     public ClinicalAuditController(ClinicalAuditService auditService, AuditPayloadParser payloadParser,
-            AuditRequestBodyReader bodyReader, AuditSecurityContext securityContext) {
+            AuditRequestBodyReader bodyReader, AuditSecurityContext securityContext, AuditRateLimiter rateLimiter) {
         this.auditService = auditService;
         this.payloadParser = payloadParser;
         this.bodyReader = bodyReader;
         this.securityContext = securityContext;
+        this.rateLimiter = rateLimiter;
     }
 
     @RequestMapping(method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    public SimpleObject ingest(HttpServletRequest request) throws IOException {
-        securityContext.requireAuthenticatedUserWithPrivilege(ClinicalAuditConstants.PRIVILEGE_RECORD);
+    public SimpleObject ingest(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        User actor = securityContext.requireAuthenticatedUserWithPrivilege(ClinicalAuditConstants.PRIVILEGE_RECORD);
+        int retryAfter = rateLimiter.acquire(actor);
+        if (retryAfter > 0) {
+            response.setHeader("Retry-After", Integer.toString(retryAfter));
+            throw new AuditRateLimitException();
+        }
         byte[] body = bodyReader.read(request);
         List<ClinicalAuditSubmission> submissions = payloadParser.parse(body);
         List<String> confirmedIds = auditService.recordEvents(submissions);
@@ -73,7 +83,13 @@ public class ClinicalAuditController extends BaseRestController {
                     .add("encounterUuid", event.getEncounterUuid())
                     .add("resourceType", event.getResourceType())
                     .add("actorUuid", event.getActor().getUuid())
-                    .add("timestamp", Instant.ofEpochMilli(event.getServerTimestamp().getTime()).toString());
+                    // timestamp remains a compatibility alias for the authoritative receive time.
+                    .add("timestamp", Instant.ofEpochMilli(event.getServerTimestamp().getTime()).toString())
+                    .add("receivedAt", Instant.ofEpochMilli(event.getServerTimestamp().getTime()).toString());
+            if (event.getClientOccurredAt() != null) {
+                result.add("occurredAt", Instant.ofEpochMilli(event.getClientOccurredAt().getTime()).toString())
+                        .add("occurredAtAuthoritative", false);
+            }
             JsonNode metadata = payloadParser.parseStoredMetadata(event.getMetadataJson());
             if (metadata != null) {
                 result.add("metadata", metadata);

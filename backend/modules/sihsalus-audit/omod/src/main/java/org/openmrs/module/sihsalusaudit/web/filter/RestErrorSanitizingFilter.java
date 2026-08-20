@@ -28,7 +28,9 @@ public class RestErrorSanitizingFilter implements Filter {
 
     private static final Logger log = LoggerFactory.getLogger(RestErrorSanitizingFilter.class);
 
-    private static final int MAX_BUFFERED_SUCCESS_BYTES = 64 * 1024;
+    // Review pages are capped at 100 compact, schema-bounded rows. Keeping the entire endpoint
+    // response buffered guarantees that a later failure can never expose a partial/raw body.
+    private static final int MAX_BUFFERED_SUCCESS_BYTES = 512 * 1024;
 
     @Override
     public void init(FilterConfig filterConfig) {
@@ -149,10 +151,6 @@ public class RestErrorSanitizingFilter implements Filter {
 
         private boolean errorBody;
 
-        private boolean passthrough;
-
-        private ServletOutputStream responseOutputStream;
-
         private String authenticateHeader;
 
         private String allowedMethodsHeader;
@@ -225,7 +223,7 @@ public class RestErrorSanitizingFilter implements Filter {
         public void setStatus(int status) {
             this.status = status;
             this.errorBody = status >= 400;
-            if (errorBody && !passthrough) {
+            if (errorBody) {
                 buffer.reset();
             }
             super.setStatus(status);
@@ -236,7 +234,7 @@ public class RestErrorSanitizingFilter implements Filter {
         public void setStatus(int status, String message) {
             this.status = status;
             this.errorBody = status >= 400;
-            if (errorBody && !passthrough) {
+            if (errorBody) {
                 buffer.reset();
             }
             super.setStatus(status, message);
@@ -290,16 +288,11 @@ public class RestErrorSanitizingFilter implements Filter {
         }
 
         private void resetBufferedBody() {
-            if (!passthrough) {
-                buffer.reset();
-            }
+            buffer.reset();
         }
 
         private void copyBodyToResponse() throws IOException {
             flushWriter();
-            if (passthrough) {
-                return;
-            }
             byte[] body = buffer.toByteArray();
             HttpServletResponse response = (HttpServletResponse) getResponse();
             if (body.length > 0) {
@@ -311,20 +304,10 @@ public class RestErrorSanitizingFilter implements Filter {
             if (errorBody) {
                 return;
             }
-            if (passthrough) {
-                getResponseOutputStream().write(bytes, offset, length);
-                return;
+            if (buffer.size() + length > MAX_BUFFERED_SUCCESS_BYTES) {
+                throw new IOException("Audit response exceeded the safe buffer");
             }
-            if (buffer.size() + length <= MAX_BUFFERED_SUCCESS_BYTES) {
-                buffer.write(bytes, offset, length);
-                return;
-            }
-
-            ServletOutputStream target = getResponseOutputStream();
-            buffer.writeTo(target);
-            buffer.reset();
-            passthrough = true;
-            target.write(bytes, offset, length);
+            buffer.write(bytes, offset, length);
         }
 
         private ServletOutputStream createBufferingOutputStream() {
@@ -339,13 +322,6 @@ public class RestErrorSanitizingFilter implements Filter {
                     writeBytes(bytes, offset, length);
                 }
             };
-        }
-
-        private ServletOutputStream getResponseOutputStream() throws IOException {
-            if (responseOutputStream == null) {
-                responseOutputStream = ((HttpServletResponse) getResponse()).getOutputStream();
-            }
-            return responseOutputStream;
         }
 
         private void flushWriter() {

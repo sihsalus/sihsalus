@@ -23,6 +23,8 @@ public class ClinicalAuditEvent implements Serializable {
 
     private String metadataJson;
 
+    private Date clientOccurredAt;
+
     private User actor;
 
     private Date serverTimestamp;
@@ -81,6 +83,14 @@ public class ClinicalAuditEvent implements Serializable {
 
     public void setMetadataJson(String metadataJson) {
         this.metadataJson = metadataJson;
+    }
+
+    public Date getClientOccurredAt() {
+        return clientOccurredAt;
+    }
+
+    public void setClientOccurredAt(Date clientOccurredAt) {
+        this.clientOccurredAt = clientOccurredAt;
     }
 
     public User getActor() {
