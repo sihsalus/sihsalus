@@ -12,7 +12,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -153,23 +152,14 @@ public class AuditPayloadParser {
         }
         resourceType = validateAndNormalizeClinicalTarget(eventType, patientUuid, encounterUuid, resourceType);
 
-        Date clientOccurredAt = validateUntrustedEnvelopeFields(node);
+        Date clientOccurredAt = parseClientOccurredAt(node.get("timestamp"));
         String metadataJson = validateAndSerializeMetadata(node.get("metadata"));
 
         return new ClinicalAuditSubmission(id, eventType, patientUuid, encounterUuid, resourceType, metadataJson,
                 clientOccurredAt);
     }
 
-    private Date validateUntrustedEnvelopeFields(JsonNode node) {
-        String userUuid = optionalText(node, "userUuid", 38);
-        validateOptionalUuid(userUuid);
-
-        String sessionId = optionalText(node, "sessionId", 128);
-        if (sessionId != null && !sessionId.matches("[A-Za-z0-9._:-]+")) {
-            throw new AuditValidationException();
-        }
-
-        JsonNode timestamp = node.get("timestamp");
+    private Date parseClientOccurredAt(JsonNode timestamp) {
         if (timestamp == null || timestamp.isNull() || !timestamp.isTextual()
                 || timestamp.textValue().length() > 40) {
             return null;
@@ -263,27 +253,9 @@ public class AuditPayloadParser {
         }
         rejectUnknownFields(metadata, METADATA_FIELDS);
 
-        Iterator<Map.Entry<String, JsonNode>> fields = metadata.properties().iterator();
-        while (fields.hasNext()) {
-            Map.Entry<String, JsonNode> field = fields.next();
-            JsonNode value = field.getValue();
-            if ("offline".equals(field.getKey())) {
-                if (!value.isBoolean()) {
-                    throw new AuditValidationException();
-                }
-                continue;
-            }
-            if (!value.isTextual()) {
-                throw new AuditValidationException();
-            }
-            if (!isDiscardedCompatibilityField(field.getKey()) && value.textValue().length() > 128) {
-                throw new AuditValidationException();
-            }
-            if ("locationUuid".equals(field.getKey())) {
-                validateUuid(value.textValue());
-            }
-        }
-
+        // Metadata is non-authoritative telemetry. Canonicalization below persists only known,
+        // type-safe machine values. Every other value for an allowed compatibility key is
+        // discarded so a stale or malformed client field cannot poison an atomic offline batch.
         JsonNode canonicalMetadata = canonicalizeMetadata(metadata);
         if (canonicalMetadata == null) {
             return null;
@@ -318,10 +290,6 @@ public class AuditPayloadParser {
             canonicalMetadata.set("locationUuid", locationUuid);
         }
         return canonicalMetadata.isEmpty() ? null : canonicalMetadata;
-    }
-
-    private static boolean isDiscardedCompatibilityField(String field) {
-        return "message".equals(field) || "componentStack".equals(field);
     }
 
     private static void rejectUnknownFields(JsonNode object, Set<String> allowedFields) {

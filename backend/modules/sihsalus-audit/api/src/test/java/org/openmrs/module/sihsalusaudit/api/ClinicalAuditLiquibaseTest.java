@@ -55,6 +55,7 @@ public class ClinicalAuditLiquibaseTest {
 
         Element validation = changeSet(document, "sihsalusaudit-20260819-09-validate");
         assertEquals("true", validation.getAttribute("runAlways"));
+        assertEquals("true", validation.getAttribute("runOnChange"));
         assertEquals("HALT", ((Element) validation.getElementsByTagName("preConditions").item(0))
                 .getAttribute("onFail"));
         assertTrue(hasElementAttribute(document, "column", "name", "client_occurred_at"));
@@ -78,16 +79,18 @@ public class ClinicalAuditLiquibaseTest {
             Element trigger = changeSet(document, id);
             assertEquals("mysql,mariadb", trigger.getAttribute("dbms"));
             assertEquals("true", trigger.getAttribute("runAlways"));
+            assertEquals("true", trigger.getAttribute("runOnChange"));
         }
         Element databaseValidation = changeSet(document, "sihsalusaudit-20260819-10-mariadb-validate");
         assertEquals("mysql,mariadb", databaseValidation.getAttribute("dbms"));
         assertEquals("true", databaseValidation.getAttribute("runAlways"));
+        assertEquals("true", databaseValidation.getAttribute("runOnChange"));
         assertEquals("HALT", ((Element) databaseValidation.getElementsByTagName("preConditions").item(0))
                 .getAttribute("onFail"));
     }
 
     @Test
-    public void validatesTheMariaDbPrimaryKeyByItsPortablePrimaryNameAndColumn() throws Exception {
+    public void validatesTheExactMariaDbPrimaryAndActorForeignKeys() throws Exception {
         Document document = changelog();
         NodeList primaryKeyChecks = document.getElementsByTagName("primaryKeyExists");
         assertEquals(1, primaryKeyChecks.getLength());
@@ -98,6 +101,9 @@ public class ClinicalAuditLiquibaseTest {
         String xmlText = document.getDocumentElement().getTextContent();
         assertTrue(xmlText.contains("CONSTRAINT_NAME = 'PRIMARY'"));
         assertTrue(xmlText.contains("ORDINAL_POSITION = 1 AND COLUMN_NAME = 'audit_event_id'"));
+        assertTrue(xmlText.contains("CONSTRAINT_NAME = 'fk_sihsalus_audit_actor'"));
+        assertTrue(xmlText.contains("REFERENCED_TABLE_NAME = 'users'"));
+        assertTrue(xmlText.contains("REFERENCED_COLUMN_NAME = 'user_id'"));
     }
 
     private Document changelog() throws Exception {

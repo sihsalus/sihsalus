@@ -83,11 +83,23 @@ public class AuditPayloadParserTest {
         AuditValidationException exception = assertThrows(AuditValidationException.class, () -> parse("[{"
                 + "\"id\":\"99999999-9999-4999-8999-999999999999\","
                 + "\"eventType\":\"PATIENT_SEARCH\","
-                + "\"userUuid\":\"patient-name-secret-token\"}]"));
+                + "\"unexpected\":\"patient-name-secret-token\"}]"));
 
         assertNull(exception.getCause());
         assertFalse(exception.getMessage().contains("patient-name"));
         assertFalse(exception.getMessage().contains("secret-token"));
+    }
+
+    @Test
+    public void discardsMalformedCompatibilityEnvelopeFieldsWithoutPoisoningTheBatch() {
+        ClinicalAuditSubmission submission = parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"PATIENT_SEARCH\","
+                + "\"userUuid\":{\"legacy\":\"patient-name-secret-token\"},"
+                + "\"sessionId\":[\"unexpected\",\"shape\"]}]").get(0);
+
+        assertNull(submission.getClientOccurredAt());
+        assertNull(submission.getMetadataJson());
     }
 
     @Test
@@ -161,6 +173,25 @@ public class AuditPayloadParserTest {
         ClinicalAuditSubmission submission = parse(json).get(0);
 
         assertEquals("{\"appName\":\"patient-chart\"}", submission.getMetadataJson());
+    }
+
+    @Test
+    public void discardsMalformedAllowedMetadataValuesWithoutPoisoningTheBatch() {
+        ClinicalAuditSubmission submission = parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"UNHANDLED_ERROR\","
+                + "\"metadata\":{"
+                + "\"appName\":{\"legacy\":true},"
+                + "\"module\":[\"patient-name-secret-token\"],"
+                + "\"action\":42,"
+                + "\"outcome\":{\"legacy\":true},"
+                + "\"offline\":\"true\","
+                + "\"reasonCode\":null,"
+                + "\"message\":{\"patient\":\"patient-name\"},"
+                + "\"componentStack\":42,"
+                + "\"locationUuid\":\"not-a-uuid\"}}]").get(0);
+
+        assertNull(submission.getMetadataJson());
     }
 
     @Test

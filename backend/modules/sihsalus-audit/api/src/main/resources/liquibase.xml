@@ -97,7 +97,7 @@
        supported MariaDB/MySQL runtime. An approved retention migration must explicitly replace
        these triggers before deleting or archiving evidence. -->
   <changeSet id="sihsalusaudit-20260819-07-no-update" author="sihsalus"
-    dbms="mysql,mariadb" runAlways="true">
+    dbms="mysql,mariadb" runAlways="true" runOnChange="true">
     <preConditions onFail="MARK_RAN" onError="HALT">
       <sqlCheck expectedResult="0"><![CDATA[
         SELECT COUNT(*) FROM information_schema.TRIGGERS
@@ -113,7 +113,7 @@
   </changeSet>
 
   <changeSet id="sihsalusaudit-20260819-08-no-delete" author="sihsalus"
-    dbms="mysql,mariadb" runAlways="true">
+    dbms="mysql,mariadb" runAlways="true" runOnChange="true">
     <preConditions onFail="MARK_RAN" onError="HALT">
       <sqlCheck expectedResult="0"><![CDATA[
         SELECT COUNT(*) FROM information_schema.TRIGGERS
@@ -128,7 +128,8 @@
     ]]></sql>
   </changeSet>
 
-  <changeSet id="sihsalusaudit-20260819-09-validate" author="sihsalus" runAlways="true">
+  <changeSet id="sihsalusaudit-20260819-09-validate" author="sihsalus"
+    runAlways="true" runOnChange="true">
     <preConditions onFail="HALT" onError="HALT">
       <tableExists tableName="sihsalus_clinical_audit_event" />
       <!-- MariaDB/MySQL expose the primary key name as PRIMARY even when createTable receives
@@ -154,7 +155,7 @@
   </changeSet>
 
   <changeSet id="sihsalusaudit-20260819-10-mariadb-validate" author="sihsalus"
-    dbms="mysql,mariadb" runAlways="true">
+    dbms="mysql,mariadb" runAlways="true" runOnChange="true">
     <preConditions onFail="HALT" onError="HALT">
       <sqlCheck expectedResult="1"><![CDATA[
         SELECT CASE
@@ -167,6 +168,22 @@
           AND TABLE_SCHEMA = DATABASE()
           AND TABLE_NAME = 'sihsalus_clinical_audit_event'
           AND CONSTRAINT_NAME = 'PRIMARY'
+      ]]></sqlCheck>
+      <sqlCheck expectedResult="1"><![CDATA[
+        SELECT CASE
+          WHEN COUNT(*) = 1
+            AND SUM(CASE
+              WHEN COLUMN_NAME = 'actor_id'
+                AND REFERENCED_TABLE_SCHEMA = DATABASE()
+                AND REFERENCED_TABLE_NAME = 'users'
+                AND REFERENCED_COLUMN_NAME = 'user_id'
+              THEN 1 ELSE 0 END) = 1
+          THEN 1 ELSE 0 END
+        FROM information_schema.KEY_COLUMN_USAGE
+        WHERE CONSTRAINT_SCHEMA = DATABASE()
+          AND TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'sihsalus_clinical_audit_event'
+          AND CONSTRAINT_NAME = 'fk_sihsalus_audit_actor'
       ]]></sqlCheck>
       <sqlCheck expectedResult="1"><![CDATA[
         SELECT CASE
