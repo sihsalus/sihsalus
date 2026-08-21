@@ -64,7 +64,9 @@ aceptar la primera respuesta saludable. El conteo, intervalo y timeout pueden
 ajustarse con `EXTERNAL_VERIFY_SAMPLE_COUNT`,
 `EXTERNAL_VERIFY_SAMPLE_INTERVAL_SECONDS` y
 `EXTERNAL_VERIFY_CURL_TIMEOUT_SECONDS`; producción siempre debe conservar al
-menos dos muestras.
+menos dos muestras. Solo el fallo de transporte se reintenta
+(`EXTERNAL_VERIFY_CURL_ATTEMPTS`, `EXTERNAL_VERIFY_CURL_RETRY_DELAY_SECONDS`):
+las garantías de SHA, digest, node-id y split-brain siguen con tolerancia cero.
 
 TLS usa la cadena de confianza normal por defecto. Un endpoint con certificado
 privado puede usar un pin SPKI `sha256//...`; desactivar la validación de cadena
