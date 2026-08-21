@@ -107,9 +107,18 @@ container_node_id() {
     2>/dev/null || true
 }
 
+# La identidad del nodo ya vive en .env desde el primer despliegue; el script la
+# reescribe alli al terminar. Leer solo el entorno obligaba a reexportarla a mano
+# en cada despliegue manual y abortaba con el UUID correcto delante, en el .env.
+# No se puede omitir: sin un UUID valido el compose cae a "unconfigured" y la
+# verificacion externa lo rechaza, asi que se exige igual, solo que ahora tambien
+# se acepta el valor ya persistido.
 NODE_ID="${SIHSALUS_NODE_ID:-}"
+if [ -z "$NODE_ID" ]; then
+  NODE_ID="$(read_env_value SIHSALUS_NODE_ID)"
+fi
 if [[ ! "$NODE_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
-  echo "[deploy-frontend] SIHSALUS_NODE_ID is required and must be a lowercase UUID" >&2
+  echo "[deploy-frontend] SIHSALUS_NODE_ID must be a lowercase UUID, in the environment or in .env" >&2
   exit 2
 fi
 
