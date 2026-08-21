@@ -604,6 +604,7 @@ nohup setsid bash -c '
   frontend_transaction="$run_directory/frontend-transaction.env"
   frontend_transaction_state="$run_directory/frontend-transaction.state"
   termination_requested=false
+  interrupt_pending=false
   deploy_pid=""
 
   exec >"$log_path" 2>&1
@@ -624,6 +625,7 @@ nohup setsid bash -c '
 
   request_interrupt() {
     termination_requested=true
+    interrupt_pending=true
     if [[ "$deploy_pid" =~ ^[1-9][0-9]*$ ]]; then
       kill -TERM "$deploy_pid" 2>/dev/null || true
     fi
@@ -685,22 +687,36 @@ nohup setsid bash -c '
   if [ "$termination_requested" = true ]; then
     kill -TERM "$deploy_pid" 2>/dev/null || true
   fi
+  deploy_code=143
   while true; do
+    interrupt_pending=false
     wait "$deploy_pid"
-    deploy_code="$?"
-    if [ "$termination_requested" = true ] && kill -0 "$deploy_pid" 2>/dev/null; then
-      kill -TERM "$deploy_pid" 2>/dev/null || true
-      continue
+    wait_code="$?"
+    # A trapped signal aborts wait with 128+signal, and a second wait for an
+    # already reaped child reports no usable status at all, so only keep a
+    # status this wait actually resolved.
+    if [[ "$wait_code" =~ ^[0-9]+$ ]] && [ "$wait_code" -ne 127 ]; then
+      deploy_code="$wait_code"
     fi
-    break
+    if [ "$interrupt_pending" != true ] || ! kill -0 "$deploy_pid" 2>/dev/null; then
+      break
+    fi
+    # The signal interrupted the wait while the deployment script kept running,
+    # so its own exit status, not the signal, decides the terminal state.
+    kill -TERM "$deploy_pid" 2>/dev/null || true
   done
   deploy_pid=""
-  if [ "$termination_requested" = true ] && [ "$deploy_code" -eq 0 ]; then
+  if [ "$termination_requested" = true ]; then
+    # deploy-frontend.sh keeps a committed transaction successful even when a
+    # late signal reaches it, and a cancellation racing the deployment can cost
+    # this wrapper the exact child status, so the durable marker decides.
     if [ -f "$frontend_transaction_state" ] &&
       [ "$(cat "$frontend_transaction_state")" = committed ]; then
       exit 0
     fi
-    exit 143
+    if [ "$deploy_code" -eq 0 ]; then
+      exit 143
+    fi
   fi
   exit "$deploy_code"
 ' remote-redeploy-worker \

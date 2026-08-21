@@ -122,6 +122,30 @@ if [ "$#" -eq 11 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
   exit 255
 fi
 
+# The monitor starts its timeout clock when this launch call returns. Cases that
+# exercise a two-second budget must not also race the detached worker's startup,
+# which on a loaded CI runner can take longer than the budget itself, so hold the
+# launch open until the worker published the evidence the case depends on.
+if [ "$#" -eq 11 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
+  [ -n "${FAKE_SSH_LAUNCH_WAIT_LOG:-}" ]; then
+  set +e
+  "$@"
+  launch_code="$?"
+  set -e
+  if [ "$launch_code" -ne 0 ]; then
+    exit "$launch_code"
+  fi
+  for _ in $(seq 1 1200); do
+    if [ -f "$FAKE_SSH_LAUNCH_WAIT_LOG" ] &&
+      grep -Fq "$FAKE_SSH_LAUNCH_WAIT_PATTERN" "$FAKE_SSH_LAUNCH_WAIT_LOG"; then
+      exit 0
+    fi
+    sleep 0.1
+  done
+  echo "fake SSH never observed remote evidence: $FAKE_SSH_LAUNCH_WAIT_PATTERN" >&2
+  exit 1
+fi
+
 exec "$@"
 FAKE_SSH
 
@@ -231,6 +255,18 @@ while true; do
 done
 COMMITTED_CLEANUP_SCRIPT
 
+COMMITTED_SIGNAL_FIXTURE="$TEMP_ROOT/committed-signal.sh"
+cat >"$COMMITTED_SIGNAL_FIXTURE" <<'COMMITTED_SIGNAL_SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "committed release received a late signal"; exit 143' TERM HUP
+printf '%s\n' committed >"$FRONTEND_TRANSACTION_STATE_PATH"
+echo 'public verification passed and transaction committed'
+while true; do
+  sleep 1
+done
+COMMITTED_SIGNAL_SCRIPT
+
 EARLY_CANCEL_FIXTURE="$TEMP_ROOT/early-cancel.sh"
 cat >"$EARLY_CANCEL_FIXTURE" <<'EARLY_CANCEL_SCRIPT'
 #!/usr/bin/env bash
@@ -240,7 +276,8 @@ printf '%s\n' committed >"$FRONTEND_TRANSACTION_STATE_PATH"
 EARLY_CANCEL_SCRIPT
 
 chmod 700 "$SUCCESS_FIXTURE" "$FAILURE_FIXTURE" "$TRANSACTION_FIXTURE" "$DUMMY_VERIFIER" \
-  "$CANCELLATION_FIXTURE" "$COMMITTED_CLEANUP_FIXTURE" "$EARLY_CANCEL_FIXTURE"
+  "$CANCELLATION_FIXTURE" "$COMMITTED_CLEANUP_FIXTURE" "$COMMITTED_SIGNAL_FIXTURE" \
+  "$EARLY_CANCEL_FIXTURE"
 
 BACKEND_SHA="1111111111111111111111111111111111111111"
 BACKEND_DIGEST="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -416,6 +453,8 @@ TIMEOUT_OUTPUT="$TEMP_ROOT/timeout-output.log"
 set +e
 PATH="$FAKE_BIN:$PATH" \
   SSH_BIN="$FAKE_BIN/ssh" \
+  FAKE_SSH_LAUNCH_WAIT_LOG="$REMOTE_REPOSITORY/.redeploy-runs/timeout-run/redeploy.log" \
+  FAKE_SSH_LAUNCH_WAIT_PATTERN='cancellation fixture started' \
   REDEPLOY_SCRIPT_PATH="$CANCELLATION_FIXTURE" \
   REDEPLOY_POLL_INTERVAL_SECONDS=1 \
   REDEPLOY_TIMEOUT_SECONDS=2 \
@@ -449,6 +488,8 @@ grep -Fq 'fixture canceled' "$REMOTE_REPOSITORY/.redeploy-runs/timeout-run/redep
 COMMITTED_TIMEOUT_OUTPUT="$TEMP_ROOT/committed-timeout-output.log"
 PATH="$FAKE_BIN:$PATH" \
   SSH_BIN="$FAKE_BIN/ssh" \
+  FAKE_SSH_LAUNCH_WAIT_LOG="$REMOTE_REPOSITORY/.redeploy-runs/committed-timeout-run/redeploy.log" \
+  FAKE_SSH_LAUNCH_WAIT_PATTERN='public verification passed and transaction committed' \
   REDEPLOY_SCRIPT_PATH="$COMMITTED_CLEANUP_FIXTURE" \
   EXTERNAL_VERIFIER_PATH="$DUMMY_VERIFIER" \
   REDEPLOY_POLL_INTERVAL_SECONDS=1 \
@@ -469,6 +510,36 @@ grep -Fq 'public verification passed and transaction committed' "$COMMITTED_TIME
 grep -Fq 'confirmed durable committed transaction' "$COMMITTED_TIMEOUT_OUTPUT"
 grep -Fq 'treating the transaction as successful' "$COMMITTED_TIMEOUT_OUTPUT"
 
+# A cancellation that reaches the deployment script after it committed makes the
+# script exit on the signal, which must not downgrade a publicly verified
+# release to a failed run.
+COMMITTED_SIGNAL_OUTPUT="$TEMP_ROOT/committed-signal-output.log"
+PATH="$FAKE_BIN:$PATH" \
+  SSH_BIN="$FAKE_BIN/ssh" \
+  FAKE_SSH_LAUNCH_WAIT_LOG="$REMOTE_REPOSITORY/.redeploy-runs/committed-signal-run/redeploy.log" \
+  FAKE_SSH_LAUNCH_WAIT_PATTERN='public verification passed and transaction committed' \
+  REDEPLOY_SCRIPT_PATH="$COMMITTED_SIGNAL_FIXTURE" \
+  EXTERNAL_VERIFIER_PATH="$DUMMY_VERIFIER" \
+  REDEPLOY_POLL_INTERVAL_SECONDS=1 \
+  REDEPLOY_TIMEOUT_SECONDS=2 \
+  REDEPLOY_CANCEL_RETRY_INTERVAL_SECONDS=1 \
+  REDEPLOY_EXPECTED_REMOTE_MAC="$EXPECTED_REMOTE_MAC" \
+  REDEPLOY_EXPECTED_NODE_ID="$EXPECTED_NODE_ID" \
+  REDEPLOY_REMOTE_MAC_PATH="$REMOTE_MAC_PATH" \
+  REDEPLOY_FRONTEND_BASE_URL=https://prod.example.test \
+  REDEPLOY_FRONTEND_CURRENT_SHA=2222222222222222222222222222222222222222 \
+  REDEPLOY_FRONTEND_CURRENT_DIGEST=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+  REDEPLOY_FRONTEND_DISTRO_SHA="$DISTRO_SHA" \
+  bash "$RUNNER" \
+  "$SSH_KEY" deploy@example.test "$REMOTE_REPOSITORY" \
+  "$BACKEND_SHA" "$BACKEND_DIGEST" committed-signal-run >"$COMMITTED_SIGNAL_OUTPUT" 2>&1
+[ "$(cat "$REMOTE_REPOSITORY/.redeploy-runs/committed-signal-run/status")" = 0 ]
+[ "$(cat "$REMOTE_REPOSITORY/.redeploy-runs/committed-signal-run/frontend-transaction.state")" = committed ]
+grep -Fq 'committed release received a late signal' \
+  "$REMOTE_REPOSITORY/.redeploy-runs/committed-signal-run/redeploy.log"
+grep -Fq 'confirmed durable committed transaction' "$COMMITTED_SIGNAL_OUTPUT"
+grep -Fq 'treating the transaction as successful' "$COMMITTED_SIGNAL_OUTPUT"
+
 COMMITTED_IDENTITY_MISMATCH_OUTPUT="$TEMP_ROOT/committed-identity-mismatch-output.log"
 set +e
 PATH="$FAKE_BIN:$PATH" \
@@ -477,6 +548,8 @@ PATH="$FAKE_BIN:$PATH" \
   FAKE_SSH_LOG_COUNTER_FILE="$TEMP_ROOT/committed-identity-log-mismatches" \
   FAKE_REMOTE_MAC_PATH="$REMOTE_MAC_PATH" \
   FAKE_EXPECTED_REMOTE_MAC="$EXPECTED_REMOTE_MAC" \
+  FAKE_SSH_LAUNCH_WAIT_LOG="$REMOTE_REPOSITORY/.redeploy-runs/committed-identity-mismatch-run/redeploy.log" \
+  FAKE_SSH_LAUNCH_WAIT_PATTERN='public verification passed and transaction committed' \
   REDEPLOY_SCRIPT_PATH="$COMMITTED_CLEANUP_FIXTURE" \
   EXTERNAL_VERIFIER_PATH="$DUMMY_VERIFIER" \
   REDEPLOY_POLL_INTERVAL_SECONDS=1 \
