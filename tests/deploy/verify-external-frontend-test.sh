@@ -158,6 +158,8 @@ run_verifier() {
     EXTERNAL_VERIFY_SAMPLE_COUNT=4 \
     EXTERNAL_VERIFY_SAMPLE_INTERVAL_SECONDS=0 \
     EXTERNAL_VERIFY_CURL_TIMEOUT_SECONDS=2 \
+    EXTERNAL_VERIFY_CURL_ATTEMPTS="${TEST_CURL_ATTEMPTS:-3}" \
+    EXTERNAL_VERIFY_CURL_RETRY_DELAY_SECONDS=0 \
     bash "$VERIFIER" https://example.test "$TARGET_SHA" "$TARGET_NODE_ID" TEST >"$output" 2>&1
 }
 
@@ -212,8 +214,25 @@ grep -Fq 'observed remote address(es): 203.0.113.10 203.0.113.11' "$TEST_ROOT/sp
 assert_fails endpoint-failure
 grep -Fq 'sample 2/4 failed at /ready' "$TEST_ROOT/endpoint-failure.log"
 
-assert_fails build-request-failure
+# Sin reintentos, un unico fallo de transporte sigue rechazando: la severidad
+# original del gate se conserva y se puede recuperar con una variable.
+TEST_CURL_ATTEMPTS=1 assert_fails build-request-failure
 grep -Fq 'sample 2/4 failed at /openmrs/spa/build-info.json' "$TEST_ROOT/build-request-failure.log"
+
+# Con reintentos (por defecto), ese mismo parpadeo puntual se tolera: el fallo
+# simulado afecta solo a la segunda peticion, asi que el reintento la resuelve.
+# Es el caso real que tumbaba despliegues sanos desde runners transcontinentales.
+transient_output="$TEST_ROOT/build-request-transient.log"
+run_verifier build-request-failure "$transient_output"
+grep -Fq 'transport attempt 1/3 failed' "$transient_output"
+grep -Fq 'all 4 independent observations match' "$transient_output"
+# 16 peticiones nominales + el reintento.
+[ "$(wc -l <"$FAKE_STATE_DIR/requests" | tr -d ' ')" -eq 17 ]
+
+# Un fallo persistente (misma URL siempre) agota los reintentos y rechaza.
+assert_fails endpoint-failure
+grep -Fq 'transport attempt 2/3 failed' "$TEST_ROOT/endpoint-failure.log"
+grep -Fq 'sample 2/4 failed at /ready' "$TEST_ROOT/endpoint-failure.log"
 
 invalid_count_output="$TEST_ROOT/invalid-count.log"
 if PATH="$FAKE_BIN:$PATH" \
