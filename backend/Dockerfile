@@ -58,12 +58,22 @@ RUN yum -y update acl expat glib2 libacl libssh2 python python-libs vim-data vim
     yum clean all && \
     rm -rf /var/cache/yum
 
-COPY --chmod=0555 backend/bin/configure-ocl-token.sh /usr/local/bin/configure-ocl-token.sh
+COPY backend/bin/configure-ocl-token.sh /tmp/sihsalus-backend-bin/configure-ocl-token.sh
 
 # The pinned OpenMRS runtime quotes the wildcard used to clear distribution
 # directories, so removed modules and metadata survive in the persistent volume.
 # Keep the upstream safety guard while allowing the wildcard to expand.
-RUN bash -n /usr/local/bin/configure-ocl-token.sh && \
+RUN test -s /tmp/sihsalus-backend-bin/configure-ocl-token.sh && \
+    [ "$(head -n 1 /tmp/sihsalus-backend-bin/configure-ocl-token.sh)" = '#!/usr/bin/env bash' ] && \
+    grep -qF 'strip_ocl_property() {' /tmp/sihsalus-backend-bin/configure-ocl-token.sh && \
+    bash -n /tmp/sihsalus-backend-bin/configure-ocl-token.sh && \
+    install -m 0555 \
+      /tmp/sihsalus-backend-bin/configure-ocl-token.sh \
+      /usr/local/bin/configure-ocl-token.sh && \
+    cmp -s \
+      /tmp/sihsalus-backend-bin/configure-ocl-token.sh \
+      /usr/local/bin/configure-ocl-token.sh && \
+    rm -rf /tmp/sihsalus-backend-bin && \
     sed -i \
       -e 's|rm -fR "${OMRS_MODULES_DIR:?}/\*"|rm -fR "${OMRS_MODULES_DIR:?}"/*|' \
       -e 's|rm -fR "${OMRS_OWA_DIR:?}/\*"|rm -fR "${OMRS_OWA_DIR:?}"/*|' \
