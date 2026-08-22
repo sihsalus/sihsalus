@@ -4,11 +4,35 @@ set -euo pipefail
 
 IMAGE="${1:-sihsalus-backend:ci}"
 TOKEN="$(printf 'c%.0s' {1..40})"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+EXPECTED_HOOK="${ROOT_DIR}/backend/bin/configure-ocl-token.sh"
+TEMP_DIR="$(mktemp -d)"
+CONTAINER_ID=""
 
 fail() {
   echo "[FAIL] $*" >&2
   exit 1
 }
+
+cleanup() {
+  if [[ -n "$CONTAINER_ID" ]]; then
+    docker rm -f "$CONTAINER_ID" >/dev/null 2>&1 || true
+  fi
+  rm -rf "$TEMP_DIR"
+}
+trap cleanup EXIT
+
+CONTAINER_ID="$(docker create "$IMAGE")"
+docker cp \
+  "${CONTAINER_ID}:/usr/local/bin/configure-ocl-token.sh" \
+  "${TEMP_DIR}/configure-ocl-token.sh"
+
+[[ -s "${TEMP_DIR}/configure-ocl-token.sh" ]] \
+  || fail "the published backend hook is empty"
+[[ "$(head -n 1 "${TEMP_DIR}/configure-ocl-token.sh")" == '#!/usr/bin/env bash' ]] \
+  || fail "the published backend hook has an invalid interpreter"
+cmp -s "$EXPECTED_HOOK" "${TEMP_DIR}/configure-ocl-token.sh" \
+  || fail "the published backend hook does not match the reviewed source"
 
 [[ "$(docker image inspect --format '{{.Config.User}}' "$IMAGE")" == 1001 ]] \
   || fail "the backend candidate no longer runs as UID 1001"
@@ -28,6 +52,11 @@ output="$({
       trap '\''rm -rf "$test_root"'\'' EXIT
 
       test -x "$hook"
+      test -s "$hook"
+      test "$(stat -c %a "$hook")" = 555
+      test "$(head -n 1 "$hook")" = '\''#!/usr/bin/env bash'\''
+      grep -qF '\''strip_ocl_property() {'\'' "$hook"
+      bash -n "$hook"
       test "$(grep -Fc "$hook" "$startup")" -eq 1
       test "$(tail -n 1 "$startup")" = '\''/usr/local/bin/configure-ocl-token.sh "$OMRS_CONFIG_DIR" "$OMRS_DATA_DIR/configuration_checksums"'\''
 
