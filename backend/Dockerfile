@@ -23,21 +23,21 @@ ARG BEDMANAGEMENT_SOURCE_SHA=f7ceac08204d4239814b9978eaf7dadd8e6a62c7
 ADD --checksum=sha256:428cddc778eb382f91eafa2156117b090fc75b11202919376bb615ff3d125874 \
     https://github.com/sihsalus/openmrs-module-bedmanagement/archive/${BEDMANAGEMENT_SOURCE_SHA}.tar.gz \
     /tmp/bedmanagement-source.tar.gz
-RUN --mount=type=cache,target=/root/.m2/repository \
-    mkdir -p /tmp/bedmanagement-source && \
-    tar -xzf /tmp/bedmanagement-source.tar.gz -C /tmp/bedmanagement-source --strip-components=1 && \
-    mvn --batch-mode --show-version --no-transfer-progress \
-      -Dformatter.skip=true -DskipTests -Dmaven.javadoc.skip=true \
-      --file /tmp/bedmanagement-source/pom.xml install
-
 # Pre-download all dependencies into the BuildKit cache.
 RUN --mount=type=cache,target=/root/.m2/repository \
     mvn $MVN_ARGS_SETTINGS dependency:resolve -B || true
 
 COPY backend ./backend/
 
-# Build the distro
+# Build the private BedManagement artifact and the distro in the same cache
+# mount. A cached RUN must never hide an artifact that exists only as a cache
+# side effect from a later RUN.
 RUN --mount=type=cache,target=/root/.m2/repository \
+    mkdir -p /tmp/bedmanagement-source && \
+    tar -xzf /tmp/bedmanagement-source.tar.gz -C /tmp/bedmanagement-source --strip-components=1 && \
+    mvn --batch-mode --show-version --no-transfer-progress \
+      -Dformatter.skip=true -DskipTests -Dmaven.javadoc.skip=true \
+      --file /tmp/bedmanagement-source/pom.xml install && \
     mvn $MVN_ARGS_SETTINGS $MVN_ARGS
 
 RUN cp /openmrs_distro/backend/target/sdk-distro/web/openmrs_core/openmrs.war /openmrs/distribution/openmrs_core/ && \
