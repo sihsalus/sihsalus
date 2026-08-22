@@ -58,10 +58,13 @@ RUN yum -y update acl expat glib2 libacl libssh2 python python-libs vim-data vim
     yum clean all && \
     rm -rf /var/cache/yum
 
+COPY --chmod=0555 backend/bin/configure-ocl-token.sh /usr/local/bin/configure-ocl-token.sh
+
 # The pinned OpenMRS runtime quotes the wildcard used to clear distribution
 # directories, so removed modules and metadata survive in the persistent volume.
 # Keep the upstream safety guard while allowing the wildcard to expand.
-RUN sed -i \
+RUN bash -n /usr/local/bin/configure-ocl-token.sh && \
+    sed -i \
       -e 's|rm -fR "${OMRS_MODULES_DIR:?}/\*"|rm -fR "${OMRS_MODULES_DIR:?}"/*|' \
       -e 's|rm -fR "${OMRS_OWA_DIR:?}/\*"|rm -fR "${OMRS_OWA_DIR:?}"/*|' \
       -e 's|rm -fR "${OMRS_CONFIG_DIR:?}/\*"|rm -fR "${OMRS_CONFIG_DIR:?}"/*|' \
@@ -70,7 +73,11 @@ RUN sed -i \
     grep -qF 'rm -fR "${OMRS_MODULES_DIR:?}"/*' /openmrs/startup-init.sh && \
     grep -qF 'rm -fR "${OMRS_OWA_DIR:?}"/*' /openmrs/startup-init.sh && \
     grep -qF 'rm -fR "${OMRS_CONFIG_DIR:?}"/*' /openmrs/startup-init.sh && \
-    grep -qF 'rm -fR "${OMRS_FRONTEND_DIR:?}"/*' /openmrs/startup-init.sh
+    grep -qF 'rm -fR "${OMRS_FRONTEND_DIR:?}"/*' /openmrs/startup-init.sh && \
+    printf '\n%s\n' '/usr/local/bin/configure-ocl-token.sh "$OMRS_CONFIG_DIR" "$OMRS_DATA_DIR/configuration_checksums"' >> /openmrs/startup-init.sh && \
+    [ "$(grep -Fc '/usr/local/bin/configure-ocl-token.sh' /openmrs/startup-init.sh)" -eq 1 ] && \
+    tail -n 1 /openmrs/startup-init.sh \
+      | grep -qxF '/usr/local/bin/configure-ocl-token.sh "$OMRS_CONFIG_DIR" "$OMRS_DATA_DIR/configuration_checksums"'
 
 # Do not copy the war if using the correct openmrs-core image version
 COPY --from=dev /openmrs/distribution/openmrs_core/openmrs.war /openmrs/distribution/openmrs_core/

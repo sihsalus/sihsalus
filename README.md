@@ -43,11 +43,22 @@ cp .env.template .env
 MYSQL_OPENMRS_PASSWORD=<password_seguro>
 MYSQL_ROOT_PASSWORD=<password_seguro>
 
-# Token OCL para importar conceptos médicos, si vas a importar conceptos
+# Token API OCL crudo (40 caracteres hexadecimales en minúscula, sin el prefijo "Token")
 OMRS_OCL_TOKEN=<tu_token_de_ocl>
 ```
 
 > No uses los defaults `openmrs`/`openmrs` en producción.
+
+El backend reconcilia `OMRS_OCL_TOKEN` después de copiar la configuración y antes de que
+Initializer la procese. Un valor no vacío se aplica en cada arranque, por lo que un recreate o una
+rotación convergen al token configurado sin crear otra propiedad. Si la variable está vacía, el
+backend elimina cualquier placeholder del paquete de content, no escribe un valor vacío y conserva
+el token que OpenMRS ya tuviera almacenado. En una base limpia, dejarla vacía mantiene deshabilitada
+la importación remota hasta configurar un token válido.
+
+Vaciar la variable no revoca una credencial ya persistida. Para rotarla, reemplaza el valor en el
+archivo de entorno y recrea el backend; para retirarla sin reemplazo, revoca primero el token en OCL
+y elimina la propiedad desde la administración de OpenMRS durante una ventana controlada.
 
 También puedes generar `.env.production` con credenciales aleatorias y auditarlo antes del despliegue:
 
