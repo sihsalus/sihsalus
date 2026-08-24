@@ -26,21 +26,21 @@ ARG BEDMANAGEMENT_SOURCE_SHA=f7ceac08204d4239814b9978eaf7dadd8e6a62c7
 ADD --checksum=sha256:428cddc778eb382f91eafa2156117b090fc75b11202919376bb615ff3d125874 \
     https://github.com/sihsalus/openmrs-module-bedmanagement/archive/${BEDMANAGEMENT_SOURCE_SHA}.tar.gz \
     /tmp/bedmanagement-source.tar.gz
-RUN --mount=type=cache,target=/root/.m2/repository \
-    mkdir -p /tmp/bedmanagement-source && \
-    tar -xzf /tmp/bedmanagement-source.tar.gz -C /tmp/bedmanagement-source --strip-components=1 && \
-    mvn --batch-mode --show-version --no-transfer-progress \
-      -Dformatter.skip=true -DskipTests -Dmaven.javadoc.skip=true \
-      --file /tmp/bedmanagement-source/pom.xml install
-
 # Pre-download all dependencies into the BuildKit cache.
 RUN --mount=type=cache,target=/root/.m2/repository \
     mvn $MVN_ARGS_SETTINGS dependency:resolve -B || true
 
 COPY backend ./backend/
 
-# Build the distro
+# Build the private BedManagement artifact and the distro in the same cache
+# mount. A cached RUN must never hide an artifact that exists only as a cache
+# side effect from a later RUN.
 RUN --mount=type=cache,target=/root/.m2/repository \
+    mkdir -p /tmp/bedmanagement-source && \
+    tar -xzf /tmp/bedmanagement-source.tar.gz -C /tmp/bedmanagement-source --strip-components=1 && \
+    mvn --batch-mode --show-version --no-transfer-progress \
+      -Dformatter.skip=true -DskipTests -Dmaven.javadoc.skip=true \
+      --file /tmp/bedmanagement-source/pom.xml install && \
     mvn $MVN_ARGS_SETTINGS $MVN_ARGS
 
 RUN cp /openmrs_distro/backend/target/sdk-distro/web/openmrs_core/openmrs.war /openmrs/distribution/openmrs_core/ && \
@@ -61,10 +61,23 @@ RUN yum -y update acl expat glib2 libacl libssh2 python python-libs vim-data vim
     yum clean all && \
     rm -rf /var/cache/yum
 
+COPY backend/bin/configure-ocl-token.sh /tmp/sihsalus-backend-bin/configure-ocl-token.sh
+
 # The pinned OpenMRS runtime quotes the wildcard used to clear distribution
 # directories, so removed modules and metadata survive in the persistent volume.
 # Keep the upstream safety guard while allowing the wildcard to expand.
-RUN sed -i \
+RUN test -s /tmp/sihsalus-backend-bin/configure-ocl-token.sh && \
+    [ "$(head -n 1 /tmp/sihsalus-backend-bin/configure-ocl-token.sh)" = '#!/usr/bin/env bash' ] && \
+    grep -qF 'strip_ocl_property() {' /tmp/sihsalus-backend-bin/configure-ocl-token.sh && \
+    bash -n /tmp/sihsalus-backend-bin/configure-ocl-token.sh && \
+    install -m 0555 \
+      /tmp/sihsalus-backend-bin/configure-ocl-token.sh \
+      /usr/local/bin/configure-ocl-token.sh && \
+    cmp -s \
+      /tmp/sihsalus-backend-bin/configure-ocl-token.sh \
+      /usr/local/bin/configure-ocl-token.sh && \
+    rm -rf /tmp/sihsalus-backend-bin && \
+    sed -i \
       -e 's|rm -fR "${OMRS_MODULES_DIR:?}/\*"|rm -fR "${OMRS_MODULES_DIR:?}"/*|' \
       -e 's|rm -fR "${OMRS_OWA_DIR:?}/\*"|rm -fR "${OMRS_OWA_DIR:?}"/*|' \
       -e 's|rm -fR "${OMRS_CONFIG_DIR:?}/\*"|rm -fR "${OMRS_CONFIG_DIR:?}"/*|' \
@@ -73,7 +86,11 @@ RUN sed -i \
     grep -qF 'rm -fR "${OMRS_MODULES_DIR:?}"/*' /openmrs/startup-init.sh && \
     grep -qF 'rm -fR "${OMRS_OWA_DIR:?}"/*' /openmrs/startup-init.sh && \
     grep -qF 'rm -fR "${OMRS_CONFIG_DIR:?}"/*' /openmrs/startup-init.sh && \
-    grep -qF 'rm -fR "${OMRS_FRONTEND_DIR:?}"/*' /openmrs/startup-init.sh
+    grep -qF 'rm -fR "${OMRS_FRONTEND_DIR:?}"/*' /openmrs/startup-init.sh && \
+    printf '\n%s\n' '/usr/local/bin/configure-ocl-token.sh "$OMRS_CONFIG_DIR" "$OMRS_DATA_DIR/configuration_checksums"' >> /openmrs/startup-init.sh && \
+    [ "$(grep -Fc '/usr/local/bin/configure-ocl-token.sh' /openmrs/startup-init.sh)" -eq 1 ] && \
+    tail -n 1 /openmrs/startup-init.sh \
+      | grep -qxF '/usr/local/bin/configure-ocl-token.sh "$OMRS_CONFIG_DIR" "$OMRS_DATA_DIR/configuration_checksums"'
 
 # Do not copy the war if using the correct openmrs-core image version
 COPY --from=dev /openmrs/distribution/openmrs_core/openmrs.war /openmrs/distribution/openmrs_core/

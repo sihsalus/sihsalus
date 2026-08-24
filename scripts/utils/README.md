@@ -5,7 +5,6 @@
 | Archivo | Uso |
 | --- | --- |
 | `certificate_generate.sh` | Certificado auto-firmado local; el flujo normal HTTPS usa `compose/ssl.yml` |
-| `globalproperties_envsubst.sh` | Sustitución de variables en propiedades OpenMRS |
 | `init_full.sh` | Reinicialización de desarrollo; puede eliminar volúmenes |
 | `logs_creation.sh` | Extraer logs del backend/initializer |
 | `sihsalus-compose.service` | Arranque del stack con systemd |

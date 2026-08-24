@@ -48,7 +48,7 @@ jobs:
           fi
 
           if [ "$can_diff" = "true" ] \
-            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- pom.xml backend/; then
+            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml pom.xml backend/ tests/backend/; then
             backend=false
           fi
 
@@ -98,6 +98,9 @@ jobs:
       - name: Validate full environment redeploy policy
         run: ./tests/deploy/redeploy-environment-policy.sh
 
+      - name: Test OCL token runtime configuration
+        run: ./tests/backend/ocl-token-config.sh
+
       - name: Validate models and invariants
         run: ./scripts/validate-compose.sh compose-validation
 
@@ -141,6 +144,9 @@ jobs:
         env:
           DOCKER_BUILDKIT: '1'
         run: docker build --file backend/Dockerfile --tag sihsalus-backend:ci .
+
+      - name: Test backend OCL token contract
+        run: ./tests/backend/ocl-token-image.sh sihsalus-backend:ci
 
       - name: Resolve pinned OpenMRS security baseline
         id: openmrs-baseline

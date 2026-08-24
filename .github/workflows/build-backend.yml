@@ -9,6 +9,7 @@ on:
       - 'pom.xml'
       - 'backend/**'
       - 'distro/**'
+      - 'tests/backend/ocl-token-image.sh'
   workflow_dispatch:
 
 concurrency:
@@ -56,6 +57,14 @@ jobs:
           platforms: linux/amd64
           cache-from: type=gha,scope=backend
           cache-to: type=gha,scope=backend,mode=max
+
+      - name: Test published backend OCL token contract
+        env:
+          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          docker pull "${IMAGE}"
+          ./tests/backend/ocl-token-image.sh "${IMAGE}"
 
       - name: Resolve pinned OpenMRS security baseline
         id: openmrs-baseline
@@ -130,7 +139,7 @@ jobs:
           fi
 
       - name: Produce backend Trivy evidence
-        if: always()
+        if: ${{ always() && steps.build.outcome == 'success' && steps.build.outputs.digest != '' }}
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}

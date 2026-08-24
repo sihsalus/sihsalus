@@ -13,7 +13,9 @@ EXPECTED_NODE_ID="$3"
 ENVIRONMENT_LABEL="$4"
 SAMPLE_COUNT="${EXTERNAL_VERIFY_SAMPLE_COUNT:-12}"
 SAMPLE_INTERVAL_SECONDS="${EXTERNAL_VERIFY_SAMPLE_INTERVAL_SECONDS:-5}"
-CURL_TIMEOUT_SECONDS="${EXTERNAL_VERIFY_CURL_TIMEOUT_SECONDS:-3}"
+CURL_TIMEOUT_SECONDS="${EXTERNAL_VERIFY_CURL_TIMEOUT_SECONDS:-10}"
+CURL_ATTEMPTS="${EXTERNAL_VERIFY_CURL_ATTEMPTS:-3}"
+CURL_RETRY_DELAY_SECONDS="${EXTERNAL_VERIFY_CURL_RETRY_DELAY_SECONDS:-2}"
 
 if [[ ! "$BASE_URL" =~ ^https?://[^/?#]+$ ]]; then
   echo "[external-verify] invalid base URL: $BASE_URL" >&2
@@ -42,6 +44,16 @@ fi
 
 if [[ ! "$CURL_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
   echo "[external-verify] EXTERNAL_VERIFY_CURL_TIMEOUT_SECONDS must be a positive integer" >&2
+  exit 2
+fi
+
+if [[ ! "$CURL_ATTEMPTS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "[external-verify] EXTERNAL_VERIFY_CURL_ATTEMPTS must be a positive integer" >&2
+  exit 2
+fi
+
+if [[ ! "$CURL_RETRY_DELAY_SECONDS" =~ ^[0-9]+$ ]]; then
+  echo "[external-verify] EXTERNAL_VERIFY_CURL_RETRY_DELAY_SECONDS must be a non-negative integer" >&2
   exit 2
 fi
 
@@ -86,6 +98,36 @@ request() {
     -- "$url"
 }
 
+# Un sondeo abre TCP+TLS nuevo (Connection: close) contra un host al otro lado
+# del continente. La cola de latencia de ese handshake supera de vez en cuando
+# el presupuesto y tumbaba el despliegue sin que nada estuviera mal: el servidor
+# responde en ~20 ms medido en el propio host. Se reintenta solo el fallo de
+# transporte; las garantias de contenido (SHA, node-id) siguen sin tolerancia.
+request_with_retry() {
+  local url="$1"
+  local output_file="$2"
+  local header_file="$3"
+  local attempt=1
+  local response=''
+
+  while :; do
+    if response="$(request "$url" "$output_file" "$header_file")"; then
+      printf '%s' "$response"
+      return 0
+    fi
+
+    if [ "$attempt" -ge "$CURL_ATTEMPTS" ]; then
+      return 1
+    fi
+
+    echo "[external-verify] ${ENVIRONMENT_LABEL}: transport attempt ${attempt}/${CURL_ATTEMPTS} failed for ${url%%\?*}; retrying" >&2
+    attempt=$((attempt + 1))
+    if [ "$CURL_RETRY_DELAY_SECONDS" -gt 0 ]; then
+      sleep "$CURL_RETRY_DELAY_SECONDS"
+    fi
+  done
+}
+
 record_endpoint_failure() {
   local sample="$1"
   local endpoint="$2"
@@ -99,7 +141,7 @@ for ((sample = 1; sample <= SAMPLE_COUNT; sample++)); do
   probe_id="${GITHUB_RUN_ID:-manual}-$$-${sample}"
 
   for endpoint in health ready openmrs/health/started; do
-    if ! request \
+    if ! request_with_retry \
       "${BASE_URL}/${endpoint}?external_probe=${probe_id}" \
       /dev/null \
       /dev/null >/dev/null; then
@@ -110,7 +152,7 @@ for ((sample = 1; sample <= SAMPLE_COUNT; sample++)); do
 
   body_file="$TEMP_ROOT/build-info-${sample}.json"
   header_file="$TEMP_ROOT/build-info-${sample}.headers"
-  if remote_ip="$(request \
+  if remote_ip="$(request_with_retry \
     "${BASE_URL}/openmrs/spa/build-info.json?release=${EXPECTED_SHA}&external_probe=${probe_id}" \
     "$body_file" \
     "$header_file")"; then
