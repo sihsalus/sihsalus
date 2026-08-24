@@ -292,6 +292,37 @@ public class AuditPayloadParserTest {
     }
 
     @Test
+    public void prescriptionPrintRequestRequiresPatientAndEncounterWithoutInventingADocument() {
+        ClinicalAuditSubmission printRequest = parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"PRESCRIPTION_PRINT_REQUEST\","
+                + "\"patientUuid\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\","
+                + "\"encounterUuid\":\"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb\","
+                + "\"resourceType\":\"Encounter\","
+                + "\"metadata\":{\"appName\":\"esm-patient-medications-app\"}}]").get(0);
+
+        assertEquals("Encounter", printRequest.getResourceType());
+        assertEquals("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", printRequest.getPatientUuid());
+        assertEquals("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", printRequest.getEncounterUuid());
+        assertEquals("{\"appName\":\"esm-patient-medications-app\"}", printRequest.getMetadataJson());
+
+        assertThrows(AuditValidationException.class, () -> parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"PRESCRIPTION_PRINT_REQUEST\","
+                + "\"encounterUuid\":\"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb\"}]"));
+        assertThrows(AuditValidationException.class, () -> parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"PRESCRIPTION_PRINT_REQUEST\","
+                + "\"patientUuid\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\"}]"));
+        assertThrows(AuditValidationException.class, () -> parse("[{"
+                + "\"id\":\"99999999-9999-4999-8999-999999999999\","
+                + "\"eventType\":\"PRESCRIPTION_PRINT_REQUEST\","
+                + "\"patientUuid\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\","
+                + "\"encounterUuid\":\"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb\","
+                + "\"resourceType\":\"DocumentReference\"}]"));
+    }
+
+    @Test
     public void permissionChangesRequireAUserOrRoleTargetWithoutClinicalReferences() {
         ClinicalAuditSubmission permissionChange = parse("[{"
                 + "\"id\":\"99999999-9999-4999-8999-999999999999\","

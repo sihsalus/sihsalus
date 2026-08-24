@@ -46,6 +46,7 @@ public class AuditPayloadParser {
             "OBS_VIEW", "OBS_CREATE", "OBS_UPDATE", "OBS_VOID",
             "ORDER_VIEW", "ORDER_CREATE", "ORDER_UPDATE", "ORDER_DISCONTINUE",
             "DOCUMENT_DOWNLOAD", "DOCUMENT_PRINT", "MEDICATION_DISPENSE",
+            "PRESCRIPTION_PRINT_REQUEST",
             "PERMISSION_CHANGE", "INTEGRATION_ERROR", "UNHANDLED_ERROR");
 
     private static final Set<String> RESOURCE_TYPES = immutableSet(
@@ -65,8 +66,9 @@ public class AuditPayloadParser {
             "esm-help-menu-app", "esm-home-app", "esm-indicadores-app", "esm-interconsultas-app",
             "esm-laboratory-app", "esm-login-app", "esm-odontologia-app", "esm-offline-tools-app",
             "esm-openconceptlab-app", "esm-patient-chart-app", "esm-patient-list-management-app",
-            "esm-patient-registration-app", "esm-patient-search-app", "esm-primary-navigation-app",
-            "esm-service-queues-app", "esm-system-admin-app", "esm-user-onboarding-app", "patient-chart");
+            "esm-patient-medications-app", "esm-patient-registration-app", "esm-patient-search-app",
+            "esm-primary-navigation-app", "esm-service-queues-app", "esm-system-admin-app",
+            "esm-user-onboarding-app", "patient-chart");
 
     private static final Set<String> OUTCOMES = immutableSet(
             "SUCCESS", "FAILURE", "DENIED", "CANCELLED", "QUEUED", "SYNCED");
@@ -215,6 +217,14 @@ public class AuditPayloadParser {
         if ("MEDICATION_DISPENSE".equals(eventType)) {
             requireReference(patientUuid);
             return requireOrDefaultResource(resourceType, "MedicationDispense");
+        }
+        if ("PRESCRIPTION_PRINT_REQUEST".equals(eventType)) {
+            requireReference(patientUuid);
+            requireReference(encounterUuid);
+            // A browser cannot prove that paper was physically printed. This event records the
+            // user's request to print the prescription represented by persisted orders in one
+            // Encounter, rather than inventing a DocumentReference that does not exist.
+            return requireOrDefaultResource(resourceType, "Encounter");
         }
         if ("PERMISSION_CHANGE".equals(eventType)) {
             if (!"User".equals(resourceType) && !"Role".equals(resourceType)) {
