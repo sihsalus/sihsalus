@@ -188,6 +188,28 @@ EOF
   chmod +x "$fixture/bin/docker" "$fixture/bin/git"
 }
 
+install_low_disk_df() {
+  local fixture="$1"
+  cat >"$fixture/bin/df" <<'EOF_DF'
+#!/usr/bin/env bash
+printf 'Filesystem 1048576-blocks Used Available Capacity Mounted on\n'
+printf '/dev/fake 46080 45568 512 99%% /\n'
+EOF_DF
+  chmod +x "$fixture/bin/df"
+}
+
+configure_healthy_target() {
+  local fixture="$1"
+  sed -i.bak "s/${OLD_SHA}/${TARGET_SHA}/g" "$fixture/.env"
+  sed -i.bak "s/${OLD_DIGEST}/${TARGET_DIGEST}/g" "$fixture/.env"
+  sed -i.bak "s/FRONTEND_RUNTIME_TAG=sha-${TARGET_SHA}/FRONTEND_RUNTIME_TAG=${TARGET_RUNTIME_TAG}/" "$fixture/.env"
+  sed -i.bak "s/${OLD_NODE_ID}/${NODE_ID}/" "$fixture/.env"
+  rm -f "$fixture/.env.bak"
+  printf '%s\n' "$TARGET_SHA" >"$fixture/state/deployed_sha"
+  printf '%s\n' "sihsalus-frontend-runtime:${TARGET_RUNTIME_TAG}" >"$fixture/state/image"
+  printf '%s\n' "$NODE_ID" >"$fixture/state/node_id"
+}
+
 run_deploy() {
   local fixture="$1"
   (
@@ -330,20 +352,24 @@ fi
 
 noop_fixture="$TEST_ROOT/noop"
 make_fixture "$noop_fixture"
-sed -i.bak "s/${OLD_SHA}/${TARGET_SHA}/g" "$noop_fixture/.env"
-sed -i.bak "s/${OLD_DIGEST}/${TARGET_DIGEST}/g" "$noop_fixture/.env"
-sed -i.bak "s/FRONTEND_RUNTIME_TAG=sha-${TARGET_SHA}/FRONTEND_RUNTIME_TAG=${TARGET_RUNTIME_TAG}/" "$noop_fixture/.env"
-sed -i.bak "s/${OLD_NODE_ID}/${NODE_ID}/" "$noop_fixture/.env"
-rm -f "$noop_fixture/.env.bak"
-printf '%s\n' "$TARGET_SHA" >"$noop_fixture/state/deployed_sha"
-printf '%s\n' "sihsalus-frontend-runtime:${TARGET_RUNTIME_TAG}" >"$noop_fixture/state/image"
-printf '%s\n' "$NODE_ID" >"$noop_fixture/state/node_id"
+configure_healthy_target "$noop_fixture"
 run_deploy "$noop_fixture"
 if grep -Eq 'docker (pull|compose build|compose up)' "$noop_fixture/state/commands"; then
   echo "idempotent deployment unexpectedly changed the frontend" >&2
   exit 1
 fi
 assert_scoped_image_cleanup "$noop_fixture/state/commands"
+
+low_disk_noop_fixture="$TEST_ROOT/low-disk-noop"
+make_fixture "$low_disk_noop_fixture"
+configure_healthy_target "$low_disk_noop_fixture"
+install_low_disk_df "$low_disk_noop_fixture"
+run_deploy "$low_disk_noop_fixture"
+if grep -Eq 'docker (pull|compose build|compose up)' "$low_disk_noop_fixture/state/commands"; then
+  echo "low-disk idempotent deployment unexpectedly changed the frontend" >&2
+  exit 1
+fi
+assert_scoped_image_cleanup "$low_disk_noop_fixture/state/commands"
 
 success_fixture="$TEST_ROOT/success"
 make_fixture "$success_fixture"
@@ -500,12 +526,7 @@ grep -Fq 'LABEL org.sihsalus.node-id="${SIHSALUS_NODE_ID}"' "$ROOT/frontend/Dock
 
 low_disk_fixture="$TEST_ROOT/low-disk"
 make_fixture "$low_disk_fixture"
-cat >"$low_disk_fixture/bin/df" <<'EOF_DF'
-#!/usr/bin/env bash
-printf 'Filesystem 1048576-blocks Used Available Capacity Mounted on\n'
-printf '/dev/fake 46080 45568 512 99%% /\n'
-EOF_DF
-chmod +x "$low_disk_fixture/bin/df"
+install_low_disk_df "$low_disk_fixture"
 if run_deploy "$low_disk_fixture"; then
   echo "deployment should have refused to start with insufficient disk space" >&2
   exit 1

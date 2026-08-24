@@ -38,17 +38,6 @@ if [ ! -f docker-compose.yml ] || [ ! -f .env ]; then
   exit 2
 fi
 
-# Disk preflight: on 2026-08-17 QLTY ran out of space mid layer-extraction and
-# every cron retry failed with a cryptic docker error. Fail fast, before any
-# fetch or pull, with an actionable message. Assumes the Docker data-root
-# shares the filesystem with this checkout (single LV on these hosts).
-MINIMUM_FREE_DISK_MIB="${DEPLOY_MINIMUM_FREE_DISK_MIB:-4096}"
-available_disk_mib="$(df -Pm . | awk 'NR == 2 { print $4 }')"
-if [ "${available_disk_mib:-0}" -lt "$MINIMUM_FREE_DISK_MIB" ]; then
-  echo "[deploy-frontend] insufficient disk space: ${available_disk_mib} MiB free, ${MINIMUM_FREE_DISK_MIB} MiB required; free space (e.g. docker builder prune -f) and retry" >&2
-  exit 2
-fi
-
 read_env_value() {
   local key="$1"
   awk -F= -v key="$key" '
@@ -181,6 +170,19 @@ if [ "$CURRENT_SHA" = "$TARGET_SHA" ] &&
   prune_stale_frontend_images
   echo "[deploy-frontend] ${SOURCE_TAG} at ${TARGET_DIGEST} is already healthy; nothing to do"
   exit 0
+fi
+
+# Disk preflight: on 2026-08-17 QLTY ran out of space mid layer-extraction and
+# every cron retry failed with a cryptic docker error. Run this after the
+# healthy no-op check so an already deployed release does not fail only because
+# there is insufficient room for an update that will not happen. Actual updates
+# still fail before any fetch or pull. Assumes the Docker data-root shares the
+# filesystem with this checkout (single LV on these hosts).
+MINIMUM_FREE_DISK_MIB="${DEPLOY_MINIMUM_FREE_DISK_MIB:-4096}"
+available_disk_mib="$(df -Pm . | awk 'NR == 2 { print $4 }')"
+if [ "${available_disk_mib:-0}" -lt "$MINIMUM_FREE_DISK_MIB" ]; then
+  echo "[deploy-frontend] insufficient disk space: ${available_disk_mib} MiB free, ${MINIMUM_FREE_DISK_MIB} MiB required; free space (e.g. docker builder prune -f) and retry" >&2
+  exit 2
 fi
 
 ENV_BACKUP="$(mktemp)"

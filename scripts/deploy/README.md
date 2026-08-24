@@ -25,6 +25,12 @@ con `--no-deps`. La limpieza tampoco usa `docker image prune`: enumera
 configurado en `FRONTEND_RUNTIME_IMAGE`, por lo que no elimina imágenes de
 OpenMRS, base de datos, gateway ni otros servicios.
 
+El umbral de espacio libre se aplica antes de cualquier actualización real. Si
+el SHA, digest, imagen runtime, identidad del nodo y salud ya coinciden, el
+script completa el no-op y la limpieza acotada de imágenes frontend aunque el
+host esté por debajo del umbral; nunca reconstruye ni recrea el servicio en ese
+caso.
+
 La automatización normal vive en `.github/workflows/deploy-frontend.yml`. Una
 release verificada de `sihsalus-frontend` publica el tag de señal
 `frontend-release-<SHA>` en este repositorio mediante una deploy key limitada al
