@@ -158,8 +158,12 @@ for writer in ("db", "backend-oauth2-config", "fua-generator-db"):
 fua_generator = service(fua, "fua-generator")
 fua_database = service(fua, "fua-generator-db")
 fua_image = fua_generator.get("image", "")
-if not fua_image.startswith("ghcr.io/sihsalus/generador-de-fua:sha-"):
-    fail("FUA generator must default to an immutable official GHCR image")
+expected_fua_image = (
+    "marcelius733/fua-generator:dev-0.1.7@"
+    "sha256:807dadfd71fb4b0922a9dbd560a085a80991eff612645a6d69c458b6fda3669d"
+)
+if fua_image != expected_fua_image:
+    fail("FUA generator must default to the reviewed immutable working image")
 
 fua_environment = fua_generator.get("environment", {})
 fua_database_environment = fua_database.get("environment", {})
