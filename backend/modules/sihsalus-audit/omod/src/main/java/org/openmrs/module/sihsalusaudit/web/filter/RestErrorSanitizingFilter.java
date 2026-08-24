@@ -21,8 +21,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Last-line response sanitizer for the clinical audit endpoint. Its exact URL mapping is defined
- * in config.xml; technical exceptions remain in server logs, while public 4xx/5xx responses are
- * replaced with a stable generic envelope.
+ * in config.xml. Unexpected failures retain diagnostic stack locations in server logs, but their
+ * potentially sensitive messages, causes, and suppressed exceptions are omitted. Public 4xx/5xx
+ * responses are replaced with a stable generic envelope.
  */
 public class RestErrorSanitizingFilter implements Filter {
 
@@ -53,7 +54,7 @@ public class RestErrorSanitizingFilter implements Filter {
             chain.doFilter(request, wrapper);
         }
         catch (IOException | ServletException | RuntimeException ex) {
-            log.error("Unhandled REST request failure", ex);
+            log.error("Unhandled REST request failure", safeFailureForLogging(ex));
             wrapper.resetBufferedBody();
             wrapper.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
         }
@@ -77,6 +78,15 @@ public class RestErrorSanitizingFilter implements Filter {
 
     @Override
     public void destroy() {
+    }
+
+    static Throwable safeFailureForLogging(Throwable failure) {
+        RuntimeException sanitized = new RuntimeException(
+                failure == null ? "unknown" : failure.getClass().getName());
+        if (failure != null) {
+            sanitized.setStackTrace(failure.getStackTrace());
+        }
+        return sanitized;
     }
 
     private void writeSanitizedError(HttpServletResponse response, int status, String authenticate,

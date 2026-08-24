@@ -6,6 +6,8 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
@@ -181,14 +183,22 @@ public class RestErrorSanitizingFilterTest {
     @Test
     public void convertsUnhandledExceptionToSanitizedServerError() throws Exception {
         MockHttpServletResponse response = new MockHttpServletResponse();
+        IllegalStateException failure = new IllegalStateException("jdbc:mysql://secret-host/openmrs");
 
         filter.doFilter(new MockHttpServletRequest(), response, (request, wrappedResponse) -> {
-            throw new IllegalStateException("jdbc:mysql://secret-host/openmrs");
+            throw failure;
         });
 
         String body = response.getContentAsString(StandardCharsets.UTF_8);
+        Throwable safeFailure = RestErrorSanitizingFilter.safeFailureForLogging(failure);
+        StringWriter safeLog = new StringWriter();
+        safeFailure.printStackTrace(new PrintWriter(safeLog));
         assertEquals(500, response.getStatus());
         assertTrue(body.contains("SERVER_ERROR"));
         assertFalse(body.contains("secret-host"));
+        assertTrue(safeLog.toString().contains(IllegalStateException.class.getName()));
+        assertTrue(safeLog.toString().contains("convertsUnhandledExceptionToSanitizedServerError"));
+        assertFalse(safeLog.toString().contains("secret-host"));
+        assertNull(safeFailure.getCause());
     }
 }
