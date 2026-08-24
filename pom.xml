@@ -222,7 +222,6 @@
     <profile>
       <id>backend</id>
       <modules>
-        <module>backend/modules/sihsalus-audit</module>
         <module>backend</module>
       </modules>
     </profile>

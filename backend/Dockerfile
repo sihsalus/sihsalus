@@ -16,9 +16,6 @@ ARG MVN_ARGS="install"
 # Copy build files
 COPY pom.xml ./
 COPY backend/pom.xml ./backend/
-COPY backend/modules/sihsalus-audit/pom.xml ./backend/modules/sihsalus-audit/
-COPY backend/modules/sihsalus-audit/api/pom.xml ./backend/modules/sihsalus-audit/api/
-COPY backend/modules/sihsalus-audit/omod/pom.xml ./backend/modules/sihsalus-audit/omod/
 
 # Build the SIHSALUS Bed Management patch from an immutable source revision.
 # The checksum prevents a changed or substituted archive from entering the image.
@@ -26,13 +23,21 @@ ARG BEDMANAGEMENT_SOURCE_SHA=f7ceac08204d4239814b9978eaf7dadd8e6a62c7
 ADD --checksum=sha256:428cddc778eb382f91eafa2156117b090fc75b11202919376bb615ff3d125874 \
     https://github.com/sihsalus/openmrs-module-bedmanagement/archive/${BEDMANAGEMENT_SOURCE_SHA}.tar.gz \
     /tmp/bedmanagement-source.tar.gz
+
+# Clinical Audit is an independent OpenMRS module. Build the reviewed source
+# from its own repository until version 1.0.0 is released to Maven Central.
+ARG SIHSALUSAUDIT_SOURCE_SHA=49c72a6a1fdddb37bc2272a2484dd68aebc36dec
+ADD --checksum=sha256:0b5cac106931f50d3ff0d63caae853e644bd850d74916d97365353dcc1743ab3 \
+    https://github.com/sihsalus/openmrs-module-sihsalus-audit/archive/${SIHSALUSAUDIT_SOURCE_SHA}.tar.gz \
+    /tmp/sihsalusaudit-source.tar.gz
+
 # Pre-download all dependencies into the BuildKit cache.
 RUN --mount=type=cache,target=/root/.m2/repository \
     mvn $MVN_ARGS_SETTINGS dependency:resolve -B || true
 
 COPY backend ./backend/
 
-# Build the private BedManagement artifact and the distro in the same cache
+# Build private/unreleased module artifacts and the distro in the same cache
 # mount. A cached RUN must never hide an artifact that exists only as a cache
 # side effect from a later RUN.
 RUN --mount=type=cache,target=/root/.m2/repository \
@@ -41,6 +46,11 @@ RUN --mount=type=cache,target=/root/.m2/repository \
     mvn --batch-mode --show-version --no-transfer-progress \
       -Dformatter.skip=true -DskipTests -Dmaven.javadoc.skip=true \
       --file /tmp/bedmanagement-source/pom.xml install && \
+    mkdir -p /tmp/sihsalusaudit-source && \
+    tar -xzf /tmp/sihsalusaudit-source.tar.gz -C /tmp/sihsalusaudit-source --strip-components=1 && \
+    mvn --batch-mode --show-version --no-transfer-progress \
+      -DskipTests -Dmaven.javadoc.skip=true \
+      --file /tmp/sihsalusaudit-source/pom.xml install && \
     mvn $MVN_ARGS_SETTINGS $MVN_ARGS
 
 RUN cp /openmrs_distro/backend/target/sdk-distro/web/openmrs_core/openmrs.war /openmrs/distribution/openmrs_core/ && \

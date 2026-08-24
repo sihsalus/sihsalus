@@ -29,7 +29,7 @@
     <initializer.version>2.12.0</initializer.version>
     <fhir2.version>4.2.0</fhir2.version>
     <webservices.rest.version>3.5.0</webservices.rest.version>
-    <sihsalusaudit.version>1.0.0-SNAPSHOT</sihsalusaudit.version>
+    <sihsalusaudit.version>1.0.0</sihsalusaudit.version>
     <addresshierarchy.version>2.21.0</addresshierarchy.version>
     <patientdocuments.version>1.1.0</patientdocuments.version>
     <idgen.version>5.0.4</idgen.version>
@@ -90,7 +90,7 @@
 
     <!-- Module dependencies -->
     <dependency>
-      <groupId>org.openmrs.module</groupId>
+      <groupId>io.github.proyecto-santaclotilde</groupId>
       <artifactId>sihsalusaudit-omod</artifactId>
       <version>${sihsalusaudit.version}</version>
       <scope>provided</scope>
