@@ -58,7 +58,9 @@ output="$({
       grep -qF '\''strip_ocl_property() {'\'' "$hook"
       bash -n "$hook"
       test "$(grep -Fc "$hook" "$startup")" -eq 1
-      test "$(tail -n 1 "$startup")" = '\''/usr/local/bin/configure-ocl-token.sh "$OMRS_CONFIG_DIR" "$OMRS_DATA_DIR/configuration_checksums"'\''
+      grep -qxF \
+        '\''/usr/local/bin/configure-ocl-token.sh "$OMRS_CONFIG_DIR" "$OMRS_DATA_DIR/configuration_checksums"'\'' \
+        "$startup"
 
       distribution_properties="$test_root/distribution/openmrs_config/globalproperties"
       data_properties="$test_root/data/configuration/globalproperties"

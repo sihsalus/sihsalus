@@ -70,6 +70,7 @@ docker compose ps
 - El core conserva defaults solo para desarrollo local.
 - El core puede renderizar sin secretos de profiles opcionales. Al activar un profile, su servicio o `security-audit.sh` rechaza credenciales vacías.
 - `OAUTH2_ENABLED` no se configura en `.env`: core lo fija en `false` y `compose/keycloak.yml` lo cambia a `true`.
+- `SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED` vale `true` por defecto para autenticación local. `false` desactiva el filtro backend y requiere recrearlo; el rollback completo también debe restaurar el frontend coordinado. OAuth2 siempre desactiva el filtro local.
 - En producción se usan tags inmutables, no `latest`.
 - HAPI y las consolas de observabilidad se publican solo en localhost.
 

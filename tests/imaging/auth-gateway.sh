@@ -96,6 +96,24 @@ for _ in $(seq 1 30); do
 done
 curl --fail --silent --show-error "$BASE_URL/health" >/dev/null
 
+# Legacy secret-question recovery is not an approved credential-recovery
+# channel. Exercise the real Nginx parser and request matcher, including the
+# path-parameter forms that Tomcat would otherwise normalize before mapping.
+for method in GET POST; do
+  for path in \
+    '/openmrs/forgotPassword.form' \
+    '/openmrs/forgotPassword.form;jsessionid=test' \
+    '/openmrs;jsessionid=test/forgotPassword.form'; do
+    status="$(curl --path-as-is --request "$method" --silent --show-error \
+      --output /dev/null --write-out '%{http_code}' "$BASE_URL$path")"
+    [ "$status" = "404" ]
+  done
+done
+
+status="$(curl --path-as-is --silent --show-error --output /dev/null \
+  --write-out '%{http_code}' "$BASE_URL/openmrs/admin/users/changePassword.form")"
+[ "$status" = "200" ]
+
 startup_headers="$TMP_DIR/startup.headers"
 startup_body="$TMP_DIR/startup.body"
 status="$(curl --http1.1 --max-time 5 --silent --show-error \
