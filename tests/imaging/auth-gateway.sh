@@ -106,6 +106,24 @@ heartbeat_log="$(docker exec "$GATEWAY" cat /var/log/nginx/clinical-activity.log
 [ "$(printf '%s\n' "$heartbeat_log" | wc -l | tr -d '[:space:]')" = "1" ]
 printf '%s\n' "$heartbeat_log" | grep -Eq '^[0-9]+\.[0-9]{3}$'
 
+# Legacy secret-question recovery is not an approved credential-recovery
+# channel. Exercise the real Nginx parser and request matcher, including the
+# path-parameter forms that Tomcat would otherwise normalize before mapping.
+for method in GET POST; do
+  for path in \
+    '/openmrs/forgotPassword.form' \
+    '/openmrs/forgotPassword.form;jsessionid=test' \
+    '/openmrs;jsessionid=test/forgotPassword.form'; do
+    status="$(curl --path-as-is --request "$method" --silent --show-error \
+      --output /dev/null --write-out '%{http_code}' "$BASE_URL$path")"
+    [ "$status" = "404" ]
+  done
+done
+
+status="$(curl --path-as-is --silent --show-error --output /dev/null \
+  --write-out '%{http_code}' "$BASE_URL/openmrs/admin/users/changePassword.form")"
+[ "$status" = "200" ]
+
 startup_headers="$TMP_DIR/startup.headers"
 startup_body="$TMP_DIR/startup.body"
 status="$(curl --http1.1 --max-time 5 --silent --show-error \

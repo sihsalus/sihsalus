@@ -38,7 +38,24 @@ RUN --mount=type=cache,target=/root/.m2/repository \
     mvn --batch-mode --show-version --no-transfer-progress \
       -Dformatter.skip=true -DskipTests -Dmaven.javadoc.skip=true \
       --file /tmp/bedmanagement-source/pom.xml install && \
-    mvn $MVN_ARGS_SETTINGS $MVN_ARGS
+    mvn $MVN_ARGS_SETTINGS $MVN_ARGS && \
+    modules_dir=/openmrs_distro/backend/target/sdk-distro/web/openmrs_modules && \
+    set -- "$modules_dir"/authentication-*.omod && \
+    [ "$#" -eq 1 ] && [ -f "$1" ] && \
+    authentication_omod="$1" && \
+    set -- "$modules_dir"/legacyui-*.omod && \
+    [ "$#" -eq 1 ] && [ -f "$1" ] && \
+    legacyui_omod="$1" && \
+    jar tf "$authentication_omod" \
+      | grep -qxF 'org/openmrs/module/authentication/web/ForcePasswordChangeFilter.class' && \
+    javap -classpath "$authentication_omod" -verbose \
+      org.openmrs.module.authentication.web.ForcePasswordChangeFilter \
+      | grep -qF 'authentication.supportForcedPasswordChange' && \
+    jar tf "$legacyui_omod" \
+      | grep -qxF 'web/module/admin/users/changePasswordForm.jsp' && \
+    javap -classpath "$legacyui_omod" -verbose \
+      org.openmrs.web.controller.user.ChangePasswordFormController \
+      | grep -qF '/admin/users/changePassword.form'
 
 RUN cp /openmrs_distro/backend/target/sdk-distro/web/openmrs_core/openmrs.war /openmrs/distribution/openmrs_core/ && \
     cp /openmrs_distro/backend/target/sdk-distro/web/openmrs-distro.properties /openmrs/distribution/ && \
@@ -59,20 +76,30 @@ RUN yum -y update acl expat glib2 libacl libssh2 python python-libs vim-data vim
     rm -rf /var/cache/yum
 
 COPY backend/bin/configure-ocl-token.sh /tmp/sihsalus-backend-bin/configure-ocl-token.sh
+COPY backend/bin/configure-forced-password-change.sh /tmp/sihsalus-backend-bin/configure-forced-password-change.sh
 
 # The pinned OpenMRS runtime quotes the wildcard used to clear distribution
 # directories, so removed modules and metadata survive in the persistent volume.
 # Keep the upstream safety guard while allowing the wildcard to expand.
 RUN test -s /tmp/sihsalus-backend-bin/configure-ocl-token.sh && \
+    test -s /tmp/sihsalus-backend-bin/configure-forced-password-change.sh && \
     [ "$(head -n 1 /tmp/sihsalus-backend-bin/configure-ocl-token.sh)" = '#!/usr/bin/env bash' ] && \
+    [ "$(head -n 1 /tmp/sihsalus-backend-bin/configure-forced-password-change.sh)" = '#!/usr/bin/env bash' ] && \
     grep -qF 'strip_ocl_property() {' /tmp/sihsalus-backend-bin/configure-ocl-token.sh && \
     bash -n /tmp/sihsalus-backend-bin/configure-ocl-token.sh && \
+    bash -n /tmp/sihsalus-backend-bin/configure-forced-password-change.sh && \
     install -m 0555 \
       /tmp/sihsalus-backend-bin/configure-ocl-token.sh \
       /usr/local/bin/configure-ocl-token.sh && \
+    install -m 0555 \
+      /tmp/sihsalus-backend-bin/configure-forced-password-change.sh \
+      /usr/local/bin/configure-forced-password-change.sh && \
     cmp -s \
       /tmp/sihsalus-backend-bin/configure-ocl-token.sh \
       /usr/local/bin/configure-ocl-token.sh && \
+    cmp -s \
+      /tmp/sihsalus-backend-bin/configure-forced-password-change.sh \
+      /usr/local/bin/configure-forced-password-change.sh && \
     rm -rf /tmp/sihsalus-backend-bin && \
     sed -i \
       -e 's|rm -fR "${OMRS_MODULES_DIR:?}/\*"|rm -fR "${OMRS_MODULES_DIR:?}"/*|' \
@@ -84,10 +111,14 @@ RUN test -s /tmp/sihsalus-backend-bin/configure-ocl-token.sh && \
     grep -qF 'rm -fR "${OMRS_OWA_DIR:?}"/*' /openmrs/startup-init.sh && \
     grep -qF 'rm -fR "${OMRS_CONFIG_DIR:?}"/*' /openmrs/startup-init.sh && \
     grep -qF 'rm -fR "${OMRS_FRONTEND_DIR:?}"/*' /openmrs/startup-init.sh && \
-    printf '\n%s\n' '/usr/local/bin/configure-ocl-token.sh "$OMRS_CONFIG_DIR" "$OMRS_DATA_DIR/configuration_checksums"' >> /openmrs/startup-init.sh && \
+    printf '\n%s\n%s\n' \
+      '/usr/local/bin/configure-ocl-token.sh "$OMRS_CONFIG_DIR" "$OMRS_DATA_DIR/configuration_checksums"' \
+      '/usr/local/bin/configure-forced-password-change.sh "$OMRS_SERVER_PROPERTIES_FILE" "$OMRS_RUNTIME_PROPERTIES_FILE"' \
+      >> /openmrs/startup-init.sh && \
     [ "$(grep -Fc '/usr/local/bin/configure-ocl-token.sh' /openmrs/startup-init.sh)" -eq 1 ] && \
+    [ "$(grep -Fc '/usr/local/bin/configure-forced-password-change.sh' /openmrs/startup-init.sh)" -eq 1 ] && \
     tail -n 1 /openmrs/startup-init.sh \
-      | grep -qxF '/usr/local/bin/configure-ocl-token.sh "$OMRS_CONFIG_DIR" "$OMRS_DATA_DIR/configuration_checksums"'
+      | grep -qxF '/usr/local/bin/configure-forced-password-change.sh "$OMRS_SERVER_PROPERTIES_FILE" "$OMRS_RUNTIME_PROPERTIES_FILE"'
 
 # Do not copy the war if using the correct openmrs-core image version
 COPY --from=dev /openmrs/distribution/openmrs_core/openmrs.war /openmrs/distribution/openmrs_core/

@@ -14,6 +14,23 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
+forgot_password_pattern='^/openmrs(;[^/]*)?/forgotPassword[.]form(;[^/]*)?(/|$)'
+for blocked_uri in \
+  '/openmrs/forgotPassword.form' \
+  '/openmrs/forgotPassword.form;jsessionid=test' \
+  '/openmrs;jsessionid=test/forgotPassword.form'; do
+  printf '%s\n' "$blocked_uri" | grep -Eq "$forgot_password_pattern" \
+    || { echo "[FAIL] password recovery route does not cover $blocked_uri" >&2; exit 1; }
+done
+for allowed_uri in \
+  '/openmrs/admin/users/changePassword.form' \
+  '/openmrs/spa/login/forced-password'; do
+  if printf '%s\n' "$allowed_uri" | grep -Eq "$forgot_password_pattern"; then
+    echo "[FAIL] password recovery route also blocks $allowed_uri" >&2
+    exit 1
+  fi
+done
+
 for gateway_template in gateway/default.conf.template gateway/default-ssl.conf.template; do
   if grep -Eq 'proxy_pass http://backend(/|:)' "$gateway_template"; then
     echo "[FAIL] $gateway_template must resolve backend health routes dynamically" >&2
@@ -27,6 +44,28 @@ for gateway_template in gateway/default.conf.template gateway/default-ssl.conf.t
     echo "[FAIL] $gateway_template must not discard the startup response body" >&2
     exit 1
   fi
+  if [ "$(grep -Fc 'location = /openmrs/index.htm {' "$gateway_template")" -ne 1 ] \
+    || ! awk '
+      /location = \/openmrs\/index[.]htm \{/ {
+        getline
+        if ($0 ~ /return 302 \/openmrs\/spa\/home;/) found = 1
+      }
+      END { exit(found == 1 ? 0 : 1) }
+    ' "$gateway_template"; then
+    echo "[FAIL] $gateway_template must return the Legacy password flow to the O3 home page" >&2
+    exit 1
+  fi
+  if [ "$(grep -Fc "location ~ \"${forgot_password_pattern}\" {" "$gateway_template")" -ne 1 ] \
+    || ! awk '
+      /location ~ "\^\/openmrs/ && /forgotPassword\[.\]form/ {
+        getline
+        if ($0 ~ /return 404;/) found = 1
+      }
+      END { exit(found == 1 ? 0 : 1) }
+    ' "$gateway_template"; then
+    echo "[FAIL] $gateway_template must disable Legacy secret-question password recovery" >&2
+    exit 1
+  fi
 
   spa_csp="$(grep -F '"~^/openmrs/spa/"' "$gateway_template")"
   spa_script_policy="${spa_csp#*script-src }"
@@ -36,7 +75,7 @@ for gateway_template in gateway/default.conf.template gateway/default-ssl.conf.t
     exit 1
   fi
 done
-echo "[OK] gateway health routes use dynamic Docker DNS and valid startup framing"
+echo "[OK] gateway health and Legacy password routes use the reviewed policy"
 echo "[OK] SPA CSP permits only same-origin external scripts"
 
 if [ "$#" -gt 1 ]; then
@@ -75,6 +114,7 @@ export IMAGING_OIDC_CLIENT_SECRET="${IMAGING_OIDC_CLIENT_SECRET:-ci-imaging-clie
 export IMAGING_OAUTH_COOKIE_SECRET="${IMAGING_OAUTH_COOKIE_SECRET:-QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=}"
 export GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD:-ci-grafana-password-123}"
 export OMRS_OCL_TOKEN="${OMRS_OCL_TOKEN:-}"
+export SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED="true"
 export SIHSALUS_SEED_URL="${SIHSALUS_SEED_URL:-https://example.test/sihsalus-seed.tar.gz.enc}"
 export SIHSALUS_SEED_SHA256="${SIHSALUS_SEED_SHA256:-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}"
 export SIHSALUS_SEED_PASSPHRASE_FILE="${SIHSALUS_SEED_PASSPHRASE_FILE:-/dev/null}"
@@ -88,6 +128,8 @@ validate() {
 }
 
 validate core -f docker-compose.yml
+SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED=false \
+validate local-auth-rollback -f docker-compose.yml
 validate ci-no-volumes -f docker-compose-no-volumes.yml
 validate fua -f docker-compose.yml --profile fua
 validate hapi -f docker-compose.yml --profile hapi
@@ -114,7 +156,7 @@ IMAGING_OAUTH_REDIRECT_URI=https://sihsalus.example.test/imaging/oauth2/callback
 IMAGING_OAUTH_COOKIE_SECURE=true \
 validate imaging-auth-ssl -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml -f compose/ssl.yml --profile keycloak --profile imaging --profile ssl
 
-python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/fua.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" "$EVIDENCE_DIR/imaging.json" "$EVIDENCE_DIR/keycloak-ssl.json" "$EVIDENCE_DIR/monitoring-logs.json" "$EVIDENCE_DIR/imaging-auth.json" "$EVIDENCE_DIR/imaging-auth-ssl.json" "$EVIDENCE_DIR/seed.json" keycloak/realm-export.json <<'PY'
+python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/fua.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" "$EVIDENCE_DIR/imaging.json" "$EVIDENCE_DIR/keycloak-ssl.json" "$EVIDENCE_DIR/monitoring-logs.json" "$EVIDENCE_DIR/imaging-auth.json" "$EVIDENCE_DIR/imaging-auth-ssl.json" "$EVIDENCE_DIR/seed.json" "$EVIDENCE_DIR/local-auth-rollback.json" keycloak/realm-export.json <<'PY'
 import json
 import sys
 
@@ -135,7 +177,7 @@ def service(config, name):
         fail(f"missing service: {name}")
 
 
-core, fua, keycloak, ssl, ci, imaging, keycloak_ssl, monitoring, imaging_auth, imaging_auth_ssl, seed, realm = map(load, sys.argv[1:])
+core, fua, keycloak, ssl, ci, imaging, keycloak_ssl, monitoring, imaging_auth, imaging_auth_ssl, seed, local_auth_rollback, realm = map(load, sys.argv[1:])
 core_backend = service(core, "backend")
 core_generator = service(core, "backend-oauth2-config")
 
@@ -143,6 +185,10 @@ if core_backend.get("environment", {}).get("OAUTH2_ENABLED") != "false":
     fail("core backend must keep OAuth2 disabled")
 if core_generator.get("environment", {}).get("OAUTH2_ENABLED") != "false":
     fail("core OAuth2 config generator must keep OAuth2 disabled")
+if core_backend.get("environment", {}).get("SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED") != "true":
+    fail("core backend must enable the local forced-password flow by default")
+if service(local_auth_rollback, "backend").get("environment", {}).get("SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED") != "false":
+    fail("local forced-password rollback must render the disabled value")
 if "keycloak" in core.get("services", {}):
     fail("core must not start Keycloak without the explicit override")
 if core_backend.get("depends_on", {}).get("backend-oauth2-config", {}).get("condition") != "service_completed_successfully":
@@ -204,6 +250,8 @@ service(keycloak, "keycloak-db")
 
 if keycloak_backend.get("environment", {}).get("OAUTH2_ENABLED") != "true":
     fail("Keycloak override must enable OAuth2 in backend")
+if keycloak_backend.get("environment", {}).get("SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED") != "true":
+    fail("Keycloak model must preserve the local feature default for mode-switch testing")
 if keycloak_generator.get("environment", {}).get("OAUTH2_ENABLED") != "true":
     fail("Keycloak override must enable generated OAuth2 configuration")
 if keycloak_backend.get("depends_on", {}).get("keycloak", {}).get("condition") != "service_healthy":

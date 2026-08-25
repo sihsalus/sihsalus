@@ -176,6 +176,17 @@ server {
     proxy_pass $frontend;
   }
 
+  # Password recovery is administrator-mediated. Legacy's secret-question
+  # endpoint is intentionally unavailable, including POST requests.
+  location ~ "^/openmrs(;[^/]*)?/forgotPassword[.]form(;[^/]*)?(/|$)" {
+    return 404;
+  }
+
+  # Legacy password change returns to /openmrs/index.htm. Keep the user in O3.
+  location = /openmrs/index.htm {
+    return 302 /openmrs/spa/home;
+  }
+
   location = /keycloak {
     return 301 /keycloak/;
   }

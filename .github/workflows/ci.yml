@@ -104,6 +104,9 @@ jobs:
       - name: Test OCL token runtime configuration
         run: ./tests/backend/ocl-token-config.sh
 
+      - name: Test forced-password runtime configuration
+        run: ./tests/backend/forced-password-config.sh
+
       - name: Validate models and invariants
         run: ./scripts/validate-compose.sh compose-validation
 
@@ -150,6 +153,9 @@ jobs:
 
       - name: Test backend OCL token contract
         run: ./tests/backend/ocl-token-image.sh sihsalus-backend:ci
+
+      - name: Test backend forced-password contract
+        run: ./tests/backend/forced-password-image.sh sihsalus-backend:ci
 
       - name: Resolve pinned OpenMRS security baseline
         id: openmrs-baseline
