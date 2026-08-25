@@ -85,6 +85,7 @@ docker run -d --name "$UPSTREAM" --network "$NETWORK" \
 docker run -d --name "$AUTH" --network "$NETWORK" --network-alias imaging-auth \
   -v "$TMP_DIR/auth.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.27-alpine >/dev/null
 docker run -d --name "$GATEWAY" --network "$NETWORK" -p 127.0.0.1::80 \
+  -v "$ROOT_DIR/gateway/nginx.conf:/etc/nginx/nginx.conf:ro" \
   -v "$TMP_DIR/gateway.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.27-alpine >/dev/null
 
 PORT="$(docker port "$GATEWAY" 80/tcp | awk -F: 'END { print $NF }')"
