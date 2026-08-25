@@ -64,6 +64,7 @@ sp_reset_policy() {
   SIHSALUS_SAFE_POWEROFF_IDLE_SECONDS=900
   SIHSALUS_SAFE_POWEROFF_BOOT_GRACE_SECONDS=1800
   SIHSALUS_SAFE_POWEROFF_FINAL_GRACE_SECONDS=0
+  SIHSALUS_SAFE_POWEROFF_COMPOSE_DIR="$SP_TEST_ROOT"
   SIHSALUS_SAFE_POWEROFF_GATEWAY_SERVICE=gateway
   SIHSALUS_SAFE_POWEROFF_INHIBIT_FILE="$SP_TEST_INHIBIT"
   SP_TEST_NOW_EPOCH=10000
@@ -90,6 +91,24 @@ sp_reset_policy
 SIHSALUS_SAFE_POWEROFF_ENABLED=false
 sp_main > "$SP_TEST_OUTPUT"
 sp_assert_output 'decision=skip reason=disabled'
+[[ "$SP_TEST_POWEROFF_COUNT" -eq 0 ]]
+
+sp_reset_policy
+SIHSALUS_SAFE_POWEROFF_COMPOSE_DIR='relative/path'
+if sp_main > "$SP_TEST_OUTPUT"; then
+  printf 'Relative Compose directory unexpectedly passed\n' >&2
+  exit 1
+fi
+sp_assert_output 'reason=compose_dir_not_absolute'
+[[ "$SP_TEST_POWEROFF_COUNT" -eq 0 ]]
+
+sp_reset_policy
+SIHSALUS_SAFE_POWEROFF_COMPOSE_DIR="$SP_TEST_ROOT/missing-compose-directory"
+if sp_main > "$SP_TEST_OUTPUT"; then
+  printf 'Missing Compose directory unexpectedly passed\n' >&2
+  exit 1
+fi
+sp_assert_output 'reason=compose_dir_unavailable'
 [[ "$SP_TEST_POWEROFF_COUNT" -eq 0 ]]
 
 sp_reset_policy
@@ -180,5 +199,15 @@ grep -Fq 'SIHSALUS_SAFE_POWEROFF_ENABLED=false' \
   "$SP_TEST_ROOT/scripts/utils/sihsalus-safe-poweroff.env.example"
 grep -Fq 'SIHSALUS_SAFE_POWEROFF_DRY_RUN=true' \
   "$SP_TEST_ROOT/scripts/utils/sihsalus-safe-poweroff.env.example"
+grep -Fq 'SIHSALUS_SAFE_POWEROFF_COMPOSE_DIR=/opt/sihsalus' \
+  "$SP_TEST_ROOT/scripts/utils/sihsalus-safe-poweroff.env.example"
+if grep -Fq '/opt/sihsalus' \
+  "$SP_TEST_ROOT/scripts/utils/sihsalus-safe-poweroff.service" \
+  "$SP_TEST_ROOT/scripts/utils/sihsalus-safe-poweroff.timer"; then
+  printf 'Systemd units must not hardcode the distro checkout path\n' >&2
+  exit 1
+fi
+grep -Fq 'WorkingDirectory=/' \
+  "$SP_TEST_ROOT/scripts/utils/sihsalus-safe-poweroff.service"
 
 printf 'safe poweroff policy tests passed\n'

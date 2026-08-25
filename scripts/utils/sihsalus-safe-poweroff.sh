@@ -129,6 +129,23 @@ sp_require_nonnegative_integer() {
   fi
 }
 
+sp_enter_compose_directory() {
+  local sp_compose_dir="$1"
+
+  if [[ "$sp_compose_dir" != /* ]]; then
+    sp_log ERROR 'reason=compose_dir_not_absolute'
+    return 1
+  fi
+  if [[ ! -d "$sp_compose_dir" || ! -f "$sp_compose_dir/docker-compose.yml" ]]; then
+    sp_log ERROR 'reason=compose_dir_unavailable'
+    return 1
+  fi
+  if ! cd -- "$sp_compose_dir"; then
+    sp_log ERROR 'reason=compose_dir_unavailable'
+    return 1
+  fi
+}
+
 sp_load_activity_age() {
   local sp_now_epoch="$1"
   local sp_gateway_service="$2"
@@ -196,6 +213,7 @@ sp_main() {
   local sp_final_grace_seconds="${SIHSALUS_SAFE_POWEROFF_FINAL_GRACE_SECONDS:-60}"
   local sp_gateway_service="${SIHSALUS_SAFE_POWEROFF_GATEWAY_SERVICE:-gateway}"
   local sp_inhibit_file="${SIHSALUS_SAFE_POWEROFF_INHIBIT_FILE:-/run/sihsalus/poweroff.inhibit}"
+  local sp_compose_dir="${SIHSALUS_SAFE_POWEROFF_COMPOSE_DIR:-}"
 
   sp_require_boolean SIHSALUS_SAFE_POWEROFF_ENABLED "$sp_enabled"
   sp_require_boolean SIHSALUS_SAFE_POWEROFF_DRY_RUN "$sp_dry_run"
@@ -206,6 +224,10 @@ sp_main() {
   if [[ "$sp_enabled" != 'true' ]]; then
     sp_log INFO 'decision=skip reason=disabled'
     return 0
+  fi
+
+  if ! sp_enter_compose_directory "$sp_compose_dir"; then
+    return 1
   fi
 
   if ((sp_idle_seconds < 60)); then

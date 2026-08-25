@@ -83,7 +83,16 @@ sudo grep -RniE 'shutdown|poweroff|halt' /etc/cron.d /etc/crontab /var/spool/cro
 Conserva esa salida como evidencia restringida fuera del repositorio. No
 publiques crontabs ni logs del servidor en un issue.
 
-Desde el checkout versionado en `/opt/sihsalus`:
+Desde el checkout versionado y limpio del SHA aprobado, confirma primero su
+ruta absoluta. No crees un segundo checkout para satisfacer la unidad:
+
+```bash
+pwd
+git status --short --branch
+git rev-parse HEAD
+```
+
+Luego instala los archivos desde ese checkout:
 
 ```bash
 sudo install -d -m 0755 /etc/sihsalus
@@ -108,7 +117,12 @@ SIHSALUS_SAFE_POWEROFF_NOT_AFTER=HH:MM
 SIHSALUS_SAFE_POWEROFF_IDLE_SECONDS=900
 SIHSALUS_SAFE_POWEROFF_BOOT_GRACE_SECONDS=1800
 SIHSALUS_SAFE_POWEROFF_FINAL_GRACE_SECONDS=60
+SIHSALUS_SAFE_POWEROFF_COMPOSE_DIR=/ruta/absoluta/al/checkout/sihsalus
 ```
+
+`SIHSALUS_SAFE_POWEROFF_COMPOSE_DIR` debe apuntar al checkout que usa el stack
+activo y que contiene `docker-compose.yml`. La unidad no asume `/opt`, un home
+ni otro usuario; una ruta relativa, ausente o incorrecta bloquea el apagado.
 
 Luego activa el evaluador, todavía en dry-run:
 
