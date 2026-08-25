@@ -1,0 +1,13 @@
+[Unit]
+Description=Poll SIH Salus guarded automatic poweroff policy
+Documentation=https://github.com/sihsalus/sihsalus/blob/main/docs/operations/safe-poweroff.md
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Persistent=false
+Unit=sihsalus-safe-poweroff.service
+
+[Install]
+WantedBy=timers.target

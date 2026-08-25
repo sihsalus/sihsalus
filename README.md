@@ -22,6 +22,7 @@
 - [Docker Bake (Build)](#docker-bake-build)
 - [Configuración SSL/HTTPS](#configuración-sslhttps)
 - [Backup y Restore](#backup-y-restore)
+- [Apagado automático seguro](docs/operations/safe-poweroff.md)
 - [Políticas de Seguridad](#políticas-de-seguridad-cifrado-de-backups-y-retención-de-logs)
 
 ---

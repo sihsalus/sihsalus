@@ -85,6 +85,7 @@ docker run -d --name "$UPSTREAM" --network "$NETWORK" \
 docker run -d --name "$AUTH" --network "$NETWORK" --network-alias imaging-auth \
   -v "$TMP_DIR/auth.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.27-alpine >/dev/null
 docker run -d --name "$GATEWAY" --network "$NETWORK" -p 127.0.0.1::80 \
+  -v "$ROOT_DIR/gateway/nginx.conf:/etc/nginx/nginx.conf:ro" \
   -v "$TMP_DIR/gateway.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.27-alpine >/dev/null
 
 PORT="$(docker port "$GATEWAY" 80/tcp | awk -F: 'END { print $NF }')"
@@ -95,6 +96,15 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 curl --fail --silent --show-error "$BASE_URL/health" >/dev/null
+
+heartbeat_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+  --request POST \
+  --header 'User-Agent: sihsalus-privacy-probe' \
+  "$BASE_URL/_sihsalus/clinical-activity?privacy_probe=must_not_be_logged")"
+[ "$heartbeat_status" = "204" ]
+heartbeat_log="$(docker exec "$GATEWAY" cat /var/log/nginx/clinical-activity.log)"
+[ "$(printf '%s\n' "$heartbeat_log" | wc -l | tr -d '[:space:]')" = "1" ]
+printf '%s\n' "$heartbeat_log" | grep -Eq '^[0-9]+\.[0-9]{3}$'
 
 # Legacy secret-question recovery is not an approved credential-recovery
 # channel. Exercise the real Nginx parser and request matcher, including the

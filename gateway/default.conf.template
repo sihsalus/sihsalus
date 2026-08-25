@@ -87,6 +87,15 @@ server {
     return 200 'OK';
   }
 
+  # The SPA emits a bodyless heartbeat while a visible user has interacted
+  # recently. This log contains only a timestamp and never clinical context.
+  location = /_sihsalus/clinical-activity {
+    client_max_body_size 1k;
+    access_log /var/log/nginx/clinical-activity.log clinical_activity;
+    add_header Cache-Control 'no-store' always;
+    return 204;
+  }
+
   # Startup del backend: valida que OpenMRS/Tomcat responda, aunque siga
   # ejecutando Initial Setup o imports de metadata.
   location = /startup {

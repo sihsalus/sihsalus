@@ -1,0 +1,17 @@
+[Unit]
+Description=Evaluate SIH Salus guarded automatic poweroff policy
+Documentation=https://github.com/sihsalus/sihsalus/blob/main/docs/operations/safe-poweroff.md
+Wants=docker.service
+After=docker.service sihsalus-compose.service
+ConditionPathExists=/etc/sihsalus/safe-poweroff.env
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+EnvironmentFile=/etc/sihsalus/safe-poweroff.env
+ExecStart=/usr/local/sbin/sihsalus-safe-poweroff
+TimeoutStartSec=300
+StandardOutput=journal
+StandardError=journal
