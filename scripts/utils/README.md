@@ -8,6 +8,8 @@
 | `init_full.sh` | Reinicialización de desarrollo; puede eliminar volúmenes |
 | `logs_creation.sh` | Extraer logs del backend/initializer |
 | `sihsalus-compose.service` | Arranque del stack con systemd |
+| `sihsalus-safe-poweroff.sh` | Evaluador fail-closed de apagado automático |
+| `sihsalus-safe-poweroff.{service,timer}` | Ejecución y sondeo systemd del evaluador |
 
 ## Servicio systemd
 
@@ -56,3 +58,11 @@ docker compose logs --tail 200 backend gateway
 ```
 
 No adjuntes logs con datos clínicos, tokens o credenciales a issues públicos.
+
+## Apagado automático
+
+No programes `shutdown` directamente en cron. El mecanismo versionado exige
+ventana local explícita, heartbeat del SPA, ausencia de conexiones activas,
+gracia de arranque, inhibidor operativo y una segunda comprobación. Se entrega
+deshabilitado y en dry-run; la instalación y aceptación están en el
+[runbook de apagado seguro](../../docs/operations/safe-poweroff.md).

@@ -11,7 +11,7 @@ Este directorio contiene las herramientas ejecutables del stack. La documentaci�
 | `deploy/` | Despliegue inmutable y rollback del frontend | [deploy/README.md](deploy/README.md) |
 | `security/` | Generación y auditoría de archivos de entorno | [security/README.md](security/README.md) |
 | `seed/` | Crear y aplicar releases cifrados de datos seed | [seed/README.md](seed/README.md) |
-| `utils/` | Inicialización, certificados y soporte operativo | [utils/README.md](utils/README.md) |
+| `utils/` | Inicialización, certificados, apagado seguro y soporte operativo | [utils/README.md](utils/README.md) |
 | `validate-compose.sh` | Validación local y de CI de todos los modelos Compose | [compose/README.md](../compose/README.md) |
 | `management-tunnel.sh` | Túneles SSH hacia consolas administrativas locales | Ayuda del script |
 | `verify-installation.sh` | Verificación posterior a instalación | Ayuda del script |

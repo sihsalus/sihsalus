@@ -54,6 +54,9 @@ Política operativa:
 - Debe ejecutar backup local diario.
 - Debe permitir backup externo semanal.
 - Debe mantener instrucciones impresas de recuperación.
+- Si requiere apagado automático por inestabilidad eléctrica, debe usar la
+  [política con ventana, actividad e inhibición](safe-poweroff.md); un cron a
+  hora fija no es aceptable.
 
 ## Centro de salud
 

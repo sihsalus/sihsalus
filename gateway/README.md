@@ -8,3 +8,10 @@ The main configuration for the gateway can be found in the default.conf.template
 
 `FRAME_ANCESTORS`
 : This should be a space separated list of origins that are allowed to embed OpenMRS in an IFRAME. For example "http://my.webpage/com http://my.webpage2.com". The syntax is described [on MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/frame-ancestors). By default, only pages served from the gateway can embed OpenMRS in an IFRAME.
+
+## Clinical activity heartbeat
+
+`POST /_sihsalus/clinical-activity` returns `204` without reaching OpenMRS. Its
+dedicated access log contains only a Unix timestamp and is consumed by the host
+[safe-poweroff policy](../docs/operations/safe-poweroff.md). Never add request
+paths, IPs, cookies, identifiers, bodies, or user agents to that log format.
