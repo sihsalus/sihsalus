@@ -10,6 +10,7 @@ on:
       - 'backend/**'
       - 'distro/**'
       - 'tests/backend/ocl-token-image.sh'
+      - 'tests/backend/forced-password-image.sh'
   workflow_dispatch:
 
 concurrency:
@@ -65,6 +66,11 @@ jobs:
           set -euo pipefail
           docker pull "${IMAGE}"
           ./tests/backend/ocl-token-image.sh "${IMAGE}"
+
+      - name: Test published backend forced-password contract
+        env:
+          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+        run: ./tests/backend/forced-password-image.sh "${IMAGE}"
 
       - name: Resolve pinned OpenMRS security baseline
         id: openmrs-baseline

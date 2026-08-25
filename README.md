@@ -17,6 +17,7 @@
 - [Inicio Rápido](#inicio-rápido)
 - [Profiles](#profiles)
 - [Arquitectura de infraestructura](docs/architecture/infrastructure.md)
+- [Cambio obligatorio de contraseña local](docs/operations/forced-password-change.md)
 - [Actualización en Producción](#actualización-en-producción)
 - [Docker Bake (Build)](#docker-bake-build)
 - [Configuración SSL/HTTPS](#configuración-sslhttps)
