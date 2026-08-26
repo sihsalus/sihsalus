@@ -66,6 +66,7 @@ OMRS_OCL_TOKEN=
 BACKEND_TAG=latest
 FRONTEND_SOURCE_TAG=latest
 FRONTEND_RUNTIME_TAG=latest
+DOCS_IMAGE_REF=ghcr.io/sihsalus/sihsalus-docs:latest
 STRIP_SOURCE_MAPS=true
 
 # Keycloak

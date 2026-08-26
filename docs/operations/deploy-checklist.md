@@ -30,7 +30,7 @@ con aprobación explícita.
 
 - PR aprobado y mergeado.
 - CI requerido en verde.
-- Versiones a desplegar identificadas: backend, frontend, content package y perfiles habilitados.
+- Versiones a desplegar identificadas: backend, frontend, portal de ayuda, content package y perfiles habilitados.
 - Backup reciente confirmado.
 - Ruta de rollback definida.
 - Variables y secretos requeridos confirmados sin exponer valores.
@@ -98,6 +98,7 @@ Registrar:
 | Commit desplegado | |
 | Backend tag | |
 | Frontend tag | |
+| Portal de ayuda image/digest | |
 | Content package | |
 | Perfiles activos | |
 | Backup usado como referencia | |
@@ -109,6 +110,8 @@ Registrar:
 - `GET /startup` responde correctamente.
 - `GET /ready` responde correctamente cuando OpenMRS termina bootstrap.
 - `/openmrs/spa/home` carga en navegador.
+- `/ayuda/` carga la versión esperada o, si el servicio está detenido, devuelve
+  su contingencia sin afectar `/health`, `/ready` ni la SPA.
 - Login funciona.
 - Roles principales pueden acceder a sus superficies esperadas.
 - Si aplica, Keycloak redirige a `/openmrs/spa/home`.

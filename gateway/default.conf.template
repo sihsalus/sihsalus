@@ -2,6 +2,9 @@ map $request_uri $csp_header {
   # Dyaku/FHIR browser access is scoped to the O3 SPA. Imaging and legacy
   # surfaces must not inherit external FHIR connectivity by default.
   default "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'self'; font-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
+  # The static help portal has no user input or analytics. Material for MkDocs
+  # uses small inline bootstrap scripts; all network access remains same-origin.
+  "~^/ayuda/" "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src 'self'; base-uri 'self'; font-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
   # The assembled SPA externalizes all executable startup code. Inline styles
   # remain temporarily required by Carbon and React component style props.
   "~^/openmrs/spa/" "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://dyaku.minsa.gob.pe; base-uri 'self'; font-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
@@ -138,6 +141,26 @@ server {
     set $frontend http://frontend;
     rewrite ^/openmrs/spa/(.*) /$1 break;
     proxy_pass $frontend;
+  }
+
+  location = /ayuda {
+    return 301 /ayuda/;
+  }
+
+  location /ayuda/ {
+    set $docs http://docs:8080;
+    rewrite ^/ayuda/(.*)$ /$1 break;
+    proxy_set_header Host docs;
+    proxy_read_timeout 30s;
+    proxy_intercept_errors on;
+    proxy_redirect http://docs:8080/ /ayuda/;
+    error_page 502 503 504 = @docs_unavailable;
+    proxy_pass $docs;
+  }
+
+  location @docs_unavailable {
+    default_type text/html;
+    return 503 '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Ayuda no disponible</title></head><body><h1>Ayuda temporalmente no disponible</h1><p>Puede continuar utilizando SIHSALUS e intentarlo nuevamente m&aacute;s tarde.</p></body></html>';
   }
 
   # Password recovery is administrator-mediated. Legacy's secret-question

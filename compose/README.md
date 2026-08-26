@@ -6,7 +6,7 @@
 
 | Capa | Activación | Propósito |
 | --- | --- | --- |
-| Core | `docker compose up -d` | Gateway, frontend, OpenMRS y MariaDB |
+| Core | `docker compose up -d` | Gateway, portal de ayuda, frontend, OpenMRS y MariaDB |
 | FUA | `--profile fua` | Generador FUA y PostgreSQL propio |
 | HAPI | `--profile hapi` | Servidor FHIR y PostgreSQL propio |
 | Imaging | `--profile imaging` | OHIF, Orthanc y proxy DICOMweb |
@@ -72,6 +72,9 @@ docker compose ps
 - `OAUTH2_ENABLED` no se configura en `.env`: core lo fija en `false` y `compose/keycloak.yml` lo cambia a `true`.
 - `SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED` vale `true` por defecto para autenticación local. `false` desactiva el filtro backend y requiere recrearlo; el rollback completo también debe restaurar el frontend coordinado. OAuth2 siempre desactiva el filtro local.
 - En producción se usan tags inmutables, no `latest`.
+- `DOCS_IMAGE_REF` fija por digest el portal de ayuda público-seguro. El gateway
+  no depende de su salud, por lo que una caída de documentación no bloquea la
+  atención clínica.
 - HAPI y las consolas de observabilidad se publican solo en localhost.
 
 Para generar credenciales y auditar un ambiente, ver [scripts/security/README.md](../scripts/security/README.md).

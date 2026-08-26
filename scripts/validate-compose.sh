@@ -74,9 +74,39 @@ for gateway_template in gateway/default.conf.template gateway/default-ssl.conf.t
     echo "[FAIL] $gateway_template must not allow inline or cross-origin SPA scripts" >&2
     exit 1
   fi
+
+  docs_csp="$(grep -F '"~^/ayuda/"' "$gateway_template")"
+  docs_script_policy="${docs_csp#*script-src }"
+  docs_script_policy="${docs_script_policy%%;*}"
+  if [ "$docs_script_policy" != "'self' 'unsafe-inline'" ]; then
+    echo "[FAIL] $gateway_template help portal scripts must remain same-origin" >&2
+    exit 1
+  fi
+  docs_style_policy="${docs_csp#*style-src }"
+  docs_style_policy="${docs_style_policy%%;*}"
+  if [ "$docs_style_policy" != "'self' 'unsafe-inline'" ]; then
+    echo "[FAIL] $gateway_template help portal styles must support the reviewed Material CSSOM contract" >&2
+    exit 1
+  fi
+  for required_docs_contract in \
+    'location = /ayuda {' \
+    'return 301 /ayuda/;' \
+    'location /ayuda/ {' \
+    'set $docs http://docs:8080;' \
+    'proxy_set_header Host docs;' \
+    'proxy_redirect http://docs:8080/ /ayuda/;' \
+    'error_page 502 503 504 = @docs_unavailable;' \
+    'location @docs_unavailable {' \
+    'Puede continuar utilizando SIHSALUS'; do
+    if [ "$(grep -Fc "$required_docs_contract" "$gateway_template")" -ne 1 ]; then
+      echo "[FAIL] $gateway_template must contain the reviewed help portal contract: $required_docs_contract" >&2
+      exit 1
+    fi
+  done
 done
 echo "[OK] gateway health and Legacy password routes use the reviewed policy"
 echo "[OK] SPA CSP permits only same-origin external scripts"
+echo "[OK] help portal route is isolated and degrades without blocking SIHSALUS"
 
 if [ "$#" -gt 1 ]; then
   echo "Usage: $0 [evidence-directory]" >&2
@@ -180,6 +210,24 @@ def service(config, name):
 core, fua, keycloak, ssl, ci, imaging, keycloak_ssl, monitoring, imaging_auth, imaging_auth_ssl, seed, local_auth_rollback, realm = map(load, sys.argv[1:])
 core_backend = service(core, "backend")
 core_generator = service(core, "backend-oauth2-config")
+core_docs = service(core, "docs")
+core_gateway = service(core, "gateway")
+
+if core_docs.get("image") != "ghcr.io/sihsalus/sihsalus-docs:latest":
+    fail("core docs must default to the official SIHSALUS image")
+if core_docs.get("ports"):
+    fail("docs must only be reachable through the gateway")
+if core_docs.get("read_only") is not True:
+    fail("docs filesystem must be read-only")
+if "no-new-privileges:true" not in core_docs.get("security_opt", []):
+    fail("docs must prevent privilege escalation")
+if core_docs.get("cap_drop") != ["ALL"]:
+    fail("docs must drop Linux capabilities by default")
+docs_healthcheck = "\n".join(map(str, core_docs.get("healthcheck", {}).get("test", [])))
+if "http://127.0.0.1:8080/health" not in docs_healthcheck:
+    fail("docs must expose an internal healthcheck")
+if "docs" in core_gateway.get("depends_on", {}):
+    fail("gateway must not depend on docs; help downtime cannot block SIHSALUS")
 
 if core_backend.get("environment", {}).get("OAUTH2_ENABLED") != "false":
     fail("core backend must keep OAuth2 disabled")

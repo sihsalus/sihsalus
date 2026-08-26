@@ -86,6 +86,17 @@ check_pinned_tag() {
   esac
 }
 
+check_docs_digest() {
+  local value
+  value="$(env_value DOCS_IMAGE_REF)"
+
+  if [[ "$value" =~ ^ghcr\.io/sihsalus/sihsalus-docs@sha256:[0-9a-f]{64}$ ]]; then
+    ok "DOCS_IMAGE_REF uses an immutable image digest"
+  else
+    fail "DOCS_IMAGE_REF must use ghcr.io/sihsalus/sihsalus-docs@sha256:<64 lowercase hex> in production"
+  fi
+}
+
 if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
   MODE="$(file_mode "$ENV_FILE")"
   case "$MODE" in
@@ -118,6 +129,7 @@ if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
     check_pinned_tag BACKEND_TAG
     check_pinned_tag FRONTEND_SOURCE_TAG
     check_pinned_tag FRONTEND_RUNTIME_TAG
+    check_docs_digest
 
     if profile_enabled hapi; then
       check_pinned_tag HAPI_TAG
