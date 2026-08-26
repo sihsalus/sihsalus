@@ -72,13 +72,17 @@ También puedes generar `.env.production` con credenciales aleatorias y auditarl
 ### 2. Construir e iniciar
 
 ```bash
-# Core (gateway, frontend, backend, db)
+# Core (gateway, portal de ayuda, frontend, backend, db)
 docker compose up -d
 
 # http://localhost/openmrs/spa
+# http://localhost/ayuda/
 ```
 
 La primera vez, OpenMRS puede tardar bastante en quedar listo, especialmente si importa conceptos y mappings OCL. La señal principal de readiness es `http://localhost/openmrs/health/started` respondiendo `200`; después de eso `http://localhost/openmrs/login.htm` y la SPA en `http://localhost/openmrs/spa/` deben responder correctamente.
+
+El portal de ayuda es un servicio estático independiente. Su indisponibilidad no
+altera la salud del gateway, el frontend ni OpenMRS.
 
 ### Health y readiness
 
@@ -103,7 +107,7 @@ curl -k -i https://localhost/openmrs/spa/home
 
 ## Profiles
 
-La infraestructura se organiza en **profiles** opcionales. Solo los servicios core (gateway, frontend, backend, db) se inician por defecto.
+La infraestructura se organiza en **profiles** opcionales. Solo los servicios core (gateway, portal de ayuda, frontend, backend, db) se inician por defecto.
 
 ```bash
 # Core solamente
@@ -297,7 +301,7 @@ certbot/                        # SSL certificates
 keycloak/                       # Keycloak auth
 imaging/                        # OHIF config
 compose/
-  core.yml                      # gateway, frontend, backend, db
+  core.yml                      # gateway, portal de ayuda, frontend, backend, db
   fua.yml                       # profile: fua
   indicadores.yml               # profile: indicadores
   hapi.yml                      # profile: hapi

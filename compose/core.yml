@@ -34,6 +34,30 @@ services:
       retries: 3
       start_period: 30s
 
+  docs:
+    container_name: sihsalus-docs
+    image: ${DOCS_IMAGE_REF:-ghcr.io/sihsalus/sihsalus-docs:latest}
+    pull_policy: always
+    restart: "unless-stopped"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    tmpfs:
+      - /var/cache/nginx:rw,noexec,nosuid,size=16m,mode=1777
+      - /var/run:rw,noexec,nosuid,size=1m,mode=1777
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   frontend:
     container_name: sihsalus-frontend
     image: ${FRONTEND_RUNTIME_IMAGE:-sihsalus-frontend-runtime}:${FRONTEND_RUNTIME_TAG:-latest}
