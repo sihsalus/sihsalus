@@ -17,6 +17,15 @@ services:
         condition: service_started
     ports:
       - "80:80"
+    # El gateway publica /grafana, asi que necesita compartir red con Grafana.
+    # Nunca estuvo declarado: el contenedor en produccion habia sido conectado a
+    # mano, asi que la consola funcionaba hasta que se recreaba el contenedor y
+    # entonces devolvia 502 con "grafana could not be resolved". Se repite
+    # default porque nombrar cualquier red aqui reemplaza la implicita, y el
+    # gateway sigue teniendo que alcanzar al backend y al frontend.
+    networks:
+      - default
+      - monitoring-network
     environment:
       FRAME_ANCESTORS: ${FRAME_ANCESTORS:-}
       FUA_CONFIG: ${FUA_CONFIG:-}
