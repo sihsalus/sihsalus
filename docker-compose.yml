@@ -83,3 +83,9 @@ networks:
   # Red de monitoreo - Prometheus, Loki, Grafana
   monitoring-network:
     driver: bridge
+  # Enlace punto a punto gateway <-> grafana para servir /grafana/ por HTTPS.
+  # Deliberadamente NO incluye loki, alloy ni docker-socket-proxy: el gateway
+  # es el unico contenedor expuesto a la LAN y no debe alcanzar el proxy del
+  # socket de Docker.
+  monitoring-edge:
+    driver: bridge

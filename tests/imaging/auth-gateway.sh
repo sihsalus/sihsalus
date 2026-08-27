@@ -76,6 +76,7 @@ sed \
   -e 's|${FUA_LOCATIONS}||g' \
   -e 's|${IMAGING_NETWORK_ACCESS_CONTROL}|allow 127.0.0.1; allow 172.16.0.0/12; deny all;|g' \
   -e 's|${IMAGING_ACCESS_CONTROL}|allow 127.0.0.1; allow 172.16.0.0/12; deny all; auth_request /imaging/oauth2/auth; error_page 401 = @imaging_oauth_signin;|g' \
+  -e 's|${GRAFANA_ACCESS_CONTROL}|deny all;|g' \
   "$ROOT_DIR/gateway/default.conf.template" > "$TMP_DIR/gateway.conf"
 
 docker network create "$NETWORK" >/dev/null
@@ -145,6 +146,16 @@ for path in /imaging/ /orthanc/ /dicom-web/studies /wado; do
     --cookie '_sihsalus_imaging=allowed' "$BASE_URL$path")"
   [ "$status" = "200" ]
 done
+
+# /grafana/ queda cerrada mientras .env no declare una red autorizada. Esto
+# tambien verifica que el marcador ${GRAFANA_ACCESS_CONTROL} este cableado: si
+# envsubst no lo sustituyera, nginx no habria arrancado.
+grafana_headers="$TMP_DIR/grafana.headers"
+status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "$BASE_URL/grafana/")"
+[ "$status" = "403" ]
+status="$(curl --silent --show-error --output /dev/null --dump-header "$grafana_headers" --write-out '%{http_code}' "$BASE_URL/grafana")"
+[ "$status" = "301" ]
+grep -qi '^Location: /grafana/' "$grafana_headers"
 
 logout_headers="$TMP_DIR/logout.headers"
 status="$(curl --silent --show-error --output /dev/null --dump-header "$logout_headers" --write-out '%{http_code}' \
