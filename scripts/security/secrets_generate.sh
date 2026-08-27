@@ -36,6 +36,7 @@ OAUTH2_CLIENT_SECRET="$(secret)"
 IMAGING_OIDC_CLIENT_SECRET="$(secret)"
 IMAGING_OAUTH_COOKIE_SECRET="$(cookie_secret)"
 GRAFANA_ADMIN_PASSWORD="$(secret)"
+GRAFANA_OIDC_CLIENT_SECRET="$(secret)"
 FUA_DB_PASSWORD="$(secret)"
 FUA_TOKEN="$(secret)"
 FUA_SECRET_KEY="$(secret)"
@@ -88,9 +89,14 @@ IMAGING_OAUTH_REDIRECT_URI=http://localhost/imaging/oauth2/callback
 IMAGING_OAUTH_COOKIE_SECRET=${IMAGING_OAUTH_COOKIE_SECRET}
 IMAGING_OAUTH_COOKIE_SECURE=true
 
-# Monitoring
+# Monitoring. Ajusta el dominio y el rango de la LAN antes de desplegar:
+# /grafana/ responde 403 mientras GRAFANA_NETWORK_ACCESS_CONTROL no liste una red.
 GRAFANA_ADMIN_USER=admin
 GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+GRAFANA_ROOT_URL=http://localhost/grafana/
+GRAFANA_COOKIE_SECURE=true
+GRAFANA_NETWORK_ACCESS_CONTROL=deny all;
+GRAFANA_OIDC_CLIENT_SECRET=${GRAFANA_OIDC_CLIENT_SECRET}
 
 # FUA
 SIHSALUS_FUA_GEN_DB_USER=fuagenerator

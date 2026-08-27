@@ -187,6 +187,32 @@ if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
   fi
   if profile_enabled monitoring || profile_enabled logs; then
     check_secret GRAFANA_ADMIN_PASSWORD
+
+    case "$(env_value GRAFANA_NETWORK_ACCESS_CONTROL)" in
+      ""|*"deny all;") : ;;
+      *) fail "GRAFANA_NETWORK_ACCESS_CONTROL must end in 'deny all;' so /grafana/ stays closed by default" ;;
+    esac
+    case "$(env_value GRAFANA_NETWORK_ACCESS_CONTROL)" in
+      "") warn "GRAFANA_NETWORK_ACCESS_CONTROL is unset: /grafana/ answers 403 to the whole LAN" ;;
+      *"allow 0.0.0.0/0"*) fail "GRAFANA_NETWORK_ACCESS_CONTROL must not allow every network" ;;
+      *) ok "Grafana gateway route is scoped to an explicit network range" ;;
+    esac
+
+    case "$(env_value GRAFANA_ROOT_URL)" in
+      */grafana/) ok "GRAFANA_ROOT_URL matches the gateway sub path" ;;
+      "") warn "GRAFANA_ROOT_URL is unset: Grafana will build links for localhost" ;;
+      *) fail "GRAFANA_ROOT_URL must end in /grafana/ to match the gateway route" ;;
+    esac
+
+    case "$(env_value COMPOSE_FILE)" in
+      *compose/monitoring-oidc.yml*) check_secret GRAFANA_OIDC_CLIENT_SECRET ;;
+    esac
+
+    if [ "$(env_value DEPLOYMENT_ENV)" = "production" ] && profile_enabled ssl; then
+      [ "$(env_value GRAFANA_COOKIE_SECURE)" = "true" ] \
+        && ok "Grafana session cookie is HTTPS-only" \
+        || fail "GRAFANA_COOKIE_SECURE must be true when Grafana is served over HTTPS"
+    fi
   fi
   if profile_enabled fua; then
     check_secret SIHSALUS_FUA_GEN_DB_PASSWORD

@@ -9,6 +9,10 @@ map $request_uri $csp_header {
   # remain temporarily required by Carbon and React component style props.
   "~^/openmrs/spa/" "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://dyaku.minsa.gob.pe; base-uri 'self'; font-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
   "~^/imaging/" "default-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; base-uri 'self'; object-src 'none'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
+  # Grafana usa CSS-in-JS (estilos inline), eval en el editor de consultas y
+  # workers blob: de Monaco. Sin esta entrada la UI carga en blanco y el
+  # sintoma parece un problema de red, no de CSP.
+  "~^/grafana(?:[/?]|$)" "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; base-uri 'self'; object-src 'none'; frame-ancestors 'self';";
   # Legacy OpenMRS pages still depend on inline scripts and eval-like behavior.
   "~^/openmrs/(?:admin|dictionary|module|patientDashboard.form|initialsetup)(?:/|$)" "default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; base-uri 'self'; font-src 'self'; frame-ancestors 'self';";
   "~^/openmrs/owa" "default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; base-uri 'self'; font-src 'self' data:; img-src 'self' data:; frame-ancestors 'self';";
@@ -27,6 +31,12 @@ map "$sihsalus_social_scraper:$uri" $sihsalus_social_redirect {
 map $http_x_real_ip $forwarded_ip {
   "~.*"  $http_x_real_ip;
   default $remote_addr;
+}
+
+# Websocket para Grafana Live (/grafana/api/live/ws).
+map $http_upgrade $connection_upgrade {
+  default upgrade;
+  ''      close;
 }
 
 upstream backend {
@@ -401,8 +411,31 @@ server {
     return 301 /openmrs/spa/home;
   }
 
-  location /grafana {
+  # Grafana (perfil monitoring). Cerrada por defecto: GRAFANA_ACCESS_CONTROL
+  # vale "deny all;" salvo que .env declare GRAFANA_NETWORK_ACCESS_CONTROL.
+  location = /grafana {
+    return 301 /grafana/;
+  }
+
+  location /grafana/ {
+    ${GRAFANA_ACCESS_CONTROL}
+
+    # Resolucion perezosa via el resolver de Docker: si el perfil monitoring
+    # esta apagado, nginx arranca igual y la ruta devuelve 502 en lugar de
+    # impedir el arranque del gateway.
     set $grafana http://grafana:3000;
+
+    # OJO: declarar cualquier proxy_set_header en un location anula TODOS los
+    # heredados del bloque server. Hay que repetir los cuatro de arriba.
+    proxy_set_header Host              $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Real-IP         $forwarded_ip;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header Upgrade           $http_upgrade;
+    proxy_set_header Connection        $connection_upgrade;
+
+    # Sin rewrite ni X-Forwarded-Prefix: GF_SERVER_SERVE_FROM_SUB_PATH hace que
+    # Grafana sirva y reescriba sus propias URLs bajo /grafana/.
     proxy_read_timeout 300s;
     proxy_pass $grafana;
   }

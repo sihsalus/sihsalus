@@ -1,0 +1,49 @@
+# Grafana autenticado con Keycloak (OIDC).
+#
+# Carga junto a compose/keycloak.yml, despues de que /grafana/ ya funcione con
+# el admin local:
+#   docker compose -f docker-compose.yml -f compose/keycloak.yml \
+#     -f compose/monitoring-oidc.yml -f compose/ssl.yml \
+#     --profile keycloak --profile monitoring --profile ssl up -d
+#
+# En Keycloak hay que registrar el cliente `sihsalus-grafana` con redirect URI
+# https://<dominio>/grafana/login/generic_oauth y los roles grafana-admin y
+# grafana-editor.
+
+services:
+  grafana:
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    environment:
+      GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
+      GF_AUTH_GENERIC_OAUTH_NAME: Keycloak
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: sihsalus-grafana
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: ${GRAFANA_OIDC_CLIENT_SECRET:?GRAFANA_OIDC_CLIENT_SECRET is required when Grafana OIDC is enabled}
+      GF_AUTH_GENERIC_OAUTH_SCOPES: "openid profile email"
+      # El navegador va por el gateway; el intercambio de token y el userinfo
+      # se quedan en la red interna y no dependen de DNS hairpin ni de que
+      # Grafana confie en el certificado autofirmado del gateway.
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost/keycloak}/realms/openmrs/protocol/openid-connect/auth
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: http://keycloak:8080/realms/openmrs/protocol/openid-connect/token
+      GF_AUTH_GENERIC_OAUTH_API_URL: http://keycloak:8080/realms/openmrs/protocol/openid-connect/userinfo
+      GF_AUTH_GENERIC_OAUTH_SIGNOUT_REDIRECT_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost/keycloak}/realms/openmrs/protocol/openid-connect/logout
+      GF_AUTH_GENERIC_OAUTH_USE_PKCE: "true"
+      # strict: sin rol mapeado no se entra. Sin esto todo el mundo cae en
+      # Viewer y cualquier usuario del realm ve los tableros clinicos.
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_STRICT: "true"
+      GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN: "false"
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: >-
+        contains(resource_access."sihsalus-grafana".roles[*], 'grafana-admin') && 'Admin'
+        || contains(resource_access."sihsalus-grafana".roles[*], 'grafana-editor') && 'Editor'
+        || 'Viewer'
+      GF_AUTH_GENERIC_OAUTH_AUTO_LOGIN: "false"
+      # Break-glass: el formulario local sigue disponible para el admin de
+      # Grafana cuando Keycloak esta caido. La ACL de red es la que impide que
+      # ese formulario sea alcanzable desde fuera de la LAN autorizada.
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+      GF_AUTH_OAUTH_ALLOW_INSECURE_EMAIL_LOOKUP: "false"
+    networks:
+      # Necesaria para alcanzar keycloak:8080. Sin esto el intercambio de
+      # codigo falla con un timeout opaco al volver del login.
+      - auth-network

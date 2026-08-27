@@ -8,6 +8,9 @@ services:
     restart: "unless-stopped"
     profiles: [ monitoring ]
     ports:
+      # Loopback, no es exposicion a la LAN. Es la via de recuperacion cuando el
+      # gateway falla: tunel SSH y luego http://127.0.0.1:3001/grafana/ (el
+      # subpath tambien aplica aqui por GF_SERVER_SERVE_FROM_SUB_PATH).
       - "127.0.0.1:3001:3000"
     entrypoint:
       - sh
@@ -25,15 +28,37 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-}
-      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001}
+      # Subpath detras del gateway. Grafana reescribe sus propias URLs, por eso
+      # nginx no hace rewrite ni manda X-Forwarded-Prefix.
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001/grafana/}
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      # Falso a proposito: enforce_domain rompe el acceso de emergencia por
+      # 127.0.0.1:3001, que es la unica via cuando el gateway esta caido.
+      GF_SERVER_ENFORCE_DOMAIN: "false"
+
       GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_USERS_ALLOW_ORG_CREATE: "false"
+      GF_USERS_VIEWERS_CAN_EDIT: "false"
+      GF_USERS_AUTO_ASSIGN_ORG_ROLE: Viewer
       GF_SECURITY_DISABLE_GRAVATAR: "true"
       GF_SECURITY_COOKIE_SAMESITE: strict
+      # Keycloak se sirve en el mismo origen (/keycloak), asi que samesite
+      # strict no rompe el retorno de OIDC.
+      GF_SECURITY_COOKIE_SECURE: "${GRAFANA_COOKIE_SECURE:-false}"
+      GF_SECURITY_ANGULAR_SUPPORT_ENABLED: "false"
+      # Contiene el pivote SSRF: sin esto un Editor puede crear un datasource
+      # apuntando a db:3306 y usar Grafana como proxy hacia la red interna.
+      GF_SECURITY_DATA_SOURCE_PROXY_WHITELIST: "prometheus:9090 loki:3100"
+      # nginx ya emite estas cabeceras; evitamos duplicarlas.
+      GF_SECURITY_X_CONTENT_TYPE_OPTIONS: "false"
+      GF_SECURITY_X_XSS_PROTECTION: "false"
+
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       GF_SNAPSHOTS_EXTERNAL_ENABLED: "false"
+      # El servidor no tiene salida a Internet: evita reintentos inutiles.
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
       GF_LOG_LEVEL: warn
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/logs-dashboard.json
     volumes:
@@ -52,6 +77,7 @@ services:
       start_period: 60s
     networks:
       - monitoring-network
+      - monitoring-edge
 
   prometheus:
     container_name: sihsalus-prometheus

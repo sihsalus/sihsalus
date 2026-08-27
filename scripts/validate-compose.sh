@@ -143,6 +143,7 @@ export OAUTH2_CLIENT_SECRET="${OAUTH2_CLIENT_SECRET:-ci-oauth2-secret-123}"
 export IMAGING_OIDC_CLIENT_SECRET="${IMAGING_OIDC_CLIENT_SECRET:-ci-imaging-client-secret-123}"
 export IMAGING_OAUTH_COOKIE_SECRET="${IMAGING_OAUTH_COOKIE_SECRET:-QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=}"
 export GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD:-ci-grafana-password-123}"
+export GRAFANA_OIDC_CLIENT_SECRET="${GRAFANA_OIDC_CLIENT_SECRET:-ci-grafana-oidc-secret-123}"
 export OMRS_OCL_TOKEN="${OMRS_OCL_TOKEN:-}"
 export SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED="true"
 export SIHSALUS_SEED_URL="${SIHSALUS_SEED_URL:-https://example.test/sihsalus-seed.tar.gz.enc}"
@@ -172,6 +173,11 @@ validate imaging-auth -f docker-compose.yml -f compose/keycloak.yml -f compose/i
 validate status -f docker-compose.yml -f compose/status.yml --profile status
 validate ssl -f docker-compose.yml -f compose/ssl.yml --profile ssl
 validate seed -f docker-compose.yml -f compose/seed.yml --profile seed --profile fua
+KEYCLOAK_PUBLIC_URL=https://sihsalus.example.test/keycloak \
+GRAFANA_ROOT_URL=https://sihsalus.example.test/grafana/ \
+GRAFANA_COOKIE_SECURE=true \
+GRAFANA_NETWORK_ACCESS_CONTROL="allow 192.168.0.0/24; deny all;" \
+validate monitoring-oidc -f docker-compose.yml -f compose/keycloak.yml -f compose/monitoring-oidc.yml --profile keycloak --profile monitoring
 KEYCLOAK_MODE=production \
 KEYCLOAK_PUBLIC_URL=https://sihsalus.example.test/keycloak \
 KC_HOSTNAME=https://sihsalus.example.test/keycloak \
@@ -186,7 +192,7 @@ IMAGING_OAUTH_REDIRECT_URI=https://sihsalus.example.test/imaging/oauth2/callback
 IMAGING_OAUTH_COOKIE_SECURE=true \
 validate imaging-auth-ssl -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml -f compose/ssl.yml --profile keycloak --profile imaging --profile ssl
 
-python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/fua.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" "$EVIDENCE_DIR/imaging.json" "$EVIDENCE_DIR/keycloak-ssl.json" "$EVIDENCE_DIR/monitoring-logs.json" "$EVIDENCE_DIR/imaging-auth.json" "$EVIDENCE_DIR/imaging-auth-ssl.json" "$EVIDENCE_DIR/seed.json" "$EVIDENCE_DIR/local-auth-rollback.json" keycloak/realm-export.json <<'PY'
+python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/fua.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" "$EVIDENCE_DIR/imaging.json" "$EVIDENCE_DIR/keycloak-ssl.json" "$EVIDENCE_DIR/monitoring-logs.json" "$EVIDENCE_DIR/imaging-auth.json" "$EVIDENCE_DIR/imaging-auth-ssl.json" "$EVIDENCE_DIR/seed.json" "$EVIDENCE_DIR/local-auth-rollback.json" "$EVIDENCE_DIR/monitoring-oidc.json" keycloak/realm-export.json <<'PY'
 import json
 import sys
 
@@ -207,7 +213,7 @@ def service(config, name):
         fail(f"missing service: {name}")
 
 
-core, fua, keycloak, ssl, ci, imaging, keycloak_ssl, monitoring, imaging_auth, imaging_auth_ssl, seed, local_auth_rollback, realm = map(load, sys.argv[1:])
+core, fua, keycloak, ssl, ci, imaging, keycloak_ssl, monitoring, imaging_auth, imaging_auth_ssl, seed, local_auth_rollback, monitoring_oidc, realm = map(load, sys.argv[1:])
 core_backend = service(core, "backend")
 core_generator = service(core, "backend-oauth2-config")
 core_docs = service(core, "docs")
@@ -394,6 +400,51 @@ if socket_proxy.get("environment", {}).get("POST") != "0":
     fail("Docker socket proxy must reject POST requests")
 if not any(volume.get("source") == "/var/run/docker.sock" for volume in socket_proxy.get("volumes", [])):
     fail("Docker socket proxy must own the socket mount")
+
+grafana = service(monitoring, "grafana")
+grafana_networks = set(grafana.get("networks", {}) or {})
+gateway_networks = set(service(core, "gateway").get("networks", {}) or {})
+
+if "monitoring-edge" not in grafana_networks or "monitoring-edge" not in gateway_networks:
+    fail("gateway and Grafana must share the dedicated monitoring-edge network")
+if "monitoring-network" in gateway_networks:
+    fail("gateway must not join monitoring-network: it would reach the Docker socket proxy")
+if "default" not in gateway_networks:
+    fail("gateway must keep the default network to reach backend and frontend")
+for isolated in ("loki", "docker-socket-proxy"):
+    if "monitoring-edge" in set(service(monitoring, isolated).get("networks", {}) or {}):
+        fail(f"{isolated} must stay off the gateway-facing network")
+
+grafana_acl = service(core, "gateway").get("environment", {}).get("GRAFANA_ACCESS_CONTROL", "")
+if grafana_acl.strip() != "deny all;":
+    fail("Grafana gateway route must stay closed without an explicit LAN ACL")
+
+grafana_environment = grafana.get("environment", {})
+if grafana_environment.get("GF_SERVER_SERVE_FROM_SUB_PATH") != "true":
+    fail("Grafana must serve itself from the /grafana/ sub path")
+if not grafana_environment.get("GF_SERVER_ROOT_URL", "").rstrip("/").endswith("/grafana"):
+    fail("Grafana root URL must match the gateway sub path")
+if grafana_environment.get("GF_AUTH_ANONYMOUS_ENABLED") != "false":
+    fail("Grafana must not allow anonymous access")
+if grafana_environment.get("GF_USERS_ALLOW_SIGN_UP") != "false":
+    fail("Grafana must not allow self sign-up")
+if not grafana_environment.get("GF_SECURITY_DATA_SOURCE_PROXY_WHITELIST"):
+    fail("Grafana data source proxy must be restricted to the observability backends")
+if not any(str(port.get("target")) == "3000" and port.get("host_ip") == "127.0.0.1"
+           for port in grafana.get("ports", [])):
+    fail("Grafana recovery port must bind to localhost")
+
+grafana_oidc = service(monitoring_oidc, "grafana").get("environment", {})
+if grafana_oidc.get("GF_AUTH_GENERIC_OAUTH_ENABLED") != "true":
+    fail("Grafana OIDC override must enable generic OAuth")
+if grafana_oidc.get("GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_STRICT") != "true":
+    fail("Grafana OIDC must reject users without a mapped role")
+if grafana_oidc.get("GF_AUTH_GENERIC_OAUTH_USE_PKCE") != "true":
+    fail("Grafana OIDC must use PKCE")
+if grafana_oidc.get("GF_SECURITY_COOKIE_SECURE") != "true":
+    fail("production Grafana cookies must be HTTPS-only")
+if "auth-network" not in set(service(monitoring_oidc, "grafana").get("networks", {}) or {}):
+    fail("Grafana must reach Keycloak over the internal auth network")
 
 print("[OK] semantic Compose invariants")
 PY
