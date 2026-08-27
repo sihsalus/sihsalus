@@ -1,0 +1,28 @@
+services:
+  samba-backup:
+    container_name: sihsalus-samba-backup
+    image: dperson/samba
+    restart: unless-stopped
+    command:
+      - -p
+      - -u
+      - "sihsalus-backup;${SIHSALUS_BACKUP_SMB_PASS}"
+      - -u
+      - "secretariaRRHH;${SIHSALUS_SECRETARIA_RRHH_SMB_PASS}"
+      - -u
+      - "asistenteRRHH;${SIHSALUS_ASISTENTE_RRHH_SMB_PASS}"
+      - -s
+      - "secretariaRRHH;/mnt/secretariaRRHH;no;no;no;sihsalus-backup,secretariaRRHH"
+      - -s
+      - "asistenteRRHH;/mnt/asistenteRRHH;no;no;no;sihsalus-backup,asistenteRRHH"
+      - -G
+      - "global;dfree command = /usr/local/bin/smb-dfree.sh"
+      - -G
+      - "global;dfree cache time = 10"
+    ports:
+      - "192.168.88.20:445:445/tcp"
+      - "192.168.88.20:139:139/tcp"
+      - "192.168.88.20:137-138:137-138/udp"
+    volumes:
+      - /srv/sihsalus-backups/samba:/mnt
+      - ./compose/samba/dfree.sh:/usr/local/bin/smb-dfree.sh:ro
