@@ -178,6 +178,20 @@ Muestra:
 - Latencia de endpoints mediante `probe_duration_seconds`
 - Logs y errores del backend/gateway cuando Alloy está habilitado
 
+### Equipos conectados (LAN)
+
+Una fila por dirección IP de la LAN que hizo peticiones al gateway, a partir
+del log de acceso de nginx en Loki (`container_name="sihsalus-gateway"`):
+- Equipos activos (últimos 5 min y en el rango) y peticiones totales
+- Actividad por equipo en el tiempo
+- Tabla por IP: peticiones, navegador y si registró `service-worker.js`
+  (sin service worker no hay modo offline en esa PC; casi siempre es que
+  falta instalar el certificado del servidor)
+
+Excluye las IPs internas de Docker (`172.*`, `10.*`, `127.*`) y el sondeo de
+Blackbox. Las IPs las asigna el DHCP del router; el nombre de la máquina se
+obtiene con `dig -x <ip> @<router>`.
+
 ### Logs Dashboard
 
 Agregación y búsqueda de:

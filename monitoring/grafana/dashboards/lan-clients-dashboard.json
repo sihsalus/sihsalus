@@ -1,0 +1,518 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "schemaVersion": 39,
+  "tags": [
+    "sihsalus",
+    "red",
+    "lan",
+    "monitoring"
+  ],
+  "templating": {
+    "list": [
+      {
+        "type": "textbox",
+        "name": "ip",
+        "label": "Filtrar IP (regex)",
+        "query": ".*",
+        "current": {
+          "text": ".*",
+          "value": ".*"
+        },
+        "hide": 0,
+        "options": [
+          {
+            "text": ".*",
+            "value": ".*",
+            "selected": true
+          }
+        ],
+        "description": "Expresión regular sobre la IP del cliente, p. ej. 192\\.168\\.88\\.6.*"
+      }
+    ]
+  },
+  "refresh": "30s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Equipos conectados (LAN)",
+  "uid": "lan-clients",
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 3
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Equipos conectados a SIHSALUS** — se calcula desde el log de acceso de nginx (`sihsalus-gateway`) en Loki: una fila por dirección IP de la LAN que hizo peticiones en el rango. No incluye IPs internas de Docker ni al sondeo de Blackbox. Las IPs las asigna el DHCP del router; para el nombre de la máquina: `dig -x <ip> @192.168.88.1`. La columna *service worker* indica si ese navegador registró `service-worker.js`: sin él **no hay modo offline** en esa PC (normalmente porque falta instalar el certificado del servidor)."
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Equipos activos (últimos 5 min)",
+      "description": "IPs de la LAN con al menos una petición en los últimos 5 minutos.",
+      "datasource": "Loki",
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": "Loki",
+          "expr": "count(sum by (ip) (count_over_time({container_name=\"sihsalus-gateway\"} | regexp `^(?P<ip>\\d+\\.\\d+\\.\\d+\\.\\d+) ` | ip != \"\" | ip !~ `(172|127|10)\\..*` | ip =~ `$ip` [5m])))",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "queryType": "instant"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Equipos activos (rango)",
+      "description": "IPs distintas en todo el rango de tiempo seleccionado.",
+      "datasource": "Loki",
+      "gridPos": {
+        "x": 6,
+        "y": 3,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": "Loki",
+          "expr": "count(sum by (ip) (count_over_time({container_name=\"sihsalus-gateway\"} | regexp `^(?P<ip>\\d+\\.\\d+\\.\\d+\\.\\d+) ` | ip != \"\" | ip !~ `(172|127|10)\\..*` | ip =~ `$ip` [$__range])))",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "queryType": "instant"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Con service worker (rango)",
+      "description": "Equipos que registraron el service worker en el rango: son los únicos con modo offline posible.",
+      "datasource": "Loki",
+      "gridPos": {
+        "x": 12,
+        "y": 3,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": "Loki",
+          "expr": "count(sum by (ip) (count_over_time({container_name=\"sihsalus-gateway\"} | regexp `^(?P<ip>\\d+\\.\\d+\\.\\d+\\.\\d+) ` | ip != \"\" | ip !~ `(172|127|10)\\..*` | ip =~ `$ip` |= `service-worker.js` [$__range])))",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "queryType": "instant"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Peticiones (rango)",
+      "description": "Total de peticiones de equipos de la LAN en el rango.",
+      "datasource": "Loki",
+      "gridPos": {
+        "x": 18,
+        "y": 3,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": "Loki",
+          "expr": "sum(count_over_time({container_name=\"sihsalus-gateway\"} | regexp `^(?P<ip>\\d+\\.\\d+\\.\\d+\\.\\d+) ` | ip != \"\" | ip !~ `(172|127|10)\\..*` | ip =~ `$ip` [$__range]))",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "queryType": "instant"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Actividad por equipo (peticiones / min)",
+      "datasource": "Loki",
+      "description": "Cuándo estuvo activo cada equipo. Una línea que se apaga es un equipo que dejó de usar el sistema.",
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": "Loki",
+          "expr": "sum by (ip) (count_over_time({container_name=\"sihsalus-gateway\"} | regexp `^(?P<ip>\\d+\\.\\d+\\.\\d+\\.\\d+) ` | ip != \"\" | ip !~ `(172|127|10)\\..*` | ip =~ `$ip` [1m]))",
+          "refId": "A",
+          "legendFormat": "{{ip}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "lineWidth": 0
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "sum",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Equipos en el rango",
+      "datasource": "Loki",
+      "description": "Una fila por IP de la LAN. *service worker* = registró service-worker.js (offline posible). El navegador es el User-Agent más frecuente de esa IP.",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 24,
+        "h": 12
+      },
+      "targets": [
+        {
+          "datasource": "Loki",
+          "expr": "sum by (ip) (count_over_time({container_name=\"sihsalus-gateway\"} | regexp `^(?P<ip>\\d+\\.\\d+\\.\\d+\\.\\d+) ` | ip != \"\" | ip !~ `(172|127|10)\\..*` | ip =~ `$ip` [$__range]))",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "queryType": "instant"
+        },
+        {
+          "datasource": "Loki",
+          "expr": "sum by (ip) (count_over_time({container_name=\"sihsalus-gateway\"} | regexp `^(?P<ip>\\d+\\.\\d+\\.\\d+\\.\\d+) ` | ip != \"\" | ip !~ `(172|127|10)\\..*` | ip =~ `$ip` |= `service-worker.js` [$__range]))",
+          "refId": "B",
+          "instant": true,
+          "range": false,
+          "queryType": "instant"
+        },
+        {
+          "datasource": "Loki",
+          "expr": "topk(1, sum by (ip, navegador) (count_over_time({container_name=\"sihsalus-gateway\"} | regexp `^(?P<ip>\\d+\\.\\d+\\.\\d+\\.\\d+) .* \"(?P<navegador>[^\"]*)\" \"[^\"]*\"$` | ip != \"\" | ip !~ `(172|127|10)\\..*` | ip =~ `$ip` [$__range]))) by (ip)",
+          "refId": "C",
+          "instant": true,
+          "range": false,
+          "queryType": "instant"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "seriesToRows",
+          "options": {}
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "ip",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true
+            },
+            "renameByName": {
+              "ip": "IP",
+              "Value #A": "Peticiones",
+              "Value #B": "service worker",
+              "navegador": "Navegador",
+              "Value #C": "Peticiones (navegador)"
+            },
+            "indexByName": {
+              "ip": 0,
+              "Value #A": 1,
+              "Value #B": 2,
+              "navegador": 3
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Peticiones",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "service worker"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "text": "no",
+                        "color": "red"
+                      }
+                    }
+                  },
+                  {
+                    "type": "range",
+                    "options": {
+                      "from": 1,
+                      "to": 1000000000000.0,
+                      "result": {
+                        "text": "sí",
+                        "color": "green"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Peticiones (navegador)"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Peticiones"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    }
+  ]
+}
