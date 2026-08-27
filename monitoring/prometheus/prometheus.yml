@@ -36,8 +36,11 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox:9115
 
-  # Grafana metrics
+  # Grafana metrics. Grafana serves from a sub-path behind the gateway, so
+  # /metrics redirects to the public root_url, which is unreachable from the
+  # monitoring network. Scrape the sub-path directly instead.
   - job_name: 'grafana'
+    metrics_path: /grafana/metrics
     static_configs:
       - targets: ['grafana:3000']
         labels:
