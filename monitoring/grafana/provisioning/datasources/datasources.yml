@@ -45,4 +45,5 @@ datasources:
     editable: false
     jsonData:
       implementation: prometheus
+      handleGrafanaManagedAlerts: false
     version: 1
