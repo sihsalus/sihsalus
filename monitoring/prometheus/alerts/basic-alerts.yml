@@ -173,7 +173,7 @@ groups:
           dashboard: "/d/sihsalus-resilience"
 
       - alert: VpnInterfaceDown
-        expr: node_network_carrier{device=~"tun0|tun1"} == 0
+        expr: (sihsalus_network_carrier{device=~"tun0|tun1"} == 0) and (sihsalus_network_interface_present == 1)
         for: 5m
         labels:
           severity: critical
@@ -184,7 +184,7 @@ groups:
           dashboard: "/d/sihsalus-resilience"
 
       - alert: VpnInterfaceMissing
-        expr: absent(node_network_carrier{device="tun0"}) or absent(node_network_carrier{device="tun1"})
+        expr: sihsalus_network_interface_present{device=~"tun0|tun1"} == 0
         for: 5m
         labels:
           severity: critical

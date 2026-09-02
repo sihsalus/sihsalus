@@ -146,6 +146,7 @@ services:
       - no-new-privileges:true
     volumes:
       - ${SIHSALUS_BACKUP_METRICS_PATH:-/srv/sihsalus-backups}:/backups:ro
+      - /sys:/host-sys:ro
       - operations-metrics:/metrics
       - ./monitoring/operations/collect.sh:/usr/local/bin/collect.sh:ro
     healthcheck:

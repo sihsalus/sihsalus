@@ -109,8 +109,8 @@
       "id": 10,
       "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
-        { "editorMode": "code", "expr": "sum by (device) (rate(node_network_receive_bytes_total{device!~\"lo|veth.*|br-.*|docker.*\"}[5m]))", "legendFormat": "RX {{device}}", "range": true, "refId": "A" },
-        { "editorMode": "code", "expr": "sum by (device) (rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|br-.*|docker.*\"}[5m]))", "legendFormat": "TX {{device}}", "range": true, "refId": "B" }
+        { "editorMode": "code", "expr": "rate(sihsalus_network_receive_bytes_total[5m])", "legendFormat": "RX {{device}}", "range": true, "refId": "A" },
+        { "editorMode": "code", "expr": "rate(sihsalus_network_transmit_bytes_total[5m])", "legendFormat": "TX {{device}}", "range": true, "refId": "B" }
       ],
       "title": "Tráfico de red del host",
       "type": "timeseries"
