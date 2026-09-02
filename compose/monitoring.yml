@@ -115,6 +115,9 @@ services:
     profiles: [ monitoring ]
     command:
       - '--path.rootfs=/host'
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.textfile.directory=/var/lib/node_exporter/textfile_collector'
       - '--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/containers/storage/.+)($|/)'
       - '--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|securityfs|selinuxfs|squashfs|sysfs|tracefs)$'
     pid: host
@@ -123,8 +126,34 @@ services:
       - no-new-privileges:true
     volumes:
       - /:/host:ro,rslave
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - operations-metrics:/var/lib/node_exporter/textfile_collector:ro
     networks:
       - monitoring-network
+
+  operations-collector:
+    container_name: sihsalus-operations-collector
+    image: alpine:3.23
+    restart: "unless-stopped"
+    profiles: [ monitoring ]
+    command: [ "/bin/sh", "/usr/local/bin/collect.sh" ]
+    environment:
+      COLLECTION_INTERVAL_SECONDS: "60"
+    read_only: true
+    network_mode: none
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ${SIHSALUS_BACKUP_METRICS_PATH:-/srv/sihsalus-backups}:/backups:ro
+      - operations-metrics:/metrics
+      - ./monitoring/operations/collect.sh:/usr/local/bin/collect.sh:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "test -s /metrics/sihsalus.prom" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   cadvisor:
     container_name: sihsalus-cadvisor

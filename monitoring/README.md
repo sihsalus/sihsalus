@@ -12,6 +12,7 @@ Stack de observabilidad para disponibilidad HTTP, recursos del host y contenedor
 - **Node Exporter** - CPU, memoria, filesystems, red y kernel del host
 - **cAdvisor** - Consumo de recursos por contenedor
 - **Alertmanager** - Agrupación, deduplicación y silencios
+- **Operations Collector** - Frescura y tamaño de backups mediante métricas textfile
 
 ---
 
@@ -66,6 +67,7 @@ GRAFANA_ROOT_URL=http://localhost:3001   # URL base (para links)
 - Estado operativo (portada)
 - OpenMRS
 - Infraestructura
+- Resiliencia
 - Equipos LAN
 - Logs
 
@@ -181,6 +183,13 @@ filesystem, disponibilidad, latencia, errores y salud del propio monitoreo.
 
 Métricas USE del host y recursos por servicio Docker: CPU, memoria, carga,
 filesystems, red, contenedores observados y eventos OOM.
+
+### Resiliencia
+
+Edad, tamaño y retención de los backups cifrados de MariaDB, HAPI y FUA;
+estado y tráfico de `tun0`/`tun1`; vencimiento del certificado HTTPS y
+temperatura máxima expuesta por el host. La frescura del archivo no sustituye
+una restauración de prueba periódica.
 
 ### OpenMRS Overview
 

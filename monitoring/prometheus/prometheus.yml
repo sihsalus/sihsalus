@@ -41,6 +41,26 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox:9115
 
+  # The HTTPS probe provides certificate-expiration metrics. Certificate
+  # identity validation is intentionally skipped because the internal Docker
+  # hostname differs from the certificate SAN; expiry is still read from the
+  # certificate actually served by the production gateway.
+  - job_name: 'blackbox-https-certificate'
+    metrics_path: /probe
+    params:
+      module: [ http_2xx_ignore_ssl ]
+    static_configs:
+      - targets: ["https://gateway:443/"]
+        labels:
+          service: 'gateway-tls'
+    relabel_configs:
+      - source_labels: [ __address__ ]
+        target_label: __param_target
+      - source_labels: [ __param_target ]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115
+
   # Grafana metrics. Grafana serves from a sub-path behind the gateway, so
   # /metrics redirects to the public root_url, which is unreachable from the
   # monitoring network. Scrape the sub-path directly instead.

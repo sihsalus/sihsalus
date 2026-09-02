@@ -388,6 +388,7 @@ socket_proxy = service(monitoring, "docker-socket-proxy")
 alertmanager = service(monitoring, "alertmanager")
 node_exporter = service(monitoring, "node-exporter")
 cadvisor = service(monitoring, "cadvisor")
+operations_collector = service(monitoring, "operations-collector")
 
 for volume in alloy.get("volumes", []):
     if volume.get("source") == "/var/run/docker.sock":
@@ -413,6 +414,14 @@ if cadvisor.get("read_only") is not True:
 for volume in cadvisor.get("volumes", []):
     if volume.get("source") in ("/", "/var/lib/docker", "/sys") and not volume.get("read_only"):
         fail("cAdvisor host mounts must be read-only")
+
+if operations_collector.get("network_mode") != "none":
+    fail("operations collector must not have network access")
+if operations_collector.get("read_only") is not True:
+    fail("operations collector must use a read-only container filesystem")
+backup_mounts = [volume for volume in operations_collector.get("volumes", []) if volume.get("target") == "/backups"]
+if len(backup_mounts) != 1 or not backup_mounts[0].get("read_only"):
+    fail("operations collector backup mount must exist and be read-only")
 
 print("[OK] semantic Compose invariants")
 PY

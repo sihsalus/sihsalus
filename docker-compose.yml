@@ -67,6 +67,8 @@ volumes:
     name: sihsalus-prometheus-data
   alertmanager-data:
     name: sihsalus-alertmanager-data
+  operations-metrics:
+    name: sihsalus-operations-metrics
   loki-data:
     name: sihsalus-loki-data
   alloy-data:
