@@ -46,6 +46,9 @@ RUN --mount=type=cache,target=/root/.m2/repository \
     set -- "$modules_dir"/legacyui-*.omod && \
     [ "$#" -eq 1 ] && [ -f "$1" ] && \
     legacyui_omod="$1" && \
+    set -- "$modules_dir"/sihsalusnotifications-*.omod && \
+    [ "$#" -eq 1 ] && [ -f "$1" ] && \
+    notifications_omod="$1" && \
     jar tf "$authentication_omod" \
       | grep -qxF 'org/openmrs/module/authentication/web/ForcePasswordChangeFilter.class' && \
     javap -classpath "$authentication_omod" -verbose \
@@ -55,7 +58,11 @@ RUN --mount=type=cache,target=/root/.m2/repository \
       | grep -qxF 'web/module/admin/users/changePasswordForm.jsp' && \
     javap -classpath "$legacyui_omod" -verbose \
       org.openmrs.web.controller.user.ChangePasswordFormController \
-      | grep -qF '/admin/users/changePassword.form'
+      | grep -qF '/admin/users/changePassword.form' && \
+    jar tf "$notifications_omod" \
+      | grep -qxF 'org/openmrs/module/sihsalusnotifications/web/NotificationWebSocketEndpoint.class' && \
+    jar tf "$notifications_omod" \
+      | grep -qxF 'org/openmrs/module/sihsalusnotifications/web/SseNotificationFilter.class'
 
 RUN cp /openmrs_distro/backend/target/sdk-distro/web/openmrs_core/openmrs.war /openmrs/distribution/openmrs_core/ && \
     cp /openmrs_distro/backend/target/sdk-distro/web/openmrs-distro.properties /openmrs/distribution/ && \

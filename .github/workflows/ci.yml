@@ -107,6 +107,9 @@ jobs:
       - name: Test forced-password runtime configuration
         run: ./tests/backend/forced-password-config.sh
 
+      - name: Test realtime notifications OMOD and gateway configuration
+        run: ./tests/backend/realtime-notifications-config.sh
+
       - name: Validate models and invariants
         run: ./scripts/validate-compose.sh compose-validation
 
