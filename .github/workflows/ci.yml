@@ -110,6 +110,9 @@ jobs:
       - name: Test realtime notifications OMOD and gateway configuration
         run: ./tests/backend/realtime-notifications-config.sh
 
+      - name: Test backend security refresh cache policy
+        run: ./tests/backend/security-refresh-config.sh
+
       - name: Validate models and invariants
         run: ./scripts/validate-compose.sh compose-validation
 
@@ -152,7 +155,12 @@ jobs:
       - name: Build deployable backend image
         env:
           DOCKER_BUILDKIT: '1'
-        run: docker build --file backend/Dockerfile --tag sihsalus-backend:ci .
+        run: >-
+          docker build
+          --build-arg SECURITY_REFRESH="${GITHUB_SHA}"
+          --file backend/Dockerfile
+          --tag sihsalus-backend:ci
+          .
 
       - name: Test backend OCL token contract
         run: ./tests/backend/ocl-token-image.sh sihsalus-backend:ci
