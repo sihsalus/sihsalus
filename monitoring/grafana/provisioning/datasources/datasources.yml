@@ -1,6 +1,15 @@
 # Grafana Datasources Configuration for SIHSALUS
 apiVersion: 1
 
+# Grafana data source UIDs are immutable. These entries perform the one-time
+# migration from the previously auto-generated UIDs to stable, versioned UIDs.
+# Data remains in Prometheus/Loki; only Grafana's connection records change.
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+  - name: Loki
+    orgId: 1
+
 datasources:
   # Prometheus datasource
   - name: Prometheus
