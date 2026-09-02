@@ -1,0 +1,127 @@
+{
+  "annotations": { "list": [{ "builtIn": 1, "datasource": { "type": "grafana", "uid": "-- Grafana --" }, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Alertas y anotaciones", "type": "dashboard" }] },
+  "description": "Backups, VPN, certificado y temperatura del host SIHSALUS.",
+  "editable": false,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [{ "asDropdown": true, "icon": "external link", "includeVars": true, "keepTime": true, "tags": ["sihsalus"], "targetBlank": false, "title": "Dashboards SIHSALUS", "type": "dashboards" }],
+  "panels": [
+    {
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "content": "# Resiliencia operativa\nVigila que existan backups cifrados recientes, las dos VPN permanezcan activas y el certificado no se acerque a su vencimiento. **La existencia de un archivo no sustituye una restauración de prueba.** iDRAC/RAID todavía requieren una integración Redfish con credenciales de solo lectura.", "mode": "markdown" },
+      "title": "",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Edad del artefacto cifrado más reciente por base de datos.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 1, "noValue": "SIN DATOS", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 8 }, { "color": "red", "value": 14 }] }, "unit": "h" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 9, "x": 0, "y": 4 },
+      "id": 2,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name", "wideLayout": true },
+      "targets": [{ "editorMode": "code", "expr": "(time() - sihsalus_backup_latest_timestamp_seconds) / 3600", "instant": true, "legendFormat": "{{backup}}", "range": false, "refId": "A" }],
+      "title": "Edad de backups",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "tun0 corresponde a CloudConnexa; tun1 corresponde a GOREL.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "mappings": [{ "options": { "0": { "color": "red", "text": "ABAJO" }, "1": { "color": "green", "text": "ACTIVA" } }, "type": "value" }], "noValue": "NO DETECTADA", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 9, "y": 4 },
+      "id": 3,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name", "wideLayout": true },
+      "targets": [{ "editorMode": "code", "expr": "node_network_carrier{device=~\"tun0|tun1\"}", "instant": true, "legendFormat": "{{device}}", "range": false, "refId": "A" }],
+      "title": "VPN",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 0, "noValue": "SIN DATOS", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 7 }, { "color": "green", "value": 30 }] }, "unit": "d" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 5, "x": 15, "y": 4 },
+      "id": 4,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "(probe_ssl_earliest_cert_expiry{job=\"blackbox-https-certificate\"} - time()) / 86400", "legendFormat": "Certificado", "range": true, "refId": "A" }],
+      "title": "Días de certificado",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 1, "noValue": "SIN SENSOR", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 80 }] }, "unit": "celsius" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 4 },
+      "id": 5,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "max(node_hwmon_temp_celsius)", "legendFormat": "Máxima", "range": true, "refId": "A" }],
+      "title": "Temperatura",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "La caída a cero suele indicar artefacto ausente o ruta incorrecta.",
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 12, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": true, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } }, "min": 0, "unit": "bytes" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "id": 6,
+      "options": { "legend": { "calcs": ["lastNotNull", "min", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [{ "editorMode": "code", "expr": "sihsalus_backup_latest_size_bytes", "legendFormat": "{{backup}}", "range": true, "refId": "A" }],
+      "title": "Tamaño del backup más reciente",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 10, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } }, "min": 0, "unit": "Bps" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "id": 7,
+      "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "editorMode": "code", "expr": "rate(node_network_receive_bytes_total{device=~\"tun0|tun1\"}[5m])", "legendFormat": "RX {{device}}", "range": true, "refId": "A" },
+        { "editorMode": "code", "expr": "rate(node_network_transmit_bytes_total{device=~\"tun0|tun1\"}[5m])", "legendFormat": "TX {{device}}", "range": true, "refId": "B" }
+      ],
+      "title": "Tráfico VPN",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Tiempo desde la última ejecución del colector. Debe permanecer alrededor de un minuto.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 0, "noValue": "SIN DATOS", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 180 }, { "color": "red", "value": 300 }] }, "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 17 },
+      "id": 8,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "time() - sihsalus_operations_collector_last_run_seconds", "legendFormat": "Antigüedad", "range": true, "refId": "A" }],
+      "title": "Colector operativo",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Cantidad de artefactos cifrados actualmente retenidos por cada sistema.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "noValue": "0", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 17 },
+      "id": 9,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "sihsalus_backup_artifacts_total", "instant": true, "legendFormat": "{{backup}}", "range": false, "refId": "A" }],
+      "title": "Artefactos retenidos",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "mappings": [{ "options": { "0": { "color": "red", "text": "FALLÓ" }, "1": { "color": "green", "text": "OPERATIVO" } }, "type": "value" }], "noValue": "SIN DATOS", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 17 },
+      "id": 10,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "probe_success{job=\"blackbox-https-certificate\"}", "instant": true, "legendFormat": "HTTPS", "range": false, "refId": "A" }],
+      "title": "Sonda HTTPS",
+      "type": "stat"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["sihsalus", "resilience", "backups", "vpn"],
+  "templating": { "list": [] },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "America/Lima",
+  "title": "SIHSALUS · Resiliencia",
+  "uid": "sihsalus-resilience",
+  "version": 1,
+  "weekStart": "monday"
+}

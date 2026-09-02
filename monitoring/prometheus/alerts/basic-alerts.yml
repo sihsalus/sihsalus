@@ -124,3 +124,105 @@ groups:
           summary: "Un contenedor de SIHSALUS agotó su memoria"
           description: "{{ $labels.name }} registró un evento OOM en los últimos 10 minutos. Revise consumo, límites y logs."
           dashboard: "/d/sihsalus-infrastructure"
+
+  - name: sihsalus_resilience
+    interval: 1m
+    rules:
+      - alert: OperationsCollectorStale
+        expr: time() - sihsalus_operations_collector_last_run_seconds > 300
+        for: 5m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "El colector operativo dejó de actualizar métricas"
+          description: "Las métricas de backups llevan más de 5 minutos sin actualizarse. Revise sihsalus-operations-collector."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: BackupArtifactMissing
+        expr: sihsalus_backup_latest_timestamp_seconds == 0
+        for: 10m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "No existe backup cifrado de {{ $labels.backup }}"
+          description: "El colector no encontró ningún artefacto cifrado para {{ $labels.backup }} en la ruta configurada."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: BackupArtifactStale
+        expr: (time() - sihsalus_backup_latest_timestamp_seconds > 8 * 3600) and (sihsalus_backup_latest_timestamp_seconds > 0)
+        for: 30m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Backup de {{ $labels.backup }} retrasado"
+          description: "El artefacto cifrado más reciente de {{ $labels.backup }} tiene más de 8 horas."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: BackupArtifactStaleCritical
+        expr: (time() - sihsalus_backup_latest_timestamp_seconds > 14 * 3600) and (sihsalus_backup_latest_timestamp_seconds > 0)
+        for: 10m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Backup de {{ $labels.backup }} críticamente retrasado"
+          description: "El artefacto cifrado más reciente de {{ $labels.backup }} tiene más de 14 horas. Intervenga y compruebe su checksum."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: VpnInterfaceDown
+        expr: node_network_carrier{device=~"tun0|tun1"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "La interfaz VPN {{ $labels.device }} está abajo"
+          description: "Node Exporter detecta {{ $labels.device }} en estado down desde hace 5 minutos."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: VpnInterfaceMissing
+        expr: absent(node_network_carrier{device="tun0"}) or absent(node_network_carrier{device="tun1"})
+        for: 5m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Falta una interfaz VPN esperada"
+          description: "No se observan ambas interfaces tun0/tun1. Revise CloudConnexa y el watchdog de GOREL."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: GatewayCertificateExpiringSoon
+        expr: (probe_ssl_earliest_cert_expiry{job="blackbox-https-certificate"} - time()) / 86400 < 30
+        for: 1h
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "El certificado HTTPS vence en menos de 30 días"
+          description: "El certificado servido por el gateway vence en {{ $value | humanize }} días."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: GatewayCertificateExpiringCritical
+        expr: (probe_ssl_earliest_cert_expiry{job="blackbox-https-certificate"} - time()) / 86400 < 7
+        for: 15m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "El certificado HTTPS vence en menos de 7 días"
+          description: "El certificado servido por el gateway vence en {{ $value | humanize }} días. Renueve y valide la cadena de inmediato."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: HostTemperatureHigh
+        expr: max(node_hwmon_temp_celsius) > 80
+        for: 15m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Temperatura alta en el servidor"
+          description: "Un sensor del host supera 80 °C desde hace 15 minutos (actual: {{ $value | humanize }} °C)."
+          dashboard: "/d/sihsalus-resilience"
