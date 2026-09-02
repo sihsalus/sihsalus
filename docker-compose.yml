@@ -65,6 +65,8 @@ volumes:
   # Monitoring (profile: monitoring)
   prometheus-data:
     name: sihsalus-prometheus-data
+  alertmanager-data:
+    name: sihsalus-alertmanager-data
   loki-data:
     name: sihsalus-loki-data
   alloy-data:

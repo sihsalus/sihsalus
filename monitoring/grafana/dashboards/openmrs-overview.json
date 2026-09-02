@@ -1,412 +1,136 @@
 {
-    "annotations": {
-        "list": [
-            {
-                "builtIn": 1,
-                "datasource": {
-                    "type": "grafana",
-                    "uid": "-- Grafana --"
-                },
-                "enable": true,
-                "hide": true,
-                "iconColor": "rgba(0, 211, 255, 1)",
-                "name": "Annotations & Alerts",
-                "type": "dashboard"
-            }
-        ]
+  "annotations": { "list": [{ "builtIn": 1, "datasource": { "type": "grafana", "uid": "-- Grafana --" }, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Alertas y anotaciones", "type": "dashboard" }] },
+  "description": "Disponibilidad, latencia y errores visibles para usuarios de OpenMRS.",
+  "editable": false,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [{ "asDropdown": true, "icon": "external link", "includeVars": true, "keepTime": true, "tags": ["sihsalus"], "targetBlank": false, "title": "Dashboards SIHSALUS", "type": "dashboards" }],
+  "panels": [
+    {
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "content": "# OpenMRS · Experiencia del usuario\nDisponibilidad y latencia observadas desde el propio servidor. Filtre un endpoint para investigar; los errores de aplicación se muestran sin convertir identificadores de pacientes o solicitudes en etiquetas.", "mode": "markdown" },
+      "title": "",
+      "transparent": true,
+      "type": "text"
     },
-    "editable": true,
-    "fiscalYearStartMonth": 0,
-    "graphTooltip": 0,
-    "id": null,
-    "links": [],
-    "liveNow": false,
-    "panels": [
-        {
-            "datasource": {
-                "type": "prometheus",
-                "uid": "${DS_PROMETHEUS}"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "palette-classic"
-                    },
-                    "custom": {
-                        "axisCenteredZero": false,
-                        "axisColorMode": "text",
-                        "axisLabel": "",
-                        "axisPlacement": "auto",
-                        "barAlignment": 0,
-                        "drawStyle": "line",
-                        "fillOpacity": 10,
-                        "gradientMode": "none",
-                        "hideFrom": {
-                            "tooltip": false,
-                            "viz": false,
-                            "legend": false
-                        },
-                        "lineInterpolation": "linear",
-                        "lineWidth": 1,
-                        "pointSize": 5,
-                        "scaleDistribution": {
-                            "type": "linear"
-                        },
-                        "showPoints": "auto",
-                        "spanNulls": false,
-                        "stacking": {
-                            "group": "A",
-                            "mode": "none"
-                        },
-                        "thresholdsStyle": {
-                            "mode": "off"
-                        }
-                    },
-                    "mappings": [],
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            {
-                                "color": "green",
-                                "value": null
-                            },
-                            {
-                                "color": "red",
-                                "value": 80
-                            }
-                        ]
-                    }
-                },
-                "overrides": []
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 0,
-                "y": 0
-            },
-            "id": 1,
-            "options": {
-                "legend": {
-                    "calcs": [],
-                    "displayMode": "list",
-                    "placement": "bottom",
-                    "showLegend": true
-                },
-                "tooltip": {
-                    "mode": "single",
-                    "sort": "none"
-                }
-            },
-            "targets": [
-                {
-                    "datasource": {
-                        "type": "prometheus",
-                        "uid": "${DS_PROMETHEUS}"
-                    },
-                    "editorMode": "code",
-                    "expr": "probe_success{job=\"blackbox-http-prod\"}",
-                    "legendFormat": "{{instance}}",
-                    "range": true,
-                    "refId": "A"
-                }
-            ],
-            "title": "Endpoint Availability",
-            "type": "timeseries"
-        },
-        {
-            "datasource": {
-                "type": "prometheus",
-                "uid": "${DS_PROMETHEUS}"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "thresholds"
-                    },
-                    "mappings": [
-                        {
-                            "options": {
-                                "0": {
-                                    "color": "red",
-                                    "index": 1,
-                                    "text": "DOWN"
-                                },
-                                "1": {
-                                    "color": "green",
-                                    "index": 0,
-                                    "text": "UP"
-                                }
-                            },
-                            "type": "value"
-                        }
-                    ],
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            {
-                                "color": "green",
-                                "value": null
-                            }
-                        ]
-                    }
-                },
-                "overrides": []
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 12,
-                "y": 0
-            },
-            "id": 2,
-            "options": {
-                "orientation": "auto",
-                "reduceOptions": {
-                    "values": false,
-                    "calcs": [
-                        "lastNotNull"
-                    ],
-                    "fields": ""
-                },
-                "showThresholdLabels": false,
-                "showThresholdMarkers": true
-            },
-            "pluginVersion": "12.2.1",
-            "targets": [
-                {
-                    "datasource": {
-                        "type": "prometheus",
-                        "uid": "${DS_PROMETHEUS}"
-                    },
-                    "editorMode": "code",
-                    "expr": "probe_http_status_code{job=\"blackbox-http-prod\"}",
-                    "legendFormat": "{{instance}}",
-                    "range": true,
-                    "refId": "A"
-                }
-            ],
-            "title": "HTTP Status",
-            "type": "gauge"
-        },
-        {
-            "datasource": {
-                "type": "loki",
-                "uid": "${DS_LOKI}"
-            },
-            "gridPos": {
-                "h": 10,
-                "w": 24,
-                "x": 0,
-                "y": 8
-            },
-            "id": 3,
-            "options": {
-                "dedupStrategy": "none",
-                "enableLogDetails": true,
-                "prettifyLogMessage": false,
-                "showCommonLabels": false,
-                "showLabels": false,
-                "showTime": true,
-                "sortOrder": "Descending",
-                "wrapLogMessage": false
-            },
-            "targets": [
-                {
-                    "datasource": {
-                        "type": "loki",
-                        "uid": "${DS_LOKI}"
-                    },
-                    "editorMode": "code",
-                    "expr": "{job=\"docker\", service_name=~\"backend|gateway\"}",
-                    "queryType": "range",
-                    "refId": "A"
-                }
-            ],
-            "title": "OpenMRS/Gateway Logs",
-            "type": "logs"
-        },
-        {
-            "datasource": {
-                "type": "loki",
-                "uid": "${DS_LOKI}"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "palette-classic"
-                    },
-                    "custom": {
-                        "axisCenteredZero": false,
-                        "axisColorMode": "text",
-                        "axisLabel": "",
-                        "axisPlacement": "auto",
-                        "barAlignment": 0,
-                        "drawStyle": "bars",
-                        "fillOpacity": 100,
-                        "gradientMode": "none",
-                        "hideFrom": {
-                            "tooltip": false,
-                            "viz": false,
-                            "legend": false
-                        },
-                        "lineInterpolation": "linear",
-                        "lineWidth": 1,
-                        "pointSize": 5,
-                        "scaleDistribution": {
-                            "type": "linear"
-                        },
-                        "showPoints": "auto",
-                        "spanNulls": false,
-                        "stacking": {
-                            "group": "A",
-                            "mode": "normal"
-                        },
-                        "thresholdsStyle": {
-                            "mode": "off"
-                        }
-                    },
-                    "mappings": [],
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            {
-                                "color": "green",
-                                "value": null
-                            }
-                        ]
-                    }
-                },
-                "overrides": []
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 0,
-                "y": 18
-            },
-            "id": 4,
-            "options": {
-                "legend": {
-                    "calcs": [],
-                    "displayMode": "list",
-                    "placement": "bottom",
-                    "showLegend": true
-                },
-                "tooltip": {
-                    "mode": "single",
-                    "sort": "none"
-                }
-            },
-            "targets": [
-                {
-                    "datasource": {
-                        "type": "loki",
-                        "uid": "${DS_LOKI}"
-                    },
-                    "editorMode": "code",
-                    "expr": "sum by (service_name, level) (count_over_time({job=\"docker\", service_name=~\"backend|gateway\"}[5m]))",
-                    "queryType": "range",
-                    "refId": "A"
-                }
-            ],
-            "title": "OpenMRS/Gateway Logs by Level",
-            "type": "timeseries"
-        },
-        {
-            "datasource": {
-                "type": "loki",
-                "uid": "${DS_LOKI}"
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 12,
-                "y": 18
-            },
-            "id": 5,
-            "options": {
-                "dedupStrategy": "none",
-                "enableLogDetails": true,
-                "prettifyLogMessage": false,
-                "showCommonLabels": false,
-                "showLabels": false,
-                "showTime": true,
-                "sortOrder": "Descending",
-                "wrapLogMessage": false
-            },
-            "targets": [
-                {
-                    "datasource": {
-                        "type": "loki",
-                        "uid": "${DS_LOKI}"
-                    },
-                    "editorMode": "code",
-                    "expr": "{job=\"docker\", service_name=~\"backend|gateway\", level=~\"error\"}",
-                    "queryType": "range",
-                    "refId": "A"
-                }
-            ],
-            "title": "OpenMRS/Gateway Error Logs",
-            "type": "logs"
-        }
-    ],
-    "refresh": "10s",
-    "schemaVersion": 39,
-    "style": "dark",
-    "tags": [
-        "openmrs",
-        "docker",
-        "monitoring"
-    ],
-    "templating": {
-        "list": [
-            {
-                "current": {
-                    "selected": false,
-                    "text": "Prometheus",
-                    "value": "Prometheus"
-                },
-                "hide": 0,
-                "includeAll": false,
-                "label": "Prometheus",
-                "multi": false,
-                "name": "DS_PROMETHEUS",
-                "options": [],
-                "query": "prometheus",
-                "refresh": 1,
-                "regex": "",
-                "skipUrlSync": false,
-                "type": "datasource"
-            },
-            {
-                "current": {
-                    "selected": false,
-                    "text": "Loki",
-                    "value": "Loki"
-                },
-                "hide": 0,
-                "includeAll": false,
-                "label": "Loki",
-                "multi": false,
-                "name": "DS_LOKI",
-                "options": [],
-                "query": "loki",
-                "refresh": 1,
-                "regex": "",
-                "skipUrlSync": false,
-                "type": "datasource"
-            }
-        ]
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Estado actual por endpoint.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "mappings": [{ "options": { "0": { "color": "red", "text": "CAÍDO" }, "1": { "color": "green", "text": "OPERATIVO" } }, "type": "value" }], "noValue": "SIN DATOS", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 12, "x": 0, "y": 3 },
+      "id": 2,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name", "wideLayout": true },
+      "targets": [{ "editorMode": "code", "expr": "probe_success{job=\"blackbox-http-prod\", instance=~\"$endpoint\"}", "instant": true, "legendFormat": "{{instance}}", "range": false, "refId": "A" }],
+      "title": "Estado actual",
+      "type": "stat"
     },
-    "time": {
-        "from": "now-15m",
-        "to": "now"
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Promedio de muestras exitosas durante las últimas 24 horas.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 3, "max": 100, "min": 0, "noValue": "—", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 99 }, { "color": "green", "value": 99.9 }] }, "unit": "percent" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 3 },
+      "id": 3,
+      "options": { "minVizHeight": 75, "minVizWidth": 75, "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showThresholdLabels": false, "showThresholdMarkers": true, "sizing": "auto" },
+      "targets": [{ "editorMode": "code", "expr": "avg(avg_over_time(probe_success{job=\"blackbox-http-prod\", instance=~\"$endpoint\"}[24h])) * 100", "instant": true, "legendFormat": "Disponibilidad", "range": false, "refId": "A" }],
+      "title": "Disponibilidad 24 h",
+      "type": "gauge"
     },
-    "timepicker": {},
-    "timezone": "",
-    "title": "OpenMRS Overview",
-    "uid": "openmrs-overview",
-    "version": 0,
-    "weekStart": ""
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Peor latencia actual entre los endpoints seleccionados.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 2, "noValue": "—", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 2 }] }, "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 3 },
+      "id": 4,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "max(probe_duration_seconds{job=\"blackbox-http-prod\", instance=~\"$endpoint\"})", "legendFormat": "Máxima", "range": true, "refId": "A" }],
+      "title": "Latencia actual",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "custom": { "fillOpacity": 80, "lineWidth": 0, "spanNulls": false }, "mappings": [{ "options": { "0": { "color": "red", "text": "DOWN" }, "1": { "color": "green", "text": "UP" } }, "type": "value" }], "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 5,
+      "options": { "alignValue": "left", "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "mergeValues": true, "rowHeight": 0.8, "showValue": "never", "tooltip": { "mode": "single", "sort": "none" } },
+      "targets": [{ "editorMode": "code", "expr": "probe_success{job=\"blackbox-http-prod\", instance=~\"$endpoint\"}", "legendFormat": "{{instance}}", "range": true, "refId": "A" }],
+      "title": "Historia de disponibilidad",
+      "type": "state-timeline"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 10, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "line" } }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 2 }] }, "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 6,
+      "options": { "legend": { "calcs": ["lastNotNull", "max", "mean"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [{ "editorMode": "code", "expr": "probe_duration_seconds{job=\"blackbox-http-prod\", instance=~\"$endpoint\"}", "legendFormat": "{{instance}}", "range": true, "refId": "A" }],
+      "title": "Latencia total",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Desglose del tiempo de la sonda para distinguir red de procesamiento HTTP.",
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 8, "lineInterpolation": "smooth", "lineWidth": 1, "pointSize": 3, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": true, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } }, "min": 0, "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "id": 7,
+      "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "editorMode": "code", "expr": "probe_http_duration_seconds{job=\"blackbox-http-prod\", instance=~\"$endpoint\"}", "legendFormat": "{{instance}} · {{phase}}", "range": true, "refId": "A" }
+      ],
+      "title": "Fases de la petición HTTP",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisCenteredZero": true, "axisColorMode": "text", "axisPlacement": "auto", "drawStyle": "bars", "fillOpacity": 75, "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 3, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": true, "stacking": { "group": "A", "mode": "normal" }, "thresholdsStyle": { "mode": "off" } }, "min": 0, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "id": 8,
+      "options": { "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [{ "editorMode": "code", "expr": "sum by (service_name, level) (count_over_time({job=\"docker\", service_name=~\"backend|gateway\", level=~\"warn|error\"}[$__interval]))", "legendFormat": "{{service_name}} · {{level}}", "queryType": "range", "refId": "A" }],
+      "title": "Warnings y errores",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "description": "Diagnóstico reciente de backend y gateway. El acceso a este panel debe limitarse al equipo técnico.",
+      "gridPos": { "h": 11, "w": 24, "x": 0, "y": 24 },
+      "id": 9,
+      "options": { "dedupStrategy": "exact", "enableLogDetails": true, "prettifyLogMessage": false, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true },
+      "targets": [{ "editorMode": "code", "expr": "{job=\"docker\", service_name=~\"backend|gateway\", level=~\"warn|error\"}", "queryType": "range", "refId": "A" }],
+      "title": "Eventos recientes",
+      "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["sihsalus", "openmrs", "application"],
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": { "selected": true, "text": "Todos", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(probe_success{job=\"blackbox-http-prod\"}, instance)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Endpoint",
+        "multi": true,
+        "name": "endpoint",
+        "options": [],
+        "query": { "query": "label_values(probe_success{job=\"blackbox-http-prod\"}, instance)", "refId": "StandardVariableQuery" },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "America/Lima",
+  "title": "SIHSALUS · OpenMRS",
+  "uid": "openmrs-overview",
+  "version": 2,
+  "weekStart": "monday"
 }

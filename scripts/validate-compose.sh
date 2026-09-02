@@ -385,6 +385,9 @@ if ci.get("volumes"):
 
 alloy = service(monitoring, "alloy")
 socket_proxy = service(monitoring, "docker-socket-proxy")
+alertmanager = service(monitoring, "alertmanager")
+node_exporter = service(monitoring, "node-exporter")
+cadvisor = service(monitoring, "cadvisor")
 
 for volume in alloy.get("volumes", []):
     if volume.get("source") == "/var/run/docker.sock":
@@ -394,6 +397,22 @@ if socket_proxy.get("environment", {}).get("POST") != "0":
     fail("Docker socket proxy must reject POST requests")
 if not any(volume.get("source") == "/var/run/docker.sock" for volume in socket_proxy.get("volumes", [])):
     fail("Docker socket proxy must own the socket mount")
+
+for observed_service in (alertmanager, node_exporter, cadvisor):
+    for published_port in observed_service.get("ports", []):
+        if published_port.get("host_ip") not in (None, "127.0.0.1"):
+            fail("monitoring services must never publish on a non-loopback address")
+
+if node_exporter.get("read_only") is not True:
+    fail("node-exporter must use a read-only container filesystem")
+if not any(volume.get("source") == "/" and volume.get("read_only") for volume in node_exporter.get("volumes", [])):
+    fail("node-exporter host root mount must be read-only")
+
+if cadvisor.get("read_only") is not True:
+    fail("cAdvisor must use a read-only container filesystem")
+for volume in cadvisor.get("volumes", []):
+    if volume.get("source") in ("/", "/var/lib/docker", "/sys") and not volume.get("read_only"):
+        fail("cAdvisor host mounts must be read-only")
 
 print("[OK] semantic Compose invariants")
 PY

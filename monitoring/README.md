@@ -1,6 +1,6 @@
 # Monitoring - Observabilidad (Grafana, Prometheus, Loki, Alloy)
 
-Stack de observabilidad para disponibilidad HTTP, métricas del propio stack y logs de contenedores. No incluye métricas de CPU/memoria por contenedor hasta agregar cAdvisor/node-exporter.
+Stack de observabilidad para disponibilidad HTTP, recursos del host y contenedores, alertas y logs. Los dashboards se administran como código y siguen una navegación de resumen a diagnóstico.
 
 ## Stack
 
@@ -9,6 +9,9 @@ Stack de observabilidad para disponibilidad HTTP, métricas del propio stack y l
 - **Loki** - Agregador de logs (búsqueda rápida)
 - **Alloy** - Colector opcional de logs Docker
 - **Blackbox Exporter** - Probes de disponibilidad (health checks)
+- **Node Exporter** - CPU, memoria, filesystems, red y kernel del host
+- **cAdvisor** - Consumo de recursos por contenedor
+- **Alertmanager** - Agrupación, deduplicación y silencios
 
 ---
 
@@ -27,6 +30,7 @@ docker compose --profile monitoring up -d
 | Grafana | `http://localhost:3001` | `admin` | `$GRAFANA_ADMIN_PASSWORD` |
 | Prometheus | `http://localhost:9090` (localhost only) | - | - |
 | Loki | `http://localhost:3100` (localhost only) | - | - |
+| Alertmanager | `http://localhost:9093` (localhost only) | - | - |
 
 > Prometheus y Loki están limitados a localhost por seguridad. Accede a través de Grafana.
 
@@ -59,9 +63,11 @@ GRAFANA_ROOT_URL=http://localhost:3001   # URL base (para links)
 ```
 
 **Dashboards preconfigurados**:
-- Docker Overview
-- OpenMRS Overview
-- Logs aggregation
+- Estado operativo (portada)
+- OpenMRS
+- Infraestructura
+- Equipos LAN
+- Logs
 
 **Volumen persistente**: `grafana-data` (configuración, usuarios, dashboards)
 
@@ -82,6 +88,9 @@ GRAFANA_ROOT_URL=http://localhost:3001   # URL base (para links)
 - Prometheus itself
 - Grafana
 - Loki
+- Alertmanager
+- Host Linux (Node Exporter)
+- Contenedores (cAdvisor)
 - Blackbox HTTP probes (Gateway, OpenMRS endpoints)
 
 **Retención**: 30 días (configurable)
@@ -163,12 +172,15 @@ El proxy no publica el puerto `2375` al host y es el único contenedor con acces
 
 ## Dashboards
 
-### Docker Overview
+### Estado operativo
 
-Muestra:
-- Estado de scrape de Prometheus
-- Volumen de logs Docker por servicio y nivel
-- Logs recientes de contenedores
+Portada para guardias e incidentes: salud global, alertas activas, CPU, memoria,
+filesystem, disponibilidad, latencia, errores y salud del propio monitoreo.
+
+### Infraestructura
+
+Métricas USE del host y recursos por servicio Docker: CPU, memoria, carga,
+filesystems, red, contenedores observados y eventos OOM.
 
 ### OpenMRS Overview
 
@@ -192,12 +204,13 @@ Excluye las IPs internas de Docker (`172.*`, `10.*`, `127.*`) y el sondeo de
 Blackbox. Las IPs las asigna el DHCP del router; el nombre de la máquina se
 obtiene con `dig -x <ip> @<router>`.
 
-### Logs Dashboard
+### Logs
 
 Agregación y búsqueda de:
 - Logs de todos los servicios
 - Filtros por servicio/nivel
 - Estadísticas de errores
+- Advertencia explícita para no copiar ni exponer datos clínicos
 
 ---
 
@@ -216,12 +229,28 @@ annotations:
   summary: "SIHSALUS endpoint probe failed for {{ $labels.instance }}"
 ```
 
-### Configurar notificaciones
+### Alertmanager y notificaciones
 
-En Grafana:
-1. Alerting → Notification channels
-2. Agregar: Slack, Discord, Email, PagerDuty, Webhook, etc.
-3. Enlazar a alertas
+Prometheus envía las alertas a Alertmanager, que permite agruparlas, deduplicarlas
+y silenciarlas. El receiver incluido es deliberadamente inerte: no se almacena
+ninguna credencial en Git. Hasta configurar SMTP, Gmail API o un webhook aprobado,
+las alertas se verán en Grafana/Alertmanager pero no saldrán del servidor.
+
+Las reglas incluidas cubren:
+- caída de targets y endpoints;
+- latencia sostenida de OpenMRS;
+- CPU y memoria bajo presión;
+- espacio, inodos y predicción de filesystem lleno;
+- eventos OOM de contenedores;
+- fallos al recargar la configuración de Prometheus.
+
+### Configurar un canal de notificación
+
+1. Agregar un receiver a `alertmanager/alertmanager.yml`.
+2. Leer secretos desde un archivo root-only montado en el contenedor; no incluirlos
+   en el YAML versionado.
+3. Validar con `amtool check-config` y enviar una alerta de prueba controlada.
+4. Mantener TLS obligatorio y documentar quién recibe cada severidad.
 
 ---
 
@@ -267,6 +296,7 @@ sum(rate({job="docker"}[5m]))
 | Prometheus | `prometheus-data` | TSDB (30 días) | 1-5 GB |
 | Loki | `loki-data` | Índices y logs (30 días) | 2-10 GB |
 | Grafana | `grafana-data` | Config, dashboards, usuarios | 100-500 MB |
+| Alertmanager | `alertmanager-data` | Silencios y estado | <100 MB |
 
 ### Limpieza de datos antiguos
 
@@ -326,11 +356,15 @@ docker volume rm sihsalus_prometheus-data
    curl http://localhost:9090/api/v1/rules
    ```
 
-2. Revisa configuración de notificación en Grafana
-
-3. Test manual:
+2. Verifica que Prometheus descubra Alertmanager:
+   ```bash
+   curl http://localhost:9090/api/v1/alertmanagers
    ```
-   Grafana → Alerting → Alert rules → Test rule
+
+3. Valida ambas configuraciones:
+   ```bash
+   promtool check config monitoring/prometheus/prometheus.yml
+   amtool check-config monitoring/alertmanager/alertmanager.yml
    ```
 
 ### Bajo rendimiento / memoria alta
