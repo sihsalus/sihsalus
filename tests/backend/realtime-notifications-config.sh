@@ -8,7 +8,8 @@ python3 - \
   "$ROOT_DIR/backend/distro.properties" \
   "$ROOT_DIR/backend/distro-no-demo.properties" \
   "$ROOT_DIR/gateway/default.conf.template" \
-  "$ROOT_DIR/gateway/default-ssl.conf.template" <<'PY'
+  "$ROOT_DIR/gateway/default-ssl.conf.template" \
+  "$ROOT_DIR/backend/Dockerfile" <<'PY'
 import pathlib
 import re
 import sys
@@ -79,7 +80,7 @@ def location_body(configuration, marker):
 
 websocket_marker = "location = /openmrs/ws/sihsalus/notifications {"
 sse_marker = "location ~ ^/openmrs/ws/sihsalus/notifications/sse/?$ {"
-for raw_path in sys.argv[4:]:
+for raw_path in sys.argv[4:6]:
     path = pathlib.Path(raw_path)
     configuration = path.read_text(encoding="utf-8")
     websocket = location_body(configuration, websocket_marker)
@@ -105,6 +106,14 @@ for raw_path in sys.argv[4:]:
             fail(f"{path.name} SSE location is missing: {required}")
     if "proxy_set_header Upgrade" in sse:
         fail(f"{path.name} SSE location must not request a WebSocket upgrade")
+
+dockerfile = pathlib.Path(sys.argv[6]).read_text(encoding="utf-8")
+for required in (
+    "<activator>org.openmrs.module.sihsalusnotifications.SihsalusNotificationsActivator</activator>",
+    "org/openmrs/module/sihsalusnotifications/SihsalusNotificationsActivator.class",
+):
+    if required not in dockerfile:
+        fail(f"backend Dockerfile must validate the packaged notifications activator: {required}")
 
 print("[OK] independent notifications OMOD and gateway transport contract")
 PY
