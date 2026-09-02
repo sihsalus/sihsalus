@@ -1,0 +1,22 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: pending-notification-channel
+  group_by: [cluster, alertname, instance]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+# Delivery is intentionally inert until an institutional SMTP/API credential or
+# webhook is approved. Alertmanager still groups, deduplicates and exposes
+# alerts and silences in Grafana without leaking a secret into Git.
+receivers:
+  - name: pending-notification-channel
+
+inhibit_rules:
+  - source_matchers:
+      - severity="critical"
+    target_matchers:
+      - severity="warning"
+    equal: [instance, mountpoint]

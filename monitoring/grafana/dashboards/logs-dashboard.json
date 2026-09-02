@@ -1,303 +1,103 @@
 {
-  "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": "-- Grafana --",
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
-      }
-    ]
-  },
-  "editable": true,
-  "gnetId": null,
-  "graphTooltip": 0,
+  "annotations": { "list": [{ "builtIn": 1, "datasource": { "type": "grafana", "uid": "-- Grafana --" }, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Alertas y anotaciones", "type": "dashboard" }] },
+  "description": "Exploración controlada de logs Docker de SIHSALUS.",
+  "editable": false,
+  "graphTooltip": 1,
   "id": null,
+  "links": [{ "asDropdown": true, "icon": "external link", "includeVars": true, "keepTime": true, "tags": ["sihsalus"], "targetBlank": false, "title": "Dashboards SIHSALUS", "type": "dashboards" }],
   "panels": [
     {
-      "datasource": "Loki",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "stacking": {
-              "mode": "normal"
-            }
-          }
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 11,
-        "x": 13,
-        "y": 0
-      },
-      "id": 3,
-      "targets": [
-        {
-          "expr": "sum(count_over_time({job=\"docker\", service_name=~\"$service\", level=~\"$level\"} |= \"$search\" [$__interval])) by (service_name, level)",
-          "legendFormat": "{{service_name}} {{level}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Log Volume",
-      "type": "timeseries"
-    },
-    {
-      "datasource": "Loki",
-      "gridPos": {
-        "h": 3,
-        "w": 4,
-        "x": 0,
-        "y": 5
-      },
-      "id": 5,
-      "fieldConfig": {
-        "defaults": {
-          "links": [
-            {
-              "targetBlank": false,
-              "title": "Filter Errors",
-              "url": "?${__all_variables}&var-level=error"
-            }
-          ],
-          "noValue": "0",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          }
-        }
-      },
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "expr": "sum(count_over_time({job=\"docker\", service_name=~\"$service\", level=~\"(?i)error\"} |= \"$search\" [$__range]))",
-          "refId": "A"
-        }
-      ],
-      "title": "Errors Count",
-      "type": "stat"
-    },
-    {
-      "datasource": "Loki",
-      "fieldConfig": {
-        "defaults": {
-          "links": [
-            {
-              "targetBlank": false,
-              "title": "Filter Warnings",
-              "url": "?${__all_variables}&var-level=warn"
-            }
-          ],
-          "noValue": "0",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "yellow",
-                "value": null
-              }
-            ]
-          }
-        }
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 4,
-        "x": 4,
-        "y": 5
-      },
-      "id": 6,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "expr": "sum(count_over_time({job=\"docker\", service_name=~\"$service\", level=~\"(?i)warn.*\"} |= \"$search\" [$__range]))",
-          "refId": "A"
-        }
-      ],
-      "title": "Warnings Count",
-      "type": "stat"
-    },
-    {
-      "datasource": "Loki",
-      "fieldConfig": {
-        "defaults": {
-          "links": [
-            {
-              "targetBlank": false,
-              "title": "Show All",
-              "url": "?${__all_variables}&var-level=$__all"
-            }
-          ],
-          "noValue": "0",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        }
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 5,
-        "x": 8,
-        "y": 5
-      },
-      "id": 7,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "expr": "sum(count_over_time({job=\"docker\", service_name=~\"$service\"} |= \"$search\" [$__range]))",
-          "refId": "A"
-        }
-      ],
-      "title": "Logs Count",
-      "type": "stat"
-    },
-    {
-      "gridPos": {
-        "h": 5,
-        "w": 13,
-        "x": 0,
-        "y": 0
-      },
-      "id": 8,
-      "options": {
-        "content": "Use los filtros de arriba para seleccionar servicios, niveles de log, texto de busqueda o periodo de tiempo. Puede desactivar el auto-refresh en la esquina superior derecha para detener el scroll de logs. Para exportar los logs visibles, haga clic en el panel `Logs`, escriba `i` y luego haga clic en el boton `Download logs`. Tambien puede copiar una linea de log individual haciendo clic en ella y luego en el icono de copiar.",
-        "mode": "markdown"
-      },
-      "title": "Bienvenido",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "content": "# Logs de SIHSALUS\nUse **Servicio**, **Nivel** y **Texto** para acotar el diagnóstico. Los logs pueden contener información operativa sensible: limite el acceso al equipo técnico, no copie datos clínicos en tickets y verifique periódicamente que las aplicaciones no registren información de pacientes.", "mode": "markdown" },
+      "title": "",
+      "transparent": true,
       "type": "text"
     },
     {
-      "datasource": "Loki",
-      "gridPos": {
-        "h": 12,
-        "w": 24,
-        "x": 0,
-        "y": 8
-      },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "noValue": "0", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 4 },
       "id": 2,
-      "options": {
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": false
-      },
-      "targets": [
-        {
-          "expr": "{job=\"docker\", service_name=~\"$service\", level=~\"$level\"} |= \"$search\"",
-          "refId": "A"
-        }
-      ],
-      "title": "Logs",
-      "type": "logs"
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "sum(count_over_time({job=\"docker\", service_name=~\"$service\", level=~\"$level\"} |= `$search` [$__range]))", "legendFormat": "Eventos", "queryType": "instant", "refId": "A" }],
+      "title": "Eventos en el rango",
+      "type": "stat"
     },
     {
-      "datasource": "Loki",
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 20
-      },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "noValue": "0", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 4 },
+      "id": 3,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "sum(count_over_time({job=\"docker\", service_name=~\"$service\", level=\"error\"} |= `$search` [$__range]))", "legendFormat": "Errores", "queryType": "instant", "refId": "A" }],
+      "title": "Errores",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "noValue": "0", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 4 },
       "id": 4,
-      "options": {
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": false
-      },
-      "targets": [
-        {
-          "expr": "{job=\"docker\", service_name=~\"$service\", level=~\"(?i)error\"} |= \"$search\"",
-          "refId": "A"
-        }
-      ],
-      "title": "Error Logs",
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "sum(count_over_time({job=\"docker\", service_name=~\"$service\", level=\"warn\"} |= `$search` [$__range]))", "legendFormat": "Warnings", "queryType": "instant", "refId": "A" }],
+      "title": "Warnings",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "noValue": "0", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 4 },
+      "id": 5,
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "count(count by (service_name) (count_over_time({job=\"docker\", service_name=~\"$service\"}[$__range])))", "legendFormat": "Servicios", "queryType": "instant", "refId": "A" }],
+      "title": "Servicios con actividad",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisCenteredZero": true, "axisColorMode": "text", "axisPlacement": "auto", "drawStyle": "bars", "fillOpacity": 70, "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 3, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": true, "stacking": { "group": "A", "mode": "normal" }, "thresholdsStyle": { "mode": "off" } }, "min": 0, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 14, "x": 0, "y": 8 },
+      "id": 6,
+      "options": { "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [{ "editorMode": "code", "expr": "sum by (service_name, level) (count_over_time({job=\"docker\", service_name=~\"$service\", level=~\"$level\"} |= `$search` [$__interval]))", "legendFormat": "{{service_name}} · {{level}}", "queryType": "range", "refId": "A" }],
+      "title": "Volumen por servicio y nivel",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisCenteredZero": true, "axisColorMode": "text", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 18, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": true, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } }, "min": 0, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 10, "x": 14, "y": 8 },
+      "id": 7,
+      "options": { "legend": { "calcs": ["sum", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [{ "editorMode": "code", "expr": "sum by (service_name) (count_over_time({job=\"docker\", service_name=~\"$service\", level=\"error\"} |= `$search` [$__interval]))", "legendFormat": "{{service_name}}", "queryType": "range", "refId": "A" }],
+      "title": "Tendencia de errores",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "description": "Resultados ordenados del más reciente al más antiguo. Abra una fila para inspeccionar sus etiquetas.",
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 16 },
+      "id": 8,
+      "options": { "dedupStrategy": "exact", "enableLogDetails": true, "prettifyLogMessage": false, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true },
+      "targets": [{ "editorMode": "code", "expr": "{job=\"docker\", service_name=~\"$service\", level=~\"$level\"} |= `$search`", "queryType": "range", "refId": "A" }],
+      "title": "Eventos",
       "type": "logs"
     }
   ],
-  "schemaVersion": 26,
-  "style": "dark",
-  "tags": ["sihsalus", "logs", "monitoring"],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["sihsalus", "logs", "diagnostics"],
   "templating": {
     "list": [
       {
-        "allValue": null,
-        "current": {
-          "text": [
-            "backend",
-            "frontend",
-            "gateway",
-            "db"
-          ],
-          "value": [
-            "backend",
-            "frontend",
-            "gateway",
-            "db"
-          ]
-        },
-        "datasource": "Loki",
+        "allValue": ".*",
+        "current": { "selected": true, "text": "Todos", "value": "$__all" },
+        "datasource": { "type": "loki", "uid": "loki" },
         "definition": "label_values(service_name)",
         "hide": 0,
         "includeAll": true,
-        "label": "Service",
+        "label": "Servicio",
         "multi": true,
         "name": "service",
         "options": [],
@@ -309,15 +109,13 @@
         "type": "query"
       },
       {
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        },
-        "datasource": "Loki",
+        "allValue": ".*",
+        "current": { "selected": true, "text": "Todos", "value": "$__all" },
+        "datasource": { "type": "loki", "uid": "loki" },
         "definition": "label_values(level)",
         "hide": 0,
         "includeAll": true,
-        "label": "Level",
+        "label": "Nivel",
         "multi": true,
         "name": "level",
         "options": [],
@@ -329,12 +127,10 @@
         "type": "query"
       },
       {
-        "current": {
-          "text": "",
-          "value": ""
-        },
+        "current": { "selected": true, "text": "", "value": "" },
+        "description": "Coincidencia literal dentro de la línea de log.",
         "hide": 0,
-        "label": "Search",
+        "label": "Texto",
         "name": "search",
         "options": [],
         "query": "",
@@ -343,13 +139,11 @@
       }
     ]
   },
-  "refresh": "5s",
-  "time": {
-    "from": "now-1h",
-    "to": "now"
-  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
   "timezone": "America/Lima",
-  "title": "Logs",
+  "title": "SIHSALUS · Logs",
   "uid": "logs",
-  "version": 1
+  "version": 2,
+  "weekStart": "monday"
 }

@@ -1,5 +1,5 @@
 groups:
-  - name: sihsalus_monitoring_alerts
+  - name: sihsalus_service_health
     interval: 30s
     rules:
       - alert: PrometheusTargetDown
@@ -7,24 +7,120 @@ groups:
         for: 5m
         labels:
           severity: critical
+          team: infrastructure
         annotations:
-          summary: "Prometheus target {{ $labels.instance }} is down"
-          description: "{{ $labels.instance }} from job {{ $labels.job }} has not been scrapeable for more than 5 minutes."
+          summary: "No se puede consultar {{ $labels.job }} en {{ $labels.instance }}"
+          description: "El target lleva al menos 5 minutos sin responder. Revise el dashboard Estado operativo y el servicio {{ $labels.job }}."
+          dashboard: "/d/sihsalus-operations"
+
+      - alert: PrometheusConfigurationReloadFailed
+        expr: prometheus_config_last_reload_successful == 0
+        for: 5m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Prometheus rechazó su configuración"
+          description: "La última recarga de Prometheus falló. Valide prometheus.yml y las reglas con promtool antes de reiniciar."
+          dashboard: "/d/sihsalus-operations"
 
       - alert: SihsalusEndpointProbeFailing
         expr: probe_success{job="blackbox-http-prod"} == 0
         for: 2m
         labels:
           severity: critical
+          team: application
         annotations:
-          summary: "SIHSALUS endpoint probe failed for {{ $labels.instance }}"
-          description: "Blackbox exporter has not received a successful response from {{ $labels.instance }} for more than 2 minutes."
+          summary: "SIHSALUS no responde: {{ $labels.instance }}"
+          description: "La sonda recibió una respuesta inválida o no pudo conectarse durante 2 minutos. Confirme gateway, OpenMRS y base de datos."
+          dashboard: "/d/openmrs-overview"
 
       - alert: SihsalusEndpointSlow
         expr: probe_duration_seconds{job="blackbox-http-prod"} > 2
-        for: 5m
+        for: 10m
         labels:
           severity: warning
+          team: application
         annotations:
-          summary: "SIHSALUS endpoint is slow: {{ $labels.instance }}"
-          description: "Blackbox probe duration for {{ $labels.instance }} has been above 2 seconds for more than 5 minutes."
+          summary: "SIHSALUS responde lentamente: {{ $labels.instance }}"
+          description: "La latencia de la sonda supera 2 segundos desde hace 10 minutos (valor actual: {{ $value | humanizeDuration }})."
+          dashboard: "/d/openmrs-overview"
+
+  - name: sihsalus_host_health
+    interval: 30s
+    rules:
+      - alert: HostCpuSaturated
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 15m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "CPU del servidor por encima de 90%"
+          description: "La CPU promedio de {{ $labels.instance }} lleva 15 minutos por encima de 90% (actual: {{ $value | humanize }}%)."
+          dashboard: "/d/sihsalus-infrastructure"
+
+      - alert: HostMemoryPressure
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 15m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Memoria del servidor por encima de 90%"
+          description: "La memoria utilizada de {{ $labels.instance }} lleva 15 minutos por encima de 90% (actual: {{ $value | humanize }}%)."
+          dashboard: "/d/sihsalus-infrastructure"
+
+      - alert: HostFilesystemSpaceLow
+        expr: 100 * (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"}) > 85
+        for: 30m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Poco espacio en {{ $labels.mountpoint }}"
+          description: "El filesystem {{ $labels.device }} en {{ $labels.instance }} supera 85% de uso desde hace 30 minutos (actual: {{ $value | humanize }}%)."
+          dashboard: "/d/sihsalus-infrastructure"
+
+      - alert: HostFilesystemSpaceCritical
+        expr: 100 * (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"}) > 95
+        for: 5m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Espacio crítico en {{ $labels.mountpoint }}"
+          description: "El filesystem {{ $labels.device }} en {{ $labels.instance }} supera 95% de uso (actual: {{ $value | humanize }}%). Libere espacio de inmediato."
+          dashboard: "/d/sihsalus-infrastructure"
+
+      - alert: HostFilesystemWillFillIn24Hours
+        expr: predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}[6h], 24 * 3600) < 0 and node_filesystem_avail_bytes > 0
+        for: 1h
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "{{ $labels.mountpoint }} podría llenarse en 24 horas"
+          description: "La tendencia de las últimas 6 horas predice que {{ $labels.device }} agotará su espacio dentro de 24 horas."
+          dashboard: "/d/sihsalus-infrastructure"
+
+      - alert: HostFilesystemInodesLow
+        expr: 100 * (node_filesystem_files_free{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_files{fstype!~"tmpfs|overlay|squashfs"}) < 10
+        for: 30m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Pocos inodos libres en {{ $labels.mountpoint }}"
+          description: "Queda menos de 10% de inodos libres en {{ $labels.device }} de {{ $labels.instance }}."
+          dashboard: "/d/sihsalus-infrastructure"
+
+      - alert: ContainerOomKilled
+        expr: increase(container_oom_events_total{container_label_com_docker_compose_project="sihsalus"}[10m]) > 0
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Un contenedor de SIHSALUS agotó su memoria"
+          description: "{{ $labels.name }} registró un evento OOM en los últimos 10 minutos. Revise consumo, límites y logs."
+          dashboard: "/d/sihsalus-infrastructure"

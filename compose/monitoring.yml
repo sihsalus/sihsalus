@@ -40,7 +40,7 @@ services:
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       GF_SNAPSHOTS_EXTERNAL_ENABLED: "false"
       GF_LOG_LEVEL: warn
-      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/logs-dashboard.json
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/operations-overview.json
     volumes:
       - grafana-data:/var/lib/grafana
       - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
@@ -84,6 +84,69 @@ services:
     networks:
       - monitoring-network
       - default
+
+  alertmanager:
+    container_name: sihsalus-alertmanager
+    image: prom/alertmanager:v0.33.1
+    restart: "unless-stopped"
+    profiles: [ monitoring ]
+    ports:
+      - "127.0.0.1:9093:9093"
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=${ALERTMANAGER_EXTERNAL_URL:-http://localhost:9093}'
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - monitoring-network
+
+  node-exporter:
+    container_name: sihsalus-node-exporter
+    image: prom/node-exporter:v1.11.1
+    restart: "unless-stopped"
+    profiles: [ monitoring ]
+    command:
+      - '--path.rootfs=/host'
+      - '--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/containers/storage/.+)($|/)'
+      - '--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|securityfs|selinuxfs|squashfs|sysfs|tracefs)$'
+    pid: host
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /:/host:ro,rslave
+    networks:
+      - monitoring-network
+
+  cadvisor:
+    container_name: sihsalus-cadvisor
+    image: ghcr.io/google/cadvisor:v0.60.5
+    restart: "unless-stopped"
+    profiles: [ monitoring ]
+    command:
+      - '--docker_only=true'
+      - '--housekeeping_interval=15s'
+      - '--max_housekeeping_interval=30s'
+    privileged: true
+    read_only: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    networks:
+      - monitoring-network
 
   blackbox:
     container_name: sihsalus-blackbox

@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "editable": true,
+  "editable": false,
   "graphTooltip": 1,
   "id": null,
   "schemaVersion": 39,
@@ -40,8 +40,8 @@
     "from": "now-24h",
     "to": "now"
   },
-  "timezone": "browser",
-  "title": "Equipos conectados (LAN)",
+  "timezone": "America/Lima",
+  "title": "SIHSALUS · Equipos LAN",
   "uid": "lan-clients",
   "version": 1,
   "panels": [
@@ -57,7 +57,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "**Equipos conectados a SIHSALUS** — se calcula desde el log de acceso de nginx (`sihsalus-gateway`) en Loki: una fila por dirección IP de la LAN que hizo peticiones en el rango. No incluye IPs internas de Docker ni al sondeo de Blackbox. Las IPs las asigna el DHCP del router; para el nombre de la máquina: `dig -x <ip> @192.168.88.1`. La columna *service worker* indica si ese navegador registró `service-worker.js`: sin él **no hay modo offline** en esa PC (normalmente porque falta instalar el certificado del servidor)."
+        "content": "# Equipos conectados a SIHSALUS\nSe infiere la actividad desde el log de acceso de nginx: una fila por IP de la LAN que hizo peticiones en el rango. No incluye redes internas de Docker ni sondas. La columna *service worker* ayuda a detectar equipos sin modo offline. Las IP son datos operativos sensibles; limite este panel al equipo técnico."
       }
     },
     {
