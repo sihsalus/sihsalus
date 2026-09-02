@@ -56,6 +56,8 @@ jobs:
           tags: ghcr.io/sihsalus/sihsalus-backend:sha-${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
+          build-args: |
+            SECURITY_REFRESH=${{ github.sha }}
           cache-from: type=gha,scope=backend
           cache-to: type=gha,scope=backend,mode=max
 

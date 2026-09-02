@@ -78,7 +78,11 @@ FROM ${OPENMRS_RUNTIME_IMAGE}
 # The upstream Amazon Linux 2 image is immutable, so apply the security updates
 # that became available after its publication before dropping back to UID 1001.
 USER root
-RUN yum -y update acl expat glib2 libacl libssh2 python python-libs vim-data vim-minimal && \
+# CI supplies the commit SHA so BuildKit cannot reuse a stale package-update
+# layer after the distribution repositories publish new security fixes.
+ARG SECURITY_REFRESH=local
+RUN echo "Security refresh: ${SECURITY_REFRESH}" && \
+    yum -y update acl expat glib2 libacl libssh2 python python-libs vim-data vim-minimal && \
     yum clean all && \
     rm -rf /var/cache/yum
 
