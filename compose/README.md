@@ -20,6 +20,9 @@
 
 Keycloak, HTTPS y Status son overrides porque cambian o dependen de servicios del core. Por eso no se agregan mediante `include`.
 
+El servicio de archivos Samba se administra en el repositorio independiente
+`sihsalus-samba-backup`. Este stack no crea contenedores ni publica puertos SMB.
+
 ## Comandos comunes
 
 ```bash
