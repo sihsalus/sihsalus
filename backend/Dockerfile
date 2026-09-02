@@ -62,7 +62,19 @@ RUN --mount=type=cache,target=/root/.m2/repository \
     jar tf "$notifications_omod" \
       | grep -qxF 'org/openmrs/module/sihsalusnotifications/web/NotificationWebSocketEndpoint.class' && \
     jar tf "$notifications_omod" \
-      | grep -qxF 'org/openmrs/module/sihsalusnotifications/web/SseNotificationFilter.class'
+      | grep -qxF 'org/openmrs/module/sihsalusnotifications/web/SseNotificationFilter.class' && \
+    notifications_api_entry="$(jar tf "$notifications_omod" \
+      | grep -Ex 'lib/sihsalusnotifications-api-[0-9]+\.[0-9]+\.[0-9]+\.jar')" && \
+    [ -n "$notifications_api_entry" ] && \
+    [ "$(printf '%s\n' "$notifications_api_entry" | wc -l)" -eq 1 ] && \
+    mkdir -p /tmp/sihsalusnotifications-omod-check && \
+    cd /tmp/sihsalusnotifications-omod-check && \
+    jar xf "$notifications_omod" config.xml "$notifications_api_entry" && \
+    grep -qxF \
+      '  <activator>org.openmrs.module.sihsalusnotifications.SihsalusNotificationsActivator</activator>' \
+      config.xml && \
+    jar tf "$notifications_api_entry" \
+      | grep -qxF 'org/openmrs/module/sihsalusnotifications/SihsalusNotificationsActivator.class'
 
 RUN cp /openmrs_distro/backend/target/sdk-distro/web/openmrs_core/openmrs.war /openmrs/distribution/openmrs_core/ && \
     cp /openmrs_distro/backend/target/sdk-distro/web/openmrs-distro.properties /openmrs/distribution/ && \
