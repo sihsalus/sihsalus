@@ -44,6 +44,27 @@ emit_marker() {
   printf 'sihsalus_backup_marker_timestamp_seconds{marker="%s"} %s\n' "$marker" "$timestamp"
 }
 
+emit_network_interface() {
+  device="$1"
+  interface_path="/host-sys/class/net/$device"
+  present=0
+  carrier=0
+  receive_bytes=0
+  transmit_bytes=0
+
+  if [ -d "$interface_path" ]; then
+    present=1
+    [ -r "$interface_path/carrier" ] && carrier="$(cat "$interface_path/carrier")"
+    [ -r "$interface_path/statistics/rx_bytes" ] && receive_bytes="$(cat "$interface_path/statistics/rx_bytes")"
+    [ -r "$interface_path/statistics/tx_bytes" ] && transmit_bytes="$(cat "$interface_path/statistics/tx_bytes")"
+  fi
+
+  printf 'sihsalus_network_interface_present{device="%s"} %s\n' "$device" "$present"
+  printf 'sihsalus_network_carrier{device="%s"} %s\n' "$device" "$carrier"
+  printf 'sihsalus_network_receive_bytes_total{device="%s"} %s\n' "$device" "$receive_bytes"
+  printf 'sihsalus_network_transmit_bytes_total{device="%s"} %s\n' "$device" "$transmit_bytes"
+}
+
 while :; do
   now="$(date +%s)"
   {
@@ -63,6 +84,18 @@ while :; do
     echo '# TYPE sihsalus_backup_marker_timestamp_seconds gauge'
     emit_marker primary /backups/.last-success
     emit_marker secondary /backups/.secondary-last-success
+    echo '# HELP sihsalus_network_interface_present Whether an expected host interface exists.'
+    echo '# TYPE sihsalus_network_interface_present gauge'
+    echo '# HELP sihsalus_network_carrier Link carrier state reported by the host interface.'
+    echo '# TYPE sihsalus_network_carrier gauge'
+    echo '# HELP sihsalus_network_receive_bytes_total Bytes received by the host interface.'
+    echo '# TYPE sihsalus_network_receive_bytes_total counter'
+    echo '# HELP sihsalus_network_transmit_bytes_total Bytes transmitted by the host interface.'
+    echo '# TYPE sihsalus_network_transmit_bytes_total counter'
+    emit_network_interface eno8303
+    emit_network_interface eno8403
+    emit_network_interface tun0
+    emit_network_interface tun1
   } >"$temporary"
   mv -f "$temporary" "$output"
   sleep "$interval"

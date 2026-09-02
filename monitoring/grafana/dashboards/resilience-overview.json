@@ -32,7 +32,7 @@
       "gridPos": { "h": 5, "w": 6, "x": 9, "y": 4 },
       "id": 3,
       "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name", "wideLayout": true },
-      "targets": [{ "editorMode": "code", "expr": "node_network_carrier{device=~\"tun0|tun1\"}", "instant": true, "legendFormat": "{{device}}", "range": false, "refId": "A" }],
+      "targets": [{ "editorMode": "code", "expr": "sihsalus_network_carrier{device=~\"tun0|tun1\"} and sihsalus_network_interface_present == 1", "instant": true, "legendFormat": "{{device}}", "range": false, "refId": "A" }],
       "title": "VPN",
       "type": "stat"
     },
@@ -74,8 +74,8 @@
       "id": 7,
       "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
-        { "editorMode": "code", "expr": "rate(node_network_receive_bytes_total{device=~\"tun0|tun1\"}[5m])", "legendFormat": "RX {{device}}", "range": true, "refId": "A" },
-        { "editorMode": "code", "expr": "rate(node_network_transmit_bytes_total{device=~\"tun0|tun1\"}[5m])", "legendFormat": "TX {{device}}", "range": true, "refId": "B" }
+        { "editorMode": "code", "expr": "rate(sihsalus_network_receive_bytes_total{device=~\"tun0|tun1\"}[5m])", "legendFormat": "RX {{device}}", "range": true, "refId": "A" },
+        { "editorMode": "code", "expr": "rate(sihsalus_network_transmit_bytes_total{device=~\"tun0|tun1\"}[5m])", "legendFormat": "TX {{device}}", "range": true, "refId": "B" }
       ],
       "title": "Tráfico VPN",
       "type": "timeseries"
