@@ -44,20 +44,46 @@ loki.process "docker_process" {
     expression = ".*(msg=\\\"(error notifying scheduler about finished query|error processing requests from scheduler|error health checking|error notifying frontend about finished query|error getting ingester clients)\\\"|msg=\\\"write operation failed\\\" details=\\\"entry too far behind).*"
   }
 
+  // A Docker log tail is cancelled whenever discovery refreshes an idle
+  // container. Alloy reports that cancellation as a warning even though it
+  // transferred zero entries and no application log was lost. Do not feed
+  // this collector-internal noise back into its own warning dashboard.
+  stage.drop {
+    expression = ".*msg=\\\"could not transfer logs\\\".*written=0.*(context deadline exceeded|Client.Timeout|request canceled).*"
+  }
+
   // Join multiline logs (Java stack traces)
   stage.multiline {
-    firstline = "^(?i)((\\d{4}-\\d{2}-\\d{2}|\\d{2}-[a-z]{3}-\\d{4})|(trace|debug|info|warning|warn|error|fatal|panic|note))"
+    firstline = "^(?i)((\\d{4}[-/]\\d{2}[-/]\\d{2}|\\d{2}-[a-z]{3}-\\d{4}|ts=)|(trace|debug|info|warning|warn|error|fatal|panic|note))"
     max_wait_time = "3s"
   }
 
-  // Extract log level
+  // Extract only an explicit severity: a leading level (optionally after a
+  // timestamp) or a structured level=/level: field. Searching for the words
+  // anywhere classified benign fields such as Gatus errors=0 as errors.
   stage.regex {
-    expression = "(?i)(?P<level>trace|debug|info|warning|warn|error|fatal|panic|note)"
+    expression = "(?i)(?:^\\s*(?:\\d{4}[-/]\\d{2}[-/]\\d{2}[^ ]*\\s+)?|\\blevel[=:]\\s*)(?P<level>trace|debug|info|warning|warn|error|fatal|panic|note)\\b"
   }
 
   stage.labels {
     values = {
       level = "level",
+    }
+  }
+
+  // Gatus emits structured success=true/false fields but no severity. Map the
+  // bounded result explicitly instead of inferring it from errors=<count>.
+  stage.match {
+    selector = "{service_name=\"gatus\"} |~ \"success=true\""
+    stage.static_labels {
+      values = { level = "info" }
+    }
+  }
+
+  stage.match {
+    selector = "{service_name=\"gatus\"} |~ \"success=false\""
+    stage.static_labels {
+      values = { level = "error" }
     }
   }
 

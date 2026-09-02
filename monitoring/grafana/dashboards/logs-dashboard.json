@@ -30,7 +30,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 4 },
       "id": 3,
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
-      "targets": [{ "editorMode": "code", "expr": "sum(count_over_time({job=\"docker\", service_name=~\"$service\", level=\"error\"} |= `$search` [$__range]))", "legendFormat": "Errores", "queryType": "instant", "refId": "A" }],
+      "targets": [{ "editorMode": "code", "expr": "sum(count_over_time({job=\"docker\", service_name=~\"$service\", service_name!=\"gatus\", level=\"error\"} |= `$search` [$__range])) + sum(count_over_time({job=\"docker\", service_name=~\"$service\", service_name=\"gatus\"} |= `success=false` |= `$search` [$__range]))", "legendFormat": "Errores", "queryType": "instant", "refId": "A" }],
       "title": "Errores",
       "type": "stat"
     },
@@ -70,7 +70,10 @@
       "gridPos": { "h": 8, "w": 10, "x": 14, "y": 8 },
       "id": 7,
       "options": { "legend": { "calcs": ["sum", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
-      "targets": [{ "editorMode": "code", "expr": "sum by (service_name) (count_over_time({job=\"docker\", service_name=~\"$service\", level=\"error\"} |= `$search` [$__interval]))", "legendFormat": "{{service_name}}", "queryType": "range", "refId": "A" }],
+      "targets": [
+        { "editorMode": "code", "expr": "sum by (service_name) (count_over_time({job=\"docker\", service_name=~\"$service\", service_name!=\"gatus\", level=\"error\"} |= `$search` [$__interval]))", "legendFormat": "{{service_name}}", "queryType": "range", "refId": "A" },
+        { "editorMode": "code", "expr": "sum by (service_name) (count_over_time({job=\"docker\", service_name=~\"$service\", service_name=\"gatus\"} |= `success=false` |= `$search` [$__interval]))", "legendFormat": "{{service_name}}", "queryType": "range", "refId": "B" }
+      ],
       "title": "Tendencia de errores",
       "type": "timeseries"
     },
@@ -139,7 +142,7 @@
       }
     ]
   },
-  "time": { "from": "now-1h", "to": "now" },
+  "time": { "from": "now-15m", "to": "now" },
   "timepicker": {},
   "timezone": "America/Lima",
   "title": "SIHSALUS · Logs",

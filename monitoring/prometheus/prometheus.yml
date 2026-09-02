@@ -100,6 +100,14 @@ scrape_configs:
         labels:
           service: 'alertmanager'
 
+  # Structured local application checks. These are more reliable for alerting
+  # than deriving health from the textual Gatus log stream.
+  - job_name: 'gatus'
+    static_configs:
+      - targets: ['gatus:8080']
+        labels:
+          service: 'gatus'
+
   # OpenMRS Backend metrics (JMX exporter - requires configuration)
   # - job_name: 'openmrs-backend'
   #   metrics_path: '/openmrs/metrics'

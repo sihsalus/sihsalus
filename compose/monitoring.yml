@@ -39,6 +39,9 @@ services:
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       GF_SNAPSHOTS_EXTERNAL_ENABLED: "false"
+      # Grafana Live validates WebSocket origins. Permit the fixed local SSH
+      # tunnel explicitly; the normal root_url origin remains accepted.
+      GF_LIVE_ALLOWED_ORIGINS: ${GRAFANA_LIVE_ALLOWED_ORIGINS:-https://127.0.0.1:8443}
       GF_LOG_LEVEL: warn
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/operations-overview.json
     volumes:

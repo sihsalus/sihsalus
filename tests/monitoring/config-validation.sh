@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT_DIR"
+
+cleanup() {
+  if [ -n "${GATUS_TEST_CONTAINER:-}" ]; then
+    docker rm -f "$GATUS_TEST_CONTAINER" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+
+for dashboard in monitoring/grafana/dashboards/*.json; do
+  jq empty "$dashboard"
+done
+
+docker run --rm \
+  --entrypoint /bin/alloy \
+  -v "$ROOT_DIR/monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro" \
+  grafana/alloy:v1.13.1 \
+  validate /etc/alloy/config.alloy
+
+docker run --rm \
+  --entrypoint /bin/promtool \
+  -v "$ROOT_DIR/monitoring/prometheus:/etc/prometheus:ro" \
+  prom/prometheus:v3.2.1 \
+  check config /etc/prometheus/prometheus.yml
+
+GATUS_TEST_CONTAINER="$(docker run -d --rm \
+  -e GATUS_CONFIG_PATH=/config/config.yaml \
+  --tmpfs /data \
+  -v "$ROOT_DIR/monitoring/status/gatus/config.yaml:/config/config.yaml:ro" \
+  twinproduction/gatus:v5.20.0)"
+sleep 2
+
+if [ "$(docker inspect --format '{{.State.Running}}' "$GATUS_TEST_CONTAINER")" != "true" ]; then
+  docker logs "$GATUS_TEST_CONTAINER" >&2
+  echo "[FAIL] Gatus rejected monitoring/status/gatus/config.yaml" >&2
+  exit 1
+fi
+
+echo "[OK] Grafana JSON, Alloy, Prometheus rules and Gatus configuration"

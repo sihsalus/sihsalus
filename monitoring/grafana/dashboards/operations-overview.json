@@ -126,7 +126,10 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "id": 7,
       "options": { "alignValue": "left", "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "mergeValues": true, "rowHeight": 0.8, "showValue": "never", "tooltip": { "mode": "single", "sort": "none" } },
-      "targets": [{ "editorMode": "code", "expr": "probe_success{job=\"blackbox-http-prod\"}", "legendFormat": "{{instance}}", "range": true, "refId": "A" }],
+      "targets": [
+        { "editorMode": "code", "expr": "probe_success{job=\"blackbox-http-prod\"}", "legendFormat": "Externa · {{instance}}", "range": true, "refId": "A" },
+        { "editorMode": "code", "expr": "gatus_results_endpoint_success", "legendFormat": "Interna · {{name}}", "range": true, "refId": "B" }
+      ],
       "title": "Disponibilidad por endpoint",
       "type": "state-timeline"
     },
@@ -186,7 +189,10 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
       "id": 10,
       "options": { "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
-      "targets": [{ "editorMode": "code", "expr": "sum by (service_name) (count_over_time({job=\"docker\", level=\"error\"}[$__interval]))", "legendFormat": "{{service_name}}", "queryType": "range", "refId": "A" }],
+      "targets": [
+        { "editorMode": "code", "expr": "sum by (service_name) (count_over_time({job=\"docker\", service_name!=\"gatus\", level=\"error\"}[$__interval]))", "legendFormat": "{{service_name}}", "queryType": "range", "refId": "A" },
+        { "editorMode": "code", "expr": "sum by (service_name) (count_over_time({job=\"docker\", service_name=\"gatus\"} |= `success=false` [$__interval]))", "legendFormat": "{{service_name}}", "queryType": "range", "refId": "B" }
+      ],
       "title": "Errores por servicio",
       "type": "timeseries"
     },

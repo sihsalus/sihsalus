@@ -46,6 +46,17 @@ groups:
           description: "La latencia de la sonda supera 2 segundos desde hace 10 minutos (valor actual: {{ $value | humanizeDuration }})."
           dashboard: "/d/openmrs-overview"
 
+      - alert: GatusEndpointFailing
+        expr: gatus_results_endpoint_success == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: application
+        annotations:
+          summary: "Comprobación local fallida: {{ $labels.name }}"
+          description: "Gatus confirma que {{ $labels.name }} lleva 2 minutos fallando desde la red interna del sistema."
+          dashboard: "/d/sihsalus-operations"
+
   - name: sihsalus_host_health
     interval: 30s
     rules:
