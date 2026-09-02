@@ -42,9 +42,6 @@ include:
     project_directory: .
   - path: compose/indicadores.yml
     project_directory: .
-  - path: compose/samba.yml
-    project_directory: .
-
 volumes:
   # Core
   openmrs-data:

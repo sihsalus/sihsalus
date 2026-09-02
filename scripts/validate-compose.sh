@@ -213,6 +213,13 @@ core_generator = service(core, "backend-oauth2-config")
 core_docs = service(core, "docs")
 core_gateway = service(core, "gateway")
 
+if "samba-backup" in core.get("services", {}):
+    fail("Samba is managed independently and must not be part of this stack")
+for service_name, service_config in core.get("services", {}).items():
+    for published_port in service_config.get("ports", []):
+        if str(published_port.get("target")) in {"137", "138", "139", "445"}:
+            fail(f"{service_name} must not publish SMB port {published_port.get('target')}")
+
 if core_docs.get("image") != "ghcr.io/sihsalus/sihsalus-docs:latest":
     fail("core docs must default to the official SIHSALUS image")
 if core_docs.get("ports"):
