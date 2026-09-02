@@ -276,6 +276,9 @@ jobs:
       - name: Verify read-only Docker API
         run: ./tests/monitoring/socket-proxy.sh
 
+      - name: Validate monitoring configurations
+        run: ./tests/monitoring/config-validation.sh
+
   imaging:
     name: Imaging authorization
     needs: changes
