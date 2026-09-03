@@ -46,6 +46,9 @@ RUN --mount=type=cache,target=/root/.m2/repository \
     set -- "$modules_dir"/legacyui-*.omod && \
     [ "$#" -eq 1 ] && [ -f "$1" ] && \
     legacyui_omod="$1" && \
+    set -- "$modules_dir"/sihsalusnotifications-*.omod && \
+    [ "$#" -eq 1 ] && [ -f "$1" ] && \
+    notifications_omod="$1" && \
     jar tf "$authentication_omod" \
       | grep -qxF 'org/openmrs/module/authentication/web/ForcePasswordChangeFilter.class' && \
     javap -classpath "$authentication_omod" -verbose \
@@ -55,7 +58,23 @@ RUN --mount=type=cache,target=/root/.m2/repository \
       | grep -qxF 'web/module/admin/users/changePasswordForm.jsp' && \
     javap -classpath "$legacyui_omod" -verbose \
       org.openmrs.web.controller.user.ChangePasswordFormController \
-      | grep -qF '/admin/users/changePassword.form'
+      | grep -qF '/admin/users/changePassword.form' && \
+    jar tf "$notifications_omod" \
+      | grep -qxF 'org/openmrs/module/sihsalusnotifications/web/NotificationWebSocketEndpoint.class' && \
+    jar tf "$notifications_omod" \
+      | grep -qxF 'org/openmrs/module/sihsalusnotifications/web/SseNotificationFilter.class' && \
+    notifications_api_entry="$(jar tf "$notifications_omod" \
+      | grep -Ex 'lib/sihsalusnotifications-api-[0-9]+\.[0-9]+\.[0-9]+\.jar')" && \
+    [ -n "$notifications_api_entry" ] && \
+    [ "$(printf '%s\n' "$notifications_api_entry" | wc -l)" -eq 1 ] && \
+    mkdir -p /tmp/sihsalusnotifications-omod-check && \
+    cd /tmp/sihsalusnotifications-omod-check && \
+    jar xf "$notifications_omod" config.xml "$notifications_api_entry" && \
+    grep -qxF \
+      '  <activator>org.openmrs.module.sihsalusnotifications.SihsalusNotificationsActivator</activator>' \
+      config.xml && \
+    jar tf "$notifications_api_entry" \
+      | grep -qxF 'org/openmrs/module/sihsalusnotifications/SihsalusNotificationsActivator.class'
 
 RUN cp /openmrs_distro/backend/target/sdk-distro/web/openmrs_core/openmrs.war /openmrs/distribution/openmrs_core/ && \
     cp /openmrs_distro/backend/target/sdk-distro/web/openmrs-distro.properties /openmrs/distribution/ && \
@@ -71,7 +90,11 @@ FROM ${OPENMRS_RUNTIME_IMAGE}
 # The upstream Amazon Linux 2 image is immutable, so apply the security updates
 # that became available after its publication before dropping back to UID 1001.
 USER root
-RUN yum -y update acl expat glib2 libacl libssh2 python python-libs vim-data vim-minimal && \
+# CI supplies the commit SHA so BuildKit cannot reuse a stale package-update
+# layer after the distribution repositories publish new security fixes.
+ARG SECURITY_REFRESH=local
+RUN echo "Security refresh: ${SECURITY_REFRESH}" && \
+    yum -y update acl expat glib2 libacl libssh2 python python-libs vim-data vim-minimal && \
     yum clean all && \
     rm -rf /var/cache/yum
 
