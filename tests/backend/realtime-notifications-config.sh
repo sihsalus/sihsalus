@@ -27,6 +27,8 @@ namespace = {"m": "http://maven.apache.org/POM/4.0.0"}
 version = root.findtext("m:properties/m:sihsalusnotifications.version", namespaces=namespace)
 if not version or not re.fullmatch(r"[0-9]+[.][0-9]+[.][0-9]+", version):
     fail("backend must pin sihsalusnotifications.version to a stable release")
+if tuple(map(int, version.split("."))) < (1, 2, 0):
+    fail("backend notifications version must include facility-scoped clinical order events")
 
 dependencies = []
 for dependency in root.findall("m:dependencies/m:dependency", namespace):
@@ -111,6 +113,10 @@ dockerfile = pathlib.Path(sys.argv[6]).read_text(encoding="utf-8")
 for required in (
     "<activator>org.openmrs.module.sihsalusnotifications.SihsalusNotificationsActivator</activator>",
     "org/openmrs/module/sihsalusnotifications/SihsalusNotificationsActivator.class",
+    "org/openmrs/module/sihsalusnotifications/web/WebSocketTicketFilter.class",
+    "org/openmrs/module/sihsalusnotifications/web/NotificationStatusFilter.class",
+    "org/openmrs/module/sihsalusnotifications/api/advice/OrderCreationNotificationAdvice.class",
+    "org/openmrs/module/sihsalusnotifications/api/advice/LaboratoryResultNotificationAdvice.class",
 ):
     if required not in dockerfile:
         fail(f"backend Dockerfile must validate the packaged notifications activator: {required}")
