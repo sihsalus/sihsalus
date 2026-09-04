@@ -3,12 +3,20 @@
 set -eu
 
 interval="${COLLECTION_INTERVAL_SECONDS:-60}"
+samba_quota_bytes="${SAMBA_QUOTA_BYTES:-21474836480}"
 output=/metrics/sihsalus.prom
 temporary=/metrics/.sihsalus.prom.tmp
 
 case "$interval" in
   *[!0-9]* | 0)
     echo "COLLECTION_INTERVAL_SECONDS must be a positive integer" >&2
+    exit 2
+    ;;
+esac
+
+case "$samba_quota_bytes" in
+  "" | *[!0-9]* | 0)
+    echo "SAMBA_QUOTA_BYTES must be a positive integer" >&2
     exit 2
     ;;
 esac
@@ -65,6 +73,28 @@ emit_network_interface() {
   printf 'sihsalus_network_transmit_bytes_total{device="%s"} %s\n' "$device" "$transmit_bytes"
 }
 
+directory_size_bytes() {
+  path="$1"
+  size_kb="$(du -sk "$path" 2>/dev/null | awk '{print $1}' || true)"
+  case "$size_kb" in
+    "" | *[!0-9]*) size_kb=0 ;;
+  esac
+  printf '%s\n' "$((size_kb * 1024))"
+}
+
+emit_samba_share() {
+  share="$1"
+  path="$2"
+  present=0
+  size_bytes=0
+  if [ -d "$path" ]; then
+    present=1
+    size_bytes="$(directory_size_bytes "$path")"
+  fi
+  printf 'sihsalus_samba_share_present{share="%s"} %s\n' "$share" "$present"
+  printf 'sihsalus_samba_share_size_bytes{share="%s"} %s\n' "$share" "$size_bytes"
+}
+
 while :; do
   now="$(date +%s)"
   {
@@ -96,6 +126,26 @@ while :; do
     emit_network_interface eno8403
     emit_network_interface tun0
     emit_network_interface tun1
+    echo '# HELP sihsalus_samba_data_present Whether the standalone Samba data directory is mounted.'
+    echo '# TYPE sihsalus_samba_data_present gauge'
+    echo '# HELP sihsalus_samba_used_bytes Bytes used by the complete Samba data tree.'
+    echo '# TYPE sihsalus_samba_used_bytes gauge'
+    if [ -d /backups/samba ]; then
+      echo 'sihsalus_samba_data_present 1'
+      printf 'sihsalus_samba_used_bytes %s\n' "$(directory_size_bytes /backups/samba)"
+    else
+      echo 'sihsalus_samba_data_present 0'
+      echo 'sihsalus_samba_used_bytes 0'
+    fi
+    echo '# HELP sihsalus_samba_quota_bytes Informational quota exposed to SMB clients.'
+    echo '# TYPE sihsalus_samba_quota_bytes gauge'
+    printf 'sihsalus_samba_quota_bytes %s\n' "$samba_quota_bytes"
+    echo '# HELP sihsalus_samba_share_present Whether an expected Samba share directory exists.'
+    echo '# TYPE sihsalus_samba_share_present gauge'
+    echo '# HELP sihsalus_samba_share_size_bytes Bytes used by an expected Samba share.'
+    echo '# TYPE sihsalus_samba_share_size_bytes gauge'
+    emit_samba_share secretariaRRHH /backups/samba/secretariaRRHH
+    emit_samba_share asistenteRRHH /backups/samba/asistenteRRHH
   } >"$temporary"
   mv -f "$temporary" "$output"
   sleep "$interval"

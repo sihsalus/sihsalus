@@ -237,3 +237,152 @@ groups:
           summary: "Temperatura alta en el servidor"
           description: "Un sensor del host supera 80 °C desde hace 15 minutos (actual: {{ $value | humanize }} °C)."
           dashboard: "/d/sihsalus-resilience"
+
+  - name: sihsalus_power
+    interval: 15s
+    rules:
+      - alert: UpsTelemetryUnavailable
+        expr: sihsalus_ups_exporter_up == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "No se puede leer la UPS desde ViewPower"
+          description: "ViewPower o la comunicación USB no entrega una muestra válida desde hace 2 minutos. Revise el proceso ViewPower y el dispositivo USB 0665:5161."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: UpsRunningOnBattery
+        expr: sihsalus_ups_on_battery == 1
+        for: 1m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "El servidor funciona con batería"
+          description: "La UPS lleva al menos un minuto sin alimentación de red. Consulte la autonomía restante en el dashboard de Resiliencia."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: UpsBatteryChargeLow
+        expr: (sihsalus_ups_battery_charge_percent < 40) and (sihsalus_ups_battery_charge_percent >= 20)
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Carga de UPS por debajo de 40%"
+          description: "La batería permanece en {{ $value | humanize }}%. Confirme que está cargando y revise su vida útil."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: UpsBatteryChargeCritical
+        expr: sihsalus_ups_battery_charge_percent < 20
+        for: 2m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Carga crítica de UPS"
+          description: "La batería permanece por debajo de 20% (actual: {{ $value | humanize }}%). Prepare un apagado controlado si no vuelve la energía."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: UpsRuntimeCritical
+        expr: (sihsalus_ups_battery_runtime_seconds < 900) and (sihsalus_ups_on_battery == 1)
+        for: 1m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Quedan menos de 15 minutos de UPS"
+          description: "La autonomía estimada es {{ $value | humanizeDuration }} mientras el servidor funciona con batería."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: UpsLoadHigh
+        expr: sihsalus_ups_load_percent > 80
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Carga alta en la UPS"
+          description: "La salida de la UPS supera 80% desde hace 10 minutos (actual: {{ $value | humanize }}%)."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: UpsTemperatureHigh
+        expr: sihsalus_ups_temperature_celsius > 45
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Temperatura alta en la UPS"
+          description: "La UPS supera 45 °C desde hace 10 minutos (actual: {{ $value | humanize }} °C)."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: UpsWarningPresent
+        expr: sihsalus_ups_warning_count > 0
+        for: 2m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "ViewPower reporta una advertencia de UPS"
+          description: "La UPS mantiene {{ $value | humanize }} advertencia(s). Abra ViewPower para consultar el detalle."
+          dashboard: "/d/sihsalus-resilience"
+
+  - name: sihsalus_samba
+    interval: 30s
+    rules:
+      - alert: SambaUnavailable
+        expr: probe_success{job="blackbox-tcp-samba"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "El servicio Samba de RRHH no responde"
+          description: "El puerto SMB de 192.168.88.20 lleva 2 minutos sin aceptar conexiones. Revise el stack sihsalus-samba-backup."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: SambaDataPathMissing
+        expr: sihsalus_samba_data_present == 0
+        for: 5m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Falta el árbol de datos de Samba"
+          description: "El colector no puede ver /srv/sihsalus-backups/samba. Revise el montaje antes de aceptar escrituras."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: SambaShareMissing
+        expr: sihsalus_samba_share_present == 0
+        for: 5m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Falta el share {{ $labels.share }}"
+          description: "El colector no puede ver el directorio del share {{ $labels.share }} en /srv/sihsalus-backups/samba."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: SambaQuotaHigh
+        expr: (100 * sihsalus_samba_used_bytes / sihsalus_samba_quota_bytes > 85) and (100 * sihsalus_samba_used_bytes / sihsalus_samba_quota_bytes <= 95)
+        for: 30m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "La cuota Samba supera 85%"
+          description: "Los shares de RRHH usan {{ $value | humanize }}% de la cuota lógica de 20 GiB."
+          dashboard: "/d/sihsalus-resilience"
+
+      - alert: SambaQuotaCritical
+        expr: 100 * sihsalus_samba_used_bytes / sihsalus_samba_quota_bytes > 95
+        for: 5m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "La cuota Samba está casi agotada"
+          description: "Los shares de RRHH superan 95% de la cuota lógica (actual: {{ $value | humanize }}%)."
+          dashboard: "/d/sihsalus-resilience"

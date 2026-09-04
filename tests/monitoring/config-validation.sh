@@ -15,6 +15,8 @@ for dashboard in monitoring/grafana/dashboards/*.json; do
   jq empty "$dashboard"
 done
 
+python3 -m unittest discover -s tests/monitoring -p 'test_*.py'
+
 docker run --rm \
   --entrypoint /bin/alloy \
   -v "$ROOT_DIR/monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro" \

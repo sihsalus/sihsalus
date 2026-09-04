@@ -6,3 +6,7 @@ modules:
       # Ignore SSL exceptions
       tls_config:
         insecure_skip_verify: true
+
+  tcp_connect:
+    prober: tcp
+    timeout: 5s

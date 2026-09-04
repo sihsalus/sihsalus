@@ -1,6 +1,6 @@
 {
   "annotations": { "list": [{ "builtIn": 1, "datasource": { "type": "grafana", "uid": "-- Grafana --" }, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Alertas y anotaciones", "type": "dashboard" }] },
-  "description": "Backups, VPN, certificado y temperatura del host SIHSALUS.",
+  "description": "Backups, VPN, certificado, UPS y servicio temporal de archivos Samba de SIHSALUS.",
   "editable": false,
   "graphTooltip": 1,
   "id": null,
@@ -9,7 +9,7 @@
     {
       "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
       "id": 1,
-      "options": { "content": "# Resiliencia operativa\nVigila que existan backups cifrados recientes, las dos VPN permanezcan activas y el certificado no se acerque a su vencimiento. **La existencia de un archivo no sustituye una restauración de prueba.** iDRAC/RAID todavía requieren una integración Redfish con credenciales de solo lectura.", "mode": "markdown" },
+      "options": { "content": "# Resiliencia operativa\nVigila backups cifrados, VPN, certificado, energía protegida y el servicio temporal de archivos de RRHH. La UPS se lee desde ViewPower sin controlar el USB. **La existencia de un backup no sustituye una restauración de prueba.**", "mode": "markdown" },
       "title": "",
       "transparent": true,
       "type": "text"
@@ -111,17 +111,146 @@
       "targets": [{ "editorMode": "code", "expr": "probe_success{job=\"blackbox-https-certificate\"}", "instant": true, "legendFormat": "HTTPS", "range": false, "refId": "A" }],
       "title": "Sonda HTTPS",
       "type": "stat"
+    },
+    {
+      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 22 },
+      "id": 11,
+      "options": { "content": "## UPS · Energía protegida", "mode": "markdown" },
+      "title": "",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 0, "max": 100, "min": 0, "noValue": "SIN DATOS", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 20 }, { "color": "yellow", "value": 40 }, { "color": "green", "value": 60 }] }, "unit": "percent" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 5, "x": 0, "y": 24 },
+      "id": 12,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "sihsalus_ups_battery_charge_percent", "instant": true, "legendFormat": "Batería", "range": false, "refId": "A" }],
+      "title": "Batería",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 0, "noValue": "SIN DATOS", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 900 }, { "color": "yellow", "value": 1800 }, { "color": "green", "value": 3600 }] }, "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 5, "x": 5, "y": 24 },
+      "id": 13,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "sihsalus_ups_battery_runtime_seconds", "instant": true, "legendFormat": "Autonomía", "range": false, "refId": "A" }],
+      "title": "Autonomía estimada",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 0, "max": 100, "min": 0, "noValue": "SIN DATOS", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 90 }] }, "unit": "percent" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 4, "x": 10, "y": 24 },
+      "id": 14,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "sihsalus_ups_load_percent", "instant": true, "legendFormat": "Carga", "range": false, "refId": "A" }],
+      "title": "Carga UPS",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 1, "noValue": "SIN DATOS", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 40 }, { "color": "red", "value": 45 }] }, "unit": "celsius" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 4, "x": 14, "y": 24 },
+      "id": 15,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "sihsalus_ups_temperature_celsius", "instant": true, "legendFormat": "Interna", "range": false, "refId": "A" }],
+      "title": "Temperatura UPS",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "mappings": [{ "options": { "0": { "color": "green", "text": "RED ELÉCTRICA" }, "1": { "color": "orange", "text": "BATERÍA" } }, "type": "value" }], "noValue": "SIN DATOS", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }] } }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 24 },
+      "id": 16,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" },
+      "targets": [{ "editorMode": "code", "expr": "sihsalus_ups_on_battery", "instant": true, "legendFormat": "Fuente", "range": false, "refId": "A" }],
+      "title": "Fuente de energía",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 10, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "showPoints": "never", "spanNulls": false }, "unit": "volt" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 29 },
+      "id": 17,
+      "options": { "legend": { "calcs": ["lastNotNull", "min", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [{ "editorMode": "code", "expr": "sihsalus_ups_input_voltage_volts", "legendFormat": "Entrada", "range": true, "refId": "A" }, { "editorMode": "code", "expr": "sihsalus_ups_output_voltage_volts", "legendFormat": "Salida", "range": true, "refId": "B" }],
+      "title": "Voltaje de entrada y salida",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 10, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "showPoints": "never", "spanNulls": false }, "max": 100, "min": 0, "unit": "percent" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 29 },
+      "id": 18,
+      "options": { "legend": { "calcs": ["lastNotNull", "min", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [{ "editorMode": "code", "expr": "sihsalus_ups_battery_charge_percent", "legendFormat": "Batería", "range": true, "refId": "A" }, { "editorMode": "code", "expr": "sihsalus_ups_load_percent", "legendFormat": "Carga", "range": true, "refId": "B" }],
+      "title": "Batería y carga",
+      "type": "timeseries"
+    },
+    {
+      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 37 },
+      "id": 19,
+      "options": { "content": "## Samba RRHH · Panel temporal\nDisponibilidad real del puerto SMB y uso agregado; no se recolectan nombres ni contenido de archivos.", "mode": "markdown" },
+      "title": "",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Comprueba el listener SMB publicado exclusivamente en la LAN del hospital.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "mappings": [{ "options": { "0": { "color": "red", "text": "CAÍDO" }, "1": { "color": "green", "text": "OPERATIVO" } }, "type": "value" }], "noValue": "SIN DATOS", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 39 },
+      "id": 20,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" },
+      "targets": [{ "editorMode": "code", "expr": "probe_success{job=\"blackbox-tcp-samba\"}", "instant": true, "legendFormat": "SMB", "range": false, "refId": "A" }],
+      "title": "Servicio Samba",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Uso total contra la cuota lógica de 20 GiB que Samba muestra a Windows.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 1, "max": 100, "min": 0, "noValue": "SIN DATOS", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 85 }, { "color": "red", "value": 95 }] }, "unit": "percent" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 39 },
+      "id": 21,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "100 * sihsalus_samba_used_bytes / sihsalus_samba_quota_bytes", "instant": true, "legendFormat": "Cuota usada", "range": false, "refId": "A" }],
+      "title": "Cuota Samba",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Solo agrega tamaños; nunca nombres ni contenido de archivos.",
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "decimals": 1, "noValue": "SIN DATOS", "unit": "bytes" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 39 },
+      "id": 22,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "sihsalus_samba_share_size_bytes", "instant": true, "legendFormat": "{{share}}", "range": false, "refId": "A" }],
+      "title": "Uso por share",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "custom": { "fillOpacity": 70, "lineWidth": 0, "spanNulls": false }, "mappings": [{ "options": { "0": { "color": "red", "text": "CAÍDO" }, "1": { "color": "green", "text": "OPERATIVO" } }, "type": "value" }], "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } }, "overrides": [] },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 44 },
+      "id": 23,
+      "options": { "alignValue": "left", "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false }, "mergeValues": true, "rowHeight": 0.9, "showValue": "never", "tooltip": { "mode": "single", "sort": "none" } },
+      "targets": [{ "editorMode": "code", "expr": "probe_success{job=\"blackbox-tcp-samba\"}", "legendFormat": "SMB 192.168.88.20:445", "range": true, "refId": "A" }],
+      "title": "Disponibilidad Samba",
+      "type": "state-timeline"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["sihsalus", "resilience", "backups", "vpn"],
+  "tags": ["sihsalus", "resilience", "backups", "vpn", "ups", "samba"],
   "templating": { "list": [] },
   "time": { "from": "now-24h", "to": "now" },
   "timepicker": {},
   "timezone": "America/Lima",
   "title": "SIHSALUS · Resiliencia",
   "uid": "sihsalus-resilience",
-  "version": 1,
+  "version": 2,
   "weekStart": "monday"
 }

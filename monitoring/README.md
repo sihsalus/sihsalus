@@ -13,6 +13,7 @@ Stack de observabilidad para disponibilidad HTTP, recursos del host y contenedor
 - **cAdvisor** - Consumo de recursos por contenedor
 - **Alertmanager** - Agrupación, deduplicación y silencios
 - **Operations Collector** - Frescura y tamaño de backups mediante métricas textfile
+- **ViewPower Exporter** - Batería, autonomía, carga, voltajes y temperatura de la UPS
 
 ---
 
@@ -94,6 +95,8 @@ GRAFANA_ROOT_URL=http://localhost:3001   # URL base (para links)
 - Host Linux (Node Exporter)
 - Contenedores (cAdvisor)
 - Blackbox HTTP probes (Gateway, OpenMRS endpoints)
+- Blackbox TCP probe (Samba en `192.168.88.20:445`)
+- UPS conectada al host mediante la API local de ViewPower
 
 **Retención**: 30 días (configurable)
 
@@ -169,6 +172,26 @@ El proxy no publica el puerto `2375` al host y es el único contenedor con acces
 - `http://gateway:80/` - Gateway disponible
 - `http://gateway:80/openmrs` - OpenMRS accesible
 - `http://gateway:80/openmrs/ws/rest/v1/session` - API OpenMRS
+- `192.168.88.20:445` - Listener Samba de RRHH en la LAN
+
+### ViewPower Exporter
+
+Adaptador de solo lectura para la instancia de ViewPower instalada en el host.
+Descubre la UPS USB desde `initDeviceTree` y consulta únicamente los endpoints
+de monitorización. No abre el dispositivo USB ni ejecuta acciones de control.
+
+Por defecto consulta `http://host.docker.internal:15178/ViewPower` y expone en la
+red interna de monitoreo:
+
+- carga y autonomía estimada de batería;
+- porcentaje de carga conectada;
+- voltajes y frecuencias de entrada/salida;
+- corriente de salida y temperatura interna;
+- modo de trabajo y número de advertencias.
+
+Si ViewPower cambia de puerto o el identificador USB no se puede descubrir, usa
+`VIEWPOWER_BASE_URL` o `VIEWPOWER_DEVICE`. El exporter no publica ningún puerto
+en el host.
 
 ---
 
@@ -187,9 +210,10 @@ filesystems, red, contenedores observados y eventos OOM.
 ### Resiliencia
 
 Edad, tamaño y retención de los backups cifrados de MariaDB, HAPI y FUA;
-estado y tráfico de `tun0`/`tun1`; vencimiento del certificado HTTPS y
-temperatura máxima expuesta por el host. La frescura del archivo no sustituye
-una restauración de prueba periódica.
+estado y tráfico de `tun0`/`tun1`; vencimiento del certificado HTTPS;
+temperatura del host; carga, autonomía, consumo y voltajes de la UPS. Incluye
+un panel temporal para disponibilidad y cuota del Samba independiente. La
+frescura del archivo no sustituye una restauración de prueba periódica.
 
 ### OpenMRS Overview
 
@@ -252,6 +276,9 @@ Las reglas incluidas cubren:
 - espacio, inodos y predicción de filesystem lleno;
 - eventos OOM de contenedores;
 - fallos al recargar la configuración de Prometheus.
+- ViewPower sin telemetría, UPS en batería, baja carga/autonomía, sobrecarga,
+  temperatura y advertencias del equipo;
+- Samba caído, rutas ausentes y cuota lógica próxima a agotarse.
 
 ### Configurar un canal de notificación
 
@@ -279,6 +306,15 @@ probe_duration_seconds{job="blackbox-http-prod"}
 
 # Estado de targets scrapeados
 up
+
+# Estado y capacidad de la UPS
+sihsalus_ups_on_battery
+sihsalus_ups_battery_charge_percent
+sihsalus_ups_battery_runtime_seconds
+
+# Disponibilidad y cuota del Samba independiente
+probe_success{job="blackbox-tcp-samba"}
+100 * sihsalus_samba_used_bytes / sihsalus_samba_quota_bytes
 ```
 
 ### LogQL (Loki)
