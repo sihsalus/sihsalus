@@ -122,7 +122,8 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 0, "max": 100, "min": 0, "noValue": "SIN DATOS", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 20 }, { "color": "yellow", "value": 40 }, { "color": "green", "value": 60 }] }, "unit": "percent" }, "overrides": [] },
+      "description": "Reserva de batería. Rojo por debajo de 35% para anticipar el apagado de ViewPower configurado al 30%.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 0, "max": 100, "min": 0, "noValue": "SIN DATOS", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 35 }, { "color": "yellow", "value": 40 }, { "color": "green", "value": 60 }] }, "unit": "percent" }, "overrides": [] },
       "gridPos": { "h": 5, "w": 5, "x": 0, "y": 24 },
       "id": 12,
       "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
@@ -341,6 +342,6 @@
   "timezone": "America/Lima",
   "title": "SIHSALUS · Resiliencia",
   "uid": "sihsalus-resilience",
-  "version": 3,
+  "version": 4,
   "weekStart": "monday"
 }

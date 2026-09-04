@@ -193,6 +193,12 @@ Si ViewPower cambia de puerto o el identificador USB no se puede descubrir, usa
 `VIEWPOWER_BASE_URL` o `VIEWPOWER_DEVICE`. El exporter no publica ningún puerto
 en el host.
 
+Los umbrales de Prometheus deben anticiparse al apagado configurado en
+ViewPower. En la instalación comisionada el 2026-09-03, ViewPower inicia el
+apagado local al 30% de batería; por eso la advertencia cubre 35-40% y la alerta
+crítica comienza por debajo de 35%. La configuración de ViewPower vive fuera de
+Git y debe auditarse después de reinstalar o actualizar el software.
+
 ---
 
 ## Dashboards
