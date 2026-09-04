@@ -88,6 +88,24 @@ del servidor.
 
 ## Redeploy integral no destructivo
 
+### Backend únicamente
+
+Cuando solo cambia un OMOD o la imagen clásica de OpenMRS, usa
+`deploy-backend.sh` para no recrear frontend, gateway, bases de datos ni perfiles
+opcionales:
+
+```bash
+./scripts/deploy/deploy-backend.sh \
+  0123456789abcdef0123456789abcdef01234567 \
+  sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+```
+
+El script exige que el backend actual esté saludable, valida SHA y digest OCI,
+conserva su referencia e imagen local para rollback, recrea exclusivamente el
+servicio `backend`, espera `/openmrs/health/started` y solo entonces persiste
+`BACKEND_TAG`. Si falla, restaura `.env` y vuelve a levantar la imagen anterior
+sin tocar los demás servicios.
+
 `redeploy-environment.sh` se usa para reconstruir y recrear un ambiente
 completo cuando una actualización exclusiva del frontend no es suficiente.
 Recibe el commit y digest ya publicados del backend para que un `BACKEND_TAG`
