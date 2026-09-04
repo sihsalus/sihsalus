@@ -27,7 +27,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "description": "tun0 corresponde a CloudConnexa; tun1 corresponde a GOREL.",
+      "description": "Los índices tunN son dinámicos y no identifican al proveedor. Correlacione la interfaz activa con la sesión OpenVPN; CloudConnexa puede usar tun1.",
       "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "mappings": [{ "options": { "0": { "color": "red", "text": "ABAJO" }, "1": { "color": "green", "text": "ACTIVA" } }, "type": "value" }], "noValue": "NO DETECTADA", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } }, "overrides": [] },
       "gridPos": { "h": 5, "w": 6, "x": 9, "y": 4 },
       "id": 3,

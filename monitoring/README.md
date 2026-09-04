@@ -216,7 +216,8 @@ filesystems, red, contenedores observados y eventos OOM.
 ### Resiliencia
 
 Edad, tamaño y retención de los backups cifrados de MariaDB, HAPI y FUA;
-estado y tráfico de `tun0`/`tun1`; vencimiento del certificado HTTPS;
+estado y tráfico de `tun0`/`tun1` sin inferir el proveedor por el índice dinámico
+`tunN`; vencimiento del certificado HTTPS;
 temperatura del host; carga, autonomía, consumo y voltajes de la UPS. Incluye
 un panel temporal para disponibilidad y cuota del Samba independiente, además
 de continuidad del host, boots observados, arranques o recreaciones por proyecto

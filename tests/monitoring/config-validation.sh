@@ -30,6 +30,12 @@ jq -e '
 ' monitoring/grafana/dashboards/infrastructure-overview.json >/dev/null
 grep -Fq 'alert: HostRebootLoop' monitoring/prometheus/alerts/basic-alerts.yml
 grep -Fq 'alert: ContainerRestartLoop' monitoring/prometheus/alerts/basic-alerts.yml
+grep -Fq 'expr: max(sihsalus_network_interface_present{device=~"tun0|tun1"}) == 0' \
+  monitoring/prometheus/alerts/basic-alerts.yml
+if grep -Fq 'tun0 corresponde a CloudConnexa' monitoring/grafana/dashboards/resilience-overview.json; then
+  echo "[FAIL] El dashboard no debe inferir el proveedor VPN a partir del indice tunN" >&2
+  exit 1
+fi
 grep -Fq 'expr: (sihsalus_ups_battery_charge_percent < 40) and (sihsalus_ups_battery_charge_percent >= 35)' \
   monitoring/prometheus/alerts/basic-alerts.yml
 grep -Fq 'expr: sihsalus_ups_battery_charge_percent < 35' \
@@ -53,6 +59,13 @@ docker run --rm \
   prom/prometheus:v3.2.1 \
   check config /etc/prometheus/prometheus.yml
 
+docker run --rm \
+  --entrypoint /bin/promtool \
+  -v "$ROOT_DIR:/workspace:ro" \
+  -w /workspace \
+  prom/prometheus:v3.2.1 \
+  test rules tests/monitoring/vpn-alerts.test.yml
+
 GATUS_TEST_CONTAINER="$(docker run -d --rm \
   -e GATUS_CONFIG_PATH=/config/config.yaml \
   --tmpfs /data \
@@ -66,4 +79,4 @@ if [ "$(docker inspect --format '{{.State.Running}}' "$GATUS_TEST_CONTAINER")" !
   exit 1
 fi
 
-echo "[OK] Grafana JSON, ViewPower unit, Alloy, Prometheus rules and Gatus configuration"
+echo "[OK] Grafana JSON, ViewPower unit, Alloy, Prometheus rules (including VPN failover) and Gatus configuration"

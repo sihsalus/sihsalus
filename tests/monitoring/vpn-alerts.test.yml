@@ -1,0 +1,36 @@
+rule_files:
+  - ../../monitoring/prometheus/alerts/basic-alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: an active tun1 must not report the VPN as missing
+    interval: 1m
+    input_series:
+      - series: 'sihsalus_network_interface_present{device="tun0"}'
+        values: '0x10'
+      - series: 'sihsalus_network_interface_present{device="tun1"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: VpnInterfaceMissing
+        exp_alerts: []
+
+  - name: no tunnel interface must raise the VPN missing alert
+    interval: 1m
+    input_series:
+      - series: 'sihsalus_network_interface_present{device="tun0"}'
+        values: '0x10'
+      - series: 'sihsalus_network_interface_present{device="tun1"}'
+        values: '0x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: VpnInterfaceMissing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              team: infrastructure
+            exp_annotations:
+              summary: No se detecta ninguna interfaz VPN
+              description: No se observa tun0 ni tun1. Revise la sesión de CloudConnexa y, si GOREL sigue siendo requerido, su watchdog; el índice tunN no identifica al proveedor.
+              dashboard: /d/sihsalus-resilience
