@@ -23,8 +23,10 @@ jq -e '
   and ([.panels[].title] | index("Continuidad correlacionada") != null)
 ' monitoring/grafana/dashboards/resilience-overview.json >/dev/null
 
-grep -Fq 'container_label_com_docker_compose_project=~"sihsalus|sihsalus-samba-backup"' \
-  monitoring/grafana/dashboards/infrastructure-overview.json
+jq -e '
+  [.. | objects | .expr? // empty]
+  | any(contains("container_label_com_docker_compose_project=~\"sihsalus|sihsalus-samba-backup\""))
+' monitoring/grafana/dashboards/infrastructure-overview.json >/dev/null
 grep -Fq 'alert: HostRebootLoop' monitoring/prometheus/alerts/basic-alerts.yml
 grep -Fq 'alert: ContainerRestartLoop' monitoring/prometheus/alerts/basic-alerts.yml
 
