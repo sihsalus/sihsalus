@@ -1,6 +1,6 @@
 {
   "annotations": { "list": [{ "builtIn": 1, "datasource": { "type": "grafana", "uid": "-- Grafana --" }, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Alertas y anotaciones", "type": "dashboard" }] },
-  "description": "Backups, VPN, certificado, UPS y servicio temporal de archivos Samba de SIHSALUS.",
+  "description": "Backups, VPN, certificado, UPS, continuidad del host y servicio temporal de archivos Samba de SIHSALUS.",
   "editable": false,
   "graphTooltip": 1,
   "id": null,
@@ -240,17 +240,107 @@
       "targets": [{ "editorMode": "code", "expr": "probe_success{job=\"blackbox-tcp-samba\"}", "legendFormat": "SMB 192.168.88.20:445", "range": true, "refId": "A" }],
       "title": "Disponibilidad Samba",
       "type": "state-timeline"
+    },
+    {
+      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 50 },
+      "id": 24,
+      "options": { "content": "## Continuidad y arranques\nDistingue boots del host, arranques o recreaciones de servicios, OOM y disponibilidad. **Un arranque observado no implica por sí solo un crash: también puede ser un despliegue o un apagado programado.**", "mode": "markdown" },
+      "title": "",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Tiempo transcurrido desde el boot actual del servidor.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 0, "noValue": "SIN DATOS", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 1800 }, { "color": "green", "value": 3600 }] }, "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 52 },
+      "id": 25,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "time() - node_boot_time_seconds", "instant": true, "legendFormat": "Uptime", "range": false, "refId": "A" }],
+      "title": "Uptime del host",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Cambios de boot observados por Prometheus. Es un mínimo: no cuenta periodos que Prometheus nunca alcanzó a observar.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 0, "noValue": "SIN HISTORIA", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 3 }] }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 52 },
+      "id": 26,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "changes(node_boot_time_seconds[24h])", "instant": true, "legendFormat": "Boots", "range": false, "refId": "A" }],
+      "title": "Boots observados · 24 h",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Cambios de boot observados durante siete días; correlacione con cron, UPS y ventanas de mantenimiento.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 0, "noValue": "SIN HISTORIA", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 3 }, { "color": "red", "value": 10 }] }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 52 },
+      "id": 27,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "changes(node_boot_time_seconds[7d])", "instant": true, "legendFormat": "Boots", "range": false, "refId": "A" }],
+      "title": "Boots observados · 7 días",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Eventos OOM de los proyectos principal y Samba independiente durante las últimas 24 horas.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 0, "noValue": "0", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 52 },
+      "id": 28,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" },
+      "targets": [{ "editorMode": "code", "expr": "sum(increase(container_oom_events_total{container_label_com_docker_compose_project=~\"sihsalus|sihsalus-samba-backup\"}[24h])) or vector(0)", "instant": true, "legendFormat": "OOM", "range": false, "refId": "A" }],
+      "title": "OOM · 24 h",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Cambios del timestamp de inicio vistos por cAdvisor. Incluye reinicios, recreaciones Compose y boots del host; conserva el proyecto para no confundir el Samba legado con el independiente.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 0, "noValue": "SIN HISTORIA", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 3 }] }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 57 },
+      "id": 29,
+      "options": { "displayMode": "gradient", "maxVizHeight": 300, "minVizHeight": 16, "minVizWidth": 8, "namePlacement": "auto", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showUnfilled": true, "sizing": "auto", "valueMode": "color" },
+      "targets": [{ "editorMode": "code", "expr": "changes((max by (container_label_com_docker_compose_project, container_label_com_docker_compose_service) (container_start_time_seconds{container_label_com_docker_compose_project=~\"sihsalus|sihsalus-samba-backup\", container_label_com_docker_compose_service!=\"\"}))[24h:30s])", "instant": true, "legendFormat": "{{container_label_com_docker_compose_project}} · {{container_label_com_docker_compose_service}}", "range": false, "refId": "A" }],
+      "title": "Arranques o recreaciones por servicio · 24 h",
+      "type": "bargauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "El reinicio del host aparece como una caída del uptime. Los huecos indican que el Prometheus local tampoco estaba disponible.",
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 12, "lineInterpolation": "linear", "lineWidth": 2, "pointSize": 3, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } }, "min": 0, "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 67 },
+      "id": 30,
+      "options": { "legend": { "calcs": ["lastNotNull", "min", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [{ "editorMode": "code", "expr": "time() - node_boot_time_seconds", "legendFormat": "Uptime", "range": true, "refId": "A" }],
+      "title": "Historia de uptime",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Correlaciona la señal disponible desde este mismo host. Un hueco total requiere un observador externo para distinguir apagado de pérdida de red.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "custom": { "fillOpacity": 70, "lineWidth": 0, "spanNulls": false }, "mappings": [{ "options": { "0": { "color": "red", "text": "NO / BATERÍA" }, "1": { "color": "green", "text": "SÍ / RED" } }, "type": "value" }], "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 67 },
+      "id": 31,
+      "options": { "alignValue": "left", "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "mergeValues": true, "rowHeight": 0.8, "showValue": "never", "tooltip": { "mode": "single", "sort": "none" } },
+      "targets": [
+        { "editorMode": "code", "expr": "up{job=\"node\"}", "legendFormat": "Host observado", "range": true, "refId": "A" },
+        { "editorMode": "code", "expr": "probe_success{job=\"blackbox-http-prod\", instance=\"http://gateway:80/openmrs\"}", "legendFormat": "OpenMRS", "range": true, "refId": "B" },
+        { "editorMode": "code", "expr": "probe_success{job=\"blackbox-tcp-samba\"}", "legendFormat": "Samba", "range": true, "refId": "C" },
+        { "editorMode": "code", "expr": "1 - sihsalus_ups_on_battery", "legendFormat": "Red eléctrica", "range": true, "refId": "D" }
+      ],
+      "title": "Continuidad correlacionada",
+      "type": "state-timeline"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["sihsalus", "resilience", "backups", "vpn", "ups", "samba"],
+  "tags": ["sihsalus", "resilience", "backups", "vpn", "ups", "samba", "continuity", "restarts"],
   "templating": { "list": [] },
   "time": { "from": "now-24h", "to": "now" },
   "timepicker": {},
   "timezone": "America/Lima",
   "title": "SIHSALUS · Resiliencia",
   "uid": "sihsalus-resilience",
-  "version": 2,
+  "version": 3,
   "weekStart": "monday"
 }
