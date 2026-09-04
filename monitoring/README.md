@@ -212,8 +212,12 @@ filesystems, red, contenedores observados y eventos OOM.
 Edad, tamaño y retención de los backups cifrados de MariaDB, HAPI y FUA;
 estado y tráfico de `tun0`/`tun1`; vencimiento del certificado HTTPS;
 temperatura del host; carga, autonomía, consumo y voltajes de la UPS. Incluye
-un panel temporal para disponibilidad y cuota del Samba independiente. La
-frescura del archivo no sustituye una restauración de prueba periódica.
+un panel temporal para disponibilidad y cuota del Samba independiente, además
+de continuidad del host, boots observados, arranques o recreaciones por proyecto
+y servicio, eventos OOM y una línea de tiempo correlacionada con la alimentación
+eléctrica. Un cambio de timestamp de inicio no distingue por sí solo un crash de
+un despliegue o apagado programado. La frescura del archivo no sustituye una
+restauración de prueba periódica.
 
 ### OpenMRS Overview
 
@@ -274,7 +278,8 @@ Las reglas incluidas cubren:
 - latencia sostenida de OpenMRS;
 - CPU y memoria bajo presión;
 - espacio, inodos y predicción de filesystem lleno;
-- eventos OOM de contenedores;
+- eventos OOM de contenedores del proyecto principal y Samba independiente;
+- ciclos repetidos de boot del host o de reinicio/recreación de servicios;
 - fallos al recargar la configuración de Prometheus.
 - ViewPower sin telemetría, UPS en batería, baja carga/autonomía, sobrecarga,
   temperatura y advertencias del equipo;
@@ -315,6 +320,21 @@ sihsalus_ups_battery_runtime_seconds
 # Disponibilidad y cuota del Samba independiente
 probe_success{job="blackbox-tcp-samba"}
 100 * sihsalus_samba_used_bytes / sihsalus_samba_quota_bytes
+
+# Boots del host observados por Prometheus (es un mínimo, no un ledger externo)
+changes(node_boot_time_seconds[24h])
+
+# Arranques o recreaciones por proyecto y servicio; incluye boots y despliegues
+changes(
+  (
+    max by (container_label_com_docker_compose_project, container_label_com_docker_compose_service) (
+      container_start_time_seconds{
+        container_label_com_docker_compose_project=~"sihsalus|sihsalus-samba-backup",
+        container_label_com_docker_compose_service!=""
+      }
+    )
+  )[24h:30s]
+)
 ```
 
 ### LogQL (Loki)

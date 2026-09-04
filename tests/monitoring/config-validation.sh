@@ -15,6 +15,21 @@ for dashboard in monitoring/grafana/dashboards/*.json; do
   jq empty "$dashboard"
 done
 
+jq -e '
+  .version >= 3
+  and (([.panels[].id] | length) == ([.panels[].id] | unique | length))
+  and ([.panels[].title] | index("Boots observados · 24 h") != null)
+  and ([.panels[].title] | index("Arranques o recreaciones por servicio · 24 h") != null)
+  and ([.panels[].title] | index("Continuidad correlacionada") != null)
+' monitoring/grafana/dashboards/resilience-overview.json >/dev/null
+
+jq -e '
+  [.. | objects | .expr? // empty]
+  | any(contains("container_label_com_docker_compose_project=~\"sihsalus|sihsalus-samba-backup\""))
+' monitoring/grafana/dashboards/infrastructure-overview.json >/dev/null
+grep -Fq 'alert: HostRebootLoop' monitoring/prometheus/alerts/basic-alerts.yml
+grep -Fq 'alert: ContainerRestartLoop' monitoring/prometheus/alerts/basic-alerts.yml
+
 python3 -m unittest discover -s tests/monitoring -p 'test_*.py'
 
 docker run --rm \
