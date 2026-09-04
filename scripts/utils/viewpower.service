@@ -1,0 +1,38 @@
+[Unit]
+Description=ViewPower UPS monitoring and graceful shutdown controller
+Wants=network-online.target
+After=local-fs.target network-online.target
+ConditionPathExists=/home/hii1sc/ViewPower/StartMain
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/home/hii1sc/ViewPower
+ExecStartPre=/usr/bin/test -x /home/hii1sc/ViewPower/StartMain
+ExecStart=/home/hii1sc/ViewPower/StartMain
+ExecStop=/home/hii1sc/ViewPower/StopMain
+Restart=always
+RestartSec=10s
+TimeoutStartSec=90s
+TimeoutStopSec=90s
+KillMode=control-group
+UMask=0027
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+
+# ViewPower 1.04-21353 exposes an unauthenticated control UI. Keep it reachable
+# only from localhost and the production monitoring bridge. If Docker assigns a
+# different subnet, update this entry before installing the unit.
+IPAddressAllow=127.0.0.0/8
+IPAddressAllow=::1/128
+IPAddressAllow=172.19.0.0/24
+IPAddressDeny=any
+
+[Install]
+WantedBy=multi-user.target
