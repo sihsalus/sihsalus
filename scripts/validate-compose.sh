@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+"$ROOT_DIR/tests/deploy/deploy-backend-test.sh"
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "[FAIL] docker is required" >&2
   exit 1
