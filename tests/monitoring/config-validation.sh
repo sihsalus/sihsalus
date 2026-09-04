@@ -34,6 +34,10 @@ grep -Fq 'expr: (sihsalus_ups_battery_charge_percent < 40) and (sihsalus_ups_bat
   monitoring/prometheus/alerts/basic-alerts.yml
 grep -Fq 'expr: sihsalus_ups_battery_charge_percent < 35' \
   monitoring/prometheus/alerts/basic-alerts.yml
+grep -Fq 'Type=simple' scripts/utils/viewpower.service
+grep -Fq 'Restart=always' scripts/utils/viewpower.service
+grep -Fq 'ExecStop=/home/hii1sc/ViewPower/StopMain' scripts/utils/viewpower.service
+grep -Fq 'IPAddressDeny=any' scripts/utils/viewpower.service
 
 python3 -m unittest discover -s tests/monitoring -p 'test_*.py'
 
@@ -62,4 +66,4 @@ if [ "$(docker inspect --format '{{.State.Running}}' "$GATUS_TEST_CONTAINER")" !
   exit 1
 fi
 
-echo "[OK] Grafana JSON, Alloy, Prometheus rules and Gatus configuration"
+echo "[OK] Grafana JSON, ViewPower unit, Alloy, Prometheus rules and Gatus configuration"
