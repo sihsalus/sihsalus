@@ -16,11 +16,12 @@ for dashboard in monitoring/grafana/dashboards/*.json; do
 done
 
 jq -e '
-  .version >= 3
+  .version >= 4
   and (([.panels[].id] | length) == ([.panels[].id] | unique | length))
   and ([.panels[].title] | index("Boots observados · 24 h") != null)
   and ([.panels[].title] | index("Arranques o recreaciones por servicio · 24 h") != null)
   and ([.panels[].title] | index("Continuidad correlacionada") != null)
+  and ([.panels[] | select(.id == 12) | .fieldConfig.defaults.thresholds.steps[].value] | index(35) != null)
 ' monitoring/grafana/dashboards/resilience-overview.json >/dev/null
 
 jq -e '
@@ -29,6 +30,10 @@ jq -e '
 ' monitoring/grafana/dashboards/infrastructure-overview.json >/dev/null
 grep -Fq 'alert: HostRebootLoop' monitoring/prometheus/alerts/basic-alerts.yml
 grep -Fq 'alert: ContainerRestartLoop' monitoring/prometheus/alerts/basic-alerts.yml
+grep -Fq 'expr: (sihsalus_ups_battery_charge_percent < 40) and (sihsalus_ups_battery_charge_percent >= 35)' \
+  monitoring/prometheus/alerts/basic-alerts.yml
+grep -Fq 'expr: sihsalus_ups_battery_charge_percent < 35' \
+  monitoring/prometheus/alerts/basic-alerts.yml
 
 python3 -m unittest discover -s tests/monitoring -p 'test_*.py'
 

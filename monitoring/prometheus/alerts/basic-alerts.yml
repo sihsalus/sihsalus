@@ -298,7 +298,7 @@ groups:
           dashboard: "/d/sihsalus-resilience"
 
       - alert: UpsBatteryChargeLow
-        expr: (sihsalus_ups_battery_charge_percent < 40) and (sihsalus_ups_battery_charge_percent >= 20)
+        expr: (sihsalus_ups_battery_charge_percent < 40) and (sihsalus_ups_battery_charge_percent >= 35)
         for: 10m
         labels:
           severity: warning
@@ -309,14 +309,14 @@ groups:
           dashboard: "/d/sihsalus-resilience"
 
       - alert: UpsBatteryChargeCritical
-        expr: sihsalus_ups_battery_charge_percent < 20
+        expr: sihsalus_ups_battery_charge_percent < 35
         for: 2m
         labels:
           severity: critical
           team: infrastructure
         annotations:
-          summary: "Carga crítica de UPS"
-          description: "La batería permanece por debajo de 20% (actual: {{ $value | humanize }}%). Prepare un apagado controlado si no vuelve la energía."
+          summary: "Reserva crítica antes del apagado por UPS"
+          description: "La batería permanece por debajo de 35% (actual: {{ $value | humanize }}%). ViewPower inicia el apagado local al 30%; quedan menos de 5 puntos porcentuales de margen."
           dashboard: "/d/sihsalus-resilience"
 
       - alert: UpsRuntimeCritical
