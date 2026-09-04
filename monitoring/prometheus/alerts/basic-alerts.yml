@@ -229,14 +229,14 @@ groups:
           dashboard: "/d/sihsalus-resilience"
 
       - alert: VpnInterfaceMissing
-        expr: sihsalus_network_interface_present{device=~"tun0|tun1"} == 0
+        expr: max(sihsalus_network_interface_present{device=~"tun0|tun1"}) == 0
         for: 5m
         labels:
           severity: critical
           team: infrastructure
         annotations:
-          summary: "Falta una interfaz VPN esperada"
-          description: "No se observan ambas interfaces tun0/tun1. Revise CloudConnexa y el watchdog de GOREL."
+          summary: "No se detecta ninguna interfaz VPN"
+          description: "No se observa tun0 ni tun1. Revise la sesión de CloudConnexa y, si GOREL sigue siendo requerido, su watchdog; el índice tunN no identifica al proveedor."
           dashboard: "/d/sihsalus-resilience"
 
       - alert: GatewayCertificateExpiringSoon
