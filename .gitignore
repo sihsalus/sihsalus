@@ -1,6 +1,8 @@
 **/target/
 **/.DS_Store
 **/node_modules/
+**/__pycache__/
+*.py[cod]
 .idea/
 
 # LLM coding agent documentation

@@ -396,6 +396,7 @@ alertmanager = service(monitoring, "alertmanager")
 node_exporter = service(monitoring, "node-exporter")
 cadvisor = service(monitoring, "cadvisor")
 operations_collector = service(monitoring, "operations-collector")
+viewpower_exporter = service(monitoring, "viewpower-exporter")
 
 for volume in alloy.get("volumes", []):
     if volume.get("source") == "/var/run/docker.sock":
@@ -429,6 +430,27 @@ if operations_collector.get("read_only") is not True:
 backup_mounts = [volume for volume in operations_collector.get("volumes", []) if volume.get("target") == "/backups"]
 if len(backup_mounts) != 1 or not backup_mounts[0].get("read_only"):
     fail("operations collector backup mount must exist and be read-only")
+if operations_collector.get("environment", {}).get("SAMBA_QUOTA_BYTES") != "21474836480":
+    fail("operations collector must expose the reviewed 20 GiB Samba quota")
+
+if viewpower_exporter.get("ports"):
+    fail("ViewPower exporter must not publish a host port")
+viewpower_image = viewpower_exporter.get("image", "")
+if not viewpower_image.startswith("python:3.13-alpine@sha256:") or len(viewpower_image.rsplit("@sha256:", 1)[-1]) != 64:
+    fail("ViewPower exporter image must use an immutable Python digest")
+if viewpower_exporter.get("read_only") is not True:
+    fail("ViewPower exporter must use a read-only container filesystem")
+if viewpower_exporter.get("user") != "65534:65534":
+    fail("ViewPower exporter must run as the unprivileged nobody user")
+if viewpower_exporter.get("cap_drop") != ["ALL"]:
+    fail("ViewPower exporter must drop Linux capabilities")
+if "no-new-privileges:true" not in viewpower_exporter.get("security_opt", []):
+    fail("ViewPower exporter must prevent privilege escalation")
+if not viewpower_exporter.get("environment", {}).get("VIEWPOWER_BASE_URL", "").startswith("http://host.docker.internal:15178/"):
+    fail("ViewPower exporter must default to the host-only ViewPower adapter")
+exporter_mounts = [volume for volume in viewpower_exporter.get("volumes", []) if volume.get("target") == "/app/viewpower_exporter.py"]
+if len(exporter_mounts) != 1 or not exporter_mounts[0].get("read_only"):
+    fail("ViewPower exporter source must be mounted read-only")
 
 print("[OK] semantic Compose invariants")
 PY
