@@ -8,6 +8,7 @@ NETWORK="${PREFIX}-network"
 UPSTREAM="${PREFIX}-upstream"
 AUTH="${PREFIX}-auth"
 GATEWAY="${PREFIX}-gateway"
+NGINX_TEST_IMAGE="${GATEWAY_TEST_IMAGE:-nginx:1.28-alpine}"
 
 cleanup() {
   docker rm -f "$GATEWAY" "$AUTH" "$UPSTREAM" >/dev/null 2>&1 || true
@@ -70,6 +71,8 @@ server {
 }
 EOF
 
+# Keep template variable names literal while substituting synthetic values.
+# shellcheck disable=SC2016
 sed \
   -e 's|${FRAME_ANCESTORS}||g' \
   -e 's|${FUA_CONFIG}||g' \
@@ -81,12 +84,16 @@ sed \
 docker network create "$NETWORK" >/dev/null
 docker run -d --name "$UPSTREAM" --network "$NETWORK" \
   --network-alias backend --network-alias frontend --network-alias ohif --network-alias orthanc-proxy \
-  -v "$TMP_DIR/upstream.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.27-alpine >/dev/null
+  -v "$TMP_DIR/upstream.conf:/etc/nginx/conf.d/default.conf:ro" \
+  --entrypoint nginx "$NGINX_TEST_IMAGE" -g 'daemon off;' >/dev/null
 docker run -d --name "$AUTH" --network "$NETWORK" --network-alias imaging-auth \
-  -v "$TMP_DIR/auth.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.27-alpine >/dev/null
+  -v "$TMP_DIR/auth.conf:/etc/nginx/conf.d/default.conf:ro" \
+  --entrypoint nginx "$NGINX_TEST_IMAGE" -g 'daemon off;' >/dev/null
 docker run -d --name "$GATEWAY" --network "$NETWORK" -p 127.0.0.1::80 \
+  -v "$ROOT_DIR/gateway:/etc/nginx/includes:ro" \
   -v "$ROOT_DIR/gateway/nginx.conf:/etc/nginx/nginx.conf:ro" \
-  -v "$TMP_DIR/gateway.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.27-alpine >/dev/null
+  -v "$TMP_DIR/gateway.conf:/etc/nginx/conf.d/default.conf:ro" \
+  --entrypoint nginx "$NGINX_TEST_IMAGE" -g 'daemon off;' >/dev/null
 
 PORT="$(docker port "$GATEWAY" 80/tcp | awk -F: 'END { print $NF }')"
 BASE_URL="http://127.0.0.1:${PORT}"

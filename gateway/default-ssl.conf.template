@@ -29,8 +29,8 @@ map "$sihsalus_social_scraper:$uri" $sihsalus_social_redirect {
 }
 
 map $http_x_real_ip $forwarded_ip {
-  "~.*"  $http_x_real_ip;
-  default $remote_addr;
+  "" $remote_addr;
+  default $http_x_real_ip;
 }
 
 # Grafana and any future operations console must never answer a request that
@@ -52,10 +52,6 @@ geo $sihsalus_private_client {
 map $http_upgrade $connection_upgrade {
   default upgrade;
   ''      close;
-}
-
-upstream backend {
-  server backend:8080 max_fails=0;
 }
 
 # Docker DNS resolver - enables lazy resolution for optional services
@@ -97,12 +93,7 @@ server {
   ssl_dhparam /var/www/certbot/conf/ssl-dhparams.pem;
 
   # Enhanced security headers
-  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-  add_header X-Frame-Options "SAMEORIGIN" always;
-  add_header X-Content-Type-Options "nosniff" always;
-  add_header Content-Security-Policy $csp_header always;
-  add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-  add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
+  include /etc/nginx/includes/security-headers-ssl.conf;
 
   # Proxy settings with secure cookies
   proxy_set_header      HOST $host;
@@ -111,35 +102,6 @@ server {
   proxy_set_header      X-Forwarded-For $proxy_add_x_forwarded_for;
   proxy_cookie_flags    JSESSIONID secure samesite=strict;
   proxy_http_version    1.1;
-
-  # Gzip compression
-  gzip on;
-  gzip_vary on;
-  gzip_min_length 1024;
-  gzip_proxied any;
-  gzip_http_version 1.0;
-  gzip_types  font/eot
-              font/otf
-              font/ttf
-              image/svg+xml
-              text/css
-              text/javascript
-              text/plain
-              text/xml
-              application/atom+xml
-              application/geo+json
-              application/importmap+json
-              application/javascript
-              application/x-javascript
-              application/json
-              application/ld+json
-              application/fhir+json
-              application/fhir+xml
-              application/manifest+json
-              application/rdf+xml
-              application/rss+xml
-              application/xhtml+xml
-              application/xml;
 
   # All redirects are relative to the gateway
   absolute_redirect off;
@@ -157,6 +119,7 @@ server {
     client_max_body_size 1k;
     access_log /var/log/nginx/clinical-activity.log clinical_activity;
     add_header Cache-Control 'no-store' always;
+    include /etc/nginx/includes/security-headers-ssl.conf;
     return 204;
   }
 
@@ -179,6 +142,7 @@ server {
   location @backend_not_started {
     default_type text/plain;
     add_header Retry-After 30 always;
+    include /etc/nginx/includes/security-headers-ssl.conf;
     return 503 'NOT_STARTED';
   }
 
@@ -195,6 +159,7 @@ server {
     default_type text/plain;
     add_header Retry-After 30 always;
     add_header X-SIHSALUS-Readiness 'openmrs-bootstrap-pending' always;
+    include /etc/nginx/includes/security-headers-ssl.conf;
     return 503 'NOT_READY: OpenMRS bootstrap is not complete';
   }
 
@@ -285,10 +250,15 @@ server {
     error_page 502 503 504 = @backend_unavailable;
   }
 
+  location = /_sihsalus/backend-unavailable.css {
+    alias /usr/share/nginx/html/backend-unavailable.css;
+  }
+
   location @backend_unavailable {
     default_type text/html;
     add_header Retry-After 30 always;
-    return 503 '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta http-equiv="refresh" content="30"><title>SIH Salus - Iniciando</title><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f5f5f5;color:#333}div{text-align:center;max-width:34em;padding:2em}h1{color:#f26522}</style></head><body><div><h1>SIH Salus se est&aacute; iniciando</h1><p>OpenMRS todav&iacute;a est&aacute; terminando su bootstrap. En el primer arranque puede cargar configuraci&oacute;n, conceptos y mappings OCL durante varios minutos.</p><p>Verifica <code>/startup</code> para saber si el backend responde y <code>/ready</code> para saber si ya puede atender tr&aacute;fico cl&iacute;nico.</p><p>Esta p&aacute;gina se actualizar&aacute; autom&aacute;ticamente.</p></div></body></html>';
+    include /etc/nginx/includes/security-headers-ssl.conf;
+    return 503 '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta http-equiv="refresh" content="30"><title>SIH Salus - Iniciando</title><link rel="stylesheet" href="/_sihsalus/backend-unavailable.css"></head><body><div><h1>SIH Salus se est&aacute; iniciando</h1><p>OpenMRS todav&iacute;a est&aacute; terminando su bootstrap. En el primer arranque puede cargar configuraci&oacute;n, conceptos y mappings OCL durante varios minutos.</p><p>Verifica <code>/startup</code> para saber si el backend responde y <code>/ready</code> para saber si ya puede atender tr&aacute;fico cl&iacute;nico.</p><p>Esta p&aacute;gina se actualizar&aacute; autom&aacute;ticamente.</p></div></body></html>';
   }
 
   # OIDC endpoints for individually authorized Imaging access. Token exchange
@@ -414,17 +384,19 @@ server {
 
   location /services/fua-generator/ {
     set $fua_upstream http://fua-generator:3000;
-    proxy_pass $fua_upstream/;
+    rewrite ^/services/fua-generator/(.*)$ /$1 break;
+    proxy_pass $fua_upstream;
     proxy_redirect http://$host/ /services/fua-generator/;
 
     # Si el upstream falla, devolver 503 con mensaje personalizado
+    proxy_intercept_errors on;
     error_page 502 503 504 = @fua_unavailable;
   }
 
   # Location para manejar cuando fua-generator no está disponible
   location @fua_unavailable {
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header Content-Type "application/json" always;
+    default_type application/json;
+    include /etc/nginx/includes/security-headers-ssl.conf;
     return 503 '{"error": "FUA Generator service is temporarily unavailable", "status": 503}';
   }
 

@@ -12,6 +12,8 @@ ENV FRAME_ANCESTORS="https://dyaku.minsa.gob.pe/fhir" \
 
 # Copy nginx base configuration
 COPY nginx.conf /etc/nginx/nginx.conf
+COPY security-headers*.conf /etc/nginx/includes/
+COPY backend-unavailable.css /usr/share/nginx/html/
 
 # Copy both config templates — entrypoint selects which one to use
 COPY default.conf.template /etc/nginx/conf-templates/
