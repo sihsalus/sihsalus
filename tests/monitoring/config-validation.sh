@@ -15,6 +15,38 @@ for dashboard in monitoring/grafana/dashboards/*.json; do
   jq empty "$dashboard"
 done
 
+jq -e '
+  .version >= 4
+  and (([.panels[].id] | length) == ([.panels[].id] | unique | length))
+  and ([.panels[].title] | index("Boots observados · 24 h") != null)
+  and ([.panels[].title] | index("Arranques o recreaciones por servicio · 24 h") != null)
+  and ([.panels[].title] | index("Continuidad correlacionada") != null)
+  and ([.panels[] | select(.id == 12) | .fieldConfig.defaults.thresholds.steps[].value] | index(35) != null)
+' monitoring/grafana/dashboards/resilience-overview.json >/dev/null
+
+jq -e '
+  [.. | objects | .expr? // empty]
+  | any(contains("container_label_com_docker_compose_project=~\"sihsalus|sihsalus-samba-backup\""))
+' monitoring/grafana/dashboards/infrastructure-overview.json >/dev/null
+grep -Fq 'alert: HostRebootLoop' monitoring/prometheus/alerts/basic-alerts.yml
+grep -Fq 'alert: ContainerRestartLoop' monitoring/prometheus/alerts/basic-alerts.yml
+grep -Fq 'expr: max(sihsalus_network_interface_present{device=~"tun0|tun1"}) == 0' \
+  monitoring/prometheus/alerts/basic-alerts.yml
+if grep -Fq 'tun0 corresponde a CloudConnexa' monitoring/grafana/dashboards/resilience-overview.json; then
+  echo "[FAIL] El dashboard no debe inferir el proveedor VPN a partir del indice tunN" >&2
+  exit 1
+fi
+grep -Fq 'expr: (sihsalus_ups_battery_charge_percent < 40) and (sihsalus_ups_battery_charge_percent >= 35)' \
+  monitoring/prometheus/alerts/basic-alerts.yml
+grep -Fq 'expr: sihsalus_ups_battery_charge_percent < 35' \
+  monitoring/prometheus/alerts/basic-alerts.yml
+grep -Fq 'Type=simple' scripts/utils/viewpower.service
+grep -Fq 'Restart=always' scripts/utils/viewpower.service
+grep -Fq 'ExecStop=/home/hii1sc/ViewPower/StopMain' scripts/utils/viewpower.service
+grep -Fq 'IPAddressDeny=any' scripts/utils/viewpower.service
+
+python3 -m unittest discover -s tests/monitoring -p 'test_*.py'
+
 docker run --rm \
   --entrypoint /bin/alloy \
   -v "$ROOT_DIR/monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro" \
@@ -26,6 +58,13 @@ docker run --rm \
   -v "$ROOT_DIR/monitoring/prometheus:/etc/prometheus:ro" \
   prom/prometheus:v3.2.1 \
   check config /etc/prometheus/prometheus.yml
+
+docker run --rm \
+  --entrypoint /bin/promtool \
+  -v "$ROOT_DIR:/workspace:ro" \
+  -w /workspace \
+  prom/prometheus:v3.2.1 \
+  test rules tests/monitoring/vpn-alerts.test.yml
 
 GATUS_TEST_CONTAINER="$(docker run -d --rm \
   -e GATUS_CONFIG_PATH=/config/config.yaml \
@@ -40,4 +79,4 @@ if [ "$(docker inspect --format '{{.State.Running}}' "$GATUS_TEST_CONTAINER")" !
   exit 1
 fi
 
-echo "[OK] Grafana JSON, Alloy, Prometheus rules and Gatus configuration"
+echo "[OK] Grafana JSON, ViewPower unit, Alloy, Prometheus rules (including VPN failover) and Gatus configuration"

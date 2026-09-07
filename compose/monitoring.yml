@@ -143,6 +143,7 @@ services:
     command: [ "/bin/sh", "/usr/local/bin/collect.sh" ]
     environment:
       COLLECTION_INTERVAL_SECONDS: "60"
+      SAMBA_QUOTA_BYTES: "${SIHSALUS_SAMBA_QUOTA_BYTES:-21474836480}"
     read_only: true
     network_mode: none
     security_opt:
@@ -158,6 +159,40 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+
+  viewpower-exporter:
+    container_name: sihsalus-viewpower-exporter
+    image: python:3.13-alpine@sha256:7415fbc3c9e4979cc717d92377ab2bc7b2b4a2af1ac03cc52b5f3f88efedaf3a
+    restart: "unless-stopped"
+    profiles: [ monitoring ]
+    init: true
+    user: "65534:65534"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+      VIEWPOWER_BASE_URL: "${VIEWPOWER_BASE_URL:-http://host.docker.internal:15178/ViewPower}"
+      VIEWPOWER_DEVICE: "${VIEWPOWER_DEVICE:-}"
+      VIEWPOWER_TIMEOUT_SECONDS: "${VIEWPOWER_TIMEOUT_SECONDS:-5}"
+      CACHE_SECONDS: "${VIEWPOWER_CACHE_SECONDS:-10}"
+      EXPORTER_PORT: "9199"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./monitoring/ups/viewpower_exporter.py:/app/viewpower_exporter.py:ro
+    command: [ "python", "/app/viewpower_exporter.py" ]
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9199/healthz', timeout=2)" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - monitoring-network
 
   cadvisor:
     container_name: sihsalus-cadvisor

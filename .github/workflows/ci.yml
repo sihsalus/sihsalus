@@ -58,7 +58,7 @@ jobs:
           fi
 
           if [ "$can_diff" = "true" ] \
-            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml compose/monitoring.yml monitoring/alloy/ tests/monitoring/; then
+            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml compose/monitoring.yml monitoring/ tests/monitoring/; then
             monitoring=false
           fi
 

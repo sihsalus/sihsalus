@@ -13,6 +13,7 @@ Stack de observabilidad para disponibilidad HTTP, recursos del host y contenedor
 - **cAdvisor** - Consumo de recursos por contenedor
 - **Alertmanager** - Agrupación, deduplicación y silencios
 - **Operations Collector** - Frescura y tamaño de backups mediante métricas textfile
+- **ViewPower Exporter** - Batería, autonomía, carga, voltajes y temperatura de la UPS
 
 ---
 
@@ -94,6 +95,8 @@ GRAFANA_ROOT_URL=http://localhost:3001   # URL base (para links)
 - Host Linux (Node Exporter)
 - Contenedores (cAdvisor)
 - Blackbox HTTP probes (Gateway, OpenMRS endpoints)
+- Blackbox TCP probe (Samba en `192.168.88.20:445`)
+- UPS conectada al host mediante la API local de ViewPower
 
 **Retención**: 30 días (configurable)
 
@@ -169,6 +172,32 @@ El proxy no publica el puerto `2375` al host y es el único contenedor con acces
 - `http://gateway:80/` - Gateway disponible
 - `http://gateway:80/openmrs` - OpenMRS accesible
 - `http://gateway:80/openmrs/ws/rest/v1/session` - API OpenMRS
+- `192.168.88.20:445` - Listener Samba de RRHH en la LAN
+
+### ViewPower Exporter
+
+Adaptador de solo lectura para la instancia de ViewPower instalada en el host.
+Descubre la UPS USB desde `initDeviceTree` y consulta únicamente los endpoints
+de monitorización. No abre el dispositivo USB ni ejecuta acciones de control.
+
+Por defecto consulta `http://host.docker.internal:15178/ViewPower` y expone en la
+red interna de monitoreo:
+
+- carga y autonomía estimada de batería;
+- porcentaje de carga conectada;
+- voltajes y frecuencias de entrada/salida;
+- corriente de salida y temperatura interna;
+- modo de trabajo y número de advertencias.
+
+Si ViewPower cambia de puerto o el identificador USB no se puede descubrir, usa
+`VIEWPOWER_BASE_URL` o `VIEWPOWER_DEVICE`. El exporter no publica ningún puerto
+en el host.
+
+Los umbrales de Prometheus deben anticiparse al apagado configurado en
+ViewPower. En la instalación comisionada el 2026-09-03, ViewPower inicia el
+apagado local al 30% de batería; por eso la advertencia cubre 35-40% y la alerta
+crítica comienza por debajo de 35%. La configuración de ViewPower vive fuera de
+Git y debe auditarse después de reinstalar o actualizar el software.
 
 ---
 
@@ -187,9 +216,15 @@ filesystems, red, contenedores observados y eventos OOM.
 ### Resiliencia
 
 Edad, tamaño y retención de los backups cifrados de MariaDB, HAPI y FUA;
-estado y tráfico de `tun0`/`tun1`; vencimiento del certificado HTTPS y
-temperatura máxima expuesta por el host. La frescura del archivo no sustituye
-una restauración de prueba periódica.
+estado y tráfico de `tun0`/`tun1` sin inferir el proveedor por el índice dinámico
+`tunN`; vencimiento del certificado HTTPS;
+temperatura del host; carga, autonomía, consumo y voltajes de la UPS. Incluye
+un panel temporal para disponibilidad y cuota del Samba independiente, además
+de continuidad del host, boots observados, arranques o recreaciones por proyecto
+y servicio, eventos OOM y una línea de tiempo correlacionada con la alimentación
+eléctrica. Un cambio de timestamp de inicio no distingue por sí solo un crash de
+un despliegue o apagado programado. La frescura del archivo no sustituye una
+restauración de prueba periódica.
 
 ### OpenMRS Overview
 
@@ -250,8 +285,12 @@ Las reglas incluidas cubren:
 - latencia sostenida de OpenMRS;
 - CPU y memoria bajo presión;
 - espacio, inodos y predicción de filesystem lleno;
-- eventos OOM de contenedores;
+- eventos OOM de contenedores del proyecto principal y Samba independiente;
+- ciclos repetidos de boot del host o de reinicio/recreación de servicios;
 - fallos al recargar la configuración de Prometheus.
+- ViewPower sin telemetría, UPS en batería, baja carga/autonomía, sobrecarga,
+  temperatura y advertencias del equipo;
+- Samba caído, rutas ausentes y cuota lógica próxima a agotarse.
 
 ### Configurar un canal de notificación
 
@@ -279,6 +318,30 @@ probe_duration_seconds{job="blackbox-http-prod"}
 
 # Estado de targets scrapeados
 up
+
+# Estado y capacidad de la UPS
+sihsalus_ups_on_battery
+sihsalus_ups_battery_charge_percent
+sihsalus_ups_battery_runtime_seconds
+
+# Disponibilidad y cuota del Samba independiente
+probe_success{job="blackbox-tcp-samba"}
+100 * sihsalus_samba_used_bytes / sihsalus_samba_quota_bytes
+
+# Boots del host observados por Prometheus (es un mínimo, no un ledger externo)
+changes(node_boot_time_seconds[24h])
+
+# Arranques o recreaciones por proyecto y servicio; incluye boots y despliegues
+changes(
+  (
+    max by (container_label_com_docker_compose_project, container_label_com_docker_compose_service) (
+      container_start_time_seconds{
+        container_label_com_docker_compose_project=~"sihsalus|sihsalus-samba-backup",
+        container_label_com_docker_compose_service!=""
+      }
+    )
+  )[24h:30s]
+)
 ```
 
 ### LogQL (Loki)

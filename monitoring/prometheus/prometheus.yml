@@ -61,6 +61,24 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox:9115
 
+  # Probe the LAN listener rather than the container itself. This catches a
+  # missing host bind, firewall regression or stopped standalone Samba stack.
+  - job_name: 'blackbox-tcp-samba'
+    metrics_path: /probe
+    params:
+      module: [ tcp_connect ]
+    static_configs:
+      - targets: ["192.168.88.20:445"]
+        labels:
+          service: 'samba-backup'
+    relabel_configs:
+      - source_labels: [ __address__ ]
+        target_label: __param_target
+      - source_labels: [ __param_target ]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115
+
   # Grafana metrics. Grafana serves from a sub-path behind the gateway, so
   # /metrics redirects to the public root_url, which is unreachable from the
   # monitoring network. Scrape the sub-path directly instead.
@@ -85,6 +103,13 @@ scrape_configs:
         labels:
           service: 'node-exporter'
           host: 'sihsalus-main-server'
+
+  # Read-only adapter for the ViewPower instance attached to the host USB UPS.
+  - job_name: 'viewpower-ups'
+    static_configs:
+      - targets: ['viewpower-exporter:9199']
+        labels:
+          service: 'ups'
 
   # Per-container resource metrics
   - job_name: 'cadvisor'
