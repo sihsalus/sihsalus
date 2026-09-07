@@ -190,8 +190,9 @@ sp_assert_output 'decision=power_off idle_seconds=2000'
 [[ "$SP_TEST_POWEROFF_COUNT" -eq 1 ]]
 
 grep -Fq "log_format  clinical_activity '\$msec';" "$SP_TEST_ROOT/gateway/nginx.conf"
-[[ "$(grep -l 'clinical-activity.log clinical_activity' "$SP_TEST_ROOT"/gateway/default*.conf.template | wc -l | tr -d ' ')" == '2' ]]
-if grep -n 'clinical-activity' "$SP_TEST_ROOT"/gateway/default*.conf.template | grep -Eq 'proxy_pass|request_uri|cookie'; then
+gateway_routes="$SP_TEST_ROOT/gateway/templates/includes/routes.conf.template"
+grep -Fq 'clinical-activity.log clinical_activity' "$gateway_routes"
+if grep -n 'clinical-activity' "$gateway_routes" | grep -Eq 'proxy_pass|request_uri|cookie'; then
   printf 'Clinical activity endpoint must not proxy or log request context\n' >&2
   exit 1
 fi

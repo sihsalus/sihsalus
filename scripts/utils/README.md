@@ -4,9 +4,6 @@
 
 | Archivo | Uso |
 | --- | --- |
-| `certificate_generate.sh` | Certificado auto-firmado local; el flujo normal HTTPS usa `compose/ssl.yml` |
-| `init_full.sh` | Reinicialización de desarrollo; puede eliminar volúmenes |
-| `logs_creation.sh` | Extraer logs del backend/initializer |
 | `sihsalus-compose.service` | Arranque del stack con systemd |
 | `viewpower.service` | Arranque persistente y aislamiento de red para el controlador local de la UPS |
 | `sihsalus-safe-poweroff.sh` | Evaluador fail-closed de apagado automático |
@@ -75,24 +72,16 @@ No ejecutes `runAutoStart.sh` en paralelo con esta unidad. ViewPower debe correr
 como `root` porque controla el USB y ejecuta el apagado limpio configurado en la
 reserva de batería; el exporter de Prometheus sigue siendo de solo lectura.
 
-## Inicialización de desarrollo
-
-`init_full.sh` puede detener el stack y eliminar volúmenes. Úsalo solo en entornos descartables y revisa su ayuda antes de ejecutarlo:
-
-```bash
-./scripts/utils/init_full.sh --help
-```
-
-Para producción, usa el [checklist de despliegue](../../docs/operations/deploy-checklist.md), no una reinicialización completa.
-
 ## Logs
 
 ```bash
-./scripts/utils/logs_creation.sh
 docker compose logs --tail 200 backend gateway
 ```
 
 No adjuntes logs con datos clínicos, tokens o credenciales a issues públicos.
+La instalación y verificación siguen el
+[checklist de despliegue](../../docs/operations/deploy-checklist.md); los
+certificados se administran mediante el [runbook HTTPS](../../docs/operations/https.md).
 
 ## Apagado automático
 

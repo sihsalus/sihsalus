@@ -106,6 +106,9 @@ Registrar:
 
 ## Smoke test posterior
 
+Para confianza del certificado y diagnóstico HTTPS, usar el
+[runbook HTTPS](https.md#confianza-y-diagnóstico).
+
 - `GET /health` responde correctamente.
 - `GET /startup` responde correctamente.
 - `GET /ready` responde correctamente cuando OpenMRS termina bootstrap.
