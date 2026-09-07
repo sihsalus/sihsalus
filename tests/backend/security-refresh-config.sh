@@ -23,7 +23,7 @@ ci = pathlib.Path(sys.argv[3]).read_text(encoding="utf-8")
 require_once(dockerfile, "ARG SECURITY_REFRESH=local", "backend/Dockerfile")
 require_once(dockerfile, 'echo "Security refresh: ${SECURITY_REFRESH}"', "backend/Dockerfile")
 require_once(publisher, "SECURITY_REFRESH=${{ github.sha }}", "build-backend workflow")
-require_once(ci, '--build-arg SECURITY_REFRESH="${GITHUB_SHA}"', "CI workflow")
+require_once(ci, 'build-args: SECURITY_REFRESH=${{ github.sha }}', "CI workflow")
 
 print("[OK] backend security updates are refreshed for every CI commit")
 PY

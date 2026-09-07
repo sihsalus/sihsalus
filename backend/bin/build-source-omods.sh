@@ -51,9 +51,17 @@ while read -r module repository revision checksum upstream_version version extra
     "-DnewVersion=$version" -DgenerateBackupPoms=false -DprocessAllModules=true
   args=(-Dformatter.skip=true -Dspotless.skip=true -Dmaven.javadoc.skip=true)
   if [[ "$MODE" == package ]]; then
-    args+=(-Dmaven.test.skip=true)
+    # REST and Initializer consume sibling test-jars even when not running tests.
+    args+=(-DskipTests)
   fi
-  "${MAVEN[@]}" -f "$source_dir/pom.xml" "${args[@]}" install
+  if [[ "$MODE" == test && ( "$module" == initializer || "$module" == patientdocuments ) ]]; then
+    # Legacy CGLIB/PowerMock tests need reflective class loading on Java 21.
+    # The environment reaches forked Surefire JVMs without replacing upstream argLine.
+    JDK_JAVA_OPTIONS="${JDK_JAVA_OPTIONS:-} --add-opens=java.base/java.lang=ALL-UNNAMED" \
+      "${MAVEN[@]}" -f "$source_dir/pom.xml" "${args[@]}" install
+  else
+    "${MAVEN[@]}" -f "$source_dir/pom.xml" "${args[@]}" install
+  fi
   save_reports
   echo "[source-omods] verified $module $version"
 done < "$ROOT/omod-sources.lock"

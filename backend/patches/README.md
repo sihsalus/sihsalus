@@ -17,6 +17,11 @@ packaged versions and the compiled REST response protections. `OMOD_TEST_REPORTS
 can select a destination for Surefire XML evidence; `OMOD_MAVEN_REPOSITORY` can
 select an isolated dependency cache for local runs.
 
+Packaging compiles sibling test JARs required by upstream reactors, with execution
+left to the source test jobs. Initializer and Patient Documents run their legacy
+CGLIB/PowerMock tests with `java.lang` opened to the test JVM on Java 21; the
+application JVM is not changed by this test setting.
+
 The REST patch ports the content-response correction from
 [upstream PR #748](https://github.com/openmrs/openmrs-module-webservices.rest/pull/748)
 to the released 3.5.0 javax Servlet/JUnit 4 branch. It serves CLOB content as UTF-8
