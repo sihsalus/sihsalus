@@ -21,7 +21,7 @@ jobs:
   build-and-publish:
     name: Build and Publish Backend Image
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     permissions:
       contents: read
       id-token: write
@@ -68,6 +68,11 @@ jobs:
           set -euo pipefail
           docker pull "${IMAGE}"
           ./tests/backend/ocl-token-image.sh "${IMAGE}"
+
+      - name: Verify packaged OMOD versions and REST security patch
+        env:
+          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+        run: bash tests/backend/source-omods-image.sh "$IMAGE"
 
       - name: Test published backend forced-password contract
         env:
@@ -175,6 +180,7 @@ jobs:
         run: cosign sign --yes "ghcr.io/sihsalus/sihsalus-backend@${DIGEST}"
 
       - name: Promote verified backend image
+        if: github.ref == 'refs/heads/main'
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |

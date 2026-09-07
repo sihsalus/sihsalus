@@ -38,6 +38,7 @@ RUN --mount=type=cache,target=/root/.m2/repository \
     mvn --batch-mode --show-version --no-transfer-progress \
       -Dformatter.skip=true -DskipTests -Dmaven.javadoc.skip=true \
       --file /tmp/bedmanagement-source/pom.xml install && \
+    bash backend/bin/build-source-omods.sh package && \
     mvn $MVN_ARGS_SETTINGS $MVN_ARGS && \
     modules_dir=/openmrs_distro/backend/target/sdk-distro/web/openmrs_modules && \
     set -- "$modules_dir"/authentication-*.omod && \

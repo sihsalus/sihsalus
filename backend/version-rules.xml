@@ -11,7 +11,7 @@
         <ignoreVersion type="regex">.*</ignoreVersion>
       </ignoreVersions>
     </rule>
-    <!-- Pinned to timestamped snapshots; managed manually -->
+    <!-- Bahmni upgrades include schema and workflow changes; managed manually -->
     <rule groupId="org.bahmni.module" artifactId="appointments-omod">
       <ignoreVersions>
         <ignoreVersion type="regex">.*</ignoreVersion>
@@ -22,16 +22,66 @@
         <ignoreVersion type="regex">.*</ignoreVersion>
       </ignoreVersions>
     </rule>
-    <!-- webservices.rest 4.x requires openmrs-core 3.0.0+ -->
+    <!-- REST is built from a pinned source revision with a security backport. -->
     <rule groupId="org.openmrs.module" artifactId="webservices.rest-omod">
       <ignoreVersions>
-        <ignoreVersion type="regex">([4-9]|[1-9]\d+)\..*</ignoreVersion>
+        <ignoreVersion type="regex">.*</ignoreVersion>
       </ignoreVersions>
     </rule>
     <!-- LegacyUI 3.x requires openmrs-core 3.0.0+ -->
     <rule groupId="org.openmrs.module" artifactId="legacyui-omod">
       <ignoreVersions>
         <ignoreVersion type="regex">([3-9]|[1-9]\d+)\..*</ignoreVersion>
+      </ignoreVersions>
+    </rule>
+    <rule groupId="org.openmrs.module" artifactId="initializer-omod">
+      <ignoreVersions>
+        <ignoreVersion type="regex">.*</ignoreVersion>
+      </ignoreVersions>
+    </rule>
+    <rule groupId="org.openmrs.module" artifactId="queue-omod">
+      <ignoreVersions>
+        <ignoreVersion type="regex">.*</ignoreVersion>
+      </ignoreVersions>
+    </rule>
+    <rule groupId="org.openmrs.module" artifactId="reporting-omod">
+      <ignoreVersions>
+        <ignoreVersion type="regex">.*</ignoreVersion>
+      </ignoreVersions>
+    </rule>
+    <rule groupId="org.openmrs.module" artifactId="reportingrest-omod">
+      <ignoreVersions>
+        <ignoreVersion type="regex">.*</ignoreVersion>
+      </ignoreVersions>
+    </rule>
+    <rule groupId="org.openmrs.module" artifactId="patientdocuments-omod">
+      <ignoreVersions>
+        <ignoreVersion type="regex">.*</ignoreVersion>
+      </ignoreVersions>
+    </rule>
+    <rule groupId="org.openmrs.module" artifactId="billing-omod">
+      <ignoreVersions>
+        <ignoreVersion type="regex">.*</ignoreVersion>
+      </ignoreVersions>
+    </rule>
+    <rule groupId="org.openmrs.module" artifactId="emrapi-omod">
+      <ignoreVersions>
+        <ignoreVersion type="regex">.*</ignoreVersion>
+      </ignoreVersions>
+    </rule>
+    <rule groupId="org.openmrs.module" artifactId="fhir2-omod">
+      <ignoreVersions>
+        <ignoreVersion type="regex">.*</ignoreVersion>
+      </ignoreVersions>
+    </rule>
+    <rule groupId="org.openmrs.module" artifactId="authentication-omod">
+      <ignoreVersions>
+        <ignoreVersion type="regex">.*</ignoreVersion>
+      </ignoreVersions>
+    </rule>
+    <rule groupId="org.openmrs.module" artifactId="bedmanagement-omod">
+      <ignoreVersions>
+        <ignoreVersion type="regex">.*</ignoreVersion>
       </ignoreVersions>
     </rule>
   </rules>
