@@ -31,9 +31,12 @@ La instalación, confianza y renovación están en el
   conservan sus prefijos, incluidas las conexiones WebSocket y SSE.
 - `/ayuda/` resuelve `docs` de forma diferida, adapta sus redirects y devuelve
   una contingencia 503 si falta, sin bloquear la aplicación.
-- `/services/fua-generator/` elimina solo su prefijo, conserva subruta,
-  parámetros y método, y devuelve JSON con estado 503 si falta el generador.
-  La misma ruta está disponible en HTTP y HTTPS con el perfil `fua`.
+- `/services/fua-generator/` conserva el comportamiento desplegado: todas sus
+  subrutas y consultas se envían a `/` del generador, manteniendo el método.
+  Los errores HTTP del generador se transmiten; si falla la conexión o DNS,
+  el gateway devuelve JSON con estado 503. La ruta se comparte por HTTP/HTTPS.
+  `/services/fua-generator/health` también consulta `/`: su 200 no demuestra
+  que exista una sonda de salud. Cambiar este contrato requiere otro PR.
 - Imaging permanece cerrado hasta cargar su override de autorización.
 - `POST /_sihsalus/clinical-activity` devuelve 204. Su log contiene únicamente
   un timestamp para la [política de apagado](../docs/operations/safe-poweroff.md);

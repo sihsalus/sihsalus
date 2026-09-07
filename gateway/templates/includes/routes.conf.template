@@ -291,12 +291,12 @@ location = /services/fua-generator {
 
 location /services/fua-generator/ {
   set $fua_upstream http://fua-generator:3000;
-  rewrite ^/services/fua-generator/(.*)$ /$1 break;
-  proxy_pass $fua_upstream;
+  # Preserve the deployed FUA contract: every subpath is sent to upstream /.
+  # Changing path/query forwarding requires a separate compatibility review.
+  proxy_pass $fua_upstream/;
   proxy_redirect http://$host/ /services/fua-generator/;
 
-  # Si el upstream falla, devolver 503 con mensaje personalizado
-  proxy_intercept_errors on;
+  # Connection/DNS failures use the fallback; upstream HTTP errors pass through.
   error_page 502 503 504 = @fua_unavailable;
 }
 

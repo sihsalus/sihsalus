@@ -60,6 +60,7 @@ class GatewayRouting(unittest.TestCase):
   listen 80;
   listen 8080;
   listen 3000;
+  location = /health { return 404 'no upstream health endpoint'; }
   location = /openmrs/initialsetup { return 503 'bootstrap pending'; }
   location = /openmrs/health/started { return 503 'bootstrap pending'; }
   location = /openmrs/unavailable { return 503 'backend unavailable'; }
@@ -71,6 +72,9 @@ class GatewayRouting(unittest.TestCase):
   location = /gzip { default_type text/plain; return 200 'GZIP_BODY'; }
   location / {
     default_type application/json;
+    if ($http_x_test_fua_error = 502) { return 502 '{"upstream":"fua","status":502}'; }
+    if ($http_x_test_fua_error = 503) { return 503 '{"upstream":"fua","status":503}'; }
+    if ($http_x_test_fua_error = 504) { return 504 '{"upstream":"fua","status":504}'; }
     return 200 '{"uri":"$request_uri","method":"$request_method","ip":"$http_x_real_ip","proto":"$http_x_forwarded_proto","host":"$http_host","upgrade":"$http_upgrade","connection":"$http_connection"}';
   }
 }
@@ -195,26 +199,25 @@ class GatewayRouting(unittest.TestCase):
                 self.assertEqual(status, 302)
                 self.assertEqual(headers["Location"], "/openmrs/spa/home")
 
-    def test_fua_preserves_path_query_and_method(self):
+    def test_fua_preserves_deployed_root_routing(self):
         for scheme, url in self.urls.items():
             for method in ("GET", "POST"):
-                with self.subTest(scheme=scheme, method=method):
-                    status, _, body = self.request(url,
-                        "/services/fua-generator/forms/example?format=pdf&copy=2", method)
-                    self.assertEqual(status, 200)
-                    response = json.loads(body)
-                    self.assertEqual(response["uri"], "/forms/example?format=pdf&copy=2")
-                    self.assertEqual(response["method"], method)
+                for path in ("/", "/health", "/forms/example?format=pdf&copy=2"):
+                    with self.subTest(scheme=scheme, method=method, path=path):
+                        status, _, body = self.request(url, "/services/fua-generator" + path, method)
+                        self.assertEqual(status, 200)
+                        response = json.loads(body)
+                        self.assertEqual(response["uri"], "/")
+                        self.assertEqual(response["method"], method)
 
-    def test_fua_unavailable_is_json_with_security_headers(self):
+    def test_fua_preserves_upstream_http_errors(self):
         for scheme, url in self.urls.items():
-            with self.subTest(scheme=scheme):
-                status, headers, body = self.request(url, "/services/fua-generator/unavailable")
-                self.assertEqual(status, 503)
-                self.assertEqual(headers.get_all("Content-Type"), ["application/json"])
-                self.assertEqual(json.loads(body)["status"], 503)
-                self.assertEqual(headers.get("X-Content-Type-Options"), "nosniff")
-                self.assertEqual(bool(headers.get("Strict-Transport-Security")), scheme == "https")
+            for expected in (502, 503, 504):
+                with self.subTest(scheme=scheme, status=expected):
+                    status, _, body = self.request(url, "/services/fua-generator/",
+                        headers={"X-Test-Fua-Error": str(expected)})
+                    self.assertEqual(status, expected)
+                    self.assertEqual(json.loads(body), {"upstream": "fua", "status": expected})
 
     def test_security_headers_survive_local_headers(self):
         for scheme, url in self.urls.items():
@@ -294,6 +297,12 @@ class GatewayRouting(unittest.TestCase):
                 self.assertEqual(self.request(url, "/health")[0], 200)
                 status, _, _ = self.request(url, "/ready")
                 self.assertEqual(status, 503)
+                status, headers, body = self.request(url, "/services/fua-generator/")
+                self.assertEqual(status, 503)
+                self.assertEqual(headers.get_all("Content-Type"), ["application/json"])
+                self.assertEqual(json.loads(body)["status"], 503)
+                self.assertEqual(headers.get("X-Content-Type-Options"), "nosniff")
+                self.assertEqual(bool(headers.get("Strict-Transport-Security")), scheme == "https")
 
 
 if __name__ == "__main__":
