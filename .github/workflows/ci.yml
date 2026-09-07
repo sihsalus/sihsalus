@@ -110,6 +110,9 @@ jobs:
       - name: Test realtime notifications OMOD and gateway configuration
         run: ./tests/backend/realtime-notifications-config.sh
 
+      - name: Test HTTP and HTTPS gateway routing
+        run: python3 tests/gateway/routing.py
+
       - name: Test backend security refresh cache policy
         run: ./tests/backend/security-refresh-config.sh
 

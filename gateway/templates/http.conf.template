@@ -1,0 +1,8 @@
+include /etc/nginx/conf.d/includes/maps.conf;
+
+server {
+  listen 80;
+  listen [::]:80;
+  server_name localhost;
+  include /etc/nginx/conf.d/includes/routes.conf;
+}

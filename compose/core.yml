@@ -28,8 +28,6 @@ services:
       - monitoring-network
     environment:
       FRAME_ANCESTORS: ${FRAME_ANCESTORS:-}
-      FUA_CONFIG: ${FUA_CONFIG:-}
-      FUA_LOCATIONS: ${FUA_LOCATIONS:-}
       # Imaging web routes are closed unless compose/imaging-auth.yml replaces
       # this value with network ACL plus OIDC auth_request directives.
       IMAGING_ACCESS_CONTROL: "deny all;"
