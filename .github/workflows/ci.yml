@@ -156,18 +156,32 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: 21
+          # Initializer also tests Core 2.1-era XStream; upstream supports Java 8/11.
+          java-version: ${{ matrix.module == 'initializer' && '11' || '21' }}
           cache: maven
           cache-dependency-path: backend/omod-sources.lock
       - name: Build and test the pinned module
         env:
           OMOD_TEST_REPORTS: ${{ runner.temp }}/omod-tests
         run: bash backend/bin/build-source-omods.sh test '${{ matrix.module }}'
+      - name: Set up Java 21 for Initializer Core 2.8 integration tests
+        if: matrix.module == 'initializer'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Test Initializer against Core 2.8 on Java 21
+        if: matrix.module == 'initializer'
+        env:
+          OMOD_TEST_REPORTS: ${{ runner.temp }}/omod-core28-java21-tests
+        run: bash backend/bin/build-source-omods.sh test-core28 initializer
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
           name: omod-tests-${{ matrix.module }}
-          path: ${{ runner.temp }}/omod-tests/
+          path: |
+            ${{ runner.temp }}/omod-tests/
+            ${{ runner.temp }}/omod-core28-java21-tests/
           if-no-files-found: warn
 
   backend:

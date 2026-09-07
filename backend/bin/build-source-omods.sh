@@ -4,7 +4,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODE="${1:-package}"
 SELECTED_MODULE="${2:-all}"
-[[ "$MODE" == package || "$MODE" == test ]] || { echo 'Expected package or test' >&2; exit 2; }
+[[ "$MODE" == package || "$MODE" == test || "$MODE" == test-core28 ]] \
+  || { echo 'Expected package, test or test-core28' >&2; exit 2; }
+[[ "$MODE" != test-core28 || "$SELECTED_MODULE" == initializer ]] \
+  || { echo 'test-core28 requires initializer and its previously installed reactor artifacts' >&2; exit 2; }
 BUILD_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/sihsalus-omods.XXXXXX")"
 save_reports() {
   if [[ -n "${OMOD_TEST_REPORTS:-}" && -n "${source_dir:-}" && -d "$source_dir" ]]; then
@@ -54,7 +57,11 @@ while read -r module repository revision checksum upstream_version version extra
     # REST and Initializer consume sibling test-jars even when not running tests.
     args+=(-DskipTests)
   fi
-  if [[ "$MODE" == test && ( "$module" == initializer || "$module" == patientdocuments ) ]]; then
+  if [[ "$MODE" == test-core28 ]]; then
+    # The complete Initializer reactor was installed by its Java 11 test job.
+    args+=(-pl api-2.8)
+  fi
+  if [[ "$MODE" == test-core28 || ( "$MODE" == test && "$module" == patientdocuments ) ]]; then
     # Legacy CGLIB/PowerMock tests need reflective class loading on Java 21.
     # The environment reaches forked Surefire JVMs without replacing upstream argLine.
     JDK_JAVA_OPTIONS="${JDK_JAVA_OPTIONS:-} --add-opens=java.base/java.lang=ALL-UNNAMED" \

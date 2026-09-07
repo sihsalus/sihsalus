@@ -12,14 +12,18 @@ The version rules prevent the release updater from silently replacing these
 artifacts. Update the source lock and POM together when adopting a newer release.
 
 Run `bash backend/bin/build-source-omods.sh test <module>` to run that source
-module's Maven tests. CI runs all ten source suites on Java 21 and checks the
-packaged versions and the compiled REST response protections. `OMOD_TEST_REPORTS`
+module's Maven tests. CI runs nine source suites on Java 21. Initializer's full
+reactor also exercises Core 2.1-era dependencies, so it runs on upstream's Java 11
+test baseline; CI then repeats its Core 2.8 integration tests on Java 21 with
+`test-core28 initializer`, using the installed reactor artifacts. Packaging uses
+Java 21 for all modules. CI checks packaged versions and the compiled REST
+response protections. `OMOD_TEST_REPORTS`
 can select a destination for Surefire XML evidence; `OMOD_MAVEN_REPOSITORY` can
 select an isolated dependency cache for local runs.
 
 Packaging compiles sibling test JARs required by upstream reactors, with execution
-left to the source test jobs. Initializer and Patient Documents run their legacy
-CGLIB/PowerMock tests with `java.lang` opened to the test JVM on Java 21; the
+left to the source test jobs. Patient Documents and Initializer's Core 2.8 tests
+run legacy CGLIB mocks with `java.lang` opened to the test JVM on Java 21; the
 application JVM is not changed by this test setting.
 
 The REST patch ports the content-response correction from
