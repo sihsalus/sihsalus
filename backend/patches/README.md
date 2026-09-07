@@ -32,6 +32,8 @@ to the released 3.5.0 javax Servlet/JUnit 4 branch. It serves CLOB content as UT
 plain text with `X-Content-Type-Options: nosniff`, reads uploads as UTF-8, and tests
 both direct CLOB and delegated form-resource responses. The upstream master
 branch uses Jakarta and must not replace this Core 2.8-compatible base.
+The SIHSalus module descriptor uses its explicit Maven version without upstream's
+extra SCM build-number suffix; the immutable source revision is recorded in the lock.
 
 Validation in DEV and then QLTY must use the same immutable image digest. Confirm
 all 33 modules are started, compare their versions to `backend/pom.xml`, and test
