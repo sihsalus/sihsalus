@@ -1,66 +1,66 @@
-# OpenMRS Gateway
+# Gateway SIHSALUS
 
-The gateway service is a simple Nginx Docker container that routes requests either to the frontend or the backend as appropriate. Using a service like this enables us to largely ignore CORS issues since both the backend and frontend are served from the same origin.
+Nginx sirve frontend, OpenMRS y servicios opcionales desde el mismo origen.
+Las rutas y políticas son compartidas por HTTP y HTTPS.
 
-The main configuration for the gateway can be found in the default.conf.template file. this file is processed at start-up by the NGinx Docker containers envsubst setup, which allows us to substitute  environment variables into the configuration.
+## Fuentes de configuración
 
-## Supported Environment Variables
+| Archivo | Responsabilidad |
+| --- | --- |
+| `nginx.conf` | Procesos, logs y compresión |
+| `templates/http.conf.template` | Listener HTTP |
+| `templates/https.conf.template` | Listener HTTPS, certificados, cookies TLS y challenge ACME |
+| `templates/includes/maps.conf.template` | CSP, esquema reenviado y ACL por dirección de conexión |
+| `templates/includes/routes.conf.template` | Rutas, upstreams y contingencias |
+| `security-headers.conf` | Cabeceras comunes; HSTS y Permissions-Policy solo en conexiones HTTPS |
+| `docker-entrypoint.sh` | Selección del listener y espera inicial de certificados |
+| `watch-certs.sh` | Recarga tras la señal de Certbot |
 
-`FRAME_ANCESTORS`
-: This should be a space separated list of origins that are allowed to embed OpenMRS in an IFRAME. For example "http://my.webpage/com http://my.webpage2.com". The syntax is described [on MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/frame-ancestors). By default, only pages served from the gateway can embed OpenMRS in an IFRAME.
+El entrypoint copia las plantillas seleccionadas a `/etc/nginx/templates`.
+El `envsubst` de la imagen oficial genera `conf.d/default.conf` y los includes
+bajo `conf.d/includes/`. Las plantillas compartidas se editan una sola vez.
+La instalación, confianza y renovación están en el
+[runbook HTTPS](../docs/operations/https.md).
 
-## Clinical activity heartbeat
+## Contratos de las rutas
 
-`POST /_sihsalus/clinical-activity` returns `204` without reaching OpenMRS. Its
-dedicated access log contains only a Unix timestamp and is consumed by the host
-[safe-poweroff policy](../docs/operations/safe-poweroff.md). Never add request
-paths, IPs, cookies, identifiers, bodies, or user agents to that log format.
+- `/health` responde desde Nginx; `/startup` y `/ready` consultan OpenMRS.
+  Los upstreams usan Docker DNS al solicitarse, por lo que el gateway puede
+  arrancar aunque el nombre del backend todavía no exista.
+- `/openmrs/spa/` elimina su prefijo hacia el frontend. OpenMRS y Grafana
+  conservan sus prefijos, incluidas las conexiones WebSocket y SSE.
+- `/ayuda/` resuelve `docs` de forma diferida, adapta sus redirects y devuelve
+  una contingencia 503 si falta, sin bloquear la aplicación.
+- `/services/fua-generator/` elimina solo su prefijo, conserva subruta,
+  parámetros y método, y devuelve JSON con estado 503 si falta el generador.
+  La misma ruta está disponible en HTTP y HTTPS con el perfil `fua`.
+- Imaging permanece cerrado hasta cargar su override de autorización.
+- `POST /_sihsalus/clinical-activity` devuelve 204. Su log contiene únicamente
+  un timestamp para la [política de apagado](../docs/operations/safe-poweroff.md);
+  no agregar IP, cookies, rutas, cuerpos ni otros identificadores.
 
-## Portal de ayuda
+Las ubicaciones con un `add_header` propio vuelven a incluir
+`security-headers.conf`, conforme a la
+[herencia de Nginx](https://nginx.org/en/docs/http/ngx_http_headers_module.html#add_header).
+La página de contingencia usa CSS local para conservar su estilo con CSP activa.
 
-`/ayuda/` se publica desde el servicio estático `docs`. El upstream se resuelve
-de forma diferida y no participa en `depends_on`: si la documentación no está
-disponible, el gateway devuelve una página breve de contingencia y conserva
-operativos el frontend, OpenMRS y sus señales de salud. Los redirects canónicos
-del servidor estático se reescriben para conservar siempre el prefijo `/ayuda/`.
+`FRAME_ANCESTORS` configura los orígenes adicionales que pueden embeber la
+aplicación, separados por espacios. Las ACL de Imaging proceden de Compose.
+`X-Real-IP` se conserva por compatibilidad con proxies; si falta se usa la
+conexión. HTTP acepta `X-Forwarded-Proto` únicamente como `http` o `https`;
+HTTPS reenvía su propio esquema. Estas cabeceras no prueban identidad: un proxy
+anterior debe limpiar las cabeceras y aplicar su ACL de entrada.
 
-## Configuración compartida
+## Migración
 
-`nginx.conf` contiene el formato de logs y la compresión común. Las plantillas
-`default.conf.template` y `default-ssl.conf.template` conservan las diferencias
-de HTTP y HTTPS. `security-headers.conf` reúne las cabeceras comunes;
-`security-headers-ssl.conf` agrega HSTS y Permissions-Policy para HTTPS.
-
-Una ubicación que declara su propio `add_header` debe volver a incluir la
-política de cabeceras correspondiente. Nginx 1.28 deja de heredar el bloque
-superior en ese caso, incluso con `always`; véase la
-[documentación de Nginx](https://nginx.org/en/docs/http/ngx_http_headers_module.html#add_header).
-Esto también aplica a respuestas de contingencia y al heartbeat clínico.
-La página de espera carga `backend-unavailable.css` desde el propio gateway,
-por lo que conserva su estilo con CSP activa y con el backend fuera de servicio.
-
-Los upstreams se resuelven al recibir la petición mediante Docker DNS. No
-agregar un bloque estático `upstream backend`: volvería a impedir el arranque
-del gateway cuando el nombre del backend todavía no exista.
-
-En HTTPS, `/services/fua-generator/` elimina únicamente ese prefijo, conserva
-la subruta, los parámetros y el método, y devuelve JSON con estado 503 cuando
-el servicio no está disponible. `proxy_pass` con una variable seguida de `/`
-reemplaza la URI completa por `/`; véase
-[proxy_pass](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_pass).
-El modo HTTP todavía usa las extensiones históricas `FUA_CONFIG` y
-`FUA_LOCATIONS`; no se han retirado ni migrado en este cambio.
-
-La compatibilidad con proxies previos conserva `X-Real-IP` cuando llega
-informado y utiliza la dirección de conexión cuando falta. HTTP acepta
-`X-Forwarded-Proto` con valor `http` o `https`, y usa su propio esquema para
-los demás valores. Esto no autentica esas cabeceras: no deben usarse como
-prueba de identidad ni como ACL. Antes de publicar detrás de otro proxy,
-definir qué direcciones son de confianza y cómo ese proxy limpia las cabeceras.
+Se retiran `FUA_CONFIG` y `FUA_LOCATIONS`: no hacen falta para publicar el
+perfil FUA. Elimina esas variables del entorno; si una instalación inyectaba
+rutas propias, incorpora la configuración revisada en la plantilla de rutas.
+Reconstruye el gateway conservando la composición efectiva del servidor.
 
 ## Pruebas
 
-Con Docker activo, Python 3 y OpenSSL 3:
+Desde la raíz, con Docker activo, Python 3 y OpenSSL 3:
 
 ```sh
 python3 tests/gateway/routing.py
@@ -69,9 +69,8 @@ bash tests/backend/realtime-notifications-config.sh
 bash scripts/validate-compose.sh
 ```
 
-Las pruebas de rutas usan certificados efímeros y respuestas ficticias, crean
-redes separadas y publican puertos aleatorios únicamente en `127.0.0.1`.
-Eliminan sus contenedores y redes al terminar. Cubren HTTP y HTTPS, cabeceras
-de error, FUA, compresión, transporte de notificaciones y arranque sin DNS del
-backend. `GATEWAY_TEST_IMAGE` permite usar una imagen Nginx 1.28 ya disponible;
-`GATEWAY_CONFIG_DIR` permite contrastar otra versión de las plantillas.
+Las pruebas usan el entrypoint real, certificados efímeros y upstreams
+ficticios en redes separadas; sus puertos se publican solo en `127.0.0.1`.
+Eliminan sus contenedores y redes al terminar. `GATEWAY_TEST_IMAGE` permite
+seleccionar una imagen Nginx 1.28 disponible y `GATEWAY_CONFIG_DIR` otra
+carpeta con esta estructura de configuración.

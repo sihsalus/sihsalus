@@ -33,7 +33,7 @@ for allowed_uri in \
   fi
 done
 
-for gateway_template in gateway/default.conf.template gateway/default-ssl.conf.template; do
+for gateway_template in gateway/templates/includes/routes.conf.template; do
   if grep -Eq 'proxy_pass http://backend(/|:)' "$gateway_template"; then
     echo "[FAIL] $gateway_template must resolve backend health routes dynamically" >&2
     exit 1
@@ -69,7 +69,7 @@ for gateway_template in gateway/default.conf.template gateway/default-ssl.conf.t
     exit 1
   fi
 
-  spa_csp="$(grep -F '"~^/openmrs/spa/"' "$gateway_template")"
+  spa_csp="$(grep -F '"~^/openmrs/spa/"' gateway/templates/includes/maps.conf.template)"
   spa_script_policy="${spa_csp#*script-src }"
   spa_script_policy="${spa_script_policy%%;*}"
   if [ "$spa_script_policy" != "'self'" ]; then
@@ -77,7 +77,7 @@ for gateway_template in gateway/default.conf.template gateway/default-ssl.conf.t
     exit 1
   fi
 
-  docs_csp="$(grep -F '"~^/ayuda/"' "$gateway_template")"
+  docs_csp="$(grep -F '"~^/ayuda/"' gateway/templates/includes/maps.conf.template)"
   docs_script_policy="${docs_csp#*script-src }"
   docs_script_policy="${docs_script_policy%%;*}"
   if [ "$docs_script_policy" != "'self' 'unsafe-inline'" ]; then

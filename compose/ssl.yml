@@ -16,7 +16,7 @@ services:
       dockerfile: Dockerfile
     environment:
       SSL_MODE: ${SSL_MODE:-dev}
-      CERT_WEB_DOMAINS: ${CERT_WEB_DOMAINS:-localhost,127.0.0.1,192.168.0.200,sihsalus.hsc,openmrs.sihsalus.hsc}
+      CERT_WEB_DOMAINS: ${CERT_WEB_DOMAINS:-localhost,127.0.0.1}
       CERT_WEB_DOMAIN_COMMON_NAME: ${CERT_WEB_DOMAIN_COMMON_NAME:-}
       CERT_CONTACT_EMAIL: ${CERT_CONTACT_EMAIL:-}
       SSL_STAGING: ${SSL_STAGING:-false}
@@ -43,7 +43,7 @@ services:
     ports:
       - "${GATEWAY_HTTPS_PORT:-443}:443"
     environment:
-      CERT_WEB_DOMAINS: ${CERT_WEB_DOMAINS:-localhost,127.0.0.1,192.168.0.200,sihsalus.hsc,openmrs.sihsalus.hsc}
+      CERT_WEB_DOMAINS: ${CERT_WEB_DOMAINS:-localhost,127.0.0.1}
       CERT_WEB_DOMAIN_COMMON_NAME: ${CERT_WEB_DOMAIN_COMMON_NAME:-}
       FRAME_ANCESTORS: ${FRAME_ANCESTORS:-https://dyaku.minsa.gob.pe/fhir}
     healthcheck:

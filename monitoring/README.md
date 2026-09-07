@@ -483,16 +483,11 @@ Ver [compose/ssl.yml](../compose/ssl.yml)
 
 ### Backup de dashboards
 
-```bash
-# Exportar dashboards como JSON
-docker compose --profile monitoring exec grafana grafana-cli admin export-dashboard 1 > dashboard1.json
-
-# Importar
-curl -X POST http://localhost:3001/api/dashboards/db \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer TOKEN" \
-  -d @dashboard1.json
-```
+Los dashboards se versionan en [grafana/dashboards](grafana/dashboards/) y se
+cargan mediante [provisioning](grafana/provisioning/dashboards/dashboards.yml).
+Su respaldo y recuperación se hacen desde Git. Modifica esos JSON y valida con
+`tests/monitoring/config-validation.sh`; el provisioning deshabilita las
+ediciones persistentes desde la interfaz de Grafana.
 
 ---
 

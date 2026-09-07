@@ -5,7 +5,6 @@ import gzip
 import json
 import os
 from pathlib import Path
-import re
 import ssl
 import subprocess
 import tempfile
@@ -23,6 +22,11 @@ IMAGE = os.environ.get("GATEWAY_TEST_IMAGE", "nginx:1.28-alpine")
 
 def command(*args):
     return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT).strip()
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 class GatewayRouting(unittest.TestCase):
@@ -46,7 +50,10 @@ class GatewayRouting(unittest.TestCase):
         command("openssl", "genpkey", "-genparam", "-algorithm", "DH",
                 "-pkeyopt", "group:ffdhe2048", "-out", str(certs / "ssl-dhparams.pem"))
         (certs / "options-ssl-nginx.conf").write_text("ssl_protocols TLSv1.2 TLSv1.3;\n")
+        (certs / ".well-known" / "acme-challenge").mkdir(parents=True)
+        (certs / ".well-known" / "acme-challenge" / "probe").write_text("synthetic challenge")
         cls.tls = ssl.create_default_context(cafile=str(certs / "fullchain.pem"))
+        cls.redirect_urls = {}
         cls.network = cls.create_network("network")
         upstream = cls.directory / "upstream.conf"
         upstream.write_text('''server {
@@ -57,6 +64,10 @@ class GatewayRouting(unittest.TestCase):
   location = /openmrs/health/started { return 503 'bootstrap pending'; }
   location = /openmrs/unavailable { return 503 'backend unavailable'; }
   location = /unavailable { return 503 'upstream unavailable'; }
+  location = /openmrs/cookie {
+    add_header Set-Cookie 'JSESSIONID=synthetic; Path=/; HttpOnly';
+    return 200 'synthetic session';
+  }
   location = /gzip { default_type text/plain; return 200 'GZIP_BODY'; }
   location / {
     default_type application/json;
@@ -97,43 +108,46 @@ class GatewayRouting(unittest.TestCase):
         return name
 
     @classmethod
-    def run_container(cls, suffix, network, options):
+    def run_container(cls, suffix, network, options, entrypoint="nginx"):
         name = cls.prefix + "-" + suffix
         cls.containers.append(name)
+        arguments = ["-g", "daemon off;"]
+        if entrypoint != "nginx":
+            arguments.insert(0, "nginx")
         command("docker", "run", "-d", "--name", name, "--network", network,
                 "--cpus", "1", "--memory", "192m", "--pids-limit", "128",
-                *options, "--entrypoint", "nginx", IMAGE, "-g", "daemon off;")
+                *options, "--entrypoint", entrypoint, IMAGE, *arguments)
         return name
 
     @classmethod
     def start_gateway(cls, scheme, network, suffix):
-        template = "default-ssl.conf.template" if scheme == "https" else "default.conf.template"
-        values = {"FRAME_ANCESTORS": "", "FUA_CONFIG": "", "FUA_LOCATIONS": "",
-                  "CERT_WEB_DOMAIN_COMMON_NAME": "gateway.test",
-                  "IMAGING_ACCESS_CONTROL": "deny all;",
-                  "IMAGING_NETWORK_ACCESS_CONTROL": "deny all;"}
-        rendered = re.sub(r"\$\{([A-Z_]+)\}", lambda match: values[match[1]],
-                          (CONFIG / template).read_text())
-        configuration = cls.directory / (suffix + ".conf")
-        configuration.write_text(rendered)
         port = "443" if scheme == "https" else "80"
         options = [
             "-p", f"127.0.0.1::{port}",
+            "-e", "FRAME_ANCESTORS=",
+            "-e", "IMAGING_ACCESS_CONTROL=deny all;",
+            "-e", "IMAGING_NETWORK_ACCESS_CONTROL=deny all;",
             "-v", f"{CONFIG / 'nginx.conf'}:/etc/nginx/nginx.conf:ro",
             "-v", f"{CONFIG}:/etc/nginx/includes:ro",
-            "-v", f"{configuration}:/etc/nginx/conf.d/default.conf:ro",
+            "-v", f"{CONFIG / 'templates'}:/etc/nginx/conf-templates:ro",
+            "-v", f"{CONFIG / 'docker-entrypoint.sh'}:/usr/local/bin/docker-entrypoint.sh:ro",
+            "-v", f"{CONFIG / 'watch-certs.sh'}:/usr/local/bin/watch-certs.sh:ro",
+            "-v", f"{CONFIG / 'backend-unavailable.css'}:/usr/share/nginx/html/backend-unavailable.css:ro",
             "-v", f"{cls.directory / 'certs'}:/etc/letsencrypt/live/gateway.test:ro",
             "-v", f"{cls.directory / 'certs'}:/var/www/certbot/conf:ro",
         ]
-        stylesheet = CONFIG / "backend-unavailable.css"
-        if stylesheet.exists():
-            options.extend(["-v", f"{stylesheet}:/usr/share/nginx/html/backend-unavailable.css:ro"])
-        name = cls.run_container(suffix, network, options)
+        if scheme == "https":
+            options.extend(["-e", "CERT_WEB_DOMAINS=gateway.test,localhost",
+                            "-p", "127.0.0.1::80",
+                            "-v", f"{cls.directory / 'certs' / '.well-known'}:/var/www/certbot/.well-known:ro"])
+        name = cls.run_container(suffix, network, options, "/usr/local/bin/docker-entrypoint.sh")
         try:
             address = command("docker", "port", name, port + "/tcp")
         except subprocess.CalledProcessError as error:
             raise AssertionError(error.output + command("docker", "logs", name)) from error
         url = scheme + "://" + address
+        if scheme == "https":
+            cls.redirect_urls[url] = "http://" + command("docker", "port", name, "80/tcp")
         for _ in range(30):
             try:
                 if cls.request(url, "/health")[0] == 200:
@@ -146,31 +160,61 @@ class GatewayRouting(unittest.TestCase):
     @classmethod
     def request(cls, url, path, method="GET", headers=None):
         request = urllib.request.Request(url + path, method=method, headers=headers or {})
+        opener = urllib.request.build_opener(NoRedirect(), urllib.request.HTTPSHandler(context=cls.tls))
         try:
-            response = urllib.request.urlopen(request, context=cls.tls, timeout=5)
+            response = opener.open(request, timeout=5)
         except urllib.error.HTTPError as error:
             response = error
         with response:
             return response.status, response.headers, response.read()
 
+    def test_https_listener_redirects_and_preserves_acme(self):
+        url = self.redirect_urls[self.urls["https"]]
+        status, headers, _ = self.request(url, "/openmrs/spa/home?mode=test")
+        self.assertEqual(status, 301)
+        self.assertEqual(headers["Location"], "https://127.0.0.1/openmrs/spa/home?mode=test")
+        status, _, body = self.request(url, "/.well-known/acme-challenge/probe")
+        self.assertEqual(status, 200)
+        self.assertEqual(body, b"synthetic challenge")
+
+    def test_tls_cookie_flags_and_legacy_password_routes(self):
+        for scheme, url in self.urls.items():
+            with self.subTest(scheme=scheme, cookie=True):
+                _, headers, _ = self.request(url, "/openmrs/cookie")
+                cookie = headers["Set-Cookie"].lower()
+                self.assertEqual("secure" in cookie, scheme == "https")
+                self.assertEqual("samesite=strict" in cookie, scheme == "https")
+            for method in ("GET", "POST"):
+                for path in ("/openmrs/forgotPassword.form",
+                             "/openmrs;jsessionid=test/forgotPassword.form",
+                             "/openmrs/forgotPassword.form;jsessionid=test"):
+                    with self.subTest(scheme=scheme, path=path, method=method):
+                        self.assertEqual(self.request(url, path, method)[0], 404)
+            with self.subTest(scheme=scheme, legacy_return=True):
+                status, headers, _ = self.request(url, "/openmrs/index.htm")
+                self.assertEqual(status, 302)
+                self.assertEqual(headers["Location"], "/openmrs/spa/home")
+
     def test_fua_preserves_path_query_and_method(self):
-        for method in ("GET", "POST"):
-            with self.subTest(method=method):
-                status, _, body = self.request(self.urls["https"],
-                    "/services/fua-generator/forms/example?format=pdf&copy=2", method)
-                self.assertEqual(status, 200)
-                response = json.loads(body)
-                self.assertEqual(response["uri"], "/forms/example?format=pdf&copy=2")
-                self.assertEqual(response["method"], method)
+        for scheme, url in self.urls.items():
+            for method in ("GET", "POST"):
+                with self.subTest(scheme=scheme, method=method):
+                    status, _, body = self.request(url,
+                        "/services/fua-generator/forms/example?format=pdf&copy=2", method)
+                    self.assertEqual(status, 200)
+                    response = json.loads(body)
+                    self.assertEqual(response["uri"], "/forms/example?format=pdf&copy=2")
+                    self.assertEqual(response["method"], method)
 
     def test_fua_unavailable_is_json_with_security_headers(self):
-        status, headers, body = self.request(self.urls["https"],
-                                             "/services/fua-generator/unavailable")
-        self.assertEqual(status, 503)
-        self.assertEqual(headers.get_all("Content-Type"), ["application/json"])
-        self.assertEqual(json.loads(body)["status"], 503)
-        self.assertEqual(headers.get("X-Content-Type-Options"), "nosniff")
-        self.assertIn("max-age=", headers.get("Strict-Transport-Security", ""))
+        for scheme, url in self.urls.items():
+            with self.subTest(scheme=scheme):
+                status, headers, body = self.request(url, "/services/fua-generator/unavailable")
+                self.assertEqual(status, 503)
+                self.assertEqual(headers.get_all("Content-Type"), ["application/json"])
+                self.assertEqual(json.loads(body)["status"], 503)
+                self.assertEqual(headers.get("X-Content-Type-Options"), "nosniff")
+                self.assertEqual(bool(headers.get("Strict-Transport-Security")), scheme == "https")
 
     def test_security_headers_survive_local_headers(self):
         for scheme, url in self.urls.items():
