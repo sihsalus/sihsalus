@@ -7,3 +7,5 @@ Dockerfile text eol=lf
 *.json text eol=lf
 *.xml text eol=lf
 *.properties text eol=lf
+# Unified-diff context adds a space before upstream Java tab indentation.
+backend/patches/o3forms.patch whitespace=-space-before-tab

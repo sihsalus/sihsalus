@@ -79,6 +79,12 @@
         <ignoreVersion type="regex">.*</ignoreVersion>
       </ignoreVersions>
     </rule>
+    <!-- O3 Forms includes a pinned translation-loading correction. -->
+    <rule groupId="org.openmrs.module" artifactId="o3forms-omod">
+      <ignoreVersions>
+        <ignoreVersion type="regex">.*</ignoreVersion>
+      </ignoreVersions>
+    </rule>
     <rule groupId="org.openmrs.module" artifactId="bedmanagement-omod">
       <ignoreVersions>
         <ignoreVersion type="regex">.*</ignoreVersion>

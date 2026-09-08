@@ -1,0 +1,127 @@
+diff --git a/omod/src/main/java/org/openmrs/module/o3forms/api/impl/O3FormsServiceImpl.java b/omod/src/main/java/org/openmrs/module/o3forms/api/impl/O3FormsServiceImpl.java
+index 802da29..73b0085 100644
+--- a/omod/src/main/java/org/openmrs/module/o3forms/api/impl/O3FormsServiceImpl.java
++++ b/omod/src/main/java/org/openmrs/module/o3forms/api/impl/O3FormsServiceImpl.java
+@@ -515,6 +515,10 @@ public class O3FormsServiceImpl extends BaseOpenmrsService implements O3FormsSer
+ 	private Optional<Map<String, Object>> getTranslationsByPreferredLocales(LinkedHashSet<Locale> locales,
+ 	        List<FormResource> formResources) {
+ 		for (Locale locale : locales) {
++			// Skip absent locales without changing the caller's preference order or shared locale state.
++			if (locale == null) {
++				continue;
++			}
+ 			String needle = "_translations_" + locale.toLanguageTag();
+ 			for (FormResource resource : formResources) {
+ 				if (resource.getName() != null && resource.getName().endsWith(needle)) {
+@@ -1032,4 +1036,4 @@ public class O3FormsServiceImpl extends BaseOpenmrsService implements O3FormsSer
+ 			throw new FormSchemaReadException(e);
+ 		}
+ 	}
+-}
+\ No newline at end of file
++}
+diff --git a/omod/src/test/java/org/openmrs/module/o3forms/api/impl/O3FormsLocaleTest.java b/omod/src/test/java/org/openmrs/module/o3forms/api/impl/O3FormsLocaleTest.java
+new file mode 100644
+index 0000000..f6be1ce
+--- /dev/null
++++ b/omod/src/test/java/org/openmrs/module/o3forms/api/impl/O3FormsLocaleTest.java
+@@ -0,0 +1,99 @@
++/*
++ * This Source Code Form is subject to the terms of the Mozilla Public License,
++ * v. 2.0. If a copy of the MPL was not distributed with this file, You can
++ * obtain one at http://mozilla.org/MPL/2.0/. OpenMRS is also distributed under
++ * the terms of the Healthcare Disclaimer located at http://openmrs.org/license.
++ *
++ * Copyright (C) OpenMRS Inc. OpenMRS is a registered trademark and the OpenMRS
++ * graphic logo is a trademark of OpenMRS Inc.
++ */
++package org.openmrs.module.o3forms.api.impl;
++
++import static org.junit.Assert.assertEquals;
++import static org.junit.Assert.assertFalse;
++import static org.junit.Assert.assertTrue;
++
++import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.Collections;
++import java.util.LinkedHashSet;
++import java.util.List;
++import java.util.Locale;
++import java.util.Map;
++import java.util.Optional;
++
++import org.junit.Test;
++import org.openmrs.FormResource;
++import org.openmrs.api.context.Context;
++import org.openmrs.api.db.ClobDatatypeStorage;
++import org.openmrs.web.test.BaseModuleWebContextSensitiveTest;
++import org.springframework.test.util.ReflectionTestUtils;
++
++public class O3FormsLocaleTest extends BaseModuleWebContextSensitiveTest {
++
++	private FormResource translationResource(String language, String label) {
++		ClobDatatypeStorage storage = new ClobDatatypeStorage();
++		storage.setValue("{\"translations\":{\"synthetic-label\":\"" + label + "\"}}");
++		Context.getDatatypeService().saveClobDatatypeStorage(storage);
++		FormResource resource = new FormResource();
++		resource.setName("synthetic_form_translations_" + language);
++		resource.setValueReferenceInternal(storage.getUuid());
++		return resource;
++	}
++
++	private Optional<Map<String, Object>> translations(LinkedHashSet<Locale> locales, List<FormResource> resources) {
++		// Exercise the exact preferred-locale boundary without modifying Core's shared locale caches.
++		List<Locale> originalLocales = new ArrayList<>(locales);
++		Optional<Map<String, Object>> result = ReflectionTestUtils.invokeMethod(new O3FormsServiceImpl(),
++		    "getTranslationsByPreferredLocales", locales, resources);
++		assertEquals("The caller's locales and their order must be preserved", originalLocales, new ArrayList<>(locales));
++		return result;
++	}
++
++	@Test
++	public void shouldSkipNullBeforeAnAvailableTranslation() {
++		LinkedHashSet<Locale> locales = new LinkedHashSet<>(Arrays.asList(null, Locale.ENGLISH));
++		Optional<Map<String, Object>> result = translations(locales,
++		    Collections.singletonList(translationResource("en", "Synthetic English")));
++		assertTrue(result.isPresent());
++		assertEquals("Synthetic English", result.get().get("synthetic-label"));
++	}
++
++	@Test
++	public void shouldContinuePastNullToTheNextConfiguredLocale() {
++		LinkedHashSet<Locale> locales = new LinkedHashSet<>(Arrays.asList(Locale.FRENCH, null, Locale.ENGLISH));
++		Optional<Map<String, Object>> result = translations(locales,
++		    Collections.singletonList(translationResource("en", "Synthetic English")));
++		assertTrue(result.isPresent());
++		assertEquals("Synthetic English", result.get().get("synthetic-label"));
++	}
++
++	@Test
++	public void shouldNotInventAFallbackWhenOnlyNullIsAvailable() {
++		LinkedHashSet<Locale> locales = new LinkedHashSet<>(Collections.singletonList(null));
++		assertFalse(translations(locales,
++		    Collections.singletonList(translationResource("en", "Synthetic English"))).isPresent());
++	}
++
++	@Test
++	public void shouldLeaveTranslationsAbsentWhenNoResourceMatches() {
++		LinkedHashSet<Locale> locales = new LinkedHashSet<>(Arrays.asList(Locale.FRENCH, null));
++		assertFalse(translations(locales,
++		    Collections.singletonList(translationResource("en", "Synthetic English"))).isPresent());
++	}
++
++	@Test
++	public void shouldPreserveTheFirstAvailableLocaleAndTheInputSet() {
++		LinkedHashSet<Locale> locales = new LinkedHashSet<>(Arrays.asList(new Locale("es"), null, Locale.ENGLISH));
++		Optional<Map<String, Object>> result = translations(locales, Arrays.asList(
++		    translationResource("en", "Synthetic English"), translationResource("es", "Synthetic Spanish")));
++		assertTrue(result.isPresent());
++		assertEquals("Synthetic Spanish", result.get().get("synthetic-label"));
++	}
++
++	@Test
++	public void shouldLeaveTranslationsAbsentForAnEmptyLocaleSet() {
++		assertFalse(translations(new LinkedHashSet<>(),
++		    Collections.singletonList(translationResource("en", "Synthetic English"))).isPresent());
++	}
++}

@@ -27,6 +27,14 @@ Package contents:
 #### OpenMRS modules
 `omod`s are specified as Maven `<dependency>` in the [pom.xml](pom.xml) file.
 
+SIH Salus source-built modules also require an immutable entry in
+[`omod-sources.lock`](omod-sources.lock). See
+[`patches/README.md`](patches/README.md) for the build/test commands and patch
+contracts. O3 Forms uses the pinned 2.3.0 source with a null-locale translation
+fix, versioned `2.3.0-sihsalus.1`; installing the upstream 2.3.0 artifact does
+not include that correction. This patch does not change form schemas, clinical
+writes, permissions, locale configuration or database structure.
+
 #### OpenMRS Configuration (Initializer)
 OpenMRS config can be set under [`backend/config/openmrs_config/`](config/openmrs_config/) when present.
 

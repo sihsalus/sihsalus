@@ -12,7 +12,7 @@ The version rules prevent the release updater from silently replacing these
 artifacts. Update the source lock and POM together when adopting a newer release.
 
 Run `bash backend/bin/build-source-omods.sh test <module>` to run that source
-module's Maven tests. CI runs nine source suites on Java 21. Initializer's full
+module's Maven tests. CI runs ten source suites on Java 21. Initializer's full
 reactor also exercises Core 2.1-era dependencies, so it runs on upstream's Java 11
 test baseline; CI then repeats its Core 2.8 integration tests on Java 21 with
 `test-core28 initializer`, using the installed reactor artifacts. Packaging uses
@@ -22,9 +22,14 @@ can select a destination for Surefire XML evidence; `OMOD_MAVEN_REPOSITORY` can
 select an isolated dependency cache for local runs.
 
 Packaging compiles sibling test JARs required by upstream reactors, with execution
-left to the source test jobs. Patient Documents and Initializer's Core 2.8 tests
+left to the source test jobs. Patient Documents, O3 Forms and Initializer's Core 2.8 tests
 run legacy CGLIB mocks with `java.lang` opened to the test JVM on Java 21; the
 application JVM is not changed by this test setting.
+
+O3 Forms' upstream tests additionally use Core 2.3's legacy XStream harness.
+Only `test o3forms` opens `java.util`, `java.lang.reflect`, `java.text` and
+`java.awt.font` to that test JVM on Java 21. The package mode, dependencies and
+deployed JVM options are unchanged; these flags do not relax application access.
 
 The REST patch ports the content-response correction from
 [upstream PR #748](https://github.com/openmrs/openmrs-module-webservices.rest/pull/748)
@@ -34,6 +39,26 @@ both direct CLOB and delegated form-resource responses. The upstream master
 branch uses Jakarta and must not replace this Core 2.8-compatible base.
 The SIHSalus module descriptor uses its explicit Maven version without upstream's
 extra SCM build-number suffix; the immutable source revision is recorded in the lock.
+
+The O3 Forms patch is based on the released 2.3.0 source, not upstream's moving
+main branch. A null entry in the ordered locale preferences previously caused
+translation loading to throw instead of returning the compiled form. The patch
+skips null entries and retains the original preference order, translation
+fallbacks and main-form overrides of referenced-form translations. It does not
+modify the shared locale list, set a new default language, suppress unrelated
+errors, change clinical schemas or bypass permissions. The origin of a runtime
+null locale must be investigated separately; this guard does not establish a
+configuration error. No database migration is added by this O3 Forms change.
+
+Run `bash backend/bin/build-source-omods.sh test o3forms` to reproduce the
+module's complete test suite, including null-locale regressions. Before rollout,
+validate compiled form loading and translations with synthetic forms in DEV/QLTY.
+The frontend consumer must explicitly accept `2.3.0-sihsalus.1` as well as the
+upstream `>=2.3.0` range: a SemVer prerelease does not satisfy that minimum.
+Do not weaken the shared version comparator or deploy a mismatched consumer.
+Rollback requires the previously verified immutable backend image; it restores
+the old null-locale form-loading failure too. Other changes
+between deployed distribution versions can have separate migration requirements.
 
 Validation in DEV and then QLTY must use the same immutable image digest. Confirm
 all 33 modules are started, compare their versions to `backend/pom.xml`, and test

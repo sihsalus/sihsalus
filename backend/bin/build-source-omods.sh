@@ -61,10 +61,19 @@ while read -r module repository revision checksum upstream_version version extra
     # The complete Initializer reactor was installed by its Java 11 test job.
     args+=(-pl api-2.8)
   fi
-  if [[ "$MODE" == test-core28 || ( "$MODE" == test && "$module" == patientdocuments ) ]]; then
+  if [[ "$MODE" == test-core28 || ( "$MODE" == test && ( "$module" == patientdocuments || "$module" == o3forms ) ) ]]; then
     # Legacy CGLIB/PowerMock tests need reflective class loading on Java 21.
     # The environment reaches forked Surefire JVMs without replacing upstream argLine.
-    JDK_JAVA_OPTIONS="${JDK_JAVA_OPTIONS:-} --add-opens=java.base/java.lang=ALL-UNNAMED" \
+    test_jvm_options="${JDK_JAVA_OPTIONS:-} --add-opens=java.base/java.lang=ALL-UNNAMED"
+    if [[ "$MODE" == test && "$module" == o3forms ]]; then
+      # O3 Forms' Core 2.3 test harness uses legacy XStream reflection as well.
+      # These options never reach package mode or the deployed application JVM.
+      test_jvm_options+=" --add-opens=java.base/java.util=ALL-UNNAMED"
+      test_jvm_options+=" --add-opens=java.base/java.lang.reflect=ALL-UNNAMED"
+      test_jvm_options+=" --add-opens=java.base/java.text=ALL-UNNAMED"
+      test_jvm_options+=" --add-opens=java.desktop/java.awt.font=ALL-UNNAMED"
+    fi
+    JDK_JAVA_OPTIONS="$test_jvm_options" \
       "${MAVEN[@]}" -f "$source_dir/pom.xml" "${args[@]}" install
   else
     "${MAVEN[@]}" -f "$source_dir/pom.xml" "${args[@]}" install

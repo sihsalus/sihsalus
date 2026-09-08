@@ -9,3 +9,4 @@ billing openmrs/openmrs-module-billing 2e21085067a6cfc33f9c5c04f466aa983e63571b 
 emrapi openmrs/openmrs-module-emrapi a06a2efd651435609a1c4b39ef35501b3401ff5d 2295f74bfaa198a2ab0b8b7bf298054c93ff93f8e20ae729c3275089c46cfc23 3.5.0-SNAPSHOT 3.5.0-sihsalus.1
 fhir2 openmrs/openmrs-module-fhir2 069deb714818428540719182472ea13711628526 15fe6277c775a746899fa0f0f339eaae983a97624decad4a4f5adad0b4eca4b3 4.3.0-SNAPSHOT 4.3.0-sihsalus.1
 authentication openmrs/openmrs-module-authentication 3fb02d5a067826af01019e638d1354ccc9ac4a33 129cb9dc2a1ad5ba9399de9a28679e828c9208a3c04153e96e447dfecd5eb891 2.4.0-SNAPSHOT 2.4.0-sihsalus.1
+o3forms openmrs/openmrs-module-o3forms 34733b3b909e8e35456c9afa7d643cc22c52bb91 cdce100db0a49045990cc41c33b553a13a0f9d852b957e622789ff173c8fbf33 2.3.0 2.3.0-sihsalus.1
