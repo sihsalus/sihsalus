@@ -42,7 +42,6 @@ include:
     project_directory: .
   - path: compose/indicadores.yml
     project_directory: .
-
 volumes:
   # Core
   openmrs-data:
@@ -63,6 +62,10 @@ volumes:
   # Monitoring (profile: monitoring)
   prometheus-data:
     name: sihsalus-prometheus-data
+  alertmanager-data:
+    name: sihsalus-alertmanager-data
+  operations-metrics:
+    name: sihsalus-operations-metrics
   loki-data:
     name: sihsalus-loki-data
   alloy-data:
@@ -82,10 +85,4 @@ networks:
         - subnet: 172.27.0.0/24
   # Red de monitoreo - Prometheus, Loki, Grafana
   monitoring-network:
-    driver: bridge
-  # Enlace punto a punto gateway <-> grafana para servir /grafana/ por HTTPS.
-  # Deliberadamente NO incluye loki, alloy ni docker-socket-proxy: el gateway
-  # es el unico contenedor expuesto a la LAN y no debe alcanzar el proxy del
-  # socket de Docker.
-  monitoring-edge:
     driver: bridge

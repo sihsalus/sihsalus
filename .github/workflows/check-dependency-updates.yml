@@ -16,12 +16,16 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
+      actions: write
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
+          fetch-depth: 0
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 21
@@ -39,17 +43,30 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Commit and push dependency updates
+      - name: Propose release updates through a pull request
         if: steps.releases.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+          branch='automation/omod-releases'
+          old_sha="$(git ls-remote --heads origin "$branch" | cut -f1)"
+          git checkout -b "$branch"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add backend/pom.xml
-          git commit -m "chore: update OpenMRS module versions"
-          git push
+          git commit -m "chore(backend): update published OMOD releases"
+          git push "--force-with-lease=refs/heads/$branch:$old_sha" origin "HEAD:refs/heads/$branch"
+          pr="$(gh pr list --base main --head "$branch" --state open --json number --jq '.[0].number // empty')"
+          if [ -z "$pr" ]; then
+            body="${RUNNER_TEMP}/omod-release-pr.md"
+            cat > "$body" <<'BODY'
+          Updates the published OMOD releases allowed by backend/version-rules.xml.
 
-      - name: Trigger backend build on new versions
-        if: steps.releases.outputs.changed == 'true'
-        run: gh workflow run build-backend.yml
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          Modules built from pinned source revisions remain controlled by backend/omod-sources.lock. Required CI verifies the packaged modules before integration. DEV/QLTY validation is required before deployment.
+          BODY
+            gh pr create --base main --head "$branch" \
+              --title "chore(backend): update published OMOD releases" --body-file "$body"
+          fi
+          # GITHUB_TOKEN-created pushes/PRs do not trigger CI automatically.
+          gh workflow run ci.yml --ref "$branch"

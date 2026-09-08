@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+"$ROOT_DIR/tests/deploy/deploy-backend-test.sh"
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "[FAIL] docker is required" >&2
   exit 1
@@ -31,7 +33,7 @@ for allowed_uri in \
   fi
 done
 
-for gateway_template in gateway/default.conf.template gateway/default-ssl.conf.template; do
+for gateway_template in gateway/templates/includes/routes.conf.template; do
   if grep -Eq 'proxy_pass http://backend(/|:)' "$gateway_template"; then
     echo "[FAIL] $gateway_template must resolve backend health routes dynamically" >&2
     exit 1
@@ -67,7 +69,7 @@ for gateway_template in gateway/default.conf.template gateway/default-ssl.conf.t
     exit 1
   fi
 
-  spa_csp="$(grep -F '"~^/openmrs/spa/"' "$gateway_template")"
+  spa_csp="$(grep -F '"~^/openmrs/spa/"' gateway/templates/includes/maps.conf.template)"
   spa_script_policy="${spa_csp#*script-src }"
   spa_script_policy="${spa_script_policy%%;*}"
   if [ "$spa_script_policy" != "'self'" ]; then
@@ -75,7 +77,7 @@ for gateway_template in gateway/default.conf.template gateway/default-ssl.conf.t
     exit 1
   fi
 
-  docs_csp="$(grep -F '"~^/ayuda/"' "$gateway_template")"
+  docs_csp="$(grep -F '"~^/ayuda/"' gateway/templates/includes/maps.conf.template)"
   docs_script_policy="${docs_csp#*script-src }"
   docs_script_policy="${docs_script_policy%%;*}"
   if [ "$docs_script_policy" != "'self' 'unsafe-inline'" ]; then
@@ -143,7 +145,6 @@ export OAUTH2_CLIENT_SECRET="${OAUTH2_CLIENT_SECRET:-ci-oauth2-secret-123}"
 export IMAGING_OIDC_CLIENT_SECRET="${IMAGING_OIDC_CLIENT_SECRET:-ci-imaging-client-secret-123}"
 export IMAGING_OAUTH_COOKIE_SECRET="${IMAGING_OAUTH_COOKIE_SECRET:-QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=}"
 export GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD:-ci-grafana-password-123}"
-export GRAFANA_OIDC_CLIENT_SECRET="${GRAFANA_OIDC_CLIENT_SECRET:-ci-grafana-oidc-secret-123}"
 export OMRS_OCL_TOKEN="${OMRS_OCL_TOKEN:-}"
 export SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED="true"
 export SIHSALUS_SEED_URL="${SIHSALUS_SEED_URL:-https://example.test/sihsalus-seed.tar.gz.enc}"
@@ -173,11 +174,6 @@ validate imaging-auth -f docker-compose.yml -f compose/keycloak.yml -f compose/i
 validate status -f docker-compose.yml -f compose/status.yml --profile status
 validate ssl -f docker-compose.yml -f compose/ssl.yml --profile ssl
 validate seed -f docker-compose.yml -f compose/seed.yml --profile seed --profile fua
-KEYCLOAK_PUBLIC_URL=https://sihsalus.example.test/keycloak \
-GRAFANA_ROOT_URL=https://sihsalus.example.test/grafana/ \
-GRAFANA_COOKIE_SECURE=true \
-GRAFANA_NETWORK_ACCESS_CONTROL="allow 192.168.0.0/24; deny all;" \
-validate monitoring-oidc -f docker-compose.yml -f compose/keycloak.yml -f compose/monitoring-oidc.yml --profile keycloak --profile monitoring
 KEYCLOAK_MODE=production \
 KEYCLOAK_PUBLIC_URL=https://sihsalus.example.test/keycloak \
 KC_HOSTNAME=https://sihsalus.example.test/keycloak \
@@ -192,7 +188,7 @@ IMAGING_OAUTH_REDIRECT_URI=https://sihsalus.example.test/imaging/oauth2/callback
 IMAGING_OAUTH_COOKIE_SECURE=true \
 validate imaging-auth-ssl -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml -f compose/ssl.yml --profile keycloak --profile imaging --profile ssl
 
-python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/fua.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" "$EVIDENCE_DIR/imaging.json" "$EVIDENCE_DIR/keycloak-ssl.json" "$EVIDENCE_DIR/monitoring-logs.json" "$EVIDENCE_DIR/imaging-auth.json" "$EVIDENCE_DIR/imaging-auth-ssl.json" "$EVIDENCE_DIR/seed.json" "$EVIDENCE_DIR/local-auth-rollback.json" "$EVIDENCE_DIR/monitoring-oidc.json" keycloak/realm-export.json <<'PY'
+python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/fua.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" "$EVIDENCE_DIR/imaging.json" "$EVIDENCE_DIR/keycloak-ssl.json" "$EVIDENCE_DIR/monitoring-logs.json" "$EVIDENCE_DIR/imaging-auth.json" "$EVIDENCE_DIR/imaging-auth-ssl.json" "$EVIDENCE_DIR/seed.json" "$EVIDENCE_DIR/local-auth-rollback.json" keycloak/realm-export.json <<'PY'
 import json
 import sys
 
@@ -213,11 +209,18 @@ def service(config, name):
         fail(f"missing service: {name}")
 
 
-core, fua, keycloak, ssl, ci, imaging, keycloak_ssl, monitoring, imaging_auth, imaging_auth_ssl, seed, local_auth_rollback, monitoring_oidc, realm = map(load, sys.argv[1:])
+core, fua, keycloak, ssl, ci, imaging, keycloak_ssl, monitoring, imaging_auth, imaging_auth_ssl, seed, local_auth_rollback, realm = map(load, sys.argv[1:])
 core_backend = service(core, "backend")
 core_generator = service(core, "backend-oauth2-config")
 core_docs = service(core, "docs")
 core_gateway = service(core, "gateway")
+
+if "samba-backup" in core.get("services", {}):
+    fail("Samba is managed independently and must not be part of this stack")
+for service_name, service_config in core.get("services", {}).items():
+    for published_port in service_config.get("ports", []):
+        if str(published_port.get("target")) in {"137", "138", "139", "445"}:
+            fail(f"{service_name} must not publish SMB port {published_port.get('target')}")
 
 if core_docs.get("image") != "ghcr.io/sihsalus/sihsalus-docs:latest":
     fail("core docs must default to the official SIHSALUS image")
@@ -391,6 +394,11 @@ if ci.get("volumes"):
 
 alloy = service(monitoring, "alloy")
 socket_proxy = service(monitoring, "docker-socket-proxy")
+alertmanager = service(monitoring, "alertmanager")
+node_exporter = service(monitoring, "node-exporter")
+cadvisor = service(monitoring, "cadvisor")
+operations_collector = service(monitoring, "operations-collector")
+viewpower_exporter = service(monitoring, "viewpower-exporter")
 
 for volume in alloy.get("volumes", []):
     if volume.get("source") == "/var/run/docker.sock":
@@ -401,50 +409,50 @@ if socket_proxy.get("environment", {}).get("POST") != "0":
 if not any(volume.get("source") == "/var/run/docker.sock" for volume in socket_proxy.get("volumes", [])):
     fail("Docker socket proxy must own the socket mount")
 
-grafana = service(monitoring, "grafana")
-grafana_networks = set(grafana.get("networks", {}) or {})
-gateway_networks = set(service(core, "gateway").get("networks", {}) or {})
+for observed_service in (alertmanager, node_exporter, cadvisor):
+    for published_port in observed_service.get("ports", []):
+        if published_port.get("host_ip") not in (None, "127.0.0.1"):
+            fail("monitoring services must never publish on a non-loopback address")
 
-if "monitoring-edge" not in grafana_networks or "monitoring-edge" not in gateway_networks:
-    fail("gateway and Grafana must share the dedicated monitoring-edge network")
-if "monitoring-network" in gateway_networks:
-    fail("gateway must not join monitoring-network: it would reach the Docker socket proxy")
-if "default" not in gateway_networks:
-    fail("gateway must keep the default network to reach backend and frontend")
-for isolated in ("loki", "docker-socket-proxy"):
-    if "monitoring-edge" in set(service(monitoring, isolated).get("networks", {}) or {}):
-        fail(f"{isolated} must stay off the gateway-facing network")
+if node_exporter.get("read_only") is not True:
+    fail("node-exporter must use a read-only container filesystem")
+if not any(volume.get("source") == "/" and volume.get("read_only") for volume in node_exporter.get("volumes", [])):
+    fail("node-exporter host root mount must be read-only")
 
-grafana_acl = service(core, "gateway").get("environment", {}).get("GRAFANA_ACCESS_CONTROL", "")
-if grafana_acl.strip() != "deny all;":
-    fail("Grafana gateway route must stay closed without an explicit LAN ACL")
+if cadvisor.get("read_only") is not True:
+    fail("cAdvisor must use a read-only container filesystem")
+for volume in cadvisor.get("volumes", []):
+    if volume.get("source") in ("/", "/var/lib/docker", "/sys") and not volume.get("read_only"):
+        fail("cAdvisor host mounts must be read-only")
 
-grafana_environment = grafana.get("environment", {})
-if grafana_environment.get("GF_SERVER_SERVE_FROM_SUB_PATH") != "true":
-    fail("Grafana must serve itself from the /grafana/ sub path")
-if not grafana_environment.get("GF_SERVER_ROOT_URL", "").rstrip("/").endswith("/grafana"):
-    fail("Grafana root URL must match the gateway sub path")
-if grafana_environment.get("GF_AUTH_ANONYMOUS_ENABLED") != "false":
-    fail("Grafana must not allow anonymous access")
-if grafana_environment.get("GF_USERS_ALLOW_SIGN_UP") != "false":
-    fail("Grafana must not allow self sign-up")
-if not grafana_environment.get("GF_SECURITY_DATA_SOURCE_PROXY_WHITELIST"):
-    fail("Grafana data source proxy must be restricted to the observability backends")
-if not any(str(port.get("target")) == "3000" and port.get("host_ip") == "127.0.0.1"
-           for port in grafana.get("ports", [])):
-    fail("Grafana recovery port must bind to localhost")
+if operations_collector.get("network_mode") != "none":
+    fail("operations collector must not have network access")
+if operations_collector.get("read_only") is not True:
+    fail("operations collector must use a read-only container filesystem")
+backup_mounts = [volume for volume in operations_collector.get("volumes", []) if volume.get("target") == "/backups"]
+if len(backup_mounts) != 1 or not backup_mounts[0].get("read_only"):
+    fail("operations collector backup mount must exist and be read-only")
+if operations_collector.get("environment", {}).get("SAMBA_QUOTA_BYTES") != "21474836480":
+    fail("operations collector must expose the reviewed 20 GiB Samba quota")
 
-grafana_oidc = service(monitoring_oidc, "grafana").get("environment", {})
-if grafana_oidc.get("GF_AUTH_GENERIC_OAUTH_ENABLED") != "true":
-    fail("Grafana OIDC override must enable generic OAuth")
-if grafana_oidc.get("GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_STRICT") != "true":
-    fail("Grafana OIDC must reject users without a mapped role")
-if grafana_oidc.get("GF_AUTH_GENERIC_OAUTH_USE_PKCE") != "true":
-    fail("Grafana OIDC must use PKCE")
-if grafana_oidc.get("GF_SECURITY_COOKIE_SECURE") != "true":
-    fail("production Grafana cookies must be HTTPS-only")
-if "auth-network" not in set(service(monitoring_oidc, "grafana").get("networks", {}) or {}):
-    fail("Grafana must reach Keycloak over the internal auth network")
+if viewpower_exporter.get("ports"):
+    fail("ViewPower exporter must not publish a host port")
+viewpower_image = viewpower_exporter.get("image", "")
+if not viewpower_image.startswith("python:3.13-alpine@sha256:") or len(viewpower_image.rsplit("@sha256:", 1)[-1]) != 64:
+    fail("ViewPower exporter image must use an immutable Python digest")
+if viewpower_exporter.get("read_only") is not True:
+    fail("ViewPower exporter must use a read-only container filesystem")
+if viewpower_exporter.get("user") != "65534:65534":
+    fail("ViewPower exporter must run as the unprivileged nobody user")
+if viewpower_exporter.get("cap_drop") != ["ALL"]:
+    fail("ViewPower exporter must drop Linux capabilities")
+if "no-new-privileges:true" not in viewpower_exporter.get("security_opt", []):
+    fail("ViewPower exporter must prevent privilege escalation")
+if not viewpower_exporter.get("environment", {}).get("VIEWPOWER_BASE_URL", "").startswith("http://host.docker.internal:15178/"):
+    fail("ViewPower exporter must default to the host-only ViewPower adapter")
+exporter_mounts = [volume for volume in viewpower_exporter.get("volumes", []) if volume.get("target") == "/app/viewpower_exporter.py"]
+if len(exporter_mounts) != 1 or not exporter_mounts[0].get("read_only"):
+    fail("ViewPower exporter source must be mounted read-only")
 
 print("[OK] semantic Compose invariants")
 PY

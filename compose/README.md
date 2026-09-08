@@ -17,9 +17,11 @@
 | Keycloak | `-f compose/keycloak.yml --profile keycloak` | Activa OIDC en frontend/backend y agrega Keycloak |
 | HTTPS | `-f compose/ssl.yml --profile ssl` | Modifica gateway y agrega certbot |
 | Status | `-f compose/status.yml --profile status` | Panel local Gatus |
-| Grafana OIDC | `-f compose/monitoring-oidc.yml --profile monitoring` | Autentica Grafana contra Keycloak; requiere el override Keycloak |
 
-Keycloak, HTTPS, Status y Grafana OIDC son overrides porque cambian o dependen de servicios del core. Por eso no se agregan mediante `include`.
+Keycloak, HTTPS y Status son overrides porque cambian o dependen de servicios del core. Por eso no se agregan mediante `include`.
+
+El servicio de archivos Samba se administra en el repositorio independiente
+`sihsalus-samba-backup`. Este stack no crea contenedores ni publica puertos SMB.
 
 ## Comandos comunes
 
@@ -42,17 +44,6 @@ docker compose \
   -f compose/keycloak.yml \
   -f compose/ssl.yml \
   --profile keycloak \
-  --profile ssl \
-  up -d
-
-# Grafana autenticado con Keycloak, servido en https://<dominio>/grafana/
-docker compose \
-  -f docker-compose.yml \
-  -f compose/keycloak.yml \
-  -f compose/monitoring-oidc.yml \
-  -f compose/ssl.yml \
-  --profile keycloak \
-  --profile monitoring \
   --profile ssl \
   up -d
 ```
@@ -87,10 +78,7 @@ docker compose ps
 - `DOCS_IMAGE_REF` fija por digest el portal de ayuda público-seguro. El gateway
   no depende de su salud, por lo que una caída de documentación no bloquea la
   atención clínica.
-- HAPI y las consolas de observabilidad se publican solo en localhost. Grafana
-  sale a la LAN unicamente por `https://<dominio>/grafana/`, y esa ruta responde
-  403 mientras `GRAFANA_NETWORK_ACCESS_CONTROL` no declare un rango autorizado.
-  El puerto `127.0.0.1:3001` se conserva como via de recuperacion por tunel SSH.
+- HAPI y las consolas de observabilidad se publican solo en localhost.
 
 Para generar credenciales y auditar un ambiente, ver [scripts/security/README.md](../scripts/security/README.md).
 
@@ -115,6 +103,5 @@ Además de renderizar todas las combinaciones soportadas, valida invariantes de 
 3. Una variable nueva debe agregarse a `.env.template` y, si es secreta, al generador y auditor.
 4. Una combinación soportada debe agregarse a `scripts/validate-compose.sh`.
 5. Evitar subredes IP fijas; los servicios se descubren por nombre DNS de Compose.
-6. El gateway solo se une a redes cuyos miembros deba alcanzar. Para exponer un servicio de otra red se crea un enlace dedicado (`monitoring-edge`), no se agrega el gateway a la red completa.
 
 La arquitectura y los límites de cada capa están en [docs/architecture/infrastructure.md](../docs/architecture/infrastructure.md).

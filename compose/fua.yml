@@ -1,8 +1,7 @@
 # FUA Generator (Formato Unico de Atencion - MINSA)
 # Profile: fua
 #
-# Requires gateway env vars FUA_CONFIG and FUA_LOCATIONS in .env
-# for nginx routing to the FUA service.
+# Gateway routing is shared by HTTP and HTTPS; no injected Nginx configuration.
 
 services:
   fua-generator:

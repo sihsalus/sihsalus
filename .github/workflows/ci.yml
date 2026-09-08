@@ -58,7 +58,7 @@ jobs:
           fi
 
           if [ "$can_diff" = "true" ] \
-            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml compose/monitoring.yml monitoring/alloy/ tests/monitoring/; then
+            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml compose/monitoring.yml monitoring/ tests/monitoring/; then
             monitoring=false
           fi
 
@@ -107,6 +107,15 @@ jobs:
       - name: Test forced-password runtime configuration
         run: ./tests/backend/forced-password-config.sh
 
+      - name: Test realtime notifications OMOD and gateway configuration
+        run: ./tests/backend/realtime-notifications-config.sh
+
+      - name: Test HTTP and HTTPS gateway routing
+        run: python3 tests/gateway/routing.py
+
+      - name: Test backend security refresh cache policy
+        run: ./tests/backend/security-refresh-config.sh
+
       - name: Validate models and invariants
         run: ./scripts/validate-compose.sh compose-validation
 
@@ -134,25 +143,80 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  source-omods:
+    name: Test source OMOD (${{ matrix.module }})
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        module: [webservices.rest, initializer, queue, reporting, reportingrest, patientdocuments, billing, emrapi, fhir2, authentication]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          # Initializer also tests Core 2.1-era XStream; upstream supports Java 8/11.
+          java-version: ${{ matrix.module == 'initializer' && '11' || '21' }}
+          cache: maven
+          cache-dependency-path: backend/omod-sources.lock
+      - name: Build and test the pinned module
+        env:
+          OMOD_TEST_REPORTS: ${{ runner.temp }}/omod-tests
+        run: bash backend/bin/build-source-omods.sh test '${{ matrix.module }}'
+      - name: Set up Java 21 for Initializer Core 2.8 integration tests
+        if: matrix.module == 'initializer'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Test Initializer against Core 2.8 on Java 21
+        if: matrix.module == 'initializer'
+        env:
+          OMOD_TEST_REPORTS: ${{ runner.temp }}/omod-core28-java21-tests
+        run: bash backend/bin/build-source-omods.sh test-core28 initializer
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: omod-tests-${{ matrix.module }}
+          path: |
+            ${{ runner.temp }}/omod-tests/
+            ${{ runner.temp }}/omod-core28-java21-tests/
+          if-no-files-found: warn
+
   backend:
     name: Build backend
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
     permissions:
       contents: read
       security-events: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - uses: docker/setup-buildx-action@v4
+
       - name: Build deployable backend image
-        env:
-          DOCKER_BUILDKIT: '1'
-        run: docker build --file backend/Dockerfile --tag sihsalus-backend:ci .
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: backend/Dockerfile
+          load: true
+          tags: sihsalus-backend:ci
+          build-args: SECURITY_REFRESH=${{ github.sha }}
+          cache-from: type=gha,scope=backend-omod-refresh
+          cache-to: type=gha,scope=backend-omod-refresh,mode=max
 
       - name: Test backend OCL token contract
         run: ./tests/backend/ocl-token-image.sh sihsalus-backend:ci
+
+      - name: Verify all packaged OMOD versions and REST security patch
+        run: bash tests/backend/source-omods-image.sh sihsalus-backend:ci
 
       - name: Test backend forced-password contract
         run: ./tests/backend/forced-password-image.sh sihsalus-backend:ci
@@ -276,6 +340,9 @@ jobs:
       - name: Verify read-only Docker API
         run: ./tests/monitoring/socket-proxy.sh
 
+      - name: Validate monitoring configurations
+        run: ./tests/monitoring/config-validation.sh
+
   imaging:
     name: Imaging authorization
     needs: changes
@@ -291,18 +358,20 @@ jobs:
   gate:
     name: PR Gate
     if: always()
-    needs: [compose, backend, backup, monitoring, imaging]
+    needs: [compose, source-omods, backend, backup, monitoring, imaging]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful validations
         env:
           COMPOSE_RESULT: ${{ needs.compose.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
+          OMOD_RESULT: ${{ needs.source-omods.result }}
           BACKUP_RESULT: ${{ needs.backup.result }}
           MONITORING_RESULT: ${{ needs.monitoring.result }}
           IMAGING_RESULT: ${{ needs.imaging.result }}
         run: |
           [ "$COMPOSE_RESULT" = "success" ]
+          [ "$OMOD_RESULT" = "success" ] || [ "$OMOD_RESULT" = "skipped" ]
           [ "$BACKEND_RESULT" = "success" ] || [ "$BACKEND_RESULT" = "skipped" ]
           [ "$BACKUP_RESULT" = "success" ] || [ "$BACKUP_RESULT" = "skipped" ]
           [ "$MONITORING_RESULT" = "success" ] || [ "$MONITORING_RESULT" = "skipped" ]

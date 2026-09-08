@@ -20,22 +20,31 @@ metrics: true
 endpoints:
   - name: Sistema web
     group: Atencion local
-    url: http://gateway/health
+    url: https://gateway/health
     interval: 30s
+    client:
+      # The gateway uses the host's private self-signed certificate. Traffic is
+      # still encrypted; hostname verification is disabled only for this
+      # isolated Docker-network probe because "gateway" is not a certificate SAN.
+      insecure: true
     conditions:
       - "[STATUS] == 200"
 
   - name: Backend arrancado
     group: Atencion local
-    url: http://gateway/startup
+    url: https://gateway/startup
     interval: 30s
+    client:
+      insecure: true
     conditions:
       - "[STATUS] == 200"
 
   - name: Atencion clinica
     group: Atencion local
-    url: http://gateway/ready
+    url: https://gateway/ready
     interval: 30s
+    client:
+      insecure: true
     conditions:
       - "[STATUS] == 200"
 
@@ -48,11 +57,13 @@ endpoints:
 
   - name: Frontend disponible
     group: Atencion local
-    url: http://frontend/
+    # initializeSpa lives in the external bootstrap after CSP hardening; the
+    # index HTML intentionally no longer contains inline executable code.
+    url: http://frontend/sihsalus-spa-bootstrap.js
     interval: 30s
     conditions:
       - "[STATUS] == 200"
-      - "[BODY] contains initializeSpa"
+      - "[BODY] == pat(*initializeSpa*)"
 
   - name: Sesion OpenMRS
     group: Atencion local
@@ -63,7 +74,9 @@ endpoints:
 
   - name: Gateway publico
     group: Red local
-    url: http://gateway/openmrs/spa
+    url: https://gateway/openmrs/spa/home
     interval: 60s
+    client:
+      insecure: true
     conditions:
       - "[STATUS] == 200"

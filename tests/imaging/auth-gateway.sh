@@ -8,6 +8,7 @@ NETWORK="${PREFIX}-network"
 UPSTREAM="${PREFIX}-upstream"
 AUTH="${PREFIX}-auth"
 GATEWAY="${PREFIX}-gateway"
+NGINX_TEST_IMAGE="${GATEWAY_TEST_IMAGE:-nginx:1.28-alpine}"
 
 cleanup() {
   docker rm -f "$GATEWAY" "$AUTH" "$UPSTREAM" >/dev/null 2>&1 || true
@@ -70,24 +71,23 @@ server {
 }
 EOF
 
-sed \
-  -e 's|${FRAME_ANCESTORS}||g' \
-  -e 's|${FUA_CONFIG}||g' \
-  -e 's|${FUA_LOCATIONS}||g' \
-  -e 's|${IMAGING_NETWORK_ACCESS_CONTROL}|allow 127.0.0.1; allow 172.16.0.0/12; deny all;|g' \
-  -e 's|${IMAGING_ACCESS_CONTROL}|allow 127.0.0.1; allow 172.16.0.0/12; deny all; auth_request /imaging/oauth2/auth; error_page 401 = @imaging_oauth_signin;|g' \
-  -e 's|${GRAFANA_ACCESS_CONTROL}|deny all;|g' \
-  "$ROOT_DIR/gateway/default.conf.template" > "$TMP_DIR/gateway.conf"
-
 docker network create "$NETWORK" >/dev/null
 docker run -d --name "$UPSTREAM" --network "$NETWORK" \
   --network-alias backend --network-alias frontend --network-alias ohif --network-alias orthanc-proxy \
-  -v "$TMP_DIR/upstream.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.27-alpine >/dev/null
+  -v "$TMP_DIR/upstream.conf:/etc/nginx/conf.d/default.conf:ro" \
+  --entrypoint nginx "$NGINX_TEST_IMAGE" -g 'daemon off;' >/dev/null
 docker run -d --name "$AUTH" --network "$NETWORK" --network-alias imaging-auth \
-  -v "$TMP_DIR/auth.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.27-alpine >/dev/null
+  -v "$TMP_DIR/auth.conf:/etc/nginx/conf.d/default.conf:ro" \
+  --entrypoint nginx "$NGINX_TEST_IMAGE" -g 'daemon off;' >/dev/null
 docker run -d --name "$GATEWAY" --network "$NETWORK" -p 127.0.0.1::80 \
+  -e FRAME_ANCESTORS= \
+  -e 'IMAGING_NETWORK_ACCESS_CONTROL=allow 127.0.0.1; allow 172.16.0.0/12; deny all;' \
+  -e 'IMAGING_ACCESS_CONTROL=allow 127.0.0.1; allow 172.16.0.0/12; deny all; auth_request /imaging/oauth2/auth; error_page 401 = @imaging_oauth_signin;' \
+  -v "$ROOT_DIR/gateway:/etc/nginx/includes:ro" \
   -v "$ROOT_DIR/gateway/nginx.conf:/etc/nginx/nginx.conf:ro" \
-  -v "$TMP_DIR/gateway.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.27-alpine >/dev/null
+  -v "$ROOT_DIR/gateway/templates:/etc/nginx/conf-templates:ro" \
+  -v "$ROOT_DIR/gateway/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro" \
+  --entrypoint /usr/local/bin/docker-entrypoint.sh "$NGINX_TEST_IMAGE" nginx -g 'daemon off;' >/dev/null
 
 PORT="$(docker port "$GATEWAY" 80/tcp | awk -F: 'END { print $NF }')"
 BASE_URL="http://127.0.0.1:${PORT}"
@@ -146,16 +146,6 @@ for path in /imaging/ /orthanc/ /dicom-web/studies /wado; do
     --cookie '_sihsalus_imaging=allowed' "$BASE_URL$path")"
   [ "$status" = "200" ]
 done
-
-# /grafana/ queda cerrada mientras .env no declare una red autorizada. Esto
-# tambien verifica que el marcador ${GRAFANA_ACCESS_CONTROL} este cableado: si
-# envsubst no lo sustituyera, nginx no habria arrancado.
-grafana_headers="$TMP_DIR/grafana.headers"
-status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "$BASE_URL/grafana/")"
-[ "$status" = "403" ]
-status="$(curl --silent --show-error --output /dev/null --dump-header "$grafana_headers" --write-out '%{http_code}' "$BASE_URL/grafana")"
-[ "$status" = "301" ]
-grep -qi '^Location: /grafana/' "$grafana_headers"
 
 logout_headers="$TMP_DIR/logout.headers"
 status="$(curl --silent --show-error --output /dev/null --dump-header "$logout_headers" --write-out '%{http_code}' \

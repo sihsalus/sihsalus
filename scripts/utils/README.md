@@ -4,10 +4,8 @@
 
 | Archivo | Uso |
 | --- | --- |
-| `certificate_generate.sh` | Certificado auto-firmado local; el flujo normal HTTPS usa `compose/ssl.yml` |
-| `init_full.sh` | Reinicialización de desarrollo; puede eliminar volúmenes |
-| `logs_creation.sh` | Extraer logs del backend/initializer |
 | `sihsalus-compose.service` | Arranque del stack con systemd |
+| `viewpower.service` | Arranque persistente y aislamiento de red para el controlador local de la UPS |
 | `sihsalus-safe-poweroff.sh` | Evaluador fail-closed de apagado automático |
 | `sihsalus-safe-poweroff.{service,timer}` | Ejecución y sondeo systemd del evaluador |
 
@@ -40,24 +38,50 @@ Si la instalación usa otra ruta, crea un drop-in y reemplaza `WorkingDirectory`
 sudo systemctl edit sihsalus-compose.service
 ```
 
-## Inicialización de desarrollo
+## Controlador UPS ViewPower
 
-`init_full.sh` puede detener el stack y eliminar volúmenes. Úsalo solo en entornos descartables y revisa su ayuda antes de ejecutarlo:
+El instalador de ViewPower 1.04-21353 no reconoce Ubuntu 24.04 como una versión
+con systemd y su alternativa depende de un inicio de sesión interactivo. En el
+servidor de producción se usa `viewpower.service`: mantiene `StartMain` dentro
+de un cgroup, lo reinicia si falla y ejecuta `StopMain` durante una parada
+ordenada.
+
+La interfaz HTTP de esa versión no requiere autenticación. La unidad la limita
+a localhost y a la subred del bridge de monitoreo. Confirma primero la subred
+real; si no es `172.19.0.0/24`, modifica `IPAddressAllow` antes de instalar:
 
 ```bash
-./scripts/utils/init_full.sh --help
+docker network inspect sihsalus_monitoring-network \
+  --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}'
+sudo install -m 0644 scripts/utils/viewpower.service /etc/systemd/system/
+sudo systemd-analyze verify /etc/systemd/system/viewpower.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now viewpower.service
 ```
 
-Para producción, usa el [checklist de despliegue](../../docs/operations/deploy-checklist.md), no una reinicialización completa.
+Valida el proceso, la API local y la telemetría después de cada cambio:
+
+```bash
+systemctl is-enabled viewpower.service
+systemctl is-active viewpower.service
+curl --fail http://127.0.0.1:15178/ViewPower/ >/dev/null
+curl --fail http://127.0.0.1:9090/api/v1/query?query=sihsalus_ups_exporter_up
+```
+
+No ejecutes `runAutoStart.sh` en paralelo con esta unidad. ViewPower debe correr
+como `root` porque controla el USB y ejecuta el apagado limpio configurado en la
+reserva de batería; el exporter de Prometheus sigue siendo de solo lectura.
 
 ## Logs
 
 ```bash
-./scripts/utils/logs_creation.sh
 docker compose logs --tail 200 backend gateway
 ```
 
 No adjuntes logs con datos clínicos, tokens o credenciales a issues públicos.
+La instalación y verificación siguen el
+[checklist de despliegue](../../docs/operations/deploy-checklist.md); los
+certificados se administran mediante el [runbook HTTPS](../../docs/operations/https.md).
 
 ## Apagado automático
 

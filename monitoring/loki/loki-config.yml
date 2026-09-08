@@ -98,7 +98,7 @@ query_range:
         max_size_mb: 100
 
 ruler:
-  alertmanager_url: http://localhost:9093
+  alertmanager_url: http://alertmanager:9093
   enable_api: true
   enable_alertmanager_v2: true
   ring:

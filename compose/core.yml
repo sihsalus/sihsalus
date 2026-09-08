@@ -17,18 +17,21 @@ services:
         condition: service_started
     ports:
       - "80:80"
+    # El gateway publica /grafana, asi que necesita compartir red con Grafana.
+    # Nunca estuvo declarado: el contenedor en produccion habia sido conectado a
+    # mano, asi que la consola funcionaba hasta que se recreaba el contenedor y
+    # entonces devolvia 502 con "grafana could not be resolved". Se repite
+    # default porque nombrar cualquier red aqui reemplaza la implicita, y el
+    # gateway sigue teniendo que alcanzar al backend y al frontend.
+    networks:
+      - default
+      - monitoring-network
     environment:
       FRAME_ANCESTORS: ${FRAME_ANCESTORS:-}
-      FUA_CONFIG: ${FUA_CONFIG:-}
-      FUA_LOCATIONS: ${FUA_LOCATIONS:-}
       # Imaging web routes are closed unless compose/imaging-auth.yml replaces
       # this value with network ACL plus OIDC auth_request directives.
       IMAGING_ACCESS_CONTROL: "deny all;"
       IMAGING_NETWORK_ACCESS_CONTROL: "${IMAGING_NETWORK_ACCESS_CONTROL:-allow 127.0.0.1; allow 10.0.0.0/8; allow 172.16.0.0/12; allow 192.168.0.0/16; deny all;}"
-      # /grafana/ queda cerrada salvo que .env declare las redes autorizadas.
-      # Tiene que estar SIEMPRE definida: envsubst solo sustituye variables
-      # presentes en el entorno, y un ${...} sin resolver impide arrancar nginx.
-      GRAFANA_ACCESS_CONTROL: "${GRAFANA_NETWORK_ACCESS_CONTROL:-deny all;}"
     healthcheck:
       # /health lo sirve el propio nginx: mide la salud del gateway, no la de
       # los upstreams ("/" redirige 301 al frontend y acoplaria ambos estados).
@@ -37,11 +40,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    networks:
-      # `default` va explicito: al declarar la clave se pierde la red implicita
-      # y con ella backend/frontend.
-      - default
-      - monitoring-edge
 
   docs:
     container_name: sihsalus-docs

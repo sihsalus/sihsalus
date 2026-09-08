@@ -40,6 +40,8 @@ En servidores, la composición elegida se guarda en `COMPOSE_FILE` y `COMPOSE_PR
 | Validación de PR | `.github/workflows/ci.yml`, check `PR Gate` |
 | Builds de imágenes | `docker-bake.hcl` y workflows `build-*.yml` |
 | Operación de despliegue | `docs/operations/deploy-checklist.md` |
+| Rutas y políticas del gateway | `gateway/templates/includes/` |
+| HTTPS y certificados | `docs/operations/https.md` |
 | Credenciales | `scripts/security/README.md` |
 
 La documentación no debe copiar listas completas de variables o comandos si puede enlazar una de estas fuentes.
@@ -57,7 +59,9 @@ La documentación no debe copiar listas completas de variables o comandos si pue
 
 Los modelos renderizados se guardan como artifacts de CI para evidencia de cambio.
 
-`PR Gate` siempre se publica. La validación Compose corre en todos los cambios; Maven se omite cuando el diff no toca `pom.xml` ni `backend/`. Esto permite exigir un único check sin ejecutar el build pesado en cambios solo documentales.
+`PR Gate` siempre se publica. La validación Compose corre en todos los cambios;
+los builds y pruebas adicionales se seleccionan mediante el job `changes` de
+CI, que también considera cambios en sus propias pruebas y workflows.
 
 ## Decisiones pendientes
 

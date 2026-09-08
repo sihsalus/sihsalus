@@ -1,6 +1,6 @@
 # Monitoring - Observabilidad (Grafana, Prometheus, Loki, Alloy)
 
-Stack de observabilidad para disponibilidad HTTP, métricas del propio stack y logs de contenedores. No incluye métricas de CPU/memoria por contenedor hasta agregar cAdvisor/node-exporter.
+Stack de observabilidad para disponibilidad HTTP, recursos del host y contenedores, alertas y logs. Los dashboards se administran como código y siguen una navegación de resumen a diagnóstico.
 
 ## Stack
 
@@ -9,6 +9,11 @@ Stack de observabilidad para disponibilidad HTTP, métricas del propio stack y l
 - **Loki** - Agregador de logs (búsqueda rápida)
 - **Alloy** - Colector opcional de logs Docker
 - **Blackbox Exporter** - Probes de disponibilidad (health checks)
+- **Node Exporter** - CPU, memoria, filesystems, red y kernel del host
+- **cAdvisor** - Consumo de recursos por contenedor
+- **Alertmanager** - Agrupación, deduplicación y silencios
+- **Operations Collector** - Frescura y tamaño de backups mediante métricas textfile
+- **ViewPower Exporter** - Batería, autonomía, carga, voltajes y temperatura de la UPS
 
 ---
 
@@ -27,6 +32,7 @@ docker compose --profile monitoring up -d
 | Grafana | `http://localhost:3001` | `admin` | `$GRAFANA_ADMIN_PASSWORD` |
 | Prometheus | `http://localhost:9090` (localhost only) | - | - |
 | Loki | `http://localhost:3100` (localhost only) | - | - |
+| Alertmanager | `http://localhost:9093` (localhost only) | - | - |
 
 > Prometheus y Loki están limitados a localhost por seguridad. Accede a través de Grafana.
 
@@ -59,9 +65,12 @@ GRAFANA_ROOT_URL=http://localhost:3001   # URL base (para links)
 ```
 
 **Dashboards preconfigurados**:
-- Docker Overview
-- OpenMRS Overview
-- Logs aggregation
+- Estado operativo (portada)
+- OpenMRS
+- Infraestructura
+- Resiliencia
+- Equipos LAN
+- Logs
 
 **Volumen persistente**: `grafana-data` (configuración, usuarios, dashboards)
 
@@ -82,7 +91,12 @@ GRAFANA_ROOT_URL=http://localhost:3001   # URL base (para links)
 - Prometheus itself
 - Grafana
 - Loki
+- Alertmanager
+- Host Linux (Node Exporter)
+- Contenedores (cAdvisor)
 - Blackbox HTTP probes (Gateway, OpenMRS endpoints)
+- Blackbox TCP probe (Samba en `192.168.88.20:445`)
+- UPS conectada al host mediante la API local de ViewPower
 
 **Retención**: 30 días (configurable)
 
@@ -158,17 +172,59 @@ El proxy no publica el puerto `2375` al host y es el único contenedor con acces
 - `http://gateway:80/` - Gateway disponible
 - `http://gateway:80/openmrs` - OpenMRS accesible
 - `http://gateway:80/openmrs/ws/rest/v1/session` - API OpenMRS
+- `192.168.88.20:445` - Listener Samba de RRHH en la LAN
+
+### ViewPower Exporter
+
+Adaptador de solo lectura para la instancia de ViewPower instalada en el host.
+Descubre la UPS USB desde `initDeviceTree` y consulta únicamente los endpoints
+de monitorización. No abre el dispositivo USB ni ejecuta acciones de control.
+
+Por defecto consulta `http://host.docker.internal:15178/ViewPower` y expone en la
+red interna de monitoreo:
+
+- carga y autonomía estimada de batería;
+- porcentaje de carga conectada;
+- voltajes y frecuencias de entrada/salida;
+- corriente de salida y temperatura interna;
+- modo de trabajo y número de advertencias.
+
+Si ViewPower cambia de puerto o el identificador USB no se puede descubrir, usa
+`VIEWPOWER_BASE_URL` o `VIEWPOWER_DEVICE`. El exporter no publica ningún puerto
+en el host.
+
+Los umbrales de Prometheus deben anticiparse al apagado configurado en
+ViewPower. En la instalación comisionada el 2026-09-03, ViewPower inicia el
+apagado local al 30% de batería; por eso la advertencia cubre 35-40% y la alerta
+crítica comienza por debajo de 35%. La configuración de ViewPower vive fuera de
+Git y debe auditarse después de reinstalar o actualizar el software.
 
 ---
 
 ## Dashboards
 
-### Docker Overview
+### Estado operativo
 
-Muestra:
-- Estado de scrape de Prometheus
-- Volumen de logs Docker por servicio y nivel
-- Logs recientes de contenedores
+Portada para guardias e incidentes: salud global, alertas activas, CPU, memoria,
+filesystem, disponibilidad, latencia, errores y salud del propio monitoreo.
+
+### Infraestructura
+
+Métricas USE del host y recursos por servicio Docker: CPU, memoria, carga,
+filesystems, red, contenedores observados y eventos OOM.
+
+### Resiliencia
+
+Edad, tamaño y retención de los backups cifrados de MariaDB, HAPI y FUA;
+estado y tráfico de `tun0`/`tun1` sin inferir el proveedor por el índice dinámico
+`tunN`; vencimiento del certificado HTTPS;
+temperatura del host; carga, autonomía, consumo y voltajes de la UPS. Incluye
+un panel temporal para disponibilidad y cuota del Samba independiente, además
+de continuidad del host, boots observados, arranques o recreaciones por proyecto
+y servicio, eventos OOM y una línea de tiempo correlacionada con la alimentación
+eléctrica. Un cambio de timestamp de inicio no distingue por sí solo un crash de
+un despliegue o apagado programado. La frescura del archivo no sustituye una
+restauración de prueba periódica.
 
 ### OpenMRS Overview
 
@@ -178,12 +234,27 @@ Muestra:
 - Latencia de endpoints mediante `probe_duration_seconds`
 - Logs y errores del backend/gateway cuando Alloy está habilitado
 
-### Logs Dashboard
+### Equipos conectados (LAN)
+
+Una fila por dirección IP de la LAN que hizo peticiones al gateway, a partir
+del log de acceso de nginx en Loki (`container_name="sihsalus-gateway"`):
+- Equipos activos (últimos 5 min y en el rango) y peticiones totales
+- Actividad por equipo en el tiempo
+- Tabla por IP: peticiones, navegador y si registró `service-worker.js`
+  (sin service worker no hay modo offline en esa PC; casi siempre es que
+  falta instalar el certificado del servidor)
+
+Excluye las IPs internas de Docker (`172.*`, `10.*`, `127.*`) y el sondeo de
+Blackbox. Las IPs las asigna el DHCP del router; el nombre de la máquina se
+obtiene con `dig -x <ip> @<router>`.
+
+### Logs
 
 Agregación y búsqueda de:
 - Logs de todos los servicios
 - Filtros por servicio/nivel
 - Estadísticas de errores
+- Advertencia explícita para no copiar ni exponer datos clínicos
 
 ---
 
@@ -202,12 +273,32 @@ annotations:
   summary: "SIHSALUS endpoint probe failed for {{ $labels.instance }}"
 ```
 
-### Configurar notificaciones
+### Alertmanager y notificaciones
 
-En Grafana:
-1. Alerting → Notification channels
-2. Agregar: Slack, Discord, Email, PagerDuty, Webhook, etc.
-3. Enlazar a alertas
+Prometheus envía las alertas a Alertmanager, que permite agruparlas, deduplicarlas
+y silenciarlas. El receiver incluido es deliberadamente inerte: no se almacena
+ninguna credencial en Git. Hasta configurar SMTP, Gmail API o un webhook aprobado,
+las alertas se verán en Grafana/Alertmanager pero no saldrán del servidor.
+
+Las reglas incluidas cubren:
+- caída de targets y endpoints;
+- latencia sostenida de OpenMRS;
+- CPU y memoria bajo presión;
+- espacio, inodos y predicción de filesystem lleno;
+- eventos OOM de contenedores del proyecto principal y Samba independiente;
+- ciclos repetidos de boot del host o de reinicio/recreación de servicios;
+- fallos al recargar la configuración de Prometheus.
+- ViewPower sin telemetría, UPS en batería, baja carga/autonomía, sobrecarga,
+  temperatura y advertencias del equipo;
+- Samba caído, rutas ausentes y cuota lógica próxima a agotarse.
+
+### Configurar un canal de notificación
+
+1. Agregar un receiver a `alertmanager/alertmanager.yml`.
+2. Leer secretos desde un archivo root-only montado en el contenedor; no incluirlos
+   en el YAML versionado.
+3. Validar con `amtool check-config` y enviar una alerta de prueba controlada.
+4. Mantener TLS obligatorio y documentar quién recibe cada severidad.
 
 ---
 
@@ -227,6 +318,30 @@ probe_duration_seconds{job="blackbox-http-prod"}
 
 # Estado de targets scrapeados
 up
+
+# Estado y capacidad de la UPS
+sihsalus_ups_on_battery
+sihsalus_ups_battery_charge_percent
+sihsalus_ups_battery_runtime_seconds
+
+# Disponibilidad y cuota del Samba independiente
+probe_success{job="blackbox-tcp-samba"}
+100 * sihsalus_samba_used_bytes / sihsalus_samba_quota_bytes
+
+# Boots del host observados por Prometheus (es un mínimo, no un ledger externo)
+changes(node_boot_time_seconds[24h])
+
+# Arranques o recreaciones por proyecto y servicio; incluye boots y despliegues
+changes(
+  (
+    max by (container_label_com_docker_compose_project, container_label_com_docker_compose_service) (
+      container_start_time_seconds{
+        container_label_com_docker_compose_project=~"sihsalus|sihsalus-samba-backup",
+        container_label_com_docker_compose_service!=""
+      }
+    )
+  )[24h:30s]
+)
 ```
 
 ### LogQL (Loki)
@@ -253,6 +368,7 @@ sum(rate({job="docker"}[5m]))
 | Prometheus | `prometheus-data` | TSDB (30 días) | 1-5 GB |
 | Loki | `loki-data` | Índices y logs (30 días) | 2-10 GB |
 | Grafana | `grafana-data` | Config, dashboards, usuarios | 100-500 MB |
+| Alertmanager | `alertmanager-data` | Silencios y estado | <100 MB |
 
 ### Limpieza de datos antiguos
 
@@ -312,11 +428,15 @@ docker volume rm sihsalus_prometheus-data
    curl http://localhost:9090/api/v1/rules
    ```
 
-2. Revisa configuración de notificación en Grafana
-
-3. Test manual:
+2. Verifica que Prometheus descubra Alertmanager:
+   ```bash
+   curl http://localhost:9090/api/v1/alertmanagers
    ```
-   Grafana → Alerting → Alert rules → Test rule
+
+3. Valida ambas configuraciones:
+   ```bash
+   promtool check config monitoring/prometheus/prometheus.yml
+   amtool check-config monitoring/alertmanager/alertmanager.yml
    ```
 
 ### Bajo rendimiento / memoria alta
@@ -363,16 +483,11 @@ Ver [compose/ssl.yml](../compose/ssl.yml)
 
 ### Backup de dashboards
 
-```bash
-# Exportar dashboards como JSON
-docker compose --profile monitoring exec grafana grafana-cli admin export-dashboard 1 > dashboard1.json
-
-# Importar
-curl -X POST http://localhost:3001/api/dashboards/db \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer TOKEN" \
-  -d @dashboard1.json
-```
+Los dashboards se versionan en [grafana/dashboards](grafana/dashboards/) y se
+cargan mediante [provisioning](grafana/provisioning/dashboards/dashboards.yml).
+Su respaldo y recuperación se hacen desde Git. Modifica esos JSON y valida con
+`tests/monitoring/config-validation.sh`; el provisioning deshabilita las
+ediciones persistentes desde la interfaz de Grafana.
 
 ---
 
