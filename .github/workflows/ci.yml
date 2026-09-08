@@ -116,6 +116,11 @@ jobs:
       - name: Test backend security refresh cache policy
         run: ./tests/backend/security-refresh-config.sh
 
+      - name: Validate published O3 Forms dependency contract
+        run: |
+          bash tests/backend/o3forms-release-config.sh
+          bash tests/backend/o3forms-release-image.sh --self-test
+
       - name: Validate models and invariants
         run: ./scripts/validate-compose.sh compose-validation
 
@@ -217,6 +222,9 @@ jobs:
 
       - name: Verify all packaged OMOD versions and REST security patch
         run: bash tests/backend/source-omods-image.sh sihsalus-backend:ci
+
+      - name: Verify published O3 Forms bytes in backend image
+        run: bash tests/backend/o3forms-release-image.sh sihsalus-backend:ci
 
       - name: Test backend forced-password contract
         run: ./tests/backend/forced-password-image.sh sihsalus-backend:ci

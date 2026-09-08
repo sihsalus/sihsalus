@@ -11,6 +11,8 @@ on:
       - 'distro/**'
       - 'tests/backend/ocl-token-image.sh'
       - 'tests/backend/forced-password-image.sh'
+      - 'tests/backend/o3forms-release-config.sh'
+      - 'tests/backend/o3forms-release-image.sh'
   workflow_dispatch:
 
 concurrency:
@@ -29,6 +31,11 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v7.0.1
+
+      - name: Validate published O3 Forms dependency contract
+        run: |
+          bash tests/backend/o3forms-release-config.sh
+          bash tests/backend/o3forms-release-image.sh --self-test
 
       - uses: docker/setup-buildx-action@v4
 
@@ -73,6 +80,11 @@ jobs:
         env:
           IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
         run: bash tests/backend/source-omods-image.sh "$IMAGE"
+
+      - name: Verify published O3 Forms bytes in backend image
+        env:
+          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+        run: bash tests/backend/o3forms-release-image.sh "$IMAGE"
 
       - name: Test published backend forced-password contract
         env:
