@@ -86,3 +86,6 @@ networks:
   # Red de monitoreo - Prometheus, Loki, Grafana
   monitoring-network:
     driver: bridge
+  # Only gateway and Grafana share this edge; monitoring internals stay separate.
+  monitoring-edge:
+    driver: bridge

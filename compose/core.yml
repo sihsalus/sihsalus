@@ -17,21 +17,19 @@ services:
         condition: service_started
     ports:
       - "80:80"
-    # El gateway publica /grafana, asi que necesita compartir red con Grafana.
-    # Nunca estuvo declarado: el contenedor en produccion habia sido conectado a
-    # mano, asi que la consola funcionaba hasta que se recreaba el contenedor y
-    # entonces devolvia 502 con "grafana could not be resolved". Se repite
-    # default porque nombrar cualquier red aqui reemplaza la implicita, y el
-    # gateway sigue teniendo que alcanzar al backend y al frontend.
+    # Keep clinical upstreams on default and reach only Grafana over the edge.
+    # Other monitoring services do not belong on the gateway-facing network.
     networks:
       - default
-      - monitoring-network
+      - monitoring-edge
     environment:
       FRAME_ANCESTORS: ${FRAME_ANCESTORS:-}
       # Imaging web routes are closed unless compose/imaging-auth.yml replaces
       # this value with network ACL plus OIDC auth_request directives.
       IMAGING_ACCESS_CONTROL: "deny all;"
       IMAGING_NETWORK_ACCESS_CONTROL: "${IMAGING_NETWORK_ACCESS_CONTROL:-allow 127.0.0.1; allow 10.0.0.0/8; allow 172.16.0.0/12; allow 192.168.0.0/16; deny all;}"
+      # Nginx geo entries (CIDR 1;); empty means no Grafana gateway access.
+      GRAFANA_NETWORK_ALLOWLIST: "${GRAFANA_NETWORK_ALLOWLIST:-}"
     healthcheck:
       # /health lo sirve el propio nginx: mide la salud del gateway, no la de
       # los upstreams ("/" redirige 301 al frontend y acoplaria ambos estados).

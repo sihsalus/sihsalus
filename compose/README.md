@@ -78,7 +78,10 @@ docker compose ps
 - `DOCS_IMAGE_REF` fija por digest el portal de ayuda público-seguro. El gateway
   no depende de su salud, por lo que una caída de documentación no bloquea la
   atención clínica.
-- HAPI y las consolas de observabilidad se publican solo en localhost.
+- HAPI y los puertos directos de observabilidad se publican solo en localhost.
+  Grafana también puede usarse por `/grafana/`, pero el gateway exige una
+  `GRAFANA_NETWORK_ALLOWLIST` explícita además de su filtro de redes privadas.
+  Sin esa configuración devuelve 403. Ver [migración y verificación](../docs/operations/grafana-lan.md).
 
 Para generar credenciales y auditar un ambiente, ver [scripts/security/README.md](../scripts/security/README.md).
 
@@ -103,5 +106,7 @@ Además de renderizar todas las combinaciones soportadas, valida invariantes de 
 3. Una variable nueva debe agregarse a `.env.template` y, si es secreta, al generador y auditor.
 4. Una combinación soportada debe agregarse a `scripts/validate-compose.sh`.
 5. Evitar subredes IP fijas; los servicios se descubren por nombre DNS de Compose.
+6. Solo gateway y Grafana comparten `monitoring-edge`. El gateway conserva
+   `default` para los upstreams clínicos y no se une a `monitoring-network`.
 
 La arquitectura y los límites de cada capa están en [docs/architecture/infrastructure.md](../docs/architecture/infrastructure.md).

@@ -1,6 +1,10 @@
 #!/bin/sh
 set -e
 
+# envsubst substitutes only exported variables. Fail closed for direct image
+# users as well as Compose, without leaving an unresolved Nginx placeholder.
+export GRAFANA_NETWORK_ALLOWLIST="${GRAFANA_NETWORK_ALLOWLIST:-}"
+
 # Create templates directory if it doesn't exist
 mkdir -p /etc/nginx/templates
 cp -R /etc/nginx/conf-templates/includes /etc/nginx/templates/
