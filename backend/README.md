@@ -27,6 +27,25 @@ Package contents:
 #### OpenMRS modules
 `omod`s are specified as Maven `<dependency>` in the [pom.xml](pom.xml) file.
 
+O3 Forms is an explicitly versioned binary dependency published by
+[`sihsalus/openmrs-module-o3forms`](https://github.com/sihsalus/openmrs-module-o3forms/releases).
+Its Java source, patch, tests and OMOD compilation belong in that repository.
+The backend image build downloads the released OMOD using a literal SHA-256 pin
+in `Dockerfile` and registers those exact bytes in its build-only Maven cache
+before packaging the distribution. No O3 Forms source patch, compilation or
+manual runtime-module installation takes place here.
+
+To update it, approve and publish the module release first, then change
+`o3forms.version`, `O3FORMS_VERSION` and the Dockerfile checksum together. Do not
+use a short-lived CI artifact or a moving download URL. The configuration test
+checks this dependency contract; the image test checks the packaged OMOD's
+checksum, module identity and nested API version. Version automation must not
+replace this pin independently.
+
+Deploy only the tested backend image by SHA and OCI digest using the
+[backend-only procedure](../scripts/deploy/README.md#backend-únicamente), with
+synthetic DEV acceptance before QLTY. Preserve the prior image for rollback.
+
 #### OpenMRS Configuration (Initializer)
 OpenMRS config can be set under [`backend/config/openmrs_config/`](config/openmrs_config/) when present.
 
