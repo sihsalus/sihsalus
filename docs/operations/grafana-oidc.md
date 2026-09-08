@@ -89,6 +89,16 @@ HTTPS mediante el procedimiento operativo aprobado: no asumir que todos los
 navegadores envían cookies Secure por HTTP loopback ni desactivar Secure como
 recuperación rutinaria. No pegar contraseñas o tokens en comandos, logs o PRs.
 
+## Rollback coordinado
+
+Para volver al login local en una ventana autorizada, retira únicamente
+`compose/monitoring-oidc.yml` de la composición efectiva y recrea solo Grafana
+con `--no-deps`, conservando los demás overrides, perfiles, HTTPS y su volumen.
+No retires `compose/keycloak.yml` ni alteres los clientes clínicos. Comprueba
+antes que la cuenta local de contingencia funciona y conserva las referencias
+de configuración e imagen previas. Deshabilitar el proveedor no sustituye la
+revocación explícita de sesiones activas en Grafana y el IdP.
+
 ## Evidencia de pruebas y límites
 
 ```bash
