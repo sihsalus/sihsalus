@@ -23,6 +23,7 @@ jobs:
       backup: ${{ steps.scope.outputs.backup }}
       monitoring: ${{ steps.scope.outputs.monitoring }}
       imaging: ${{ steps.scope.outputs.imaging }}
+      grafana_oidc: ${{ steps.scope.outputs.grafana_oidc }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,6 +39,7 @@ jobs:
           backup=true
           monitoring=true
           imaging=true
+          grafana_oidc=true
 
           can_diff=false
           if [ "$EVENT_NAME" != "workflow_dispatch" ] \
@@ -67,6 +69,11 @@ jobs:
             imaging=false
           fi
 
+          if [ "$can_diff" = "true" ] \
+            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml compose/monitoring.yml compose/monitoring-oidc.yml compose/keycloak.yml tests/monitoring/oidc/ scripts/validate-compose.sh scripts/security-audit.sh scripts/security/ .env.template; then
+            grafana_oidc=false
+          fi
+
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
           echo "backup=$backup" >> "$GITHUB_OUTPUT"
           echo "monitoring=$monitoring" >> "$GITHUB_OUTPUT"
@@ -75,6 +82,8 @@ jobs:
           echo "Backup round-trip required: $backup"
           echo "Monitoring runtime test required: $monitoring"
           echo "Imaging auth runtime test required: $imaging"
+          echo "Grafana OIDC runtime test required: $grafana_oidc"
+          echo "grafana_oidc=$grafana_oidc" >> "$GITHUB_OUTPUT"
 
   compose:
     name: Validate Compose
@@ -355,10 +364,23 @@ jobs:
       - name: Test anonymous denial, authorized access and logout
         run: ./tests/imaging/auth-gateway.sh
 
+  grafana-oidc:
+    name: Grafana OIDC authorization
+    needs: changes
+    if: needs.changes.outputs.grafana_oidc == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test synthetic provider and configuration contracts
+        run: python3 -B -m unittest discover -s tests/monitoring/oidc -p 'test_*.py' -v
+      - name: Test real Grafana roles, denied login, expired code and logout
+        run: python3 -B tests/monitoring/oidc/runtime.py runtime
+
   gate:
     name: PR Gate
     if: always()
-    needs: [compose, source-omods, backend, backup, monitoring, imaging]
+    needs: [compose, source-omods, backend, backup, monitoring, imaging, grafana-oidc]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful validations
@@ -369,6 +391,7 @@ jobs:
           BACKUP_RESULT: ${{ needs.backup.result }}
           MONITORING_RESULT: ${{ needs.monitoring.result }}
           IMAGING_RESULT: ${{ needs.imaging.result }}
+          GRAFANA_OIDC_RESULT: ${{ needs.grafana-oidc.result }}
         run: |
           [ "$COMPOSE_RESULT" = "success" ]
           [ "$OMOD_RESULT" = "success" ] || [ "$OMOD_RESULT" = "skipped" ]
@@ -376,3 +399,4 @@ jobs:
           [ "$BACKUP_RESULT" = "success" ] || [ "$BACKUP_RESULT" = "skipped" ]
           [ "$MONITORING_RESULT" = "success" ] || [ "$MONITORING_RESULT" = "skipped" ]
           [ "$IMAGING_RESULT" = "success" ] || [ "$IMAGING_RESULT" = "skipped" ]
+          [ "$GRAFANA_OIDC_RESULT" = "success" ] || [ "$GRAFANA_OIDC_RESULT" = "skipped" ]

@@ -36,6 +36,7 @@ OAUTH2_CLIENT_SECRET="$(secret)"
 IMAGING_OIDC_CLIENT_SECRET="$(secret)"
 IMAGING_OAUTH_COOKIE_SECRET="$(cookie_secret)"
 GRAFANA_ADMIN_PASSWORD="$(secret)"
+GRAFANA_OIDC_CLIENT_SECRET="$(secret)"
 FUA_DB_PASSWORD="$(secret)"
 FUA_TOKEN="$(secret)"
 FUA_SECRET_KEY="$(secret)"
@@ -91,6 +92,8 @@ IMAGING_OAUTH_COOKIE_SECURE=true
 # Monitoring
 GRAFANA_ADMIN_USER=admin
 GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+# Inactive until compose/monitoring-oidc.yml is explicitly selected.
+GRAFANA_OIDC_CLIENT_SECRET=${GRAFANA_OIDC_CLIENT_SECRET}
 
 # FUA
 SIHSALUS_FUA_GEN_DB_USER=fuagenerator
