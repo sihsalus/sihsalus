@@ -204,6 +204,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
       - uses: docker/setup-buildx-action@v4
 
       - name: Build deployable backend image
@@ -225,6 +230,9 @@ jobs:
 
       - name: Verify published O3 Forms bytes in backend image
         run: bash tests/backend/o3forms-release-image.sh sihsalus-backend:ci
+
+      - name: Verify required OMOD dependency compatibility with packaged Core
+        run: bash tests/backend/module-dependencies-image.sh sihsalus-backend:ci
 
       - name: Test backend forced-password contract
         run: ./tests/backend/forced-password-image.sh sihsalus-backend:ci

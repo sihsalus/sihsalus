@@ -42,6 +42,39 @@ checks this dependency contract; the image test checks the packaged OMOD's
 checksum, module identity and nested API version. Version automation must not
 replace this pin independently.
 
+#### Required module compatibility gate
+
+Before promotion, CI checks every packaged OMOD's required module dependencies
+by package identity and minimum version using `ModuleUtil.compareVersion` from
+the exact Core WAR in the image. This is a test-only harness; it does not compile
+module/application source, start OpenMRS, attach runtime data or contact a database.
+Optional dependencies are not treated as required. Missing/duplicate module
+identities, malformed descriptors and incompatible required versions fail closed.
+
+```bash
+bash tests/backend/module-dependencies-image.sh IMAGE
+# Offline alternatives using distribution artifacts only:
+bash tests/backend/module-dependencies-image.sh --files PATH_TO_WAR MODULES_DIRECTORY
+bash tests/backend/module-dependencies-image.sh --self-test PATH_TO_WAR
+```
+
+The gate requires a JDK (CI uses 21); image mode additionally requires Docker.
+It creates an unstarted, network-isolated container and removes that test container
+and its anonymous volumes afterward. It never reads a deployed instance's data.
+The self-test exercises synthetic OMOD descriptors against the actual Core
+comparator, including Patient Documents requiring O3 Forms `>=2.3.0`.
+
+Core rejects `2.3.0-sihsalus.1` for that minimum even if O3 Forms itself starts.
+The planned correction `2.3.1-sihsalus.1` satisfies `2.3.0`, but not a future
+minimum of `2.3.1`. The old immutable release must not be overwritten. Until
+the correction is published and its real checksum is pinned, the current image
+is expected to fail this gate; do not bypass it to promote the rejected version.
+
+Static dependency acceptance is not module-start or clinical acceptance. After
+an explicitly authorized deployment, separately verify O3 Forms, REST and Patient
+Documents are started and test synthetic form open/save/edit flows in DEV before
+coordinating QLTY.
+
 Deploy only the tested backend image by SHA and OCI digest using the
 [backend-only procedure](../scripts/deploy/README.md#backend-únicamente), with
 synthetic DEV acceptance before QLTY. Preserve the prior image for rollback.
