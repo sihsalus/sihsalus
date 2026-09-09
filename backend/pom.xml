@@ -51,7 +51,7 @@
     <serialization-xstream.version>0.3.0</serialization-xstream.version>
     <ordertemplates.version>2.2.0</ordertemplates.version>
     <patientflags.version>3.0.10</patientflags.version>
-    <o3forms.version>2.3.0-sihsalus.1</o3forms.version>
+    <o3forms.version>2.3.1-sihsalus.1</o3forms.version>
     <emrapi.version>3.5.0-sihsalus.1</emrapi.version>
     <event.version>4.0.0</event.version>
     <bedmanagement.version>7.3.0-sihsalus.2</bedmanagement.version>

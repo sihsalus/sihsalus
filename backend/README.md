@@ -65,10 +65,13 @@ The self-test exercises synthetic OMOD descriptors against the actual Core
 comparator, including Patient Documents requiring O3 Forms `>=2.3.0`.
 
 Core rejects `2.3.0-sihsalus.1` for that minimum even if O3 Forms itself starts.
-The planned correction `2.3.1-sihsalus.1` satisfies `2.3.0`, but not a future
-minimum of `2.3.1`. The old immutable release must not be overwritten. Until
-the correction is published and its real checksum is pinned, the current image
-is expected to fail this gate; do not bypass it to promote the rejected version.
+The pinned correction
+[`2.3.1-sihsalus.1`](https://github.com/sihsalus/openmrs-module-o3forms/releases/tag/2.3.1-sihsalus.1)
+is an immutable prerelease that satisfies `2.3.0`, but not a future minimum of
+`2.3.1`. It preserves the null-locale form translation fix. Its published OMOD,
+checksum and signed provenance were verified before updating both version pins
+and the Dockerfile checksum. The image gate must still validate the actual
+packaged distribution; do not overwrite the old release or bypass the gate.
 
 Static dependency acceptance is not module-start or clinical acceptance. After
 an explicitly authorized deployment, separately verify O3 Forms, REST and Patient

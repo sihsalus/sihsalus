@@ -19,8 +19,8 @@ COPY backend/pom.xml ./backend/
 
 # O3 Forms is compiled and released by its owning module repository.
 # Infrastructure consumes only the immutable, checksum-pinned release binary.
-ARG O3FORMS_VERSION=2.3.0-sihsalus.1
-ADD --checksum=sha256:77b00a1103a074ef3dc6198c881fa4ae50ea3d625788f89d7fe17f13bc170431 \
+ARG O3FORMS_VERSION=2.3.1-sihsalus.1
+ADD --checksum=sha256:34ad1c0a9d9d924fe05697dae29a442a194a51e149e59e7f4ac8b2e6856645cf \
     https://github.com/sihsalus/openmrs-module-o3forms/releases/download/${O3FORMS_VERSION}/o3forms-${O3FORMS_VERSION}.omod \
     /tmp/o3forms.omod
 
