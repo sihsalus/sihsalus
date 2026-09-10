@@ -1,0 +1,183 @@
+diff --git a/api/src/main/java/org/openmrs/module/emrapi/adt/AdtServiceImpl.java b/api/src/main/java/org/openmrs/module/emrapi/adt/AdtServiceImpl.java
+index 47b2821..1de7a38 100644
+--- a/api/src/main/java/org/openmrs/module/emrapi/adt/AdtServiceImpl.java
++++ b/api/src/main/java/org/openmrs/module/emrapi/adt/AdtServiceImpl.java
+@@ -153,6 +153,7 @@ public class AdtServiceImpl extends BaseOpenmrsService implements AdtService {
+ 	}
+ 	
+ 	@Override
++	@Transactional
+ 	public void closeInactiveVisits() {
+ 		Collection<Location> possibleLocations = getPossibleLocationsToCloseVisit();
+ 		List<Visit> openVisits = visitService.getVisits(null, null, possibleLocations, null, null, null, null, null, null,
+@@ -162,8 +163,12 @@ public class AdtServiceImpl extends BaseOpenmrsService implements AdtService {
+ 				try {
+ 					closeAndSaveVisit(visit);
+ 				}
+-				catch (Exception ex) {
+-					log.warn("Failed to close inactive visit " + visit, ex);
++				catch (RuntimeException ex) {
++					// Save handlers may flush dirty visits and related queues before
++					// rejecting them. Propagate through the outer transaction proxy;
++					// catching and continuing would commit those invalid changes.
++					log.warn("Failed to close inactive visit; rolling back closure batch: " + visit, ex);
++					throw ex;
+ 				}
+ 			}
+ 		}
+diff --git a/api/src/test/java/org/openmrs/module/emrapi/adt/InactiveVisitClosureTransactionTest.java b/api/src/test/java/org/openmrs/module/emrapi/adt/InactiveVisitClosureTransactionTest.java
+new file mode 100644
+index 0000000..2c52551
+--- /dev/null
++++ b/api/src/test/java/org/openmrs/module/emrapi/adt/InactiveVisitClosureTransactionTest.java
+@@ -0,0 +1,150 @@
++/*
++ * This Source Code Form is subject to the terms of the Mozilla Public License,
++ * v. 2.0. If a copy of the MPL was not distributed with this file, You can
++ * obtain one at http://mozilla.org/MPL/2.0/. OpenMRS is also distributed under
++ * the terms of the Healthcare Disclaimer located at http://openmrs.org/license.
++ *
++ * Copyright (C) OpenMRS Inc. OpenMRS is a registered trademark and the OpenMRS
++ * graphic logo is a trademark of OpenMRS Inc.
++ */
++package org.openmrs.module.emrapi.adt;
++
++import java.util.Arrays;
++import java.util.Collections;
++import java.util.Date;
++import java.util.List;
++
++import org.junit.jupiter.api.AfterEach;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++import org.openmrs.Visit;
++import org.openmrs.api.LocationService;
++import org.openmrs.api.ValidationException;
++import org.openmrs.api.VisitService;
++import org.springframework.aop.framework.ProxyFactory;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.jdbc.datasource.DataSourceTransactionManager;
++import org.springframework.jdbc.datasource.embedded.EmbeddedDatabase;
++import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
++import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
++import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
++import org.springframework.transaction.interceptor.TransactionInterceptor;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertSame;
++import static org.junit.jupiter.api.Assertions.assertThrows;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.ArgumentMatchers.anyCollection;
++import static org.mockito.ArgumentMatchers.eq;
++import static org.mockito.ArgumentMatchers.isNull;
++import static org.mockito.Mockito.doReturn;
++import static org.mockito.Mockito.mock;
++import static org.mockito.Mockito.never;
++import static org.mockito.Mockito.spy;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.when;
++
++/**
++ * Exercises the real Spring annotation interceptor and an isolated H2 transaction.
++ * The VisitService double deliberately writes both rows before rejecting a queue
++ * end date, modelling a persistence flush during a save-handler validation query.
++ * This is not a substitute for an OpenMRS + Queue integration/clinical smoke test.
++ */
++public class InactiveVisitClosureTransactionTest {
++
++	private EmbeddedDatabase database;
++
++	private JdbcTemplate jdbc;
++
++	private VisitService visitService;
++
++	private AdtService service;
++
++	private List<Visit> visits;
++
++	private ValidationException rejection;
++
++	@BeforeEach
++	public void setUp() {
++		database = new EmbeddedDatabaseBuilder().generateUniqueName(true).setType(EmbeddedDatabaseType.H2).build();
++		jdbc = new JdbcTemplate(database);
++		jdbc.execute("CREATE TABLE synthetic_visit (id INT PRIMARY KEY, stopped_at BIGINT)");
++		jdbc.execute("CREATE TABLE synthetic_queue (visit_id INT PRIMARY KEY, started_at BIGINT, ended_at BIGINT)");
++		visits = Arrays.asList(new Visit(1), new Visit(2), new Visit(3));
++		for (Visit visit : visits) {
++			visit.setStartDatetime(new Date(1000L));
++			jdbc.update("INSERT INTO synthetic_visit (id) VALUES (?)", visit.getId());
++			jdbc.update("INSERT INTO synthetic_queue (visit_id, started_at) VALUES (?, ?)", visit.getId(), 500L);
++		}
++		rejection = new ValidationException("synthetic queue end must be after its start");
++		visitService = mock(VisitService.class);
++		when(visitService.getVisits(isNull(), isNull(), anyCollection(), isNull(), isNull(), isNull(), isNull(),
++		    isNull(), isNull(), eq(false), eq(false))).thenReturn(visits);
++		when(visitService.saveVisit(any(Visit.class))).thenAnswer(invocation -> {
++			Visit visit = invocation.getArgument(0);
++			long stoppedAt = visit.getStopDatetime().getTime();
++			jdbc.update("UPDATE synthetic_visit SET stopped_at=? WHERE id=?", stoppedAt, visit.getId());
++			jdbc.update("UPDATE synthetic_queue SET ended_at=? WHERE visit_id=?", stoppedAt, visit.getId());
++			Long startedAt = jdbc.queryForObject("SELECT started_at FROM synthetic_queue WHERE visit_id=?",
++			    Long.class, visit.getId());
++			if (stoppedAt <= startedAt) {
++				throw rejection;
++			}
++			return visit;
++		});
++		AdtServiceImpl target = spy(new AdtServiceImpl());
++		target.setVisitService(visitService);
++		target.setLocationService(mock(LocationService.class));
++		doReturn(true).when(target).shouldBeClosed(any(Visit.class));
++		ProxyFactory proxy = new ProxyFactory();
++		proxy.setTarget(target);
++		proxy.setInterfaces(AdtService.class);
++		proxy.addAdvice(new TransactionInterceptor(new DataSourceTransactionManager(database),
++		    new AnnotationTransactionAttributeSource()));
++		service = (AdtService) proxy.getProxy();
++	}
++
++	@AfterEach
++	public void tearDown() {
++		if (database != null) {
++			database.shutdown();
++		}
++	}
++
++	@Test
++	public void shouldRollBackTheBatchWhenAQueueWouldEndBeforeItsStart() {
++		assertRejectedBatchRollsBack(2000L);
++	}
++
++	@Test
++	public void shouldRollBackTheBatchWhenAQueueWouldEndAtItsStart() {
++		assertRejectedBatchRollsBack(1000L);
++	}
++
++	private void assertRejectedBatchRollsBack(long queueStart) {
++		jdbc.update("UPDATE synthetic_queue SET started_at=? WHERE visit_id=2", queueStart);
++		assertSame(rejection, assertThrows(ValidationException.class, () -> service.closeInactiveVisits()));
++		assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM synthetic_visit WHERE stopped_at IS NOT NULL", Integer.class));
++		assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM synthetic_queue WHERE ended_at IS NOT NULL", Integer.class));
++		assertEquals(queueStart, jdbc.queryForObject("SELECT started_at FROM synthetic_queue WHERE visit_id=2", Long.class));
++		verify(visitService).saveVisit(visits.get(0));
++		verify(visitService).saveVisit(visits.get(1));
++		verify(visitService, never()).saveVisit(visits.get(2));
++	}
++
++	@Test
++	public void shouldCommitAValidBatchWithoutChangingTheExistingStopDatePolicy() {
++		service.closeInactiveVisits();
++		assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM synthetic_visit WHERE stopped_at=1000", Integer.class));
++		assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM synthetic_queue WHERE ended_at=1000", Integer.class));
++	}
++
++	@Test
++	public void shouldLeaveRowsUnchangedWhenThereAreNoOpenVisits() {
++		when(visitService.getVisits(isNull(), isNull(), anyCollection(), isNull(), isNull(), isNull(), isNull(),
++		    isNull(), isNull(), eq(false), eq(false))).thenReturn(Collections.emptyList());
++		service.closeInactiveVisits();
++		verify(visitService, never()).saveVisit(any(Visit.class));
++		assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM synthetic_visit WHERE stopped_at IS NOT NULL", Integer.class));
++	}
++}

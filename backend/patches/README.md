@@ -35,6 +35,27 @@ branch uses Jakarta and must not replace this Core 2.8-compatible base.
 The SIHSalus module descriptor uses its explicit Maven version without upstream's
 extra SCM build-number suffix; the immutable source revision is recorded in the lock.
 
+The EMR API patch `3.5.0-sihsalus.2` makes `closeInactiveVisits` transactional
+and propagates save/validation failures instead of catching and continuing.
+Save handlers can flush modified visits and related queue rows before rejecting
+an incompatible end date. The outer transaction must therefore roll back the
+whole closure batch, including previously processed visits, on the first failure.
+Do not catch that exception inside a caller's transaction and continue committing.
+
+The regression uses the real Spring annotation interceptor and a disposable H2
+database with a save-service double that writes visit and queue rows before
+throwing `ValidationException`. It covers queue end before start, end equal to
+start, rollback of earlier writes, stopping before later visits, a valid batch,
+and an empty batch. It does not replace an actual OpenMRS + Queue integration test.
+
+This is a fail-closed containment patch, not a new clinical timestamp policy.
+It deliberately preserves the existing guessed end date and queue validation.
+Incompatible visits will still prevent automatic batch completion, but must not
+leave partially committed timestamps. It does not repair historical rows, change
+scheduler settings or authorize reactivation. Keep affected installations' auto
+closure paused until the timestamp policy and transaction behavior pass synthetic
+DEV/QLTY acceptance and clinical/operational review.
+
 Validation in DEV and then QLTY must use the same immutable image digest. Confirm
 all 33 modules are started, compare their versions to `backend/pom.xml`, and test
 the updated APIs with synthetic fixtures: FUA payloads, recurring appointments
