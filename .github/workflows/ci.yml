@@ -116,6 +116,9 @@ jobs:
       - name: Test backend security refresh cache policy
         run: ./tests/backend/security-refresh-config.sh
 
+      - name: Test Tomcat rootless configuration directory contract
+        run: bash tests/backend/tomcat-config-config.sh
+
       - name: Validate published O3 Forms dependency contract
         run: |
           bash tests/backend/o3forms-release-config.sh
@@ -236,6 +239,9 @@ jobs:
 
       - name: Test backend forced-password contract
         run: ./tests/backend/forced-password-image.sh sihsalus-backend:ci
+
+      - name: Test backend Tomcat configuration directory permissions
+        run: bash tests/backend/tomcat-config-image.sh sihsalus-backend:ci
 
       - name: Resolve pinned OpenMRS security baseline
         id: openmrs-baseline
