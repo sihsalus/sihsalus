@@ -42,6 +42,26 @@ checks this dependency contract; the image test checks the packaged OMOD's
 checksum, module identity and nested API version. Version automation must not
 replace this pin independently.
 
+#### Independently released REST and EMR API
+
+REST and EMR API follow the same owned-release pattern in
+[`sihsalus/openmrs-module-webservices.rest`](https://github.com/sihsalus/openmrs-module-webservices.rest)
+and [`sihsalus/openmrs-module-emrapi`](https://github.com/sihsalus/openmrs-module-emrapi).
+Their Java changes, regressions and CI release builds live only in those repos.
+The backend consumes the published OMODs, with literal SHA-256 pins and explicit
+versions. Do not reintroduce them into `omod-sources.lock` or apply build-time patches.
+
+Update `REST_VERSION`/`EMRAPI_VERSION`, the corresponding Dockerfile checksum and
+POM property together, only after a tested immutable module release is published.
+`python3 tests/backend/owned-module-releases.py --self-test` checks the contract;
+the image gate checks the packaged bytes against those same checksums.
+
+EMR API 3.5.1-sihsalus.1 is a containment prerelease: a failed automatic visit
+closure rolls back the entire batch. It does not correct timestamp policy,
+repair clinical rows, or authorize scheduler reactivation. Actual OpenMRS + Queue
+integration and synthetic DEV/QLTY acceptance remain necessary before deployment.
+See [module ownership and safety requirements](patches/README.md).
+
 #### Required module compatibility gate
 
 Before promotion, CI checks every packaged OMOD's required module dependencies

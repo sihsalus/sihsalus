@@ -24,6 +24,17 @@ ADD --checksum=sha256:34ad1c0a9d9d924fe05697dae29a442a194a51e149e59e7f4ac8b2e685
     https://github.com/sihsalus/openmrs-module-o3forms/releases/download/${O3FORMS_VERSION}/o3forms-${O3FORMS_VERSION}.omod \
     /tmp/o3forms.omod
 
+# REST and EMR API own their source changes, tests and release builds separately.
+# Consume only their immutable release bytes, never patch or compile them here.
+ARG REST_VERSION=3.5.1-sihsalus.1
+ADD --checksum=sha256:8dda51c6534a2cec362bc2a1c10d40021bb3f1ef962f5c291804f2e6840b0f96 \
+    https://github.com/sihsalus/openmrs-module-webservices.rest/releases/download/${REST_VERSION}/webservices.rest-${REST_VERSION}.omod \
+    /tmp/webservices.rest.omod
+ARG EMRAPI_VERSION=3.5.1-sihsalus.1
+ADD --checksum=sha256:963122a092828b8d7bb5a20e25d99c0383d4355ef0ae5a99c4e30b620b6ab216 \
+    https://github.com/sihsalus/openmrs-module-emrapi/releases/download/${EMRAPI_VERSION}/emrapi-${EMRAPI_VERSION}.omod \
+    /tmp/emrapi.omod
+
 # Build the SIHSALUS Bed Management patch from an immutable source revision.
 # The checksum prevents a changed or substituted archive from entering the image.
 ARG BEDMANAGEMENT_SOURCE_SHA=f7ceac08204d4239814b9978eaf7dadd8e6a62c7
@@ -50,6 +61,16 @@ RUN --mount=type=cache,target=/root/.m2/repository \
       org.apache.maven.plugins:maven-install-plugin:3.1.4:install-file \
       -Dfile=/tmp/o3forms.omod -DgroupId=org.openmrs.module \
       -DartifactId=o3forms-omod -Dversion=${O3FORMS_VERSION} \
+      -Dpackaging=jar -DgeneratePom=true && \
+    mvn --batch-mode --no-transfer-progress \
+      org.apache.maven.plugins:maven-install-plugin:3.1.4:install-file \
+      -Dfile=/tmp/webservices.rest.omod -DgroupId=org.openmrs.module \
+      -DartifactId=webservices.rest-omod -Dversion=${REST_VERSION} \
+      -Dpackaging=jar -DgeneratePom=true && \
+    mvn --batch-mode --no-transfer-progress \
+      org.apache.maven.plugins:maven-install-plugin:3.1.4:install-file \
+      -Dfile=/tmp/emrapi.omod -DgroupId=org.openmrs.module \
+      -DartifactId=emrapi-omod -Dversion=${EMRAPI_VERSION} \
       -Dpackaging=jar -DgeneratePom=true && \
     mvn $MVN_ARGS_SETTINGS $MVN_ARGS && \
     modules_dir=/openmrs_distro/backend/target/sdk-distro/web/openmrs_modules && \

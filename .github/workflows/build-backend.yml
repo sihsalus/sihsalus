@@ -13,6 +13,8 @@ on:
       - 'tests/backend/forced-password-image.sh'
       - 'tests/backend/o3forms-release-config.sh'
       - 'tests/backend/o3forms-release-image.sh'
+      - 'tests/backend/owned-module-releases.py'
+      - 'tests/backend/source-omods-image.sh'
       - 'tests/backend/module-dependencies-image.sh'
       - 'tests/backend/ModuleDependencyVerifier.java'
   workflow_dispatch:
@@ -43,6 +45,9 @@ jobs:
         run: |
           bash tests/backend/o3forms-release-config.sh
           bash tests/backend/o3forms-release-image.sh --self-test
+
+      - name: Validate independently released REST and EMR API modules
+        run: python3 tests/backend/owned-module-releases.py --self-test
 
       - uses: docker/setup-buildx-action@v4
 
@@ -83,7 +88,7 @@ jobs:
           docker pull "${IMAGE}"
           ./tests/backend/ocl-token-image.sh "${IMAGE}"
 
-      - name: Verify packaged OMOD versions and REST security patch
+      - name: Verify packaged versions, owned release bytes and compiled protections
         env:
           IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
         run: bash tests/backend/source-omods-image.sh "$IMAGE"

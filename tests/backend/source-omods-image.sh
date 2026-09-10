@@ -11,6 +11,7 @@ cleanup() {
 trap cleanup EXIT
 CONTAINER="$(docker create "$IMAGE")"
 docker cp "$CONTAINER:/openmrs/distribution/openmrs_modules/." "$TEMP_DIR/"
+python3 "$ROOT/tests/backend/owned-module-releases.py" --modules "$TEMP_DIR"
 python3 - "$ROOT" "$TEMP_DIR" <<'PY'
 from pathlib import Path
 import io
@@ -42,12 +43,13 @@ for path in modules.glob('*.omod'):
                 assert value in controller, f'REST protection missing: {value!r}'
         if module == 'emrapi':
             api_entries = [name for name in archive.namelist()
-                           if name.startswith('lib/emrapi-api-') and name.endswith('.jar')]
+                           if name.startswith('lib/emrapi-api-')
+                           and not name.startswith('lib/emrapi-api-reporting-') and name.endswith('.jar')]
             assert len(api_entries) == 1, 'Expected one packaged EMR API library'
             with zipfile.ZipFile(io.BytesIO(archive.read(api_entries[0]))) as api:
                 service = api.read('org/openmrs/module/emrapi/adt/AdtServiceImpl.class')
                 assert b'Failed to close inactive visit; rolling back closure batch: ' in service, \
-                    'Compiled EMR API closure containment patch missing'
+                    'Compiled EMR API closure rollback protection missing'
 assert actual == expected, f'Packaged OMOD mismatch: expected={expected}, actual={actual}'
 print(f'[OK] All {len(actual)} OMOD versions match; compiled REST and EMR API protection markers are present')
 PY

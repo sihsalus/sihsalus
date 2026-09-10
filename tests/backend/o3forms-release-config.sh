@@ -57,7 +57,8 @@ def validate(dockerfile, pom_xml, distro, lock):
     require("||" not in install and ";" not in install,
             "O3 Forms installation and packaging must fail closed")
     commands = [command.strip() for command in install.split(" && ")]
-    binary_installs = [command for command in commands if install_goal in command]
+    binary_installs = [command for command in commands if install_goal in command
+                       and "-DartifactId=o3forms-omod" in shlex.split(command)]
     require(len(binary_installs) == 1, "keep one fail-fast binary install command")
     tokens = shlex.split(binary_installs[0])
     for token in (
