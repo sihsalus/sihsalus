@@ -11,6 +11,8 @@ on:
       - 'distro/**'
       - 'tests/backend/ocl-token-image.sh'
       - 'tests/backend/forced-password-image.sh'
+      - 'tests/backend/tomcat-config-config.sh'
+      - 'tests/backend/tomcat-config-image.sh'
       - 'tests/backend/o3forms-release-config.sh'
       - 'tests/backend/o3forms-release-image.sh'
       - 'tests/backend/module-dependencies-image.sh'
@@ -43,6 +45,9 @@ jobs:
         run: |
           bash tests/backend/o3forms-release-config.sh
           bash tests/backend/o3forms-release-image.sh --self-test
+
+      - name: Test Tomcat rootless configuration directory contract
+        run: bash tests/backend/tomcat-config-config.sh
 
       - uses: docker/setup-buildx-action@v4
 
@@ -102,6 +107,11 @@ jobs:
         env:
           IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
         run: ./tests/backend/forced-password-image.sh "${IMAGE}"
+
+      - name: Test published backend Tomcat configuration directory permissions
+        env:
+          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+        run: bash tests/backend/tomcat-config-image.sh "$IMAGE"
 
       - name: Resolve pinned OpenMRS security baseline
         id: openmrs-baseline

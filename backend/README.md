@@ -85,6 +85,25 @@ synthetic DEV acceptance before QLTY. Preserve the prior image for rollback.
 #### OpenMRS Configuration (Initializer)
 OpenMRS config can be set under [`backend/config/openmrs_config/`](config/openmrs_config/) when present.
 
+#### Tomcat rootless configuration directory
+
+The image prepares the empty default Host XML base at
+`/usr/local/tomcat/conf/Catalina/localhost` before switching to UID 1001.
+Only that directory is owned by `1001:0` with mode `0750`; `conf` and `Catalina`
+remain root-owned with mode `0755`. Do not make the entire configuration tree
+writable or disable Tomcat's directory creation/validation to hide startup errors.
+
+```bash
+bash tests/backend/tomcat-config-config.sh
+bash tests/backend/tomcat-config-image.sh IMAGE
+```
+
+The first test is offline. The second requires Docker and an already-built local
+image; it runs only a shell with no network, no application startup and no mounted
+runtime data. It checks the default user, real paths, ownership, modes and access,
+then removes its test container and anonymous volumes. CI runs both gates before
+promotion. These checks do not replace startup and clinical acceptance testing.
+
 #### Micro Frontends
 SPA-related configuration is driven by the distro build and the frontend package in this repository.
 
