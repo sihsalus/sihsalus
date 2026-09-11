@@ -490,3 +490,13 @@ if len(exporter_mounts) != 1 or not exporter_mounts[0].get("read_only"):
 
 print("[OK] semantic Compose invariants")
 PY
+
+GRAFANA_ROOT_URL=https://sihsalus.example.test/grafana/ \
+KEYCLOAK_PUBLIC_URL=https://sihsalus.example.test/keycloak \
+validate monitoring-keycloak -f docker-compose.yml -f compose/keycloak.yml --profile keycloak --profile monitoring
+GRAFANA_OIDC_CLIENT_SECRET=ci-synthetic-grafana-oidc-only \
+GRAFANA_ROOT_URL=https://sihsalus.example.test/grafana/ \
+KEYCLOAK_PUBLIC_URL=https://sihsalus.example.test/keycloak \
+validate monitoring-oidc -f docker-compose.yml -f compose/keycloak.yml -f compose/monitoring-oidc.yml --profile keycloak --profile monitoring
+
+python3 tests/monitoring/oidc/config.py "$EVIDENCE_DIR/monitoring-oidc.json" "$EVIDENCE_DIR/monitoring-keycloak.json"

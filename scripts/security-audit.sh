@@ -188,6 +188,33 @@ if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
   if profile_enabled monitoring || profile_enabled logs; then
     check_secret GRAFANA_ADMIN_PASSWORD
   fi
+  case "$(env_value COMPOSE_FILE)" in
+    *compose/monitoring-oidc.yml*)
+      check_secret GRAFANA_OIDC_CLIENT_SECRET
+      if profile_enabled monitoring; then
+        ok "Grafana OIDC includes monitoring"
+      else
+        fail "Grafana OIDC requires the monitoring profile"
+      fi
+      if profile_enabled keycloak; then
+        ok "Grafana OIDC includes Keycloak"
+      else
+        fail "Grafana OIDC requires the keycloak profile"
+      fi
+      case "$(env_value COMPOSE_FILE)" in
+        *compose/keycloak.yml*) ok "Grafana OIDC includes the Keycloak override" ;;
+        *) fail "Grafana OIDC requires compose/keycloak.yml" ;;
+      esac
+      case "$(env_value GRAFANA_ROOT_URL)" in
+        https://*/grafana/) ok "Grafana OIDC root URL uses the HTTPS subpath" ;;
+        *) fail "GRAFANA_ROOT_URL must use HTTPS and end in /grafana/ for OIDC" ;;
+      esac
+      case "$(env_value KEYCLOAK_PUBLIC_URL)" in
+        https://*/keycloak) ok "Grafana OIDC provider uses HTTPS" ;;
+        *) fail "KEYCLOAK_PUBLIC_URL must use HTTPS and end in /keycloak for Grafana OIDC" ;;
+      esac
+      ;;
+  esac
   if profile_enabled fua; then
     check_secret SIHSALUS_FUA_GEN_DB_PASSWORD
     check_secret SIHSALUS_FUA_GEN_TOKEN

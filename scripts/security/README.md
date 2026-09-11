@@ -41,6 +41,10 @@ Sin argumento, el auditor busca primero `.env.production` y luego `.env`. Verifi
 
 El auditor nunca imprime valores de secretos. Retorna código distinto de cero si encuentra un fallo.
 
+El generador incluye `GRAFANA_OIDC_CLIENT_SECRET` sin activar OIDC. Al seleccionar
+`compose/monitoring-oidc.yml`, el auditor exige ese secreto, monitoring/Keycloak y
+las URLs HTTPS del [contrato de Grafana](../../docs/operations/grafana-oidc.md).
+
 ## Selección persistente del stack
 
 Para HTTPS y Keycloak, guarda la selección en el archivo de entorno. Así cualquier `docker compose up`, `pull`, `ps` o `config` usa los mismos overrides:

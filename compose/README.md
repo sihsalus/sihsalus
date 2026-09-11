@@ -12,6 +12,7 @@
 | Imaging | `--profile imaging` | OHIF, Orthanc y proxy DICOMweb |
 | Indicadores | `--profile indicadores` | Reportes SQL y PostgreSQL propio |
 | Monitoring | `--profile monitoring` | Grafana, Prometheus, Loki y blackbox |
+| Grafana OIDC | Override `compose/monitoring-oidc.yml` | Roles explícitos; requiere Keycloak existente y HTTPS; [contrato y comando completo](../docs/operations/grafana-oidc.md) |
 | Logs | `--profile monitoring --profile logs` | Alloy mediante proxy Docker API de solo lectura |
 | Réplica | `--profile replica` | Réplica MariaDB para contingencia |
 | Keycloak | `-f compose/keycloak.yml --profile keycloak` | Activa OIDC en frontend/backend y agrega Keycloak |
