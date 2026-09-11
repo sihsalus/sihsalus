@@ -60,6 +60,8 @@ services:
       start_period: 60s
     networks:
       - monitoring-network
+      # Dedicated link to the gateway; preserve monitoring datasource access.
+      - monitoring-edge
 
   prometheus:
     container_name: sihsalus-prometheus

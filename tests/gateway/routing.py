@@ -55,6 +55,9 @@ class GatewayRouting(unittest.TestCase):
         cls.tls = ssl.create_default_context(cafile=str(certs / "fullchain.pem"))
         cls.redirect_urls = {}
         cls.network = cls.create_network("network")
+        subnet = command("docker", "network", "inspect", cls.network,
+                         "--format", "{{(index .IPAM.Config 0).Subnet}}")
+        cls.grafana_allowlist = subnet + " 1;"
         upstream = cls.directory / "upstream.conf"
         upstream.write_text('''server {
   listen 80;
@@ -92,7 +95,8 @@ class GatewayRouting(unittest.TestCase):
                                  command("docker", "logs", upstream_name)) from error
         cls.urls = {}
         for scheme in ("http", "https"):
-            cls.urls[scheme] = cls.start_gateway(scheme, cls.network, scheme)
+            cls.urls[scheme] = cls.start_gateway(scheme, cls.network, scheme,
+                                               cls.grafana_allowlist)
 
     @classmethod
     def cleanup(cls):
@@ -124,7 +128,7 @@ class GatewayRouting(unittest.TestCase):
         return name
 
     @classmethod
-    def start_gateway(cls, scheme, network, suffix):
+    def start_gateway(cls, scheme, network, suffix, grafana_allowlist=None):
         port = "443" if scheme == "https" else "80"
         options = [
             "-p", f"127.0.0.1::{port}",
@@ -140,6 +144,8 @@ class GatewayRouting(unittest.TestCase):
             "-v", f"{cls.directory / 'certs'}:/etc/letsencrypt/live/gateway.test:ro",
             "-v", f"{cls.directory / 'certs'}:/var/www/certbot/conf:ro",
         ]
+        if grafana_allowlist is not None:
+            options.extend(["-e", "GRAFANA_NETWORK_ALLOWLIST=" + grafana_allowlist])
         if scheme == "https":
             options.extend(["-e", "CERT_WEB_DOMAINS=gateway.test,localhost",
                             "-p", "127.0.0.1::80",
@@ -288,6 +294,49 @@ class GatewayRouting(unittest.TestCase):
                                                headers={"Accept-Encoding": "gzip"})
                 self.assertEqual(headers.get("Content-Encoding"), "gzip")
                 self.assertEqual(gzip.decompress(body), b"x" * 2048)
+
+    def test_grafana_allowed_network_preserves_routes_and_websocket_headers(self):
+        for scheme, url in self.urls.items():
+            with self.subTest(scheme=scheme, canonical=True):
+                status, headers, _ = self.request(url, "/grafana?from=synthetic")
+                self.assertEqual(status, 301)
+                self.assertEqual(headers["Location"], "/grafana/")
+            for path in ("/grafana/", "/grafana/public/build/synthetic.js?version=1",
+                         "/grafana/api/live/ws"):
+                with self.subTest(scheme=scheme, path=path):
+                    status, headers, body = self.request(url, path,
+                        headers={"Upgrade": "websocket", "X-Real-IP": "203.0.113.9"})
+                    self.assertEqual(status, 200)
+                    forwarded = json.loads(body)
+                    self.assertEqual(forwarded["uri"], path)
+                    self.assertEqual(forwarded["upgrade"], "websocket")
+                    self.assertEqual(forwarded["connection"], "upgrade")
+                    self.assertEqual(forwarded["proto"], scheme)
+                    self.assertEqual(forwarded["host"], url.split("://", 1)[1].split(":")[0])
+                    self.assertIn("worker-src 'self' blob:", headers["Content-Security-Policy"])
+
+    def test_grafana_denies_unconfigured_empty_and_unlisted_networks(self):
+        for scheme in ("http", "https"):
+            for label, allowlist in (("unset", None), ("empty", ""),
+                                     ("unlisted", "192.0.2.0/24 1;")):
+                url = self.start_gateway(scheme, self.network,
+                                         scheme + "-grafana-" + label, allowlist)
+                for path in ("/grafana", "/grafana/", "/grafana/api/health",
+                             "/grafana/api/live/ws?synthetic=1"):
+                    for supplied in ({}, {"X-Real-IP": "192.0.2.1",
+                                          "X-Forwarded-For": "192.0.2.1",
+                                          "Upgrade": "websocket"}):
+                        with self.subTest(scheme=scheme, policy=label, path=path,
+                                          forwarded=bool(supplied)):
+                            status, headers, _ = self.request(url, path, headers=supplied)
+                            self.assertEqual(status, 403)
+                            self.assertIsNone(headers.get("Location"))
+                            self.assertEqual(headers["X-Content-Type-Options"], "nosniff")
+                with self.subTest(scheme=scheme, policy=label, clinical=True):
+                    self.assertEqual(self.request(url, "/health")[0], 200)
+                    self.assertEqual(self.request(url, "/openmrs/spa/home")[0], 200)
+                    self.assertEqual(self.request(url, "/ready")[0], 503)
+                    self.assertEqual(self.request(url, "/imaging/")[0], 403)
 
     def test_gateway_starts_without_backend_dns(self):
         network = self.create_network("empty")

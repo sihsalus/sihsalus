@@ -145,6 +145,8 @@ export OAUTH2_CLIENT_SECRET="${OAUTH2_CLIENT_SECRET:-ci-oauth2-secret-123}"
 export IMAGING_OIDC_CLIENT_SECRET="${IMAGING_OIDC_CLIENT_SECRET:-ci-imaging-client-secret-123}"
 export IMAGING_OAUTH_COOKIE_SECRET="${IMAGING_OAUTH_COOKIE_SECRET:-QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=}"
 export GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD:-ci-grafana-password-123}"
+# Default-policy models must not inherit a developer/operator's active ACL.
+export GRAFANA_NETWORK_ALLOWLIST=""
 export OMRS_OCL_TOKEN="${OMRS_OCL_TOKEN:-}"
 export SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED="true"
 export SIHSALUS_SEED_URL="${SIHSALUS_SEED_URL:-https://example.test/sihsalus-seed.tar.gz.enc}"
@@ -168,6 +170,19 @@ validate hapi -f docker-compose.yml --profile hapi
 validate imaging -f docker-compose.yml --profile imaging
 validate indicadores -f docker-compose.yml --profile indicadores
 validate monitoring-logs -f docker-compose.yml --profile monitoring --profile logs
+# Rendering the opt-in policy does not require a running monitoring service.
+GRAFANA_NETWORK_ALLOWLIST='192.0.2.0/24 1;' \
+  validate grafana-allowlist -f docker-compose.yml -f compose/ssl.yml --profile ssl --profile monitoring
+python3 - "$EVIDENCE_DIR/grafana-allowlist.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    model = json.load(handle)
+if model["services"]["gateway"]["environment"].get("GRAFANA_NETWORK_ALLOWLIST") != "192.0.2.0/24 1;":
+    raise SystemExit("[FAIL] explicit Grafana allowlist must reach the HTTPS gateway unchanged")
+print("[OK] explicit Grafana network policy reaches the gateway")
+PY
 validate replica -f docker-compose.yml --profile replica
 validate keycloak -f docker-compose.yml -f compose/keycloak.yml --profile keycloak
 validate imaging-auth -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml --profile keycloak --profile imaging
@@ -409,6 +424,25 @@ if socket_proxy.get("environment", {}).get("POST") != "0":
 if not any(volume.get("source") == "/var/run/docker.sock" for volume in socket_proxy.get("volumes", [])):
     fail("Docker socket proxy must own the socket mount")
 
+grafana = service(monitoring, "grafana")
+gateway_networks = set(service(monitoring, "gateway").get("networks", {}))
+if gateway_networks != {"default", "monitoring-edge"}:
+    fail("gateway must preserve the clinical network and use only the Grafana edge")
+if set(grafana.get("networks", {})) != {"monitoring-network", "monitoring-edge"}:
+    fail("Grafana must preserve datasource access and share the dedicated gateway edge")
+edge_members = {name for name, config in monitoring["services"].items()
+                if "monitoring-edge" in config.get("networks", {})}
+if edge_members != {"gateway", "grafana"}:
+    fail("only gateway and Grafana may join monitoring-edge")
+for model in (core, ssl, monitoring):
+    if service(model, "gateway").get("environment", {}).get("GRAFANA_NETWORK_ALLOWLIST") != "":
+        fail("Grafana gateway access must default to an empty allowlist")
+    if "grafana" in service(model, "gateway").get("depends_on", {}):
+        fail("clinical gateway startup must not depend on optional Grafana")
+if not any(str(port.get("target")) == "3000" and port.get("host_ip") == "127.0.0.1"
+           for port in grafana.get("ports", [])):
+    fail("Grafana direct recovery port must remain bound to loopback")
+
 for observed_service in (alertmanager, node_exporter, cadvisor):
     for published_port in observed_service.get("ports", []):
         if published_port.get("host_ip") not in (None, "127.0.0.1"):
@@ -456,3 +490,13 @@ if len(exporter_mounts) != 1 or not exporter_mounts[0].get("read_only"):
 
 print("[OK] semantic Compose invariants")
 PY
+
+GRAFANA_ROOT_URL=https://sihsalus.example.test/grafana/ \
+KEYCLOAK_PUBLIC_URL=https://sihsalus.example.test/keycloak \
+validate monitoring-keycloak -f docker-compose.yml -f compose/keycloak.yml --profile keycloak --profile monitoring
+GRAFANA_OIDC_CLIENT_SECRET=ci-synthetic-grafana-oidc-only \
+GRAFANA_ROOT_URL=https://sihsalus.example.test/grafana/ \
+KEYCLOAK_PUBLIC_URL=https://sihsalus.example.test/keycloak \
+validate monitoring-oidc -f docker-compose.yml -f compose/keycloak.yml -f compose/monitoring-oidc.yml --profile keycloak --profile monitoring
+
+python3 tests/monitoring/oidc/config.py "$EVIDENCE_DIR/monitoring-oidc.json" "$EVIDENCE_DIR/monitoring-keycloak.json"
