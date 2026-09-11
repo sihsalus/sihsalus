@@ -1,0 +1,23 @@
+# Keep OpenMRS local authentication while Keycloak serves Imaging.
+# Load after compose/keycloak.yml; Docker Compose >= 2.24.4 is required.
+# The explicit volume replacement retains the core OpenMRS data volume and
+# removes only the Keycloak globalproperties bind. Validate additional custom
+# backend mounts separately; they must not be discarded by this replacement.
+
+services:
+  frontend:
+    build:
+      args:
+        SPA_CONFIG_URLS: /openmrs/spa/frontend.json
+
+  backend-oauth2-config:
+    environment:
+      OAUTH2_ENABLED: "false"
+
+  backend:
+    depends_on:
+      keycloak: !reset null
+    environment:
+      OAUTH2_ENABLED: "false"
+    volumes: !override
+      - openmrs-data:/openmrs/data
