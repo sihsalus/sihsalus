@@ -8,7 +8,13 @@ map $request_uri $csp_header {
   # The assembled SPA externalizes all executable startup code. Inline styles
   # remain temporarily required by Carbon and React component style props.
   "~^/openmrs/spa/" "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://dyaku.minsa.gob.pe; base-uri 'self'; font-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
-  "~^/imaging/" "default-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; base-uri 'self'; object-src 'none'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
+  # DICOM codecs use WASM and workers; video and encapsulated PDF use blobs.
+  # This policy is scoped to the viewer. Bootstrap scripts are external and
+  # no external fonts or JavaScript evaluation are needed.
+  "~^/imaging/" "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; media-src 'self' blob:; base-uri 'self'; object-src 'self' blob:; frame-ancestors 'self' ${FRAME_ANCESTORS};";
+  # Orthanc Explorer 2 uses Vue/Bootstrap inline styles. Its redundant inline
+  # /app redirect is handled by the gateway; executable inline code stays off.
+  "~^/orthanc/ui/app/" "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; base-uri 'self'; font-src 'self' data:; img-src 'self' data: blob:; object-src 'none'; frame-ancestors 'self' ${FRAME_ANCESTORS};";
   # Legacy OpenMRS pages still depend on inline scripts and eval-like behavior.
   "~^/openmrs/(?:admin|dictionary|module|patientDashboard.form|initialsetup)(?:/|$)" "default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; base-uri 'self'; font-src 'self'; frame-ancestors 'self';";
   # Grafana ships its own bundled assets and requires inline styles, blob
@@ -17,6 +23,8 @@ map $request_uri $csp_header {
   "~^/grafana(?:/|$)" "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; font-src 'self' data:; img-src 'self' data: blob:; worker-src 'self' blob:; media-src 'self' blob:; base-uri 'self'; object-src 'none'; frame-ancestors 'self';";
   "~^/openmrs/owa" "default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; base-uri 'self'; font-src 'self' data:; img-src 'self' data:; frame-ancestors 'self';";
 }
+
+include /etc/nginx/conf.d/includes/imaging-auth-maps.conf;
 
 map $http_user_agent $sihsalus_social_scraper {
   default 0;

@@ -55,7 +55,7 @@ services:
       # el gateway en /keycloak/, incluido en el mismo dominio HTTPS de OpenMRS.
       - "127.0.0.1:${KEYCLOAK_PORT:-8180}:8080"
     healthcheck:
-      test: [ "CMD-SHELL", "bash -c '</dev/tcp/localhost/9000'" ]
+      test: [ "CMD", "/opt/keycloak/bin/sihsalus-healthcheck.sh" ]
       interval: 30s
       timeout: 10s
       retries: 3

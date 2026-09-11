@@ -1,12 +1,6 @@
 window.config = {
-  routerBasename: window.location.pathname.startsWith("/imaging") ? "/imaging" : "/",
-  // Internationalization / locale settings
-  i18n: {
-    defaultLocale: "es",
-    supportedLocales: ["es", "en"]
-  },
-  // Legacy/alternate key some OHIF builds check
-  defaultLanguage: "es",
+  // This must agree with the PUBLIC_URL compiled by imaging/Dockerfile.
+  routerBasename: "/imaging",
   extensions: [],
   modes: [],
   showStudyList: true,

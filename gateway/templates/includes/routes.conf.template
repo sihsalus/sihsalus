@@ -1,8 +1,14 @@
-# Default upload cap. DICOM upload endpoints override this because studies
-# can be large and are restricted to Orthanc proxy locations below.
+# Clinical uploads enter through OpenMRS and retain the existing default cap.
+# Direct browser access to Orthanc/DICOMweb is restricted to reads below.
 client_max_body_size 100m;
 
 include /etc/nginx/includes/security-headers.conf;
+
+# Redis stores the session and refresh lock. Only the small ticket cookie is
+# returned by auth_request; forward its renewal/deletion without rewriting it.
+large_client_header_buffers 4 8k;
+auth_request_set $imaging_auth_cookie $upstream_http_set_cookie;
+add_header Set-Cookie $imaging_auth_cookie always;
 
 proxy_set_header      HOST $host;
 proxy_set_header      X-Forwarded-Proto $forwarded_proto;
@@ -175,22 +181,47 @@ location = /imaging/oauth2/auth {
   set $imaging_auth http://imaging-auth:4180;
   proxy_pass_request_body off;
   proxy_set_header Content-Length "";
+  proxy_set_header Host $http_host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-Proto $forwarded_proto;
+  proxy_set_header X-Forwarded-Host $http_host;
+  proxy_set_header X-Forwarded-Uri $request_uri;
   proxy_set_header X-Original-URI $request_uri;
+  proxy_buffer_size 16k;
+  proxy_buffers 4 16k;
   proxy_pass $imaging_auth/imaging/oauth2/auth;
 }
 
 location /imaging/oauth2/ {
+  if ($imaging_invalid_host) { return 400; }
+  if ($imaging_cookie_too_large) { return 400; }
   ${IMAGING_NETWORK_ACCESS_CONTROL}
   set $imaging_auth http://imaging-auth:4180;
+  proxy_set_header Host $http_host;
   proxy_set_header X-Real-IP $remote_addr;
   proxy_set_header X-Forwarded-Proto $forwarded_proto;
-  proxy_set_header X-Forwarded-Host $host;
+  proxy_set_header X-Forwarded-Host $http_host;
   proxy_set_header X-Auth-Request-Redirect $forwarded_proto://$http_host$request_uri;
+  proxy_buffer_size 16k;
+  proxy_buffers 4 16k;
   proxy_pass $imaging_auth;
 }
 
 location @imaging_oauth_signin {
-  return 302 /imaging/oauth2/start?rd=$forwarded_proto://$http_host$request_uri;
+  # Let oauth2-proxy encode the return URL in its OIDC state. Concatenating
+  # request_uri into ?rd= truncates URLs with multiple query parameters.
+  set $imaging_auth http://imaging-auth:4180;
+  proxy_method GET;
+  proxy_pass_request_body off;
+  proxy_set_header Content-Length "";
+  proxy_set_header Host $http_host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-Proto $forwarded_proto;
+  proxy_set_header X-Forwarded-Host $http_host;
+  proxy_set_header X-Auth-Request-Redirect $request_uri;
+  proxy_buffer_size 16k;
+  proxy_buffers 4 16k;
+  proxy_pass $imaging_auth/imaging/oauth2/start;
 }
 
 location = /imaging/logout {
@@ -203,14 +234,22 @@ location = /imaging {
 }
 
 location = /orthanc {
+  if ($imaging_read_method_denied) { return 403; }
   return 301 /orthanc/;
 }
 
+location = /orthanc/ui/app {
+  if ($imaging_read_method_denied) { return 403; }
+  return 301 /orthanc/ui/app/$is_args$args;
+}
+
 location /orthanc/ {
+  if ($orthanc_web_method_denied) { return 403; }
   ${IMAGING_ACCESS_CONTROL}
+  include /etc/nginx/includes/imaging-proxy-headers.conf;
   set $orthanc_proxy http://orthanc-proxy;
-  # Orthanc UI/API can receive DICOM studies and archives.
-  client_max_body_size 0;
+  # The only public POSTs are small read queries from Orthanc Explorer.
+  client_max_body_size 1m;
   rewrite ^/orthanc/(.*)$ /$1 break;
   proxy_read_timeout 300s;
   proxy_pass $orthanc_proxy;
@@ -218,67 +257,64 @@ location /orthanc/ {
 
 # DICOM endpoints when OHIF runs under /imaging
 location = /imaging/dicom-web {
+  if ($imaging_read_method_denied) { return 403; }
   return 301 /imaging/dicom-web/studies;
 }
 
 location /imaging/dicom-web/ {
+  if ($imaging_read_method_denied) { return 403; }
   ${IMAGING_ACCESS_CONTROL}
+  include /etc/nginx/includes/imaging-proxy-headers.conf;
   set $orthanc_proxy http://orthanc-proxy;
-  # DICOMweb STOW-RS uploads can exceed the default gateway upload cap.
-  client_max_body_size 0;
   rewrite ^/imaging/(.*)$ /$1 break;
   proxy_read_timeout 300s;
   proxy_pass $orthanc_proxy;
 }
 
 location /imaging/wado {
+  if ($imaging_read_method_denied) { return 403; }
   ${IMAGING_ACCESS_CONTROL}
+  include /etc/nginx/includes/imaging-proxy-headers.conf;
   set $orthanc_proxy http://orthanc-proxy;
   rewrite ^/imaging/(.*)$ /$1 break;
   proxy_read_timeout 300s;
   proxy_pass $orthanc_proxy;
 }
 
-# OHIF runtime sometimes requests lazy chunks from root (/3900.bundle...)
-location ~ ^/[0-9]+(?:\.bundle\.[A-Za-z0-9]+\.js|\.css)$ {
-  set $ohif http://ohif;
-  proxy_read_timeout 300s;
-  proxy_pass $ohif;
-}
-
 location /imaging/ {
   ${IMAGING_ACCESS_CONTROL}
+  include /etc/nginx/includes/imaging-proxy-headers.conf;
   set $ohif http://ohif;
   rewrite ^/imaging/(.*) /$1 break;
   proxy_buffering off;
-  sub_filter 'src="/' 'src="/imaging/';
-  sub_filter 'href="/' 'href="/imaging/';
-  sub_filter "window.PUBLIC_URL = '/';" "window.PUBLIC_URL = '/imaging/';";
-  sub_filter_once off;
   proxy_read_timeout 300s;
   proxy_pass $ohif;
 }
 
 # Orthanc DICOMweb endpoints for OHIF
 location = /dicom-web {
+  if ($imaging_read_method_denied) { return 403; }
   return 301 /dicom-web/studies;
 }
 
 location = /dicom-web/ {
+  if ($imaging_read_method_denied) { return 403; }
   return 301 /dicom-web/studies;
 }
 
 location /dicom-web/ {
+  if ($imaging_read_method_denied) { return 403; }
   ${IMAGING_ACCESS_CONTROL}
+  include /etc/nginx/includes/imaging-proxy-headers.conf;
   set $orthanc_proxy http://orthanc-proxy;
-  # DICOMweb STOW-RS uploads can exceed the default gateway upload cap.
-  client_max_body_size 0;
   proxy_read_timeout 300s;
   proxy_pass $orthanc_proxy;
 }
 
 location /wado {
+  if ($imaging_read_method_denied) { return 403; }
   ${IMAGING_ACCESS_CONTROL}
+  include /etc/nginx/includes/imaging-proxy-headers.conf;
   set $orthanc_proxy http://orthanc-proxy;
   proxy_read_timeout 300s;
   proxy_pass $orthanc_proxy;

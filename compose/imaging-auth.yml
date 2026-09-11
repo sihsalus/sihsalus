@@ -18,17 +18,24 @@ services:
     depends_on:
       keycloak:
         condition: service_healthy
+      imaging-session-store:
+        condition: service_healthy
     environment:
       OAUTH2_PROXY_PROVIDER: keycloak-oidc
       OAUTH2_PROXY_CLIENT_ID: sihsalus-imaging
       OAUTH2_PROXY_CLIENT_SECRET: ${IMAGING_OIDC_CLIENT_SECRET:?IMAGING_OIDC_CLIENT_SECRET is required for Imaging}
       OAUTH2_PROXY_COOKIE_SECRET: ${IMAGING_OAUTH_COOKIE_SECRET:?IMAGING_OAUTH_COOKIE_SECRET is required for Imaging}
-      OAUTH2_PROXY_COOKIE_NAME: _sihsalus_imaging
+      # A new name separates Redis tickets from the former encrypted payload
+      # cookies. Existing browser sessions authenticate again after migration.
+      OAUTH2_PROXY_COOKIE_NAME: _sihsalus_imaging_session
       OAUTH2_PROXY_COOKIE_SECURE: ${IMAGING_OAUTH_COOKIE_SECURE:-false}
       OAUTH2_PROXY_COOKIE_HTTPONLY: "true"
       OAUTH2_PROXY_COOKIE_SAMESITE: lax
       OAUTH2_PROXY_COOKIE_EXPIRE: 8h
       OAUTH2_PROXY_COOKIE_REFRESH: 1h
+      OAUTH2_PROXY_SESSION_STORE_TYPE: redis
+      OAUTH2_PROXY_REDIS_CONNECTION_URL: redis://imaging-session-store:6379/0
+      OAUTH2_PROXY_REDIS_PASSWORD: ${IMAGING_REDIS_PASSWORD:?IMAGING_REDIS_PASSWORD is required for Imaging sessions}
       OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
       OAUTH2_PROXY_PROXY_PREFIX: /imaging/oauth2
       OAUTH2_PROXY_REDIRECT_URL: ${IMAGING_OAUTH_REDIRECT_URI:-http://localhost/imaging/oauth2/callback}
@@ -58,3 +65,30 @@ services:
       - auth-network
       - default
 
+  imaging-session-store:
+    image: redis:8.2.9-alpine3.22
+    restart: "unless-stopped"
+    user: redis
+    read_only: true
+    mem_limit: 192m
+    cap_drop: [ ALL ]
+    security_opt:
+      - no-new-privileges:true
+    entrypoint: [ "/bin/sh", "/opt/sihsalus/redis-entrypoint.sh" ]
+    environment:
+      IMAGING_REDIS_PASSWORD: ${IMAGING_REDIS_PASSWORD:?IMAGING_REDIS_PASSWORD is required for Imaging sessions}
+    volumes:
+      - ./imaging/redis-entrypoint.sh:/opt/sihsalus/redis-entrypoint.sh:ro
+      - ./imaging/redis-healthcheck.sh:/opt/sihsalus/redis-healthcheck.sh:ro
+    # Override the image's /data volume with memory only. No session survives
+    # restart; oauth2-proxy supplies the 8h TTL and clients receive small tickets.
+    tmpfs:
+      - /data:rw,noexec,nosuid,size=8m,mode=1777
+    healthcheck:
+      test: [ "CMD", "/bin/sh", "/opt/sihsalus/redis-healthcheck.sh" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - auth-network

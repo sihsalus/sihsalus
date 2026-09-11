@@ -144,6 +144,7 @@ export KC_DB_PASSWORD="${KC_DB_PASSWORD:-ci-keycloak-db-123}"
 export OAUTH2_CLIENT_SECRET="${OAUTH2_CLIENT_SECRET:-ci-oauth2-secret-123}"
 export IMAGING_OIDC_CLIENT_SECRET="${IMAGING_OIDC_CLIENT_SECRET:-ci-imaging-client-secret-123}"
 export IMAGING_OAUTH_COOKIE_SECRET="${IMAGING_OAUTH_COOKIE_SECRET:-QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE=}"
+export IMAGING_REDIS_PASSWORD="${IMAGING_REDIS_PASSWORD:-0123456789abcdef0123456789abcdef0123456789abcdef}"
 export GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD:-ci-grafana-password-123}"
 # Default-policy models must not inherit a developer/operator's active ACL.
 export GRAFANA_NETWORK_ALLOWLIST=""
@@ -354,6 +355,20 @@ if not any(str(port.get("target")) == "443" for port in ssl_ports):
 orthanc_ports = service(imaging, "orthanc").get("ports", [])
 if not any(str(port.get("target")) == "4242" and port.get("host_ip") == "127.0.0.1" for port in orthanc_ports):
     fail("DICOM port must bind to localhost by default")
+if service(imaging, "ohif").get("volumes"):
+    fail("OHIF runtime configuration and assets must come from its verified image")
+orthanc_configuration = json.loads(service(imaging, "orthanc").get("environment", {}).get("ORTHANC_JSON", "{}"))
+explorer = orthanc_configuration.get("OrthancExplorer2", {})
+if explorer.get("Enable") is not True or explorer.get("IsDefaultOrthancUI") is not True:
+    fail("Orthanc must use the configured Explorer 2 interface")
+explorer_options = explorer.get("UiOptions", {})
+for option in ("EnableUpload", "EnableDeleteResources", "EnableDicomModalities", "EnableAnonymization",
+               "EnableModification", "EnableSendTo", "EnableSettings", "EnableEditLabels", "EnableShares",
+               "EnableAddSeries", "EnableLinkToLegacyUi"):
+    if explorer_options.get(option) is not False:
+        fail(f"Direct Orthanc browser mutation controls must stay disabled: {option}")
+if explorer_options.get("EnableOpenInOhifViewer3") is not True or explorer_options.get("OhifViewer3PublicRoot") != "/imaging/":
+    fail("Explorer must open studies in the same-origin OHIF viewer")
 
 imaging_acl = service(imaging, "gateway").get("environment", {}).get("IMAGING_ACCESS_CONTROL", "")
 if imaging_acl.strip() != "deny all;":
@@ -376,6 +391,40 @@ if "{id_token}" not in auth_env.get("OAUTH2_PROXY_BACKEND_LOGOUT_URL", ""):
     fail("Imaging logout must terminate the Keycloak session")
 if auth_env.get("OAUTH2_PROXY_PASS_ACCESS_TOKEN") != "false":
     fail("Imaging auth must not pass reusable access tokens to browser applications")
+if auth_env.get("OAUTH2_PROXY_SESSION_STORE_TYPE") != "redis":
+    fail("Imaging must store sessions in Redis rather than browser cookie fragments")
+if auth_env.get("OAUTH2_PROXY_COOKIE_NAME") != "_sihsalus_imaging_session":
+    fail("Redis session tickets must use their dedicated cookie name")
+if auth_env.get("OAUTH2_PROXY_COOKIE_EXPIRE") != "8h":
+    fail("Imaging tickets and Redis entries must have the reviewed 8h expiry")
+if auth_env.get("OAUTH2_PROXY_REDIS_CONNECTION_URL") != "redis://imaging-session-store:6379/0":
+    fail("Imaging Redis must use its internal address without credentials in the URL")
+session_store = service(imaging_auth, "imaging-session-store")
+if session_store.get("image") != "redis:8.2.9-alpine3.22":
+    fail("Imaging Redis must use the reviewed pinned version")
+if session_store.get("ports") or set(session_store.get("networks", {})) != {"auth-network"}:
+    fail("Imaging Redis must remain private to auth-network without host ports")
+if session_store.get("user") != "redis" or session_store.get("read_only") is not True:
+    fail("Imaging Redis must run as its unprivileged user with a read-only root filesystem")
+if session_store.get("cap_drop") != ["ALL"] or "no-new-privileges:true" not in session_store.get("security_opt", []):
+    fail("Imaging Redis must drop capabilities and prevent privilege escalation")
+if session_store.get("entrypoint") != ["/bin/sh", "/opt/sihsalus/redis-entrypoint.sh"]:
+    fail("Imaging Redis must load its password from the private in-memory config")
+if session_store.get("healthcheck", {}).get("test") != ["CMD", "/bin/sh", "/opt/sihsalus/redis-healthcheck.sh"]:
+    fail("Imaging Redis readiness must authenticate without a password in argv")
+if session_store.get("mem_limit") != 192 * 1024 * 1024:
+    fail("Imaging Redis container memory must remain bounded")
+if not any(entry.startswith("/data:") for entry in session_store.get("tmpfs", [])):
+    fail("Imaging session data must use tmpfs, never the image's anonymous volume")
+if any(volume.get("type") != "bind" or volume.get("read_only") is not True
+       or volume.get("target") not in {"/opt/sihsalus/redis-entrypoint.sh", "/opt/sihsalus/redis-healthcheck.sh"}
+       for volume in session_store.get("volumes", [])):
+    fail("Imaging Redis may only mount its read-only operational scripts")
+store_password = session_store.get("environment", {}).get("IMAGING_REDIS_PASSWORD", "")
+if not store_password or auth_env.get("OAUTH2_PROXY_REDIS_PASSWORD") != store_password:
+    fail("Imaging auth and Redis must share their dedicated password")
+if imaging_auth_service.get("depends_on", {}).get("imaging-session-store", {}).get("condition") != "service_healthy":
+    fail("Imaging auth must wait for authenticated Redis readiness")
 
 protected_acl = service(imaging_auth, "gateway").get("environment", {}).get("IMAGING_ACCESS_CONTROL", "")
 if "deny all" not in protected_acl or "auth_request /imaging/oauth2/auth" not in protected_acl:

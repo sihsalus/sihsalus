@@ -178,6 +178,12 @@ if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
       *) fail "COMPOSE_FILE must include compose/imaging-auth.yml when Imaging is enabled" ;;
     esac
     check_secret IMAGING_OAUTH_COOKIE_SECRET
+    check_secret IMAGING_REDIS_PASSWORD
+    if [[ "$(env_value IMAGING_REDIS_PASSWORD)" =~ ^[0-9a-f]{48}$ ]]; then
+      ok "IMAGING_REDIS_PASSWORD has the required 48-character hexadecimal format"
+    else
+      fail "IMAGING_REDIS_PASSWORD must contain 48 lowercase hexadecimal characters"
+    fi
 
     if [ "$(env_value DEPLOYMENT_ENV)" = "production" ]; then
       [ "$(env_value IMAGING_OAUTH_COOKIE_SECURE)" = "true" ] \

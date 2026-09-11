@@ -65,7 +65,7 @@ jobs:
           fi
 
           if [ "$can_diff" = "true" ] \
-            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml compose/core.yml compose/keycloak.yml compose/imaging-auth.yml gateway/ keycloak/ tests/imaging/; then
+            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml docker-compose.yml compose/core.yml compose/keycloak.yml compose/imaging.yml compose/imaging-auth.yml compose/ssl.yml gateway/ keycloak/ imaging/ tests/imaging/ tests/keycloak/; then
             imaging=false
           fi
 
@@ -121,6 +121,12 @@ jobs:
 
       - name: Test HTTP and HTTPS gateway routing
         run: python3 tests/gateway/routing.py
+
+      - name: Test imaging readiness and compiled asset contracts
+        run: |
+          python3 tests/keycloak/healthcheck.py
+          python3 tests/imaging/orthanc-healthcheck.py
+          node --test tests/imaging/ohif-packaging.test.mjs
 
       - name: Test backend security refresh cache policy
         run: ./tests/backend/security-refresh-config.sh
@@ -378,16 +384,25 @@ jobs:
         run: ./tests/monitoring/config-validation.sh
 
   imaging:
-    name: Imaging authorization
+    name: Imaging authorization and viewer
     needs: changes
     if: needs.changes.outputs.imaging == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Test anonymous denial, authorized access and logout
         run: ./tests/imaging/auth-gateway.sh
+
+      - name: Test ephemeral imaging sessions
+        run: python3 tests/imaging/session-store.py
+
+      - name: Test the pinned Orthanc and Explorer integration
+        run: python3 tests/imaging/orthanc-service.py
+
+      - name: Build the pinned OHIF viewer and verify real assets
+        run: docker build --tag sihsalus-ohif-ci ./imaging
 
   grafana-oidc:
     name: Grafana OIDC authorization
