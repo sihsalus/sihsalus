@@ -28,7 +28,7 @@
     <openmrs.version>2.8.9</openmrs.version>
     <initializer.version>2.13.0-sihsalus.1</initializer.version>
     <fhir2.version>4.3.0-sihsalus.1</fhir2.version>
-    <webservices.rest.version>3.5.0-sihsalus.1</webservices.rest.version>
+    <webservices.rest.version>3.5.1-sihsalus.1</webservices.rest.version>
     <addresshierarchy.version>2.21.0</addresshierarchy.version>
     <patientdocuments.version>1.2.0-sihsalus.1</patientdocuments.version>
     <idgen.version>5.0.4</idgen.version>
@@ -52,7 +52,7 @@
     <ordertemplates.version>2.2.0</ordertemplates.version>
     <patientflags.version>3.0.10</patientflags.version>
     <o3forms.version>2.3.1-sihsalus.1</o3forms.version>
-    <emrapi.version>3.5.0-sihsalus.1</emrapi.version>
+    <emrapi.version>3.5.1-sihsalus.1</emrapi.version>
     <event.version>4.0.0</event.version>
     <bedmanagement.version>7.3.0-sihsalus.2</bedmanagement.version>
     <!-- Stock Management and Billing -->

@@ -1,49 +1,56 @@
-Source OMOD integration
+Module ownership and distribution integration
 
-`backend/omod-sources.lock` records the repository, immutable source revision,
-archive checksum and SIHSalus version of every module built from source. Released
-FUA 1.0.89, Appointments 2.2.0 and LegacyUI 2.2.0 are resolved normally by Maven.
-Core remains 2.8.9. The existing BedManagement source pin is retained.
+REST and EMR API source changes, regression tests, compilation and release
+publication now belong to their independent module repositories:
 
-`backend/bin/build-source-omods.sh package` installs the source modules in the
-same Maven repository used to package the distro. Source modules are assigned
-explicit SIHSalus versions; floating upstream SNAPSHOT OMODs are not installed.
-The version rules prevent the release updater from silently replacing these
-artifacts. Update the source lock and POM together when adopting a newer release.
+- [SIHSalus REST](https://github.com/sihsalus/openmrs-module-webservices.rest/tree/sihsalus-2.8)
+- [SIHSalus EMR API](https://github.com/sihsalus/openmrs-module-emrapi/tree/sihsalus-2.8)
 
-Run `bash backend/bin/build-source-omods.sh test <module>` to run that source
-module's Maven tests. CI runs nine source suites on Java 21. Initializer's full
-reactor also exercises Core 2.1-era dependencies, so it runs on upstream's Java 11
-test baseline; CI then repeats its Core 2.8 integration tests on Java 21 with
-`test-core28 initializer`, using the installed reactor artifacts. Packaging uses
-Java 21 for all modules. CI checks packaged versions and the compiled REST
-response protections. `OMOD_TEST_REPORTS`
-can select a destination for Surefire XML evidence; `OMOD_MAVEN_REPOSITORY` can
-select an isolated dependency cache for local runs.
+The distribution consumes their published OMODs by exact version and SHA-256 in
+`backend/Dockerfile`, following the O3 Forms pattern. It does not apply their
+patches, rewrite their source versions or compile them. The historical patch files
+remain recoverable from Git; their code and tests are now ordinary module commits.
 
-Packaging compiles sibling test JARs required by upstream reactors, with execution
-left to the source test jobs. Patient Documents and Initializer's Core 2.8 tests
-run legacy CGLIB mocks with `java.lang` opened to the test JVM on Java 21; the
-application JVM is not changed by this test setting.
+`tests/backend/owned-module-releases.py --self-test` verifies the release contract
+and negative cases. The backend image gate checks that packaged OMOD bytes match
+the published release pins, along with descriptor versions and compiled REST/EMR
+API protections. The required-module gate uses the exact packaged Core comparator.
+An incompatible dependency or altered release must fail before promotion.
 
-The REST patch ports the content-response correction from
-[upstream PR #748](https://github.com/openmrs/openmrs-module-webservices.rest/pull/748)
-to the released 3.5.0 javax Servlet/JUnit 4 branch. It serves CLOB content as UTF-8
-plain text with `X-Content-Type-Options: nosniff`, reads uploads as UTF-8, and tests
-both direct CLOB and delegated form-resource responses. The upstream master
-branch uses Jakarta and must not replace this Core 2.8-compatible base.
-The SIHSalus module descriptor uses its explicit Maven version without upstream's
-extra SCM build-number suffix; the immutable source revision is recorded in the lock.
+The initial 3.5.1-sihsalus.1 releases are SIHSalus prereleases, not official OpenMRS
+3.5.1 releases. See each module's `SIHSALUS-RELEASE.md` for upstream provenance,
+test scope and release verification. REST retains the Core 2.8-compatible javax
+base and upstream PR #748's UTF-8/plain-text/nosniff correction.
 
-Validation in DEV and then QLTY must use the same immutable image digest. Confirm
-all 33 modules are started, compare their versions to `backend/pom.xml`, and test
-the updated APIs with synthetic fixtures: FUA payloads, recurring appointments
-and availability, queue transitions and metrics, document/PDF generation, billing
-filters, reporting permissions, FHIR tasks and authentication. Back up the database
-before startup: Appointments adds availability tables and Queue adds indexes.
-An image rollback does not itself reverse database migrations.
+EMR API remains rollback containment, not a corrected clinical timestamp policy.
+The first save/validation failure rolls back the whole closure batch. It does not
+repair historical rows, change guessed end dates or scheduler settings, or
+authorize reactivation. Keep auto closure paused pending actual OpenMRS + Queue
+integration, an agreed timestamp policy and synthetic DEV/QLTY acceptance.
 
-Branch builds publish only their immutable SHA/digest. The `latest` alias is
-promoted only by a successful main build. The dependency updater proposes a PR
-and explicitly dispatches CI because a push made with GITHUB_TOKEN does not
-automatically trigger another workflow.
+Remaining source OMODs
+
+`backend/omod-sources.lock` retains immutable upstream source revisions and archive
+checksums for eight other modules. `bash backend/bin/build-source-omods.sh package`
+builds them in the distribution's Maven cache without applying external patches.
+Core remains 2.8.9. The separate BedManagement source pin is unchanged.
+
+Run `bash backend/bin/build-source-omods.sh test <module>` to execute a remaining
+module's Maven suite. Seven use Java 21; Initializer's full reactor uses upstream's
+Java 11 test baseline, followed by its Core 2.8 integration suite on Java 21 via
+`test-core28 initializer`. Packaging uses Java 21. `OMOD_TEST_REPORTS` selects a
+Surefire evidence directory and `OMOD_MAVEN_REPOSITORY` an isolated local cache.
+Sibling test JARs are compiled during packaging as required by upstream reactors.
+
+Deployment and promotion
+
+Version automation must not replace an owned release independently of its
+checksum and POM version. Source revisions and POM versions also move together.
+Branch builds publish only immutable image SHA/digests; only successful main
+builds promote the `latest` alias.
+
+Publishing module releases or merging this dependency change does not authorize
+clinical deployment. Validate the same image digest in DEV and then QLTY using
+synthetic fixtures; verify module startup and the affected API/form/visit flows.
+Back up the database before startup: an image rollback does not reverse schema
+migrations. Production restart and scheduler activation require separate approval.

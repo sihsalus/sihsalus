@@ -46,15 +46,12 @@ while read -r module repository revision checksum upstream_version version extra
   source_dir="$BUILD_ROOT/$module"
   mkdir "$source_dir"
   tar -xzf "$archive" -C "$source_dir" --strip-components=1
-  if [[ -f "$ROOT/patches/$module.patch" ]]; then
-    (cd "$source_dir" && git apply --check "$ROOT/patches/$module.patch" && git apply "$ROOT/patches/$module.patch")
-  fi
   "${MAVEN[@]}" -f "$source_dir/pom.xml" \
     org.codehaus.mojo:versions-maven-plugin:2.19.1:set \
     "-DnewVersion=$version" -DgenerateBackupPoms=false -DprocessAllModules=true
   args=(-Dformatter.skip=true -Dspotless.skip=true -Dmaven.javadoc.skip=true)
   if [[ "$MODE" == package ]]; then
-    # REST and Initializer consume sibling test-jars even when not running tests.
+    # Initializer consumes sibling test-jars even when not running tests.
     args+=(-DskipTests)
   fi
   if [[ "$MODE" == test-core28 ]]; then

@@ -194,6 +194,22 @@ public final class ModuleDependencyVerifier {
             }
             cases++;
         }
+        // An owned prerelease must not sort below the upstream minimum it replaces.
+        for (String module : List.of("webservices.rest", "emrapi")) {
+            String packageName = "org.openmrs.module." + module;
+            for (String version : List.of("3.5.0-sihsalus.1", "3.5.1-sihsalus.1")) {
+                Path directory = root.resolve(module + "-" + version);
+                fixture(directory, "consumer.omod", descriptor("consumer", "1.0", "example.consumer",
+                        dependency(packageName, "3.5.0")));
+                fixture(directory, "provider.omod", descriptor(module, version, packageName, ""));
+                if (version.equals("3.5.0-sihsalus.1")) {
+                    expectFailure(directory, "requires " + packageName + " >= 3.5.0; packaged " + version);
+                } else {
+                    verify(directory);
+                }
+                cases++;
+            }
+        }
         Path unversioned = root.resolve("unversioned");
         fixture(unversioned, "consumer.omod", descriptor("consumer", "1.0", "example.consumer", dependency(O3_PACKAGE, null)));
         fixture(unversioned, "provider.omod", descriptor("o3forms", "0.1", O3_PACKAGE, ""));

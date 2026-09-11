@@ -133,6 +133,9 @@ jobs:
           bash tests/backend/o3forms-release-config.sh
           bash tests/backend/o3forms-release-image.sh --self-test
 
+      - name: Validate independently released REST and EMR API modules
+        run: python3 tests/backend/owned-module-releases.py --self-test
+
       - name: Validate models and invariants
         run: ./scripts/validate-compose.sh compose-validation
 
@@ -170,7 +173,7 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
-        module: [webservices.rest, initializer, queue, reporting, reportingrest, patientdocuments, billing, emrapi, fhir2, authentication]
+        module: [initializer, queue, reporting, reportingrest, patientdocuments, billing, fhir2, authentication]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-java@v6
@@ -237,7 +240,7 @@ jobs:
       - name: Test backend OCL token contract
         run: ./tests/backend/ocl-token-image.sh sihsalus-backend:ci
 
-      - name: Verify all packaged OMOD versions and REST security patch
+      - name: Verify packaged versions, owned release bytes and compiled protections
         run: bash tests/backend/source-omods-image.sh sihsalus-backend:ci
 
       - name: Verify published O3 Forms bytes in backend image

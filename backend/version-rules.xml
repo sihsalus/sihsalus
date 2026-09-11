@@ -22,7 +22,7 @@
         <ignoreVersion type="regex">.*</ignoreVersion>
       </ignoreVersions>
     </rule>
-    <!-- REST is built from a pinned source revision with a security backport. -->
+    <!-- REST consumes a checksum-pinned release from its owning module repo. -->
     <rule groupId="org.openmrs.module" artifactId="webservices.rest-omod">
       <ignoreVersions>
         <ignoreVersion type="regex">.*</ignoreVersion>
