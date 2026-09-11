@@ -1,0 +1,28 @@
+# Host is embedded in Forwarded and authorization redirect headers.
+map $http_host $imaging_invalid_host {
+    default 1;
+    "~^(?:[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?\.?|\[[0-9A-Fa-f:.]+\])(?::[0-9]{1,5})?$" 0;
+}
+
+# Session cookies carry small Redis tickets. Bound the browser's aggregate
+# Cookie header; clinical image payloads retain their independent upload limit.
+map $http_cookie $imaging_cookie_too_large {
+    default 0;
+    "~^.{8193}" 1;
+}
+
+map $request_method $imaging_read_method_denied {
+    default 1;
+    GET 0;
+    HEAD 0;
+}
+
+# These Orthanc POST endpoints only query existing resources. All clinical
+# mutations must enter through OpenMRS, which checks the operation privilege.
+map "$request_method:$uri" $orthanc_web_method_denied {
+    default 1;
+    "~^(?:GET|HEAD):" 0;
+    "POST:/orthanc/tools/find" 0;
+    "POST:/orthanc/tools/count-resources" 0;
+    "POST:/orthanc/tools/lookup" 0;
+}
