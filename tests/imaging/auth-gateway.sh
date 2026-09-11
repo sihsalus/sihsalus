@@ -98,6 +98,14 @@ for _ in $(seq 1 30); do
 done
 curl --fail --silent --show-error "$BASE_URL/health" >/dev/null
 
+# Unconfigured Grafana stays denied even when Imaging is authorized. Exercise
+# the real entrypoint fallback rather than supplying the new variable here.
+for path in /grafana /grafana/ /grafana/api/health; do
+  status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+    --header 'X-Real-IP: 127.0.0.1' --cookie '_sihsalus_imaging=allowed' "$BASE_URL$path")"
+  [ "$status" = "403" ]
+done
+
 heartbeat_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
   --request POST \
   --header 'User-Agent: sihsalus-privacy-probe' \
