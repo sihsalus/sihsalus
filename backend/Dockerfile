@@ -195,4 +195,9 @@ COPY --from=dev  /openmrs/distribution/openmrs_config /openmrs/distribution/open
 
 RUN mkdir -p /openmrs/data
 
+# Prepare Tomcat's default Host XML base before dropping privileges. Keep the
+# parent configuration root-owned; only this empty Host directory is writable.
+RUN install -d -o 0 -g 0 -m 0755 /usr/local/tomcat/conf/Catalina && \
+    install -d -o 1001 -g 0 -m 0750 /usr/local/tomcat/conf/Catalina/localhost
+
 USER 1001

@@ -51,7 +51,7 @@ while read -r module repository revision checksum upstream_version version extra
     "-DnewVersion=$version" -DgenerateBackupPoms=false -DprocessAllModules=true
   args=(-Dformatter.skip=true -Dspotless.skip=true -Dmaven.javadoc.skip=true)
   if [[ "$MODE" == package ]]; then
-    # REST and Initializer consume sibling test-jars even when not running tests.
+    # Initializer consumes sibling test-jars even when not running tests.
     args+=(-DskipTests)
   fi
   if [[ "$MODE" == test-core28 ]]; then
