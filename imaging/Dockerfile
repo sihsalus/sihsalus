@@ -25,15 +25,14 @@ COPY app-config.js platform/app/public/config/sihsalus.js
 COPY index.html platform/app/public/html-templates/sihsalus.html
 COPY bootstrap.js platform/app/public/sihsalus-bootstrap.js
 COPY prepare-source.mjs verify-dist.mjs /opt/sihsalus-imaging/
-RUN node /opt/sihsalus-imaging/prepare-source.mjs /opt/ohif
 
-# Match upstream QUICK_BUILD: webpack.base disables minification and maps.
-# verify-dist checks that runtime's literal public path. The prefix must agree
-# with the router, template and gateway, including workers.
+# Keep upstream production optimization enabled. The router, template, lazy
+# chunks and workers all use the same compiled public prefix.
 ENV PUBLIC_URL=/imaging/ \
     APP_CONFIG=config/sihsalus.js \
     HTML_TEMPLATE=sihsalus.html \
-    QUICK_BUILD=true
+    QUICK_BUILD=false
+RUN node /opt/sihsalus-imaging/prepare-source.mjs /opt/ohif
 RUN yarn run build \
     && mkdir -p platform/app/dist/dicom-microscopy-viewer \
     && cp -a node_modules/dicom-microscopy-viewer/dist/dynamic-import/. platform/app/dist/dicom-microscopy-viewer/ \

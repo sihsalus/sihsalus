@@ -8,6 +8,11 @@ import { prepareSource } from "../../imaging/prepare-source.mjs";
 import { verifyDist } from "../../imaging/verify-dist.mjs";
 
 const imagingDirectory = new URL("../../imaging/", import.meta.url);
+const buildEnvironment = { PUBLIC_URL: "/imaging/", APP_CONFIG: "config/sihsalus.js" };
+const fixtureCodec = "0123456789abcdef01234.wasm";
+const fixtureRuntime = `__webpack_require__.p = "/imaging/";
+__webpack_require__.u = (id) => id + ".bundle.js";
+const codec = __webpack_require__.p + "${fixtureCodec}";`;
 
 async function temporaryDirectory(t) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "sihsalus-ohif-contract-"));
@@ -19,6 +24,9 @@ async function sourceFixture(t, { version = "3.9.3", imports } = {}) {
   const directory = await temporaryDirectory(t);
   await mkdir(path.join(directory, "platform/app"), { recursive: true });
   await writeFile(path.join(directory, "platform/app/package.json"), JSON.stringify({ version }));
+  const environmentPath = path.join(directory, "platform/app/.env");
+  const environment = "# Upstream development configuration\nPUBLIC_URL=/\nAPP_CONFIG=config/default.js\nUSE_HASH_ROUTER=false\nANOTHER_SETTING=preserved\n";
+  await writeFile(environmentPath, environment);
   const plugins = {
     extensions: [{ packageName: "@ohif/extension-default" }],
     modes: [{ packageName: "@ohif/mode-longitudinal" }],
@@ -35,7 +43,7 @@ async function sourceFixture(t, { version = "3.9.3", imports } = {}) {
   const pluginPath = path.join(directory, "platform/app/pluginConfig.json");
   const original = JSON.stringify(plugins);
   await writeFile(pluginPath, original);
-  return { directory, pluginPath, plugins, original };
+  return { directory, pluginPath, plugins, original, environmentPath, environment };
 }
 
 async function distFixture(t) {
@@ -49,8 +57,8 @@ async function distFixture(t) {
     writeFile(path.join(directory, "index.html"), html),
     writeFile(path.join(directory, "sihsalus-bootstrap.js"), "// fixture bootstrap"),
     writeFile(path.join(directory, "app-config.js"), "window.config = {};"),
-    writeFile(path.join(directory, "app.bundle.fixture.js"), '__webpack_require__.p = "/imaging/";'),
-    writeFile(path.join(directory, "codec.wasm"), Buffer.from([0, 97, 115, 109, 1, 0, 0, 0])),
+    writeFile(path.join(directory, "app.bundle.fixture.js"), fixtureRuntime),
+    writeFile(path.join(directory, fixtureCodec), Buffer.from([0, 97, 115, 109, 1, 0, 0, 0])),
     writeFile(path.join(directory, "dicom-microscopy-viewer/dicomMicroscopyViewer.min.js"), "// fixture"),
   ]);
   return { directory, html };
@@ -88,16 +96,49 @@ test("OHIF uses one router prefix with same-origin DICOMweb", async () => {
 
 test("source preparation relocates microscopy without changing other plugins or modes", async (t) => {
   const fixture = await sourceFixture(t);
-  await prepareSource(fixture.directory);
+  await prepareSource(fixture.directory, buildEnvironment);
   const actual = JSON.parse(await readFile(fixture.pluginPath, "utf8"));
   const expected = structuredClone(fixture.plugins);
   expected.public[1].importPath = "/imaging/dicom-microscopy-viewer/dicomMicroscopyViewer.min.js";
   assert.deepEqual(actual, expected);
 });
 
+test("build inputs replace only the public path and app configuration in upstream dotenv", async (t) => {
+  const fixture = await sourceFixture(t);
+  await prepareSource(fixture.directory, buildEnvironment);
+  assert.equal(
+    await readFile(fixture.environmentPath, "utf8"),
+    fixture.environment.replace("PUBLIC_URL=/\n", "PUBLIC_URL=/imaging/\n")
+      .replace("APP_CONFIG=config/default.js", "APP_CONFIG=config/sihsalus.js"),
+  );
+});
+
+for (const value of [undefined, "", "/imaging/\nOTHER=value"]) {
+  test(`an invalid public build path ${JSON.stringify(value)} fails before source changes`, async (t) => {
+    const fixture = await sourceFixture(t);
+    await assert.rejects(
+      prepareSource(fixture.directory, { ...buildEnvironment, PUBLIC_URL: value }),
+      /single-line PUBLIC_URL/,
+    );
+    assert.equal(await readFile(fixture.pluginPath, "utf8"), fixture.original);
+    assert.equal(await readFile(fixture.environmentPath, "utf8"), fixture.environment);
+  });
+}
+
+for (const [name, replacement] of [["absent", ""], ["duplicate", "PUBLIC_URL=/\nPUBLIC_URL=/other/"]]) {
+  test(`an ${name} upstream dotenv declaration requires review`, async (t) => {
+    const fixture = await sourceFixture(t);
+    const changed = fixture.environment.replace("PUBLIC_URL=/", replacement);
+    await writeFile(fixture.environmentPath, changed);
+    await assert.rejects(prepareSource(fixture.directory, buildEnvironment), /declaration changed/);
+    assert.equal(await readFile(fixture.pluginPath, "utf8"), fixture.original);
+    assert.equal(await readFile(fixture.environmentPath, "utf8"), changed);
+  });
+}
+
 test("an upstream version change fails before altering its source", async (t) => {
   const fixture = await sourceFixture(t, { version: "3.10.0" });
-  await assert.rejects(prepareSource(fixture.directory), /packaging contract/);
+  await assert.rejects(prepareSource(fixture.directory, buildEnvironment), /packaging contract/);
   assert.equal(await readFile(fixture.pluginPath, "utf8"), fixture.original);
 });
 
@@ -114,7 +155,7 @@ for (const [name, imports] of [
 ]) {
   test(`a ${name} microscopy import fails without silently rewriting unknown source`, async (t) => {
     const fixture = await sourceFixture(t, { imports });
-    await assert.rejects(prepareSource(fixture.directory), /microscopy import changed/);
+    await assert.rejects(prepareSource(fixture.directory, buildEnvironment), /microscopy import changed/);
     assert.equal(await readFile(fixture.pluginPath, "utf8"), fixture.original);
   });
 }
@@ -122,6 +163,46 @@ for (const [name, imports] of [
 test("the distribution contract accepts prefixed scripts, compiled chunks, codecs and microscopy", async (t) => {
   const { directory } = await distFixture(t);
   await verifyDist(directory);
+});
+
+for (const runtime of ["n", "a7", "$", "_r$"]) {
+  test(`production minification can rename the webpack runtime to ${runtime}`, async (t) => {
+    const { directory } = await distFixture(t);
+    const bundle = `(()=>{${runtime}.u=e=>e+".bundle.js",${runtime}.p="/imaging/";const c=${runtime}.p+"${fixtureCodec}"})();`;
+    await writeFile(path.join(directory, "app.bundle.fixture.js"), bundle);
+    await verifyDist(directory);
+  });
+}
+
+test("a path on an unrelated object cannot stand in for webpack's chunk runtime", async (t) => {
+  const { directory } = await distFixture(t);
+  const bundle = `n.u=e=>e+".bundle.js";n.p="/";other.p="/imaging/";const c="${fixtureCodec}";`;
+  await writeFile(path.join(directory, "app.bundle.fixture.js"), bundle);
+  await assert.rejects(verifyDist(directory), /prefixed runtime/);
+});
+
+test("runtime names cannot match the suffix of a different object", async (t) => {
+  const { directory } = await distFixture(t);
+  const bundle = `ba.u=e=>e+".bundle.js";a.p="/imaging/";const c="${fixtureCodec}";`;
+  await writeFile(path.join(directory, "app.bundle.fixture.js"), bundle);
+  await assert.rejects(verifyDist(directory), /prefixed runtime/);
+});
+
+test("every codec referenced by a lazy worker chunk must exist", async (t) => {
+  const { directory } = await distFixture(t);
+  const codec = "abcdef0123456789abcd0.wasm";
+  await writeFile(path.join(directory, "decode.worker.js"), `const wasm = workerRuntime.p + "${codec}";`);
+  await assert.rejects(verifyDist(directory), { code: "ENOENT" });
+  await writeFile(path.join(directory, codec), Buffer.from([0, 97, 115, 109, 1, 0, 0, 0]));
+  await verifyDist(directory);
+});
+
+test("a codec cannot be an HTML fallback page or a truncated module", async (t) => {
+  const { directory } = await distFixture(t);
+  for (const content of ["<!doctype html><title>Not found</title>", Buffer.from([0, 97, 115, 109])]) {
+    await writeFile(path.join(directory, fixtureCodec), content);
+    await assert.rejects(verifyDist(directory), /must be a WebAssembly module/);
+  }
 });
 
 test("script closing tags may use HTML whitespace and mixed case", async (t) => {
@@ -190,7 +271,7 @@ test("changing the router alone cannot hide an incorrectly compiled public path"
 
 for (const missingFile of [
   "app.bundle.fixture.js",
-  "codec.wasm",
+  fixtureCodec,
   "dicom-microscopy-viewer/dicomMicroscopyViewer.min.js",
 ]) {
   test(`a missing ${missingFile} fails packaging`, async (t) => {

@@ -39,14 +39,40 @@ export async function verifyDist(directory) {
   const appBundle = files.find((name) => /^app\.bundle\..+\.js$/.test(name));
   assert.ok(appBundle, "The OHIF app bundle must exist");
   const app = await readFile(path.join(directory, appBundle), "utf8");
-  // OHIF 3.9.3 QUICK_BUILD disables minification and keeps the webpack runtime
-  // in this entry bundle. Revisit this check if that build contract changes.
-  assert.match(
-    app,
-    /__webpack_require__\.p\s*=\s*["']\/imaging\/["']/,
+  // Webpack keeps its runtime in this entry bundle. Production Terser renames
+  // the runtime variable, while its publicPath (.p) and chunk loader (.u)
+  // properties are stable. Check both on the same object, without parsing or
+  // executing the application's code during image construction.
+  const runtime = app.match(/(?:^|[^\w$.])([A-Za-z_$][\w$]*)\.p\s*=\s*["']\/imaging\/["']/)?.[1];
+  assert.ok(
+    runtime,
     "Lazy chunks and workers must use the compiled /imaging/ public path",
   );
-  assert.ok(files.some((name) => name.endsWith(".wasm")), "DICOM codec WASM assets must be packaged");
+  const escapedRuntime = runtime.replaceAll("$", "\\$");
+  assert.match(
+    app,
+    new RegExp(`(?:^|[^\\w$.])${escapedRuntime}\\.u\\s*=`),
+    "The prefixed runtime must load lazy chunks",
+  );
+
+  // Asset/resource emits content hashes for codecs. Verify references in the
+  // generated chunks, including workers, instead of accepting one arbitrary
+  // WASM file while a lazy decoder's binary is missing.
+  const codecs = new Set();
+  for (const bundle of files.filter((name) => name.endsWith(".js"))) {
+    const source = bundle === appBundle ? app : await readFile(path.join(directory, bundle), "utf8");
+    for (const [, codec] of source.matchAll(/["']([0-9a-f]{16,64}\.wasm)["']/g)) {
+      codecs.add(codec);
+    }
+  }
+  assert.ok(codecs.size > 0, "The generated chunks must reference DICOM codec assets");
+  for (const codec of codecs) {
+    const bytes = await readFile(path.join(directory, codec));
+    assert.ok(
+      bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0, 97, 115, 109, 1, 0, 0, 0])),
+      `Referenced codec ${codec} must be a WebAssembly module`,
+    );
+  }
   assert.ok(!files.includes("init-service-worker.js") && !files.includes("sw.js"));
   assert.ok(
     (await stat(path.join(directory, "dicom-microscopy-viewer/dicomMicroscopyViewer.min.js"))).isFile(),

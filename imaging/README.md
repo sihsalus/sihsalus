@@ -68,6 +68,9 @@ Orthanc para que las URL de recuperación de imágenes sean correctas.
 OHIF se construye con [Dockerfile](Dockerfile) desde un commit y checksum fijos.
 `PUBLIC_URL=/imaging/` queda compilado en los bundles y los workers; cambiar solo
 `routerBasename` no sirve para relocalizar una imagen upstream compilada en `/`.
+El build usa la minificación de producción y alinea `PUBLIC_URL` y `APP_CONFIG`
+con el archivo `.env` de OHIF, conservando el resto de su configuración. CI verifica
+el runtime minificado y los binarios WASM referenciados por sus archivos JavaScript.
 La imagen conserva el service worker de OpenMRS y no registra otro para el visor.
 Los cambios de `app-config.js` requieren reconstruir OHIF. No sustituir esta imagen
 por `ohif/app` sin repetir las pruebas del contrato de assets y de navegador.
