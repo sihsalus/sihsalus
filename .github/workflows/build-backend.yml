@@ -11,6 +11,12 @@ on:
       - 'distro/**'
       - 'tests/backend/ocl-token-image.sh'
       - 'tests/backend/forced-password-image.sh'
+      - 'tests/backend/tomcat-config-config.sh'
+      - 'tests/backend/tomcat-config-image.sh'
+      - 'tests/backend/o3forms-release-config.sh'
+      - 'tests/backend/o3forms-release-image.sh'
+      - 'tests/backend/module-dependencies-image.sh'
+      - 'tests/backend/ModuleDependencyVerifier.java'
   workflow_dispatch:
 
 concurrency:
@@ -29,6 +35,19 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v7.0.1
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Validate published O3 Forms dependency contract
+        run: |
+          bash tests/backend/o3forms-release-config.sh
+          bash tests/backend/o3forms-release-image.sh --self-test
+
+      - name: Test Tomcat rootless configuration directory contract
+        run: bash tests/backend/tomcat-config-config.sh
 
       - uses: docker/setup-buildx-action@v4
 
@@ -74,10 +93,25 @@ jobs:
           IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
         run: bash tests/backend/source-omods-image.sh "$IMAGE"
 
+      - name: Verify published O3 Forms bytes in backend image
+        env:
+          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+        run: bash tests/backend/o3forms-release-image.sh "$IMAGE"
+
+      - name: Verify required OMOD dependency compatibility with packaged Core
+        env:
+          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+        run: bash tests/backend/module-dependencies-image.sh "$IMAGE"
+
       - name: Test published backend forced-password contract
         env:
           IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
         run: ./tests/backend/forced-password-image.sh "${IMAGE}"
+
+      - name: Test published backend Tomcat configuration directory permissions
+        env:
+          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+        run: bash tests/backend/tomcat-config-image.sh "$IMAGE"
 
       - name: Resolve pinned OpenMRS security baseline
         id: openmrs-baseline

@@ -63,6 +63,13 @@ geo $sihsalus_private_client {
   fd7a:115c:a1e0::/48 1;
 }
 
+# Operator-supplied Nginx geo entries. This additional, default-deny policy also
+# runs before the canonical redirect; forwarding headers cannot grant access.
+geo $sihsalus_grafana_client {
+  default 0;
+  ${GRAFANA_NETWORK_ALLOWLIST}
+}
+
 # Realtime notifications and Grafana Live use WebSocket upgrades.
 map $http_upgrade $connection_upgrade {
   default upgrade;

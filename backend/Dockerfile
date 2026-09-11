@@ -17,6 +17,13 @@ ARG MVN_ARGS="install"
 COPY pom.xml ./
 COPY backend/pom.xml ./backend/
 
+# O3 Forms is compiled and released by its owning module repository.
+# Infrastructure consumes only the immutable, checksum-pinned release binary.
+ARG O3FORMS_VERSION=2.3.1-sihsalus.1
+ADD --checksum=sha256:34ad1c0a9d9d924fe05697dae29a442a194a51e149e59e7f4ac8b2e6856645cf \
+    https://github.com/sihsalus/openmrs-module-o3forms/releases/download/${O3FORMS_VERSION}/o3forms-${O3FORMS_VERSION}.omod \
+    /tmp/o3forms.omod
+
 # Build the SIHSALUS Bed Management patch from an immutable source revision.
 # The checksum prevents a changed or substituted archive from entering the image.
 ARG BEDMANAGEMENT_SOURCE_SHA=f7ceac08204d4239814b9978eaf7dadd8e6a62c7
@@ -39,6 +46,11 @@ RUN --mount=type=cache,target=/root/.m2/repository \
       -Dformatter.skip=true -DskipTests -Dmaven.javadoc.skip=true \
       --file /tmp/bedmanagement-source/pom.xml install && \
     bash backend/bin/build-source-omods.sh package && \
+    mvn --batch-mode --no-transfer-progress \
+      org.apache.maven.plugins:maven-install-plugin:3.1.4:install-file \
+      -Dfile=/tmp/o3forms.omod -DgroupId=org.openmrs.module \
+      -DartifactId=o3forms-omod -Dversion=${O3FORMS_VERSION} \
+      -Dpackaging=jar -DgeneratePom=true && \
     mvn $MVN_ARGS_SETTINGS $MVN_ARGS && \
     modules_dir=/openmrs_distro/backend/target/sdk-distro/web/openmrs_modules && \
     set -- "$modules_dir"/authentication-*.omod && \
@@ -161,5 +173,10 @@ COPY --from=dev /openmrs/distribution/openmrs_owas /openmrs/distribution/openmrs
 COPY --from=dev  /openmrs/distribution/openmrs_config /openmrs/distribution/openmrs_config
 
 RUN mkdir -p /openmrs/data
+
+# Prepare Tomcat's default Host XML base before dropping privileges. Keep the
+# parent configuration root-owned; only this empty Host directory is writable.
+RUN install -d -o 0 -g 0 -m 0755 /usr/local/tomcat/conf/Catalina && \
+    install -d -o 1001 -g 0 -m 0750 /usr/local/tomcat/conf/Catalina/localhost
 
 USER 1001

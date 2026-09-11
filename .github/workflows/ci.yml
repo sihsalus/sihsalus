@@ -125,6 +125,14 @@ jobs:
       - name: Test backend security refresh cache policy
         run: ./tests/backend/security-refresh-config.sh
 
+      - name: Test Tomcat rootless configuration directory contract
+        run: bash tests/backend/tomcat-config-config.sh
+
+      - name: Validate published O3 Forms dependency contract
+        run: |
+          bash tests/backend/o3forms-release-config.sh
+          bash tests/backend/o3forms-release-image.sh --self-test
+
       - name: Validate models and invariants
         run: ./scripts/validate-compose.sh compose-validation
 
@@ -165,7 +173,7 @@ jobs:
         module: [webservices.rest, initializer, queue, reporting, reportingrest, patientdocuments, billing, emrapi, fhir2, authentication]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           # Initializer also tests Core 2.1-era XStream; upstream supports Java 8/11.
@@ -178,7 +186,7 @@ jobs:
         run: bash backend/bin/build-source-omods.sh test '${{ matrix.module }}'
       - name: Set up Java 21 for Initializer Core 2.8 integration tests
         if: matrix.module == 'initializer'
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 21
@@ -208,6 +216,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
       - uses: docker/setup-buildx-action@v4
 
       - name: Build deployable backend image
@@ -227,8 +240,17 @@ jobs:
       - name: Verify all packaged OMOD versions and REST security patch
         run: bash tests/backend/source-omods-image.sh sihsalus-backend:ci
 
+      - name: Verify published O3 Forms bytes in backend image
+        run: bash tests/backend/o3forms-release-image.sh sihsalus-backend:ci
+
+      - name: Verify required OMOD dependency compatibility with packaged Core
+        run: bash tests/backend/module-dependencies-image.sh sihsalus-backend:ci
+
       - name: Test backend forced-password contract
         run: ./tests/backend/forced-password-image.sh sihsalus-backend:ci
+
+      - name: Test backend Tomcat configuration directory permissions
+        run: bash tests/backend/tomcat-config-image.sh sihsalus-backend:ci
 
       - name: Resolve pinned OpenMRS security baseline
         id: openmrs-baseline

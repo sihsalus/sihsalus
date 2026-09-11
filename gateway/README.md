@@ -38,6 +38,13 @@ La instalación, confianza y renovación están en el
   `/services/fua-generator/health` también consulta `/`: su 200 no demuestra
   que exista una sonda de salud. Cambiar este contrato requiere otro PR.
 - Imaging permanece cerrado hasta cargar su override de autorización.
+- Grafana exige una red privada admitida y una coincidencia en
+  `GRAFANA_NETWORK_ALLOWLIST`. Esta política adicional usa la dirección de la
+  conexión, nunca `X-Real-IP` ni `X-Forwarded-For`. Vacía o ausente, devuelve
+  403 tanto en `/grafana` como en `/grafana/` antes de redirigir o hacer proxy.
+  El listener HTTP de una instalación HTTPS sigue redirigiendo a HTTPS;
+  la comprobación de acceso se aplica en el listener que sirve la aplicación.
+  Su configuración y migración están en el [runbook de Grafana](../docs/operations/grafana-lan.md).
 - `POST /_sihsalus/clinical-activity` devuelve 204. Su log contiene únicamente
   un timestamp para la [política de apagado](../docs/operations/safe-poweroff.md);
   no agregar IP, cookies, rutas, cuerpos ni otros identificadores.
@@ -74,6 +81,8 @@ bash scripts/validate-compose.sh
 
 Las pruebas usan el entrypoint real, certificados efímeros y upstreams
 ficticios en redes separadas; sus puertos se publican solo en `127.0.0.1`.
+Cubren Grafana permitido, no configurado, vacío y fuera del rango, sin confiar
+en cabeceras reenviadas, además de conservar las rutas clínicas y de Imaging.
 Eliminan sus contenedores y redes al terminar. `GATEWAY_TEST_IMAGE` permite
 seleccionar una imagen Nginx 1.28 disponible y `GATEWAY_CONFIG_DIR` otra
 carpeta con esta estructura de configuración.
