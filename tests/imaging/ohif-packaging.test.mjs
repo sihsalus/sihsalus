@@ -142,9 +142,14 @@ for (const [name, transform, message] of [
     /inline scripts/,
   ],
   [
-    "unsupported script markup",
+    "inline bootstrap with ignored closing-tag attributes",
     (html) => html.replace("</head>", '<script>window.PUBLIC_URL="/";</script ignored></head>'),
-    /Every script/,
+    /inline scripts/,
+  ],
+  [
+    "inline bootstrap with mixed closing-tag whitespace and attributes",
+    (html) => html.replace("</head>", '<script>window.PUBLIC_URL="/";</ScRiPt \t\n ignored="value"></head>'),
+    /inline scripts/,
   ],
   [
     "unterminated script",

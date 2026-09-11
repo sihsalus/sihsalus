@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 
 export async function verifyDist(directory) {
   const html = await readFile(path.join(directory, "index.html"), "utf8");
-  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)];
+  // HTML parsers also terminate scripts when an end tag has ignored attributes.
+  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi)];
   // This checks the pinned build template, not arbitrary HTML. Reject script
   // markup outside that contract instead of silently leaving it unchecked.
   assert.equal(

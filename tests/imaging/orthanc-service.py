@@ -151,7 +151,10 @@ def exercise(directory):
         try:
             if request(base, "/health")[0] == 200:
                 break
-        except urllib.error.URLError:
+        except (urllib.error.URLError, ConnectionError, TimeoutError):
+            # Docker can publish the port before Nginx has completed template
+            # generation. A reset/timeout during this bounded startup wait is
+            # transient; subsequent PACS assertions do not suppress errors.
             pass
         time.sleep(1)
     else:
