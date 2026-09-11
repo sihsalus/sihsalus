@@ -27,8 +27,82 @@ Package contents:
 #### OpenMRS modules
 `omod`s are specified as Maven `<dependency>` in the [pom.xml](pom.xml) file.
 
+O3 Forms is an explicitly versioned binary dependency published by
+[`sihsalus/openmrs-module-o3forms`](https://github.com/sihsalus/openmrs-module-o3forms/releases).
+Its Java source, patch, tests and OMOD compilation belong in that repository.
+The backend image build downloads the released OMOD using a literal SHA-256 pin
+in `Dockerfile` and registers those exact bytes in its build-only Maven cache
+before packaging the distribution. No O3 Forms source patch, compilation or
+manual runtime-module installation takes place here.
+
+To update it, approve and publish the module release first, then change
+`o3forms.version`, `O3FORMS_VERSION` and the Dockerfile checksum together. Do not
+use a short-lived CI artifact or a moving download URL. The configuration test
+checks this dependency contract; the image test checks the packaged OMOD's
+checksum, module identity and nested API version. Version automation must not
+replace this pin independently.
+
+#### Required module compatibility gate
+
+Before promotion, CI checks every packaged OMOD's required module dependencies
+by package identity and minimum version using `ModuleUtil.compareVersion` from
+the exact Core WAR in the image. This is a test-only harness; it does not compile
+module/application source, start OpenMRS, attach runtime data or contact a database.
+Optional dependencies are not treated as required. Missing/duplicate module
+identities, malformed descriptors and incompatible required versions fail closed.
+
+```bash
+bash tests/backend/module-dependencies-image.sh IMAGE
+# Offline alternatives using distribution artifacts only:
+bash tests/backend/module-dependencies-image.sh --files PATH_TO_WAR MODULES_DIRECTORY
+bash tests/backend/module-dependencies-image.sh --self-test PATH_TO_WAR
+```
+
+The gate requires a JDK (CI uses 21); image mode additionally requires Docker.
+It creates an unstarted, network-isolated container and removes that test container
+and its anonymous volumes afterward. It never reads a deployed instance's data.
+The self-test exercises synthetic OMOD descriptors against the actual Core
+comparator, including Patient Documents requiring O3 Forms `>=2.3.0`.
+
+Core rejects `2.3.0-sihsalus.1` for that minimum even if O3 Forms itself starts.
+The pinned correction
+[`2.3.1-sihsalus.1`](https://github.com/sihsalus/openmrs-module-o3forms/releases/tag/2.3.1-sihsalus.1)
+is an immutable prerelease that satisfies `2.3.0`, but not a future minimum of
+`2.3.1`. It preserves the null-locale form translation fix. Its published OMOD,
+checksum and signed provenance were verified before updating both version pins
+and the Dockerfile checksum. The image gate must still validate the actual
+packaged distribution; do not overwrite the old release or bypass the gate.
+
+Static dependency acceptance is not module-start or clinical acceptance. After
+an explicitly authorized deployment, separately verify O3 Forms, REST and Patient
+Documents are started and test synthetic form open/save/edit flows in DEV before
+coordinating QLTY.
+
+Deploy only the tested backend image by SHA and OCI digest using the
+[backend-only procedure](../scripts/deploy/README.md#backend-únicamente), with
+synthetic DEV acceptance before QLTY. Preserve the prior image for rollback.
+
 #### OpenMRS Configuration (Initializer)
 OpenMRS config can be set under [`backend/config/openmrs_config/`](config/openmrs_config/) when present.
+
+#### Tomcat rootless configuration directory
+
+The image prepares the empty default Host XML base at
+`/usr/local/tomcat/conf/Catalina/localhost` before switching to UID 1001.
+Only that directory is owned by `1001:0` with mode `0750`; `conf` and `Catalina`
+remain root-owned with mode `0755`. Do not make the entire configuration tree
+writable or disable Tomcat's directory creation/validation to hide startup errors.
+
+```bash
+bash tests/backend/tomcat-config-config.sh
+bash tests/backend/tomcat-config-image.sh IMAGE
+```
+
+The first test is offline. The second requires Docker and an already-built local
+image; it runs only a shell with no network, no application startup and no mounted
+runtime data. It checks the default user, real paths, ownership, modes and access,
+then removes its test container and anonymous volumes. CI runs both gates before
+promotion. These checks do not replace startup and clinical acceptance testing.
 
 #### Micro Frontends
 SPA-related configuration is driven by the distro build and the frontend package in this repository.
