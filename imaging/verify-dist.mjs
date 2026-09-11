@@ -5,7 +5,14 @@ import { fileURLToPath } from "node:url";
 
 export async function verifyDist(directory) {
   const html = await readFile(path.join(directory, "index.html"), "utf8");
-  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
+  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)];
+  // This checks the pinned build template, not arbitrary HTML. Reject script
+  // markup outside that contract instead of silently leaving it unchecked.
+  assert.equal(
+    scripts.length,
+    [...html.matchAll(/<script\b/gi)].length,
+    "Every script must have a supported closing tag",
+  );
   assert.ok(scripts.length >= 3, "Expected bootstrap, configuration and generated app scripts");
   const sources = [];
   for (const [, attributes, content] of scripts) {

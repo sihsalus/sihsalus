@@ -124,11 +124,32 @@ test("the distribution contract accepts prefixed scripts, compiled chunks, codec
   await verifyDist(directory);
 });
 
+test("script closing tags may use HTML whitespace and mixed case", async (t) => {
+  const { directory, html } = await distFixture(t);
+  await writeFile(path.join(directory, "index.html"), html.replaceAll("</script>", "</ScRiPt \t\n>"));
+  await verifyDist(directory);
+});
+
 for (const [name, transform, message] of [
   [
     "inline bootstrap",
     (html) => html.replace("</head>", '<script>window.PUBLIC_URL="/";</script></head>'),
     /inline scripts/,
+  ],
+  [
+    "inline bootstrap with closing-tag whitespace",
+    (html) => html.replace("</head>", '<script>window.PUBLIC_URL="/";</script ></head>'),
+    /inline scripts/,
+  ],
+  [
+    "unsupported script markup",
+    (html) => html.replace("</head>", '<script>window.PUBLIC_URL="/";</script ignored></head>'),
+    /Every script/,
+  ],
+  [
+    "unterminated script",
+    (html) => html.replace("</body>", '<script src="/imaging/app.bundle.fixture.js"></body>'),
+    /Every script/,
   ],
   [
     "root entry script",

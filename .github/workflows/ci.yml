@@ -396,12 +396,15 @@ jobs:
         run: ./tests/imaging/auth-gateway.sh
 
       - name: Test ephemeral imaging sessions
+        if: ${{ !cancelled() }}
         run: python3 tests/imaging/session-store.py
 
       - name: Test the pinned Orthanc and Explorer integration
+        if: ${{ !cancelled() }}
         run: python3 tests/imaging/orthanc-service.py
 
       - name: Build the pinned OHIF viewer and verify real assets
+        if: ${{ !cancelled() }}
         run: docker build --tag sihsalus-ohif-ci ./imaging
 
   grafana-oidc:

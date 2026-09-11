@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMP_DIR="$(mktemp -d "$ROOT_DIR/.tmp-imaging-auth.XXXXXX")"
@@ -15,6 +15,10 @@ SYNTHETIC_REDIS_PASSWORD=0123456789abcdef0123456789abcdef0123456789abcdef
 NGINX_TEST_IMAGE="${GATEWAY_TEST_IMAGE:-nginx:1.28-alpine}"
 CREATED_CONTAINERS=()
 NETWORK_CREATED=false
+TEST_STAGE=initialization
+
+# Report the assertion location without logging commands, headers or secrets.
+trap 'printf "[FAIL] Imaging stage %s at line %s\n" "$TEST_STAGE" "$LINENO" >&2' ERR
 
 cleanup() {
   local result=$?
@@ -46,6 +50,7 @@ start_container() {
 
 docker network create "$NETWORK" >/dev/null
 NETWORK_CREATED=true
+TEST_STAGE=redis-readiness
 # --config-test initializes Redis keys, so validate against the actual store
 # and its authenticated readiness, using only disposable synthetic state.
 start_container "$REDIS" --network-alias imaging-session-store \
@@ -64,6 +69,7 @@ docker exec "$REDIS" /bin/sh /opt/sihsalus/redis-healthcheck.sh
 
 # Use the same oauth2-proxy options as Compose with synthetic credentials and
 # public URLs. The explicit OIDC endpoints avoid contacting an identity provider.
+TEST_STAGE=oauth2-proxy-config
 docker run --rm --network "$NETWORK" \
   -e OAUTH2_PROXY_PROVIDER=keycloak-oidc \
   -e OAUTH2_PROXY_CLIENT_ID=sihsalus-imaging \
@@ -133,6 +139,9 @@ map $http_x_test_session $session_cookie {
 }
 server {
   listen 4180;
+  # These fixture redirects intentionally model the declared relative Location.
+  # Otherwise Nginx adds the auth container's port (4180) to the public Host.
+  absolute_redirect off;
 
   location = /imaging/oauth2/auth {
     add_header Set-Cookie $session_cookie always;
@@ -158,6 +167,7 @@ server {
 }
 EOF
 
+TEST_STAGE=gateway-startup
 start_container "$UPSTREAM" \
   --network-alias backend --network-alias frontend --network-alias ohif --network-alias orthanc \
   -v "$TMP_DIR/upstream.conf:/etc/nginx/conf.d/default.conf:ro" \
@@ -189,12 +199,14 @@ curl --fail --silent --show-error "$BASE_URL/health" >/dev/null
 
 # Unconfigured Grafana stays denied even when Imaging is authorized. Exercise
 # the real entrypoint fallback rather than supplying the new variable here.
+TEST_STAGE=grafana-isolation
 for path in /grafana /grafana/ /grafana/api/health; do
   status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
     --header 'X-Real-IP: 127.0.0.1' --cookie '_sihsalus_imaging_session=allowed' "$BASE_URL$path")"
   [ "$status" = "403" ]
 done
 
+TEST_STAGE=clinical-heartbeat-privacy
 heartbeat_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
   --request POST \
   --header 'User-Agent: sihsalus-privacy-probe' \
@@ -207,6 +219,7 @@ printf '%s\n' "$heartbeat_log" | grep -Eq '^[0-9]+\.[0-9]{3}$'
 # Legacy secret-question recovery is not an approved credential-recovery
 # channel. Exercise the real Nginx parser and request matcher, including the
 # path-parameter forms that Tomcat would otherwise normalize before mapping.
+TEST_STAGE=password-recovery-routes
 for method in GET POST; do
   for path in \
     '/openmrs/forgotPassword.form' \
@@ -222,6 +235,7 @@ status="$(curl --path-as-is --silent --show-error --output /dev/null \
   --write-out '%{http_code}' "$BASE_URL/openmrs/admin/users/changePassword.form")"
 [ "$status" = "200" ]
 
+TEST_STAGE=startup-framing
 startup_headers="$TMP_DIR/startup.headers"
 startup_body="$TMP_DIR/startup.body"
 status="$(curl --http1.1 --max-time 5 --silent --show-error \
@@ -233,6 +247,7 @@ content_lengths="$(awk 'tolower($1) == "content-length:" { gsub(/\r/, "", $2); p
 [ "$content_lengths" = "$startup_bytes" ]
 grep -qi '^X-Content-Type-Options: nosniff' "$startup_headers"
 
+TEST_STAGE=anonymous-and-authorized-access
 for path in /imaging/ /orthanc/ /dicom-web/studies /wado /imaging/dicom-web/studies /imaging/wado; do
   headers="$TMP_DIR/anonymous.headers"
   status="$(curl --silent --show-error --output /dev/null --dump-header "$headers" --write-out '%{http_code}' "$BASE_URL$path")"
@@ -244,6 +259,7 @@ for path in /imaging/ /orthanc/ /dicom-web/studies /wado /imaging/dicom-web/stud
   [ "$status" = "200" ]
 done
 
+TEST_STAGE=authorization-and-origin-contracts
 python3 - "$BASE_URL" <<'PY'
 from http.cookies import SimpleCookie
 import socket
@@ -433,6 +449,7 @@ with request("/imaging/oauth2/auth") as response:
 print("[OK] Imaging origin, read-only routes, authorization, Redis ticket cookies, return URLs and header limits")
 PY
 
+TEST_STAGE=logout
 logout_headers="$TMP_DIR/logout.headers"
 status="$(curl --silent --show-error --output /dev/null --dump-header "$logout_headers" --write-out '%{http_code}' \
   --cookie '_sihsalus_imaging_session=allowed' "$BASE_URL/imaging/logout")"
@@ -445,6 +462,7 @@ status="$(curl --silent --show-error --output /dev/null --dump-header "$signout_
 [ "$status" = "302" ]
 grep -Eqi '^Set-Cookie: _sihsalus_imaging_session=.*Max-Age=0' "$signout_headers"
 
+TEST_STAGE=network-denial
 start_container "$DENIED_GATEWAY" -p 127.0.0.1::80 \
   -e FRAME_ANCESTORS= \
   -e 'IMAGING_NETWORK_ACCESS_CONTROL=deny all;' \
@@ -467,6 +485,7 @@ done
 
 # Start the replacement before disconnecting the old endpoint, so it must
 # receive another address. No fixed subnet or assumed Docker IP reuse is needed.
+TEST_STAGE=orthanc-dns-recovery
 OLD_IP="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$UPSTREAM")"
 start_container "${PREFIX}-replacement" --network-alias orthanc \
   -v "$TMP_DIR/upstream.conf:/etc/nginx/conf.d/default.conf:ro" \
