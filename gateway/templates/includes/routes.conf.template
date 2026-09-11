@@ -1,5 +1,5 @@
-# Clinical uploads enter through OpenMRS and retain the existing default cap.
-# Direct browser access to Orthanc/DICOMweb is restricted to reads below.
+# Clinical uploads enter through OpenMRS. Imaging has its own bounded allowance;
+# all other routes retain the existing default cap.
 client_max_body_size 100m;
 
 include /etc/nginx/includes/security-headers.conf;
@@ -149,6 +149,19 @@ location ~ ^/openmrs/ws/sihsalus/notifications/sse/?$ {
   proxy_cache off;
   proxy_read_timeout 130s;
   proxy_pass $backend;
+}
+
+# One DICOM file can contain 200,000,000 bytes, plus multipart metadata. Keep
+# this transport allowance scoped to the module's upload endpoint. OpenMRS
+# retains session/privilege checks and validates the configured file limit.
+location = /openmrs/ws/rest/v1/imaging/instances {
+  client_max_body_size 200m;
+  set $backend http://backend:8080;
+  proxy_read_timeout 300s;
+  proxy_next_upstream off;
+  proxy_pass $backend;
+  proxy_intercept_errors on;
+  error_page 502 503 504 = @backend_unavailable;
 }
 
 # OpenMRS Backend

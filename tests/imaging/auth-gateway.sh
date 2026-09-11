@@ -72,6 +72,7 @@ server {
     add_header X-Test-Upstream-Forwarded $http_forwarded always;
     add_header X-Test-Upstream-Cookie $http_cookie always;
     add_header X-Test-Upstream-Authorization $http_authorization always;
+    if ($http_x_test_backend_error = "503") { return 503; }
     default_type text/plain;
     return 200 'mock imaging upstream';
   }
@@ -151,7 +152,7 @@ curl --fail --silent --show-error "$BASE_URL/health" >/dev/null
 # the real entrypoint fallback rather than supplying the new variable here.
 for path in /grafana /grafana/ /grafana/api/health; do
   status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
-    --header 'X-Real-IP: 127.0.0.1' --cookie '_sihsalus_imaging=allowed' "$BASE_URL$path")"
+    --header 'X-Real-IP: 127.0.0.1' --cookie '_sihsalus_imaging_session=allowed' "$BASE_URL$path")"
   [ "$status" = "403" ]
 done
 
@@ -206,8 +207,10 @@ done
 
 python3 - "$BASE_URL" <<'PY'
 from http.cookies import SimpleCookie
+import socket
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -313,6 +316,44 @@ for endpoint in ("find", "count-resources", "lookup"):
 with request("/openmrs/ws/rest/v1/synthetic-imaging-write", data=b"synthetic clinical mutation") as response:
     assert response.status == 200
     assert response.headers["X-Test-Upstream-Method"] == "POST"
+
+# The upload route keeps OpenMRS authentication, query/body semantics and its
+# unavailable response. Imaging OIDC tickets do not replace clinical checks.
+upload_path = "/openmrs/ws/rest/v1/imaging/instances?configurationId=1&patient=SYNTHETIC"
+with request(upload_path, {"Cookie": "JSESSIONID=synthetic-openmrs",
+                           "Authorization": "Basic synthetic-openmrs"}, data=b"synthetic") as response:
+    assert response.status == 200
+    assert response.headers["X-Test-Upstream-URI"] == upload_path
+    assert response.headers["X-Test-Upstream-Method"] == "POST"
+    assert response.headers["X-Test-Upstream-Cookie"] == "JSESSIONID=synthetic-openmrs"
+    assert response.headers["X-Test-Upstream-Authorization"] == "Basic synthetic-openmrs"
+with request(upload_path, {"X-Test-Backend-Error": "503"}, data=b"synthetic") as response:
+    assert response.status == 503
+    assert response.headers["Retry-After"] == "30"
+
+def request_body_allowance(path, content_length):
+    # Read only the first response: 100 means Nginx accepts this Content-Length
+    # and requests the body; 413 means it rejects the size before receiving it.
+    # Closing here avoids allocating/transferring a large synthetic DICOM file.
+    address = urllib.parse.urlsplit(base)
+    with socket.create_connection((address.hostname, address.port), timeout=10) as connection:
+        connection.sendall((
+            f"POST {path} HTTP/1.1\r\nHost: {address.netloc}\r\n"
+            f"Content-Length: {content_length}\r\n"
+            "Content-Type: multipart/form-data; boundary=synthetic\r\n"
+            "Expect: 100-continue\r\nConnection: close\r\n\r\n"
+        ).encode("ascii"))
+        with connection.makefile("rb") as incoming:
+            status_line = incoming.readline(4096).decode("ascii")
+            return int(status_line.split()[1])
+
+upload_endpoint = "/openmrs/ws/rest/v1/imaging/instances"
+for size in (104857601, 200000000 + 65536, 209715200):
+    assert request_body_allowance(upload_endpoint, size) == 100, size
+assert request_body_allowance(upload_endpoint, 209715201) == 413
+for path in ("/openmrs/ws/rest/v1/patient", upload_endpoint + "/extra"):
+    assert request_body_allowance(path, 104857600) == 100, path
+    assert request_body_allowance(path, 104857601) == 413, path
 
 with request("/orthanc/ui/app?StudyInstanceUIDs=1.2.3&label=a%26b") as response:
     assert response.status == 301

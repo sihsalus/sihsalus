@@ -103,8 +103,14 @@ con el origen actual y `/orthanc`. No sustituye silenciosamente un PACS desconoc
 por otro servidor. Las credenciales internas nunca se entregan al navegador.
 
 El límite de carga de OpenMRS es `imaging.maxUploadImageDataSize`, expresado en bytes.
-El formulario permite hasta 200 000 000 bytes por archivo; alinear los límites de
-OpenMRS, Tomcat y gateway. Un timeout puede ocurrir después de almacenar una
+El formulario permite hasta 200 000 000 bytes por archivo. El gateway reserva
+`200m` exclusivamente para `/openmrs/ws/rest/v1/imaging/instances`; las demás rutas
+conservan su límite. El módulo 1.2.9 reaplica el límite del parser compartido en
+cada refresh del contexto OpenMRS y añade 64 KiB para el multipart del formulario.
+El controlador mantiene el límite exacto del archivo. Aumentar la propiedad global
+requiere refresh/reinicio y revisar también el límite del gateway. Esto conserva
+el alcance global preexistente del parser, que actúa antes de autenticación;
+no configura un segundo parser por petición. Un timeout puede ocurrir después de almacenar una
 instancia: verificar el estudio antes de volver a cargarlo, sin borrados compensatorios.
 
 ## Autenticación, permisos y realms existentes
