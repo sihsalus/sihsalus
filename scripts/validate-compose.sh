@@ -412,7 +412,8 @@ if session_store.get("entrypoint") != ["/bin/sh", "/opt/sihsalus/redis-entrypoin
     fail("Imaging Redis must load its password from the private in-memory config")
 if session_store.get("healthcheck", {}).get("test") != ["CMD", "/bin/sh", "/opt/sihsalus/redis-healthcheck.sh"]:
     fail("Imaging Redis readiness must authenticate without a password in argv")
-if session_store.get("mem_limit") != 192 * 1024 * 1024:
+# Compose serializes byte values as decimal strings in its JSON model.
+if str(session_store.get("mem_limit")) != str(192 * 1024 * 1024):
     fail("Imaging Redis container memory must remain bounded")
 if not any(entry.startswith("/data:") for entry in session_store.get("tmpfs", [])):
     fail("Imaging session data must use tmpfs, never the image's anonymous volume")

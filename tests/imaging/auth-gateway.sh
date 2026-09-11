@@ -3,13 +3,15 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMP_DIR="$(mktemp -d "$ROOT_DIR/.tmp-imaging-auth.XXXXXX")"
-PREFIX="sihsalus-imaging-auth-test-$$"
+PREFIX="sihsalus-imaging-auth-test-${TMP_DIR##*.}"
 NETWORK="${PREFIX}-network"
 UPSTREAM="${PREFIX}-upstream"
 AUTH="${PREFIX}-auth"
 GATEWAY="${PREFIX}-gateway"
 ORTHANC_PROXY="${PREFIX}-orthanc-proxy"
 DENIED_GATEWAY="${PREFIX}-denied-gateway"
+REDIS="${PREFIX}-redis"
+SYNTHETIC_REDIS_PASSWORD=0123456789abcdef0123456789abcdef0123456789abcdef
 NGINX_TEST_IMAGE="${GATEWAY_TEST_IMAGE:-nginx:1.28-alpine}"
 CREATED_CONTAINERS=()
 NETWORK_CREATED=false
@@ -32,17 +34,51 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Validate every oauth2-proxy option without contacting an identity provider.
-docker run --rm \
+start_container() {
+  local name="$1"
+  shift
+  # A failed start can leave a created container behind. Record ownership
+  # before starting it so cleanup also covers mount/entrypoint/port failures.
+  docker create --name "$name" --network "$NETWORK" "$@" >/dev/null
+  CREATED_CONTAINERS+=("$name")
+  docker start "$name" >/dev/null
+}
+
+docker network create "$NETWORK" >/dev/null
+NETWORK_CREATED=true
+# --config-test initializes Redis keys, so validate against the actual store
+# and its authenticated readiness, using only disposable synthetic state.
+start_container "$REDIS" --network-alias imaging-session-store \
+  --user redis --read-only --memory 192m \
+  --cap-drop ALL --security-opt no-new-privileges:true \
+  --tmpfs /data:rw,noexec,nosuid,size=8m,mode=1777 \
+  -e "IMAGING_REDIS_PASSWORD=$SYNTHETIC_REDIS_PASSWORD" \
+  -v "$ROOT_DIR/imaging/redis-entrypoint.sh:/opt/sihsalus/redis-entrypoint.sh:ro" \
+  -v "$ROOT_DIR/imaging/redis-healthcheck.sh:/opt/sihsalus/redis-healthcheck.sh:ro" \
+  --entrypoint /bin/sh redis:8.2.9-alpine3.22 /opt/sihsalus/redis-entrypoint.sh
+for _ in $(seq 1 30); do
+  docker exec "$REDIS" /bin/sh /opt/sihsalus/redis-healthcheck.sh >/dev/null 2>&1 && break
+  sleep 1
+done
+docker exec "$REDIS" /bin/sh /opt/sihsalus/redis-healthcheck.sh
+
+# Use the same oauth2-proxy options as Compose with synthetic credentials and
+# public URLs. The explicit OIDC endpoints avoid contacting an identity provider.
+docker run --rm --network "$NETWORK" \
   -e OAUTH2_PROXY_PROVIDER=keycloak-oidc \
   -e OAUTH2_PROXY_CLIENT_ID=sihsalus-imaging \
   -e OAUTH2_PROXY_CLIENT_SECRET=ci-imaging-client-secret \
   -e OAUTH2_PROXY_COOKIE_SECRET=QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE= \
   -e OAUTH2_PROXY_COOKIE_SECURE=false \
   -e OAUTH2_PROXY_COOKIE_NAME=_sihsalus_imaging_session \
+  -e OAUTH2_PROXY_COOKIE_HTTPONLY=true \
+  -e OAUTH2_PROXY_COOKIE_SAMESITE=lax \
+  -e OAUTH2_PROXY_COOKIE_EXPIRE=8h \
+  -e OAUTH2_PROXY_COOKIE_REFRESH=1h \
   -e OAUTH2_PROXY_SESSION_STORE_TYPE=redis \
   -e OAUTH2_PROXY_REDIS_CONNECTION_URL=redis://imaging-session-store:6379/0 \
-  -e OAUTH2_PROXY_REDIS_PASSWORD=0123456789abcdef0123456789abcdef0123456789abcdef \
+  -e "OAUTH2_PROXY_REDIS_PASSWORD=$SYNTHETIC_REDIS_PASSWORD" \
+  -e OAUTH2_PROXY_HTTP_ADDRESS=0.0.0.0:4180 \
   -e OAUTH2_PROXY_PROXY_PREFIX=/imaging/oauth2 \
   -e OAUTH2_PROXY_REDIRECT_URL=http://localhost/imaging/oauth2/callback \
   -e OAUTH2_PROXY_OIDC_ISSUER_URL=http://localhost/keycloak/realms/openmrs \
@@ -54,8 +90,17 @@ docker run --rm \
   -e 'OAUTH2_PROXY_BACKEND_LOGOUT_URL=http://keycloak:8080/realms/openmrs/protocol/openid-connect/logout?id_token_hint={id_token}' \
   -e OAUTH2_PROXY_ALLOWED_ROLES=imaging-access \
   -e OAUTH2_PROXY_EMAIL_DOMAINS='*' \
+  -e 'OAUTH2_PROXY_SCOPE=openid profile email' \
   -e OAUTH2_PROXY_CODE_CHALLENGE_METHOD=S256 \
+  -e OAUTH2_PROXY_REVERSE_PROXY=true \
+  -e OAUTH2_PROXY_TRUSTED_PROXY_IPS=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16 \
+  -e OAUTH2_PROXY_SET_XAUTHREQUEST=true \
+  -e OAUTH2_PROXY_PASS_ACCESS_TOKEN=false \
+  -e OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER=false \
+  -e OAUTH2_PROXY_PASS_USER_HEADERS=false \
+  -e OAUTH2_PROXY_SKIP_PROVIDER_BUTTON=true \
   -e OAUTH2_PROXY_UPSTREAMS=static://202 \
+  -e OAUTH2_PROXY_SILENCE_PING_LOGGING=true \
   quay.io/oauth2-proxy/oauth2-proxy:v7.15.3 \
   --config-test
 
@@ -113,22 +158,17 @@ server {
 }
 EOF
 
-docker network create "$NETWORK" >/dev/null
-NETWORK_CREATED=true
-docker run -d --name "$UPSTREAM" --network "$NETWORK" \
+start_container "$UPSTREAM" \
   --network-alias backend --network-alias frontend --network-alias ohif --network-alias orthanc \
   -v "$TMP_DIR/upstream.conf:/etc/nginx/conf.d/default.conf:ro" \
   --entrypoint nginx "$NGINX_TEST_IMAGE" -g 'daemon off;' >/dev/null
-CREATED_CONTAINERS+=("$UPSTREAM")
-docker run -d --name "$ORTHANC_PROXY" --network "$NETWORK" --network-alias orthanc-proxy \
+start_container "$ORTHANC_PROXY" --network-alias orthanc-proxy \
   -v "$ROOT_DIR/gateway/orthanc-proxy.conf:/etc/nginx/conf.d/default.conf:ro" \
   --entrypoint nginx "$NGINX_TEST_IMAGE" -g 'daemon off;' >/dev/null
-CREATED_CONTAINERS+=("$ORTHANC_PROXY")
-docker run -d --name "$AUTH" --network "$NETWORK" --network-alias imaging-auth \
+start_container "$AUTH" --network-alias imaging-auth \
   -v "$TMP_DIR/auth.conf:/etc/nginx/conf.d/default.conf:ro" \
   --entrypoint nginx "$NGINX_TEST_IMAGE" -g 'daemon off;' >/dev/null
-CREATED_CONTAINERS+=("$AUTH")
-docker run -d --name "$GATEWAY" --network "$NETWORK" -p 127.0.0.1::80 \
+start_container "$GATEWAY" -p 127.0.0.1::80 \
   -e FRAME_ANCESTORS= \
   -e 'IMAGING_NETWORK_ACCESS_CONTROL=allow 127.0.0.1; allow 10.0.0.0/8; allow 172.16.0.0/12; allow 192.168.0.0/16; deny all;' \
   -e 'IMAGING_ACCESS_CONTROL=allow 127.0.0.1; allow 10.0.0.0/8; allow 172.16.0.0/12; allow 192.168.0.0/16; deny all; auth_request /imaging/oauth2/auth; error_page 401 = @imaging_oauth_signin;' \
@@ -137,7 +177,6 @@ docker run -d --name "$GATEWAY" --network "$NETWORK" -p 127.0.0.1::80 \
   -v "$ROOT_DIR/gateway/templates:/etc/nginx/conf-templates:ro" \
   -v "$ROOT_DIR/gateway/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro" \
   --entrypoint /usr/local/bin/docker-entrypoint.sh "$NGINX_TEST_IMAGE" nginx -g 'daemon off;' >/dev/null
-CREATED_CONTAINERS+=("$GATEWAY")
 
 PORT="$(docker port "$GATEWAY" 80/tcp | awk -F: 'END { print $NF }')"
 BASE_URL="http://127.0.0.1:${PORT}"
@@ -406,7 +445,7 @@ status="$(curl --silent --show-error --output /dev/null --dump-header "$signout_
 [ "$status" = "302" ]
 grep -Eqi '^Set-Cookie: _sihsalus_imaging_session=.*Max-Age=0' "$signout_headers"
 
-docker run -d --name "$DENIED_GATEWAY" --network "$NETWORK" -p 127.0.0.1::80 \
+start_container "$DENIED_GATEWAY" -p 127.0.0.1::80 \
   -e FRAME_ANCESTORS= \
   -e 'IMAGING_NETWORK_ACCESS_CONTROL=deny all;' \
   -e 'IMAGING_ACCESS_CONTROL=deny all;' \
@@ -415,7 +454,6 @@ docker run -d --name "$DENIED_GATEWAY" --network "$NETWORK" -p 127.0.0.1::80 \
   -v "$ROOT_DIR/gateway/templates:/etc/nginx/conf-templates:ro" \
   -v "$ROOT_DIR/gateway/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro" \
   --entrypoint /usr/local/bin/docker-entrypoint.sh "$NGINX_TEST_IMAGE" nginx -g 'daemon off;' >/dev/null
-CREATED_CONTAINERS+=("$DENIED_GATEWAY")
 DENIED_PORT="$(docker port "$DENIED_GATEWAY" 80/tcp | awk -F: 'END { print $NF }')"
 for _ in $(seq 1 30); do
   curl --fail --silent --show-error "http://127.0.0.1:$DENIED_PORT/health" >/dev/null 2>&1 && break
@@ -430,10 +468,9 @@ done
 # Start the replacement before disconnecting the old endpoint, so it must
 # receive another address. No fixed subnet or assumed Docker IP reuse is needed.
 OLD_IP="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$UPSTREAM")"
-docker run -d --name "${PREFIX}-replacement" --network "$NETWORK" --network-alias orthanc \
+start_container "${PREFIX}-replacement" --network-alias orthanc \
   -v "$TMP_DIR/upstream.conf:/etc/nginx/conf.d/default.conf:ro" \
   --entrypoint nginx "$NGINX_TEST_IMAGE" -g 'daemon off;' >/dev/null
-CREATED_CONTAINERS+=("${PREFIX}-replacement")
 NEW_IP="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "${PREFIX}-replacement")"
 [ "$OLD_IP" != "$NEW_IP" ]
 docker network disconnect "$NETWORK" "$UPSTREAM"
