@@ -272,11 +272,10 @@ set -e
 assert_not_contains "$OUTPUT_FILE" "$SYNTHETIC_SECRET" "a synthetic database secret leaked to logs"
 
 # The distribution must keep the two reviewed modules that implement the
-# filter and its Legacy UI destination in both demo and no-demo packages.
+# filter and its Legacy UI destination in the canonical SIH Salus package.
 python3 - \
   "${ROOT_DIR}/backend/pom.xml" \
-  "${ROOT_DIR}/backend/distro.properties" \
-  "${ROOT_DIR}/backend/distro-no-demo.properties" <<'PY'
+  "${ROOT_DIR}/backend/distro.properties" <<'PY'
 import pathlib
 import sys
 import xml.etree.ElementTree as ET
@@ -312,16 +311,15 @@ expected_distro_lines = {
     "omod.authentication=${authentication.version}",
     "omod.legacyui=${legacyui.version}",
 }
-for distro_path_string in sys.argv[2:]:
-    distro_path = pathlib.Path(distro_path_string)
-    lines = {
-        line.strip()
-        for line in distro_path.read_text(encoding="utf-8").splitlines()
-        if line.strip() and not line.lstrip().startswith("#")
-    }
-    missing = expected_distro_lines - lines
-    if missing:
-        fail(f"{distro_path.name} is missing required modules: {sorted(missing)}")
+distro_path = pathlib.Path(sys.argv[2])
+lines = {
+    line.strip()
+    for line in distro_path.read_text(encoding="utf-8").splitlines()
+    if line.strip() and not line.lstrip().startswith("#")
+}
+missing = expected_distro_lines - lines
+if missing:
+    fail(f"{distro_path.name} is missing required modules: {sorted(missing)}")
 PY
 
 echo "[OK] forced-password runtime configuration and module contract"

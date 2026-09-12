@@ -499,7 +499,7 @@ Los logs del backend se recolectan automáticamente via Alloy y están disponibl
 
 Búsqueda en Grafana:
 ```
-Explore → Loki → {job="docker", service="backend"}
+Explore → Loki → {job="docker", service_name="backend"}
 ```
 
 ### Métricas personalizadas

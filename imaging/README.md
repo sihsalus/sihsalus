@@ -221,7 +221,6 @@ puede sincronizar y borrar candidatos de un Orthanc compartido. Un futuro harnes
 debe registrar los recursos propios, comprobar su identidad sintética antes de
 borrarlos y conservar el journal si una limpieza falla.
 
-No se ejecutaron las pruebas del nuevo cambio localmente, por instrucción del
-usuario. CI y aceptación del entorno deben registrar comando, estado, SHA,
+CI y aceptación del entorno deben registrar comando, estado, SHA,
 versiones, rol sintético y resultado de limpieza. No adjuntar DICOM, tokens ni logs
 con datos de pacientes a artefactos públicos.

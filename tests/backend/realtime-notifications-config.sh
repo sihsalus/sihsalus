@@ -6,7 +6,6 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 python3 - \
   "$ROOT_DIR/backend/pom.xml" \
   "$ROOT_DIR/backend/distro.properties" \
-  "$ROOT_DIR/backend/distro-no-demo.properties" \
   "$ROOT_DIR/gateway/templates/includes/routes.conf.template" \
   "$ROOT_DIR/backend/Dockerfile" <<'PY'
 import pathlib
@@ -48,18 +47,17 @@ if matches[0].get("version") != "${sihsalusnotifications.version}":
 if matches[0].get("scope") != "provided":
     fail("notifications OMOD dependency must use provided scope")
 
-for raw_path in sys.argv[2:4]:
-    path = pathlib.Path(raw_path)
-    properties = {}
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            key, value = line.split("=", 1)
-            properties[key] = value
-    if properties.get("omod.sihsalusnotifications") != "${sihsalusnotifications.version}":
-        fail(f"{path.name} must enable the notifications OMOD")
-    if properties.get("omod.sihsalusnotifications.groupId") != "io.github.proyecto-santaclotilde":
-        fail(f"{path.name} must resolve the notifications OMOD from the SIHSALUS group")
+path = pathlib.Path(sys.argv[2])
+properties = {}
+for raw_line in path.read_text(encoding="utf-8").splitlines():
+    line = raw_line.strip()
+    if line and not line.startswith("#") and "=" in line:
+        key, value = line.split("=", 1)
+        properties[key] = value
+if properties.get("omod.sihsalusnotifications") != "${sihsalusnotifications.version}":
+    fail(f"{path.name} must enable the notifications OMOD")
+if properties.get("omod.sihsalusnotifications.groupId") != "io.github.proyecto-santaclotilde":
+    fail(f"{path.name} must resolve the notifications OMOD from the SIHSALUS group")
 
 
 def location_body(configuration, marker):
@@ -81,34 +79,33 @@ def location_body(configuration, marker):
 
 websocket_marker = "location = /openmrs/ws/sihsalus/notifications {"
 sse_marker = "location ~ ^/openmrs/ws/sihsalus/notifications/sse/?$ {"
-for raw_path in sys.argv[4:5]:
-    path = pathlib.Path(raw_path)
-    configuration = path.read_text(encoding="utf-8")
-    websocket = location_body(configuration, websocket_marker)
-    sse = location_body(configuration, sse_marker)
+path = pathlib.Path(sys.argv[3])
+configuration = path.read_text(encoding="utf-8")
+websocket = location_body(configuration, websocket_marker)
+sse = location_body(configuration, sse_marker)
 
-    for required in (
-        "proxy_set_header HOST $http_host;",
-        "proxy_set_header Upgrade $http_upgrade;",
-        "proxy_set_header Connection $connection_upgrade;",
-        "proxy_read_timeout 1810s;",
-        "proxy_pass $backend;",
-    ):
-        if required not in websocket:
-            fail(f"{path.name} WebSocket location is missing: {required}")
+for required in (
+    "proxy_set_header HOST $http_host;",
+    "proxy_set_header Upgrade $http_upgrade;",
+    "proxy_set_header Connection $connection_upgrade;",
+    "proxy_read_timeout 1810s;",
+    "proxy_pass $backend;",
+):
+    if required not in websocket:
+        fail(f"{path.name} WebSocket location is missing: {required}")
 
-    for required in (
-        "proxy_buffering off;",
-        "proxy_cache off;",
-        "proxy_read_timeout 130s;",
-        "proxy_pass $backend;",
-    ):
-        if required not in sse:
-            fail(f"{path.name} SSE location is missing: {required}")
-    if "proxy_set_header Upgrade" in sse:
-        fail(f"{path.name} SSE location must not request a WebSocket upgrade")
+for required in (
+    "proxy_buffering off;",
+    "proxy_cache off;",
+    "proxy_read_timeout 130s;",
+    "proxy_pass $backend;",
+):
+    if required not in sse:
+        fail(f"{path.name} SSE location is missing: {required}")
+if "proxy_set_header Upgrade" in sse:
+    fail(f"{path.name} SSE location must not request a WebSocket upgrade")
 
-dockerfile = pathlib.Path(sys.argv[5]).read_text(encoding="utf-8")
+dockerfile = pathlib.Path(sys.argv[4]).read_text(encoding="utf-8")
 for required in (
     "<activator>org.openmrs.module.sihsalusnotifications.SihsalusNotificationsActivator</activator>",
     "org/openmrs/module/sihsalusnotifications/SihsalusNotificationsActivator.class",

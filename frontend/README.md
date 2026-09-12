@@ -1,237 +1,97 @@
-# Frontend - Interfaz de Usuario OpenMRS 3.x SPA
+# Runtime del frontend SIH Salus
 
-El frontend es una Single Page Application (SPA) moderna construida con React y micro-frontends (ESM).
+Este directorio ensambla y sirve la SPA publicada por `sihsalus-frontend`.
+El código de los microfrontends se mantiene en ese repositorio; aquí se configura
+su imagen runtime y su integración con el gateway.
 
-## Stack
+## Fuentes de configuración
 
-- **Framework**: OpenMRS 3.x SPA (React)
-- **Bundler**: Webpack Module Federation (micro-frontends)
-- **Servidor web**: Nginx 1.28 Alpine
-- **Locale**: Español (es) por defecto
-- **Build output**: Artefacto estático dentro de la imagen runtime, servido por gateway en `/openmrs/spa`
+| Archivo | Responsabilidad |
+| --- | --- |
+| [Dockerfile](Dockerfile) | Ensamblado desde la imagen fuente y copia al runtime Nginx |
+| [nginx.conf](nginx.conf) | Servicio de archivos, caché e identidad del nodo |
+| [patch-config-urls.js](patch-config-urls.js) | Validación del bootstrap actual y adaptación de shells heredados |
+| [frontend-keycloak.json](frontend-keycloak.json) | Configuración del login OIDC |
+| [compose/core.yml](../compose/core.yml) | Imagen, argumentos de build y healthcheck del servicio |
 
----
+La etapa `assemble` parte de `FRONTEND_SOURCE_IMAGE` y ejecuta
+`packages/tooling/scripts/assemble-importmap.js` de la imagen fuente. Genera el
+shell, importmap, rutas, configuración y assets en `/tmp/spa`. La etapa final usa
+`nginx:1.28-alpine` y sirve ese resultado desde `/usr/share/nginx/html`.
 
-## Estructura
-
-```
-frontend/
-├── Dockerfile         # Construye la imagen runtime versionada
-├── nginx.conf         # Configuración Nginx para SPA
-├── patch-config-urls.js # Valida el bootstrap actual y adapta shells heredados
-└── frontend-keycloak.json
-```
-
-## Componentes
-
-### `frontend` (Imagen runtime versionada)
-
-Imagen: `${FRONTEND_RUNTIME_IMAGE:-sihsalus-frontend-runtime}:${FRONTEND_RUNTIME_TAG:-latest}`
-
-**Rol**: Servidor HTTP ligero que ya contiene los archivos estáticos de la SPA en `/usr/share/nginx/html`.
-
-**Build**:
-- Etapa `assemble`: usa `ghcr.io/sihsalus/sihsalus-frontend:${FRONTEND_SOURCE_TAG:-latest}` para generar app shell, importmap, rutas, config y assets.
-- Etapa runtime: copia el resultado a `nginx:1.28-alpine`.
-
-**Puertos**: 80 (interno, accesible solo desde gateway)
-
-**Health check**: verifica `initializeSpa` en el bootstrap externo. Mantiene un fallback al HTML para que un rollback a una imagen heredada siga siendo posible.
-
----
-
-## Nginx Configuration
-
-### Política de Caché
-
-```nginx
-# Service Worker - NUNCA cachear
-location ~* service-worker\.js$ {
-  expires -1d;
-}
-
-# JavaScript y CSS compilados - CACHEAR 1 año
-location ~* (\.js|openmrs\.(\w*\.)?css)$ {
-  expires 1y;
-}
-
-# Archivos estáticos (imágenes, fuentes) - Revalidar
-location ~* \.(?!html?)[^.]+$ {
-  add_header Cache-Control "no-cache, must-revalidate";
-}
-
-# HTML y rutas de SPA - NUNCA cachear (sirve index.html)
-location / {
-  try_files /index.html =404;
-}
-```
-
-### Lógica de caching
-
-1. **Service Worker** (`service-worker.js`): Nunca cachear en navegador
-2. **Assets versionados** (`*.js`, `openmrs.*.css`): Cache 1 año (cambios = nuevo nombre)
-3. **Archivos estáticos** (imágenes, fuentes): Revalidar siempre
-4. **HTML/SPA**: No cachear - el navegador siempre pregunta (304 Not Modified si no cambió)
-
-### Configuración Nginx
-
-```nginx
-worker_processes auto;              # Auto-detectar núcleos disponibles
-worker_connections 1024;            # Max conexiones por worker
-keepalive_timeout 65;               # Keepalive HTTP
-sendfile on;                        # Zero-copy para archivos estáticos
-```
-
----
+El [gateway](../gateway/README.md) publica `/openmrs/spa/`, elimina ese prefijo y
+envía la solicitud al puerto interno 80 del frontend. Esto incluye
+`frontend.json`; su contenido está en la imagen frontend.
 
 ## Configuración de la SPA
 
-### Build Args
+Los argumentos de build del core fijan `/openmrs/spa` como ruta de la SPA,
+`/openmrs` como API, `es` como idioma y `/openmrs/spa/frontend.json` como
+configuración. Cambiar esos valores requiere ajustar la composición y reconstruir
+el runtime. El inventario de variables está en [.env.template](../.env.template).
 
-| Variable | Ejemplo | Descripción |
-|----------|---------|-------------|
-| `FRONTEND_SOURCE_IMAGE` | `ghcr.io/sihsalus/sihsalus-frontend:latest` | Imagen fuente con bundles y ensamblador |
-| `SPA_PATH` | `/openmrs/spa` | Path en el que está disponible la SPA |
-| `API_URL` | `/openmrs` | URL base para llamadas a API backend |
-| `SPA_CONFIG_URLS` | `/openmrs/spa/frontend.json` | Ubicación del config JSON. Fuente de verdad: `compose/core.yml`. Acepta varios JSON separados por coma; los duplicados se ignoran |
-| `SPA_DEFAULT_LOCALE` | `es` | Idioma por defecto (es, en, pt, fr, etc.) |
+`SPA_CONFIG_URLS` es obligatorio y admite varios JSON separados por comas, sin
+duplicados. El [override Keycloak](../compose/keycloak.yml) añade
+`frontend-keycloak.json`; para combinar Imaging con login local de OpenMRS, seguir
+el [contrato de autenticación](../keycloak/README.md#openmrs-local-con-keycloak-para-imaging).
 
-### Archivos de Configuración SPA
+`patch-config-urls.js` exige que el bootstrap externo
+`sihsalus-spa-bootstrap.js` ya contenga las URLs solicitadas. Una discrepancia
+detiene el build, sin reescribir ese artefacto. Para una imagen heredada con
+inicialización inline, adapta el único inicializador de `index.html`.
 
-**`frontend.json`** (ubicación: `${SPA_CONFIG_URLS}`)
+`STRIP_SOURCE_MAPS=true` elimina los archivos `*.map` del runtime por defecto.
+`SIHSALUS_NODE_ID` se incorpora a la imagen y a la cabecera
+`X-SIHSALUS-Node-ID` de los archivos de control; la operación de despliegue valida
+la identidad esperada del entorno.
 
-Define:
-- Micro-frontends (módulos ESM) a cargar
-- Configuración de módulos
-- Rutas y navegación
-- Integraciones con terceros
+## Caché y rutas
 
-**Ubicación típica**: `/openmrs/spa/frontend.json` (servida por backend OpenMRS)
+La política canónica está en [nginx.conf](nginx.conf):
 
----
+- Los archivos de control, incluidos `service-worker.js`, `importmap.json`,
+  `frontend.json` y `build-info.json`, usan `no-cache, no-store, must-revalidate`.
+- Los assets JS/CSS con hash de contenido usan
+  `public, max-age=31536000, immutable`. Los JS/CSS sin hash y los demás archivos
+  estáticos usan `no-cache, no-store, must-revalidate`.
+- Los archivos estáticos ausentes devuelven 404. Las rutas de navegación de la
+  SPA sirven `index.html` con la misma política de no almacenamiento.
 
-## Build y Deployment
+Las cabeceras de seguridad, CSP y HTTPS se mantienen en el
+[gateway](../gateway/README.md) y en el [runbook HTTPS](../docs/operations/https.md).
 
-### Build local
+## Build y operación
 
-```bash
+Desde la raíz del repositorio, conservando la
+[composición del entorno](../compose/README.md#configuración-persistente-en-servidores):
+
+```sh
 docker compose build frontend
 ```
 
-Con Docker Bake:
+El target `frontend` de [Docker Bake](../docker-bake.hcl) también construye el
+wrapper con sus propios argumentos declarados.
 
-```bash
-TAG=2026-05-13 FRONTEND_SOURCE_TAG=latest docker buildx bake frontend
+Para actualizar o revertir un entorno, seguir la
+[guía de despliegue](../scripts/deploy/README.md). El procedimiento valida el SHA y
+digest de la imagen fuente, reconstruye y recrea exclusivamente `frontend`,
+comprueba salud, revisión e identidad del nodo y conserva la recuperación de la
+imagen anterior.
+
+El healthcheck busca `initializeSpa` en el bootstrap externo y admite el HTML
+heredado para conservar el rollback. La aceptación de la SPA requiere además
+comprobar en el navegador el login, los assets y los errores JavaScript de la
+revisión desplegada.
+
+## Pruebas
+
+Desde la raíz:
+
+```sh
+node --test frontend/patch-config-urls.test.js
 ```
 
-### Deploy y rollback
-
-```bash
-FRONTEND_RUNTIME_TAG=2026-05-13 docker compose up -d frontend gateway
-```
-
-Rollback:
-
-```bash
-FRONTEND_RUNTIME_TAG=tag-anterior docker compose up -d frontend gateway
-```
-
----
-
-## Troubleshooting
-
-### "404 not found en /openmrs/spa"
-
-1. Verifica que `frontend` esté healthy:
-   ```bash
-   docker compose ps frontend
-   ```
-2. Revisa que la imagen tenga el shell correcto:
-   ```bash
-   docker compose exec frontend \
-     wget -q -O - http://127.0.0.1/sihsalus-spa-bootstrap.js |
-     grep initializeSpa
-   ```
-3. Revisa logs del gateway:
-   ```bash
-   docker compose logs gateway
-   ```
-
-### Cambios en configuración no aparecen
-
-- **Assets versionados** (`.js`, `.css`): Limpiar caché del navegador (Ctrl+Shift+Delete)
-- **frontend.json**: reconstruir la imagen `frontend` o hacer hard refresh (Ctrl+F5)
-- **nginx.conf**: reconstruir la imagen `frontend`
-  ```bash
-  docker compose build frontend
-  docker compose up -d frontend gateway
-  ```
-
-### Errores JavaScript en SPA
-
-```bash
-# Ver logs del navegador
-# F12 → Console → Errors
-
-# Revisar que los micro-frontends se cargan
-# F12 → Network → Type: script
-
-# Log de Nginx frontend
-docker compose logs frontend
-```
-
-### Rendimiento lento
-
-1. **Cache headers correctamente configurados**: Usa DevTools para verificar
-2. **Compresión gzip**: Nginx no comprime por defecto en alpine, agregar si necesario
-3. **Versionado de assets**: Los cambios en JS/CSS deben generar nuevos nombres
-
----
-
-## Personalización
-
-### Cambiar idioma por defecto
-
-```bash
-# En .env o docker-compose override:
-SPA_DEFAULT_LOCALE=en    # Inglés
-# Valores: es, en, pt, fr, etc.
-```
-
-### Agregar headers de seguridad
-
-Editar [nginx.conf](nginx.conf) para agregar headers:
-
-```nginx
-add_header X-Content-Type-Options "nosniff";
-add_header X-Frame-Options "SAMEORIGIN";
-add_header X-XSS-Protection "1; mode=block";
-add_header Referrer-Policy "no-referrer-when-downgrade";
-```
-
-### HTTPS en producción
-
-Ver [compose/ssl.yml](../compose/ssl.yml) para agregar certificados.
-
----
-
-## Desarrollo de Micro-frontends
-
-OpenMRS 3.x permite agregar micro-frontends personalizados sin recompilar todo.
-
-**Ubicación**: Definidos en `frontend.json` (ver configuración SPA)
-
-**Ejemplos**:
-- Forms
-- Dashboards
-- Módulos custom
-
-Ver [OpenMRS ESM Documentation](https://openmrs.org/wiki/) para crear módulos.
-
----
-
-## Links relacionados
-
-- [Configuración del Gateway](../gateway/README.md)
-- [Docker Compose Profiles](../compose/README.md#core-coreymlobligatorio)
-- [Solución de problemas general](../README.md#solución-de-problemas)
+La prueba [cache-policy.sh](../tests/frontend/cache-policy.sh) usa Nginx real con
+fixtures locales y requiere Docker activo. Cubre archivos mutables, assets con
+hash, rutas SPA y adaptación de metadatos sociales al host. Ambas comprobaciones
+forman parte de CI.

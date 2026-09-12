@@ -5,10 +5,8 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/build-backend.yml'
-      - 'Dockerfile'
       - 'pom.xml'
       - 'backend/**'
-      - 'distro/**'
       - 'tests/backend/ocl-token-image.sh'
       - 'tests/backend/forced-password-image.sh'
       - 'tests/backend/tomcat-config-config.sh'
@@ -19,6 +17,8 @@ on:
       - 'tests/backend/source-omods-image.sh'
       - 'tests/backend/module-dependencies-image.sh'
       - 'tests/backend/ModuleDependencyVerifier.java'
+      - 'tests/backend/vulnerability-ratchet.sh'
+      - 'tests/backend/vulnerability-ratchet-config.sh'
   workflow_dispatch:
 
 concurrency:
@@ -152,43 +152,7 @@ jobs:
           vuln-type: os,library
 
       - name: Enforce backend vulnerability ratchet
-        run: |
-          set -euo pipefail
-          candidate_total="$(jq '[.Results[]? | (.Vulnerabilities // [])[]] | length' trivy-backend-candidate.json)"
-          baseline_total="$(jq '[.Results[]? | (.Vulnerabilities // [])[]] | length' trivy-openmrs-baseline.json)"
-          candidate_os="$(jq '[.Results[]? | select(.Class == "os-pkgs") | (.Vulnerabilities // [])[]] | length' trivy-backend-candidate.json)"
-          unexpected="$(
-            jq -n \
-              --slurpfile candidate trivy-backend-candidate.json \
-              --slurpfile baseline trivy-openmrs-baseline.json \
-              'def findings($report):
-                 [$report[0].Results[]? | (.Vulnerabilities // [])[] |
-                  "\(.VulnerabilityID)|\(.PkgName)|\(.InstalledVersion)"] | unique;
-               findings($candidate) - findings($baseline)'
-          )"
-          unexpected_total="$(jq 'length' <<<"${unexpected}")"
-
-          {
-            echo '### Backend vulnerability ratchet'
-            echo "- Candidate HIGH/CRITICAL findings: ${candidate_total}"
-            echo "- Upstream OpenMRS baseline findings: ${baseline_total}"
-            echo "- Candidate OS findings with fixes: ${candidate_os}"
-            echo "- Findings added beyond upstream: ${unexpected_total}"
-          } >>"${GITHUB_STEP_SUMMARY}"
-
-          if [[ "${candidate_os}" != '0' ]]; then
-            echo '::error::The backend still contains fixable HIGH/CRITICAL operating-system vulnerabilities.'
-            jq -r '.Results[]? | select(.Class == "os-pkgs") | (.Vulnerabilities // [])[] |
-              "\(.Severity) \(.VulnerabilityID) \(.PkgName) \(.InstalledVersion) -> \(.FixedVersion)"' \
-              trivy-backend-candidate.json
-            exit 1
-          fi
-
-          if [[ "${unexpected_total}" != '0' ]]; then
-            echo '::error::The SIHSALUS backend adds HIGH/CRITICAL vulnerabilities beyond its pinned OpenMRS base.'
-            jq -r '.[]' <<<"${unexpected}"
-            exit 1
-          fi
+        run: bash tests/backend/vulnerability-ratchet.sh trivy-backend-candidate.json trivy-openmrs-baseline.json
 
       - name: Produce backend Trivy evidence
         if: ${{ always() && steps.build.outcome == 'success' && steps.build.outputs.digest != '' }}
