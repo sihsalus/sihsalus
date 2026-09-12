@@ -55,7 +55,7 @@
     <imaging.version>1.2.8</imaging.version>
     <sihsalusnotifications.version>1.2.0</sihsalusnotifications.version>
     <!-- Content Packages -->
-    <sihsalus-content.version>1.25.15</sihsalus-content.version>
+    <sihsalus-content.version>1.25.19</sihsalus-content.version>
   </properties>
 
   <dependencies>
