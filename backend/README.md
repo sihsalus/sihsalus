@@ -1,133 +1,123 @@
-_Packages a distribution of configs, metadata and binaries to run OpenMRS_
+# OpenMRS backend distribution
 
------
+This directory packages the Core WAR, OMODs and Initializer content into the
+backend image. Build from the repository root:
 
 ```bash
-mvn clean package
+docker buildx bake backend
 ```
 
-Output:
+[Dockerfile](Dockerfile) prepares module artifacts in a build-only Maven cache
+before building the `backend` profile. [pom.xml](pom.xml) owns versions;
+[distro.properties](distro.properties) selects modules and content packages.
+The SDK writes `backend/target/sdk-distro`, packaged by the
+[assembly descriptor](src/main/assembly/assembly.xml).
 
-`target/openmrs-distro-package/openmrs-distro-package-$version.zip`
+Initializer metadata comes from the selected content packages. SPA configuration
+belongs to the [frontend build](../frontend/README.md). Runtime setup, including
+OCL token reconciliation, lives in the [root README](../README.md); password
+policy is documented in the [forced-password-change contract](../docs/operations/forced-password-change.md).
 
-Package contents:
+## Module ownership
 
-|File or Directory|Description|
-|-----------------|-----------|
-|`openmrs_config` |The OpenMRS configuration, particularly including any files to be processed by the [Initializer module](https://github.com/mekomsolutions/openmrs-module-initializer). An example configuration can be found [here](https://github.com/mekomsolutions/openmrs-config-haiti).
-|`openmrs_core`   |The main OpenMRS WAR file.|
-|`openmrs_modules`|The modules (OMODs) to be run in this OpenMRS instance.|
-|`spa`            |The compiled SPA for the 3.x frontend.|
-|`spa_config`     |Any configuration files used by the SPA.|
-|`openmrs-distro.properties`|The distro.properties used to generate this package.|
+The following repositories own their Java changes, patches, regression tests,
+OMOD compilation and releases:
 
-----
+| Module | Owning repository | Dockerfile version / POM property |
+| --- | --- | --- |
+| O3 Forms | [openmrs-module-o3forms](https://github.com/sihsalus/openmrs-module-o3forms) | `O3FORMS_VERSION` / `o3forms.version` |
+| REST | [openmrs-module-webservices.rest](https://github.com/sihsalus/openmrs-module-webservices.rest/tree/sihsalus-2.8) | `REST_VERSION` / `webservices.rest.version` |
+| EMR API | [openmrs-module-emrapi](https://github.com/sihsalus/openmrs-module-emrapi/tree/sihsalus-2.8) | `EMRAPI_VERSION` / `emrapi.version` |
 
-### Specifying dependencies
-#### OpenMRS modules
-`omod`s are specified as Maven `<dependency>` in the [pom.xml](pom.xml) file.
+The image consumes their published OMODs with literal SHA-256 pins. Do not compile
+or patch them here, add them to `omod-sources.lock`, or install them manually into
+a running instance. Historical distribution patches remain recoverable from Git.
 
-O3 Forms is an explicitly versioned binary dependency published by
-[`sihsalus/openmrs-module-o3forms`](https://github.com/sihsalus/openmrs-module-o3forms/releases).
-Its Java source, patch, tests and OMOD compilation belong in that repository.
-The backend image build downloads the released OMOD using a literal SHA-256 pin
-in `Dockerfile` and registers those exact bytes in its build-only Maven cache
-before packaging the distribution. No O3 Forms source patch, compilation or
-manual runtime-module installation takes place here.
+Publish and verify a tested immutable module release first, then update its
+Dockerfile version, checksum and POM property together. Version automation must
+preserve these pins; temporary CI artifacts, moving URLs and overwritten releases
+are not substitutes. Each module's `SIHSALUS-RELEASE.md` records provenance and
+release verification. SIH Salus prereleases are not official OpenMRS releases.
 
-To update it, approve and publish the module release first, then change
-`o3forms.version`, `O3FORMS_VERSION` and the Dockerfile checksum together. Do not
-use a short-lived CI artifact or a moving download URL. The configuration test
-checks this dependency contract; the image test checks the packaged OMOD's
-checksum, module identity and nested API version. Version automation must not
-replace this pin independently.
+Preserve O3 Forms' null-locale translation handling and REST's Core 2.8-compatible
+`javax` base with UTF-8/plain-text/`nosniff` responses. EMR API rolls back the entire
+automatic visit-closure batch on its first save or validation failure; it does not
+repair clinical rows or correct timestamp policy. Keep automatic closure paused
+pending actual OpenMRS + Queue integration, an agreed timestamp policy and
+synthetic DEV/QLTY acceptance. An image update does not authorize reactivation.
 
-#### Independently released REST and EMR API
+## Source-built modules
 
-REST and EMR API follow the same owned-release pattern in
-[`sihsalus/openmrs-module-webservices.rest`](https://github.com/sihsalus/openmrs-module-webservices.rest)
-and [`sihsalus/openmrs-module-emrapi`](https://github.com/sihsalus/openmrs-module-emrapi).
-Their Java changes, regressions and CI release builds live only in those repos.
-The backend consumes the published OMODs, with literal SHA-256 pins and explicit
-versions. Do not reintroduce them into `omod-sources.lock` or apply build-time patches.
+[omod-sources.lock](omod-sources.lock) pins the remaining upstream source revisions,
+archive checksums and distribution versions. The [build script](bin/build-source-omods.sh)
+builds them without external patches; source pins and POM versions must move
+together. BedManagement has a separate source/checksum pin in the Dockerfile.
 
-Update `REST_VERSION`/`EMRAPI_VERSION`, the corresponding Dockerfile checksum and
-POM property together, only after a tested immutable module release is published.
-`python3 tests/backend/owned-module-releases.py --self-test` checks the contract;
-the image gate checks the packaged bytes against those same checksums.
-
-EMR API 3.5.1-sihsalus.1 is a containment prerelease: a failed automatic visit
-closure rolls back the entire batch. It does not correct timestamp policy,
-repair clinical rows, or authorize scheduler reactivation. Actual OpenMRS + Queue
-integration and synthetic DEV/QLTY acceptance remain necessary before deployment.
-See [module ownership and safety requirements](patches/README.md).
-
-#### Required module compatibility gate
-
-Before promotion, CI checks every packaged OMOD's required module dependencies
-by package identity and minimum version using `ModuleUtil.compareVersion` from
-the exact Core WAR in the image. This is a test-only harness; it does not compile
-module/application source, start OpenMRS, attach runtime data or contact a database.
-Optional dependencies are not treated as required. Missing/duplicate module
-identities, malformed descriptors and incompatible required versions fail closed.
+Run from the repository root with Maven and the appropriate JDK:
 
 ```bash
+bash backend/bin/build-source-omods.sh package
+bash backend/bin/build-source-omods.sh test MODULE
+bash backend/bin/build-source-omods.sh test-core28 initializer
+```
+
+Packaging uses Java 21 and compiles sibling test JARs required by upstream
+reactors. Tests use Java 21 except Initializer: first install its full reactor
+with `test initializer` on Java 11, then run `test-core28 initializer` on Java 21
+using the same Maven repository. `OMOD_MAVEN_REPOSITORY` selects an isolated cache;
+`OMOD_TEST_REPORTS` selects the Surefire evidence directory.
+
+## Distribution checks
+
+Run these static checks from the repository root, without a backend or database:
+
+```bash
+bash tests/backend/o3forms-release-config.sh
+python3 tests/backend/owned-module-releases.py --self-test
+bash tests/backend/tomcat-config-config.sh
+```
+
+For an already-built local image, CI checks release bytes, descriptor/API versions,
+compiled protections, required module dependencies and Tomcat permissions:
+
+```bash
+bash tests/backend/o3forms-release-image.sh IMAGE
+bash tests/backend/source-omods-image.sh IMAGE
 bash tests/backend/module-dependencies-image.sh IMAGE
-# Offline alternatives using distribution artifacts only:
+bash tests/backend/tomcat-config-image.sh IMAGE
+```
+
+The required-module gate uses `ModuleUtil.compareVersion` from the exact Core WAR.
+Missing/duplicate identities, malformed descriptors and incompatible required
+versions fail; optional dependencies are not required. Core rejects
+`2.3.0-sihsalus.1` for Patient Documents' O3 Forms minimum `2.3.0`; the pinned
+`2.3.1-sihsalus.1` meets that minimum, but not a future minimum of `2.3.1`.
+
+This gate requires a JDK (CI uses 21), compiles only a test harness and extracts
+files from an unstarted, network-isolated container, removing it and its anonymous
+volumes afterward. It never accesses deployed data. Offline alternatives:
+
+```bash
 bash tests/backend/module-dependencies-image.sh --files PATH_TO_WAR MODULES_DIRECTORY
 bash tests/backend/module-dependencies-image.sh --self-test PATH_TO_WAR
 ```
 
-The gate requires a JDK (CI uses 21); image mode additionally requires Docker.
-It creates an unstarted, network-isolated container and removes that test container
-and its anonymous volumes afterward. It never reads a deployed instance's data.
-The self-test exercises synthetic OMOD descriptors against the actual Core
-comparator, including Patient Documents requiring O3 Forms `>=2.3.0`.
+Tomcat's empty `/usr/local/tomcat/conf/Catalina/localhost` must be owned by `1001:0`,
+mode `0750`; `conf` and `Catalina` stay root-owned, mode `0755`. Do not make the
+configuration tree writable or disable directory validation. Its image check runs
+only a shell as UID 1001, without network or mounted runtime data, and removes its
+test container and anonymous volumes.
 
-Core rejects `2.3.0-sihsalus.1` for that minimum even if O3 Forms itself starts.
-The pinned correction
-[`2.3.1-sihsalus.1`](https://github.com/sihsalus/openmrs-module-o3forms/releases/tag/2.3.1-sihsalus.1)
-is an immutable prerelease that satisfies `2.3.0`, but not a future minimum of
-`2.3.1`. It preserves the null-locale form translation fix. Its published OMOD,
-checksum and signed provenance were verified before updating both version pins
-and the Dockerfile checksum. The image gate must still validate the actual
-packaged distribution; do not overwrite the old release or bypass the gate.
+## Deployment and acceptance
 
-Static dependency acceptance is not module-start or clinical acceptance. After
-an explicitly authorized deployment, separately verify O3 Forms, REST and Patient
-Documents are started and test synthetic form open/save/edit flows in DEV before
-coordinating QLTY.
+Branch builds publish immutable SHA/digests; successful main builds promote
+`latest`. Static/image checks and release publication do not authorize clinical
+deployment or prove module startup and clinical behavior.
 
-Deploy only the tested backend image by SHA and OCI digest using the
-[backend-only procedure](../scripts/deploy/README.md#backend-únicamente), with
-synthetic DEV acceptance before QLTY. Preserve the prior image for rollback.
-
-#### OpenMRS Configuration (Initializer)
-OpenMRS config can be set under [`backend/config/openmrs_config/`](config/openmrs_config/) when present.
-
-#### Tomcat rootless configuration directory
-
-The image prepares the empty default Host XML base at
-`/usr/local/tomcat/conf/Catalina/localhost` before switching to UID 1001.
-Only that directory is owned by `1001:0` with mode `0750`; `conf` and `Catalina`
-remain root-owned with mode `0755`. Do not make the entire configuration tree
-writable or disable Tomcat's directory creation/validation to hide startup errors.
-
-```bash
-bash tests/backend/tomcat-config-config.sh
-bash tests/backend/tomcat-config-image.sh IMAGE
-```
-
-The first test is offline. The second requires Docker and an already-built local
-image; it runs only a shell with no network, no application startup and no mounted
-runtime data. It checks the default user, real paths, ownership, modes and access,
-then removes its test container and anonymous volumes. CI runs both gates before
-promotion. These checks do not replace startup and clinical acceptance testing.
-
-#### Micro Frontends
-SPA-related configuration is driven by the distro build and the frontend package in this repository.
-
-#### Micro Frontends configuration
-MF Config can be set under the frontend or distro configuration used by the build.
-
-----
+Use the [backend-only procedure](../scripts/deploy/README.md#backend-únicamente)
+with the tested SHA and OCI digest, retaining the previous image for rollback.
+Back up the database before startup: an image rollback does not reverse schema
+migrations. Verify O3 Forms, REST and Patient Documents start and exercise the
+affected API, synthetic form open/save/edit and visit flows in DEV before QLTY
+on the same digest. Production restart and scheduler activation require separate
+approval.

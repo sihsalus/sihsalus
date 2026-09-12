@@ -1,8 +1,7 @@
 # syntax=docker/dockerfile:1
 
 ARG OPENMRS_BUILD_IMAGE=openmrs/openmrs-core:2.8.x-dev-amazoncorretto-21
-# Pin the multi-arch runtime used by Reference Application 3.7.1. The Core
-# 2.8.8 WAR is copied below; its exact runtime tag contains a reverted DB check.
+# Keep the runtime base pinned; the distribution supplies its own Core WAR.
 ARG OPENMRS_RUNTIME_IMAGE=openmrs/openmrs-core:2.8.x-amazoncorretto-21@sha256:7f08dd72400c08d4fbf584cc9ac7cf17d96a2ae5fa0c43b4dc60a40ea7d0b760
 
 ### Build Stage
@@ -15,7 +14,6 @@ ARG MVN_ARGS="install"
 
 # Copy build files
 COPY pom.xml ./
-COPY backend/pom.xml ./backend/
 
 # O3 Forms is compiled and released by its owning module repository.
 # Infrastructure consumes only the immutable, checksum-pinned release binary.
@@ -41,10 +39,6 @@ ARG BEDMANAGEMENT_SOURCE_SHA=f7ceac08204d4239814b9978eaf7dadd8e6a62c7
 ADD --checksum=sha256:428cddc778eb382f91eafa2156117b090fc75b11202919376bb615ff3d125874 \
     https://github.com/sihsalus/openmrs-module-bedmanagement/archive/${BEDMANAGEMENT_SOURCE_SHA}.tar.gz \
     /tmp/bedmanagement-source.tar.gz
-# Pre-download all dependencies into the BuildKit cache.
-RUN --mount=type=cache,target=/root/.m2/repository \
-    mvn $MVN_ARGS_SETTINGS dependency:resolve -B || true
-
 COPY backend ./backend/
 
 # Build the private BedManagement artifact and the distro in the same cache
@@ -140,32 +134,14 @@ RUN echo "Security refresh: ${SECURITY_REFRESH}" && \
     yum clean all && \
     rm -rf /var/cache/yum
 
-COPY backend/bin/configure-ocl-token.sh /tmp/sihsalus-backend-bin/configure-ocl-token.sh
-COPY backend/bin/configure-forced-password-change.sh /tmp/sihsalus-backend-bin/configure-forced-password-change.sh
+COPY --chmod=0555 backend/bin/configure-ocl-token.sh \
+    backend/bin/configure-forced-password-change.sh /usr/local/bin/
 
 # The pinned OpenMRS runtime quotes the wildcard used to clear distribution
 # directories, so removed modules and metadata survive in the persistent volume.
 # Keep the upstream safety guard while allowing the wildcard to expand.
-RUN test -s /tmp/sihsalus-backend-bin/configure-ocl-token.sh && \
-    test -s /tmp/sihsalus-backend-bin/configure-forced-password-change.sh && \
-    [ "$(head -n 1 /tmp/sihsalus-backend-bin/configure-ocl-token.sh)" = '#!/usr/bin/env bash' ] && \
-    [ "$(head -n 1 /tmp/sihsalus-backend-bin/configure-forced-password-change.sh)" = '#!/usr/bin/env bash' ] && \
-    grep -qF 'strip_ocl_property() {' /tmp/sihsalus-backend-bin/configure-ocl-token.sh && \
-    bash -n /tmp/sihsalus-backend-bin/configure-ocl-token.sh && \
-    bash -n /tmp/sihsalus-backend-bin/configure-forced-password-change.sh && \
-    install -m 0555 \
-      /tmp/sihsalus-backend-bin/configure-ocl-token.sh \
-      /usr/local/bin/configure-ocl-token.sh && \
-    install -m 0555 \
-      /tmp/sihsalus-backend-bin/configure-forced-password-change.sh \
-      /usr/local/bin/configure-forced-password-change.sh && \
-    cmp -s \
-      /tmp/sihsalus-backend-bin/configure-ocl-token.sh \
-      /usr/local/bin/configure-ocl-token.sh && \
-    cmp -s \
-      /tmp/sihsalus-backend-bin/configure-forced-password-change.sh \
-      /usr/local/bin/configure-forced-password-change.sh && \
-    rm -rf /tmp/sihsalus-backend-bin && \
+RUN bash -n /usr/local/bin/configure-ocl-token.sh && \
+    bash -n /usr/local/bin/configure-forced-password-change.sh && \
     sed -i \
       -e 's|rm -fR "${OMRS_MODULES_DIR:?}/\*"|rm -fR "${OMRS_MODULES_DIR:?}"/*|' \
       -e 's|rm -fR "${OMRS_OWA_DIR:?}/\*"|rm -fR "${OMRS_OWA_DIR:?}"/*|' \
@@ -185,7 +161,6 @@ RUN test -s /tmp/sihsalus-backend-bin/configure-ocl-token.sh && \
     tail -n 1 /openmrs/startup-init.sh \
       | grep -qxF '/usr/local/bin/configure-forced-password-change.sh "$OMRS_SERVER_PROPERTIES_FILE" "$OMRS_RUNTIME_PROPERTIES_FILE"'
 
-# Do not copy the war if using the correct openmrs-core image version
 COPY --from=dev /openmrs/distribution/openmrs_core/openmrs.war /openmrs/distribution/openmrs_core/
 
 COPY --from=dev /openmrs/distribution/openmrs-distro.properties /openmrs/distribution/

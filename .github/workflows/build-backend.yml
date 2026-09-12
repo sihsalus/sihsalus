@@ -5,10 +5,8 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/build-backend.yml'
-      - 'Dockerfile'
       - 'pom.xml'
       - 'backend/**'
-      - 'distro/**'
       - 'tests/backend/ocl-token-image.sh'
       - 'tests/backend/forced-password-image.sh'
       - 'tests/backend/tomcat-config-config.sh'
