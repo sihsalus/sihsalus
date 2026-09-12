@@ -225,11 +225,5 @@
         <module>backend</module>
       </modules>
     </profile>
-    <profile>
-      <id>frontend</id>
-      <modules>
-        <module>frontend</module>
-      </modules>
-    </profile>
   </profiles>
 </project>

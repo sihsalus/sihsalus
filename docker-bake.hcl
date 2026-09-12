@@ -3,7 +3,7 @@
 // ===========================================
 //
 // USAGE:
-//   docker buildx bake                 # Build core (backend, gateway)
+//   docker buildx bake                 # Build core (backend, gateway, frontend)
 //   docker buildx bake all             # Build all targets
 //   docker buildx bake backend         # Build single target
 //   docker buildx bake --print         # Show resolved build config (dry-run)
