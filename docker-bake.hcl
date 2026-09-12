@@ -17,7 +17,7 @@ variable "REGISTRY" {
 }
 
 variable "FRONTEND_SOURCE_TAG" {
-  default = "latest"
+  default = "sha-6cadce5b8a225bc6fe0715b9ff085ced5f9feacf@sha256:ada19c77f8d27ea50e89db4fdae7287bbdf3a51c9fab8ac95dd82eba36d9a28c"
 }
 
 // ---- Shared base ----
