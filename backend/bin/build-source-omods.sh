@@ -67,6 +67,8 @@ while read -r module repository revision checksum upstream_version version extra
     "${MAVEN[@]}" -f "$source_dir/pom.xml" "${args[@]}" install
   fi
   save_reports
+  # Reports are already saved; a later download failure must not reuse this source.
+  source_dir=""
   echo "[source-omods] verified $module $version"
 done < "$ROOT/omod-sources.lock"
 [[ "$matched" == true ]] || { echo "Unknown source module: $SELECTED_MODULE" >&2; exit 2; }
