@@ -16,6 +16,7 @@
 | Logs | `--profile monitoring --profile logs` | Alloy mediante proxy Docker API de solo lectura |
 | Réplica | `--profile replica` | Réplica MariaDB para contingencia |
 | Keycloak | `-f compose/keycloak.yml --profile keycloak` | Activa OIDC en frontend/backend y agrega Keycloak |
+| OpenMRS local con Keycloak | `-f compose/openmrs-local-auth.yml` después de Keycloak | Conserva login local de OpenMRS y OIDC individual de Imaging |
 | HTTPS | `-f compose/ssl.yml --profile ssl` | Modifica gateway y agrega certbot |
 | Status | `-f compose/status.yml --profile status` | Panel local Gatus |
 
@@ -74,6 +75,9 @@ docker compose ps
 - El core conserva defaults solo para desarrollo local.
 - El core puede renderizar sin secretos de profiles opcionales. Al activar un profile, su servicio o `security-audit.sh` rechaza credenciales vacías.
 - `OAUTH2_ENABLED` no se configura en `.env`: core lo fija en `false` y `compose/keycloak.yml` lo cambia a `true`.
+- `compose/openmrs-local-auth.yml` permite conservar autenticación local al usar
+  Keycloak para Imaging. Se carga después de `compose/keycloak.yml`; consultar
+  [orden, compatibilidad y transición](../keycloak/README.md#openmrs-local-con-keycloak-para-imaging).
 - `SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED` vale `true` por defecto para autenticación local. `false` desactiva el filtro backend y requiere recrearlo; el rollback completo también debe restaurar el frontend coordinado. OAuth2 siempre desactiva el filtro local.
 - En producción se usan tags inmutables, no `latest`.
 - `DOCS_IMAGE_REF` fija por digest el portal de ayuda público-seguro. El gateway

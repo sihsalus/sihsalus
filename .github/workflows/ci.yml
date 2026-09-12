@@ -65,7 +65,7 @@ jobs:
           fi
 
           if [ "$can_diff" = "true" ] \
-            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml docker-compose.yml compose/core.yml compose/keycloak.yml compose/imaging.yml compose/imaging-auth.yml compose/ssl.yml gateway/ keycloak/ imaging/ tests/imaging/ tests/keycloak/; then
+            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml docker-compose.yml compose/core.yml compose/keycloak.yml compose/openmrs-local-auth.yml compose/imaging.yml compose/imaging-auth.yml compose/ssl.yml gateway/ keycloak/ imaging/ tests/imaging/ tests/keycloak/; then
             imaging=false
           fi
 

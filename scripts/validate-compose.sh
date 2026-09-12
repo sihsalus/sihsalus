@@ -186,7 +186,9 @@ print("[OK] explicit Grafana network policy reaches the gateway")
 PY
 validate replica -f docker-compose.yml --profile replica
 validate keycloak -f docker-compose.yml -f compose/keycloak.yml --profile keycloak
+validate keycloak-local-auth -f docker-compose.yml -f compose/keycloak.yml -f compose/openmrs-local-auth.yml --profile keycloak
 validate imaging-auth -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml --profile keycloak --profile imaging
+validate imaging-local-auth -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml -f compose/openmrs-local-auth.yml --profile keycloak --profile imaging
 validate status -f docker-compose.yml -f compose/status.yml --profile status
 validate ssl -f docker-compose.yml -f compose/ssl.yml --profile ssl
 validate seed -f docker-compose.yml -f compose/seed.yml --profile seed --profile fua
@@ -203,6 +205,19 @@ OPENMRS_REDIRECT_URI=https://sihsalus.example.test/openmrs/* \
 IMAGING_OAUTH_REDIRECT_URI=https://sihsalus.example.test/imaging/oauth2/callback \
 IMAGING_OAUTH_COOKIE_SECURE=true \
 validate imaging-auth-ssl -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml -f compose/ssl.yml --profile keycloak --profile imaging --profile ssl
+KEYCLOAK_MODE=production \
+KEYCLOAK_PUBLIC_URL=https://sihsalus.example.test/keycloak \
+KC_HOSTNAME=https://sihsalus.example.test/keycloak \
+OPENMRS_REDIRECT_URI=https://sihsalus.example.test/openmrs/* \
+IMAGING_OAUTH_REDIRECT_URI=https://sihsalus.example.test/imaging/oauth2/callback \
+IMAGING_OAUTH_COOKIE_SECURE=true \
+validate imaging-local-auth-ssl -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml -f compose/ssl.yml -f compose/openmrs-local-auth.yml --profile keycloak --profile imaging --profile ssl
+validate imaging-auth-fua -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml --profile keycloak --profile imaging --profile fua
+validate imaging-local-auth-fua -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml -f compose/openmrs-local-auth.yml --profile keycloak --profile imaging --profile fua
+SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED=false \
+validate imaging-local-auth-rollback -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml -f compose/openmrs-local-auth.yml --profile keycloak --profile imaging
+
+python3 tests/keycloak/local-auth-config.py "$EVIDENCE_DIR"
 
 python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/fua.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" "$EVIDENCE_DIR/imaging.json" "$EVIDENCE_DIR/keycloak-ssl.json" "$EVIDENCE_DIR/monitoring-logs.json" "$EVIDENCE_DIR/imaging-auth.json" "$EVIDENCE_DIR/imaging-auth-ssl.json" "$EVIDENCE_DIR/seed.json" "$EVIDENCE_DIR/local-auth-rollback.json" keycloak/realm-export.json <<'PY'
 import json

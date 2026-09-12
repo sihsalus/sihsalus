@@ -65,6 +65,12 @@ En HTTPS añadir `compose/ssl.yml`, usar una callback HTTPS exacta y establecer
 `KEYCLOAK_PUBLIC_URL`; el esquema y el puerto público deben conservarse hasta
 Orthanc para que las URL de recuperación de imágenes sean correctas.
 
+Si OpenMRS debe conservar su login local, añadir `compose/openmrs-local-auth.yml`
+después de `compose/keycloak.yml`, manteniendo `compose/imaging-auth.yml` y los
+profiles actuales. El override conserva la ACL, el rol `imaging-access` y las
+sesiones OIDC de Imaging. Ver [compatibilidad, orden y transición de autenticación](../keycloak/README.md#openmrs-local-con-keycloak-para-imaging)
+antes de aplicarlo a un entorno existente.
+
 OHIF se construye con [Dockerfile](Dockerfile) desde un commit y checksum fijos.
 `PUBLIC_URL=/imaging/` queda compilado en los bundles y los workers; cambiar solo
 `routerBasename` no sirve para relocalizar una imagen upstream compilada en `/`.
