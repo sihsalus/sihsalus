@@ -119,6 +119,15 @@ DELETE attempts are rejected. Image rollback leaves the audit schema and evidenc
 in place. This operator step must be included in first-install acceptance before
 any wider rollout.
 
+After a failed lifecycle start, OpenMRS can persist `sihsalusaudit.started=false`.
+Replacing the OMOD then leaves it stopped. Once the corrected image and trigger
+migration are verified, start the module through OpenMRS administration. An
+operator recovering that specific failed-install state can instead apply
+[the narrow startup recovery SQL](migrations/clinical-audit-resume-after-failed-start.sql)
+with the same database command above, then restart the backend. Preserve an
+intentional module stop. This recovery changes only the module's autostart flag;
+it grants no audit privileges and enables no scheduled task or retention policy.
+
 ## Distribution checks
 
 Run these static checks from the repository root, without a backend or database:
