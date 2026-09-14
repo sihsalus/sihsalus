@@ -28,10 +28,6 @@ class AuditAcceptance:
             raise ValueError('A credential-free HTTPS base URL is required')
         if config.get('environment') != 'dev':
             raise ValueError('This acceptance runner requires an explicit DEV target')
-        self.context = ssl.create_default_context(cafile=config.get('ca_file'))
-        self.context.minimum_version = ssl.TLSVersion.TLSv1_2
-        if config.get('ca_file'):
-            self.context.verify_flags |= ssl.VERIFY_X509_PARTIAL_CHAIN
         self.actors = config['actors']
         if set(self.actors) != {'record', 'review', 'denied'}:
             raise ValueError('Provide three dedicated test accounts: record, review, denied')
@@ -45,6 +41,10 @@ class AuditAcceptance:
 
     def request(self, method, path, actor=None, payload=None, raw=None,
                 content_type='application/json', retry_limit=True):
+        context = ssl.create_default_context(cafile=self.config.get('ca_file'))
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        if self.config.get('ca_file'):
+            context.verify_flags |= ssl.VERIFY_X509_PARTIAL_CHAIN
         headers = {'Accept': 'application/json'}
         if actor:
             account = self.actors[actor]
@@ -55,9 +55,9 @@ class AuditAcceptance:
             headers['Content-Type'] = content_type
         for attempt in range(4):
             connection = http.client.HTTPSConnection(
-                self.url.hostname, self.url.port or 443, timeout=20, context=self.context)
+                self.url.hostname, self.url.port or 443, timeout=20, context=context)
             if self.config.get('connect_address'):
-                connection.sock = self.context.wrap_socket(socket.create_connection(
+                connection.sock = context.wrap_socket(socket.create_connection(
                     (self.config['connect_address'], self.url.port or 443), timeout=20),
                     server_hostname=self.url.hostname)
             try:
