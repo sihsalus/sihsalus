@@ -29,6 +29,7 @@ class AuditAcceptance:
         if config.get('environment') != 'dev':
             raise ValueError('This acceptance runner requires an explicit DEV target')
         self.context = ssl.create_default_context(cafile=config.get('ca_file'))
+        self.context.minimum_version = ssl.TLSVersion.TLSv1_2
         if config.get('ca_file'):
             self.context.verify_flags |= ssl.VERIFY_X509_PARTIAL_CHAIN
         self.actors = config['actors']
