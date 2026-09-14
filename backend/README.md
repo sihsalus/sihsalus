@@ -67,6 +67,24 @@ with `test initializer` on Java 11, then run `test-core28 initializer` on Java 2
 using the same Maven repository. `OMOD_MAVEN_REPOSITORY` selects an isolated cache;
 `OMOD_TEST_REPORTS` selects the Surefire evidence directory.
 
+## Clinical audit candidate for DEV
+
+The standalone [clinical audit module](https://github.com/sihsalus/openmrs-module-sihsalus-audit)
+owns event ingestion and privileged review. While its release is pending,
+`omod-sources.lock` pins its source commit and archive checksum. The existing
+build compiles the module into the distribution; no audit Java source is
+vendored here and no external runtime script is required.
+
+The source-module CI matrix runs its tests. The packaged-image gate also checks
+the controller, response sanitizer, persistence resources and distinct record
+and review privileges. These checks do not establish clinical event coverage.
+
+DEV acceptance must cover MariaDB migration and restart, authenticated ingestion,
+separate review access, invalid payloads, idempotent replay and frontend offline
+delivery using dedicated test users. The candidate grants neither audit privilege
+to existing roles and enables no retention deletion or visit-closing job. Wider
+rollout still requires event coverage, role assignments and retention decisions.
+
 ## Distribution checks
 
 Run these static checks from the repository root, without a backend or database:
