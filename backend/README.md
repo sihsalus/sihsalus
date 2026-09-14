@@ -89,6 +89,36 @@ The [DEV endpoint acceptance runner](../tests/backend/clinical-audit-smoke.md)
 uses three dedicated accounts and records synthetic events without changing
 patients. Database trigger checks and browser offline replay remain separate.
 
+### MariaDB installations with binary logging
+
+MariaDB requires an operator with `SUPER` to create triggers when `log_bin=ON`
+and `log_bin_trust_function_creators=OFF` ([MariaDB documentation](https://mariadb.com/docs/server/ha-and-performance/standard-replication/replication-and-binary-log-system-variables#log_bin_trust_function_creators)).
+The application database user should keep its existing database-scoped grants.
+On these installations the first module migration creates the audit table and
+indexes, then stops at trigger creation. Overall OpenMRS readiness can still be
+healthy while the audit module has failed; check the module and endpoint too.
+
+After taking a database backup and confirming the target installation, an
+operator can apply the versioned [trigger migration](migrations/clinical-audit-append-only.sql)
+to the OpenMRS database. From the distro checkout, for the standard Compose
+database name `openmrs`:
+
+```bash
+docker compose exec -T db sh -c \
+  'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; exec mariadb --user=root openmrs' \
+  < backend/migrations/clinical-audit-append-only.sql
+```
+
+Run this within the deployment lock/window, then restart only the backend. The
+module resumes its recoverable migration and validates the complete schema and
+both trigger bodies. The SQL preserves existing triggers on repeat execution and
+does not change grants, replication settings or evidence rows. If an existing
+trigger is incompatible, startup validation must fail instead of replacing it.
+Verify the module starts, both audit privileges exist, and synthetic UPDATE and
+DELETE attempts are rejected. Image rollback leaves the audit schema and evidence
+in place. This operator step must be included in first-install acceptance before
+any wider rollout.
+
 ## Distribution checks
 
 Run these static checks from the repository root, without a backend or database:
