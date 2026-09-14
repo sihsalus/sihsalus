@@ -81,9 +81,13 @@ and review privileges. These checks do not establish clinical event coverage.
 
 DEV acceptance must cover MariaDB migration and restart, authenticated ingestion,
 separate review access, invalid payloads, idempotent replay and frontend offline
-delivery using dedicated test users. The candidate grants neither audit privilege
-to existing roles and enables no retention deletion or visit-closing job. Wider
-rollout still requires event coverage, role assignments and retention decisions.
+delivery using dedicated test users. The module declares separate recording and
+review privileges. OpenMRS can also attach newly declared privileges to existing
+`Privilege Level: High` and `Privilege Level: Full` roles. Review their
+effective inheritance before assigning either role; a read-only auditor must not
+inherit recording or clinical editing rights. The candidate enables no retention
+deletion or visit-closing job. Wider rollout still requires event coverage, role
+assignments and retention decisions.
 
 The [DEV endpoint acceptance runner](../tests/backend/clinical-audit-smoke.md)
 uses three dedicated accounts and records synthetic events without changing
