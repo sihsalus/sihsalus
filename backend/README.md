@@ -85,6 +85,10 @@ delivery using dedicated test users. The candidate grants neither audit privileg
 to existing roles and enables no retention deletion or visit-closing job. Wider
 rollout still requires event coverage, role assignments and retention decisions.
 
+The [DEV endpoint acceptance runner](../tests/backend/clinical-audit-smoke.md)
+uses three dedicated accounts and records synthetic events without changing
+patients. Database trigger checks and browser offline replay remain separate.
+
 ## Distribution checks
 
 Run these static checks from the repository root, without a backend or database:
