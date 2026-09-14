@@ -39,6 +39,8 @@ for path in modules.glob('*.omod'):
         actual[module] = version
         if module == 'sihsalusaudit':
             assert config.findtext('package') == 'org.openmrs.module.sihsalusaudit'
+            assert config.findtext('activator') == 'org.openmrs.module.sihsalusaudit.ClinicalAuditActivator', \
+                'Clinical audit must declare its OpenMRS lifecycle entry point'
             assert {p.findtext('name') for p in config.findall('privilege')} == {
                 'Record Clinical Audit Events', 'View Clinical Audit Events'
             }, 'Clinical audit ingestion/review privileges must remain separate'
@@ -57,6 +59,7 @@ for path in modules.glob('*.omod'):
             assert len(api_entries) == 1, 'Expected one clinical audit API library'
             with zipfile.ZipFile(io.BytesIO(archive.read(api_entries[0]))) as api:
                 assert 'org/openmrs/module/sihsalusaudit/model/ClinicalAuditEvent.class' in api.namelist()
+                assert 'org/openmrs/module/sihsalusaudit/ClinicalAuditActivator.class' in api.namelist()
         if module == 'webservices.rest':
             controller = archive.read('org/openmrs/module/webservices/rest/web/v1_0/controller/openmrs1_9/ClobDatatypeStorageController.class')
             for value in [b'text/plain;charset=UTF-8', b'X-Content-Type-Options', b'nosniff']:
