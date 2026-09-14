@@ -98,6 +98,32 @@ the module persists client time as an `Instant` in the existing `datetime(3)`
 column, preserving its public API and client timestamp precision. Database
 trigger checks and browser offline replay remain separate.
 
+### Reverify an already published candidate
+
+`Build Backend` can finish publishing an image and then fail while exporting
+its build cache. A manual `verify-existing` run on a non-main branch verifies
+that exact image without rebuilding it:
+
+```bash
+gh workflow run build-backend.yml --repo sihsalus/sihsalus --ref REVIEW_BRANCH \
+  -f mode=verify-existing \
+  -f source_sha=FULL_SOURCE_COMMIT \
+  -f image_digest=sha256:FULL_IMAGE_DIGEST
+```
+
+Use the source commit and manifest digest from the original publication. The
+source must be an ancestor of the workflow revision. The workflow checks out
+that source for the package contracts and pinned dependencies, verifies the
+image's digest, architecture and revision label, and runs the same image tests,
+security scans, vulnerability ratchet and signature as a new build. It records
+both the workflow and image source revisions. This mode does not promote a
+release alias, change package visibility or deploy a service.
+
+Normal builds continue to fail on build, publication or verification errors.
+Only [cache export failures](https://docs.docker.com/build/cache/backends/gha/)
+are non-fatal, so an unavailable cache cannot prevent the image gates from
+running after a successful publication.
+
 ### MariaDB installations with binary logging
 
 MariaDB requires an operator with `SUPER` to create triggers when `log_bin=ON`
