@@ -48,6 +48,15 @@ invalid payloads and HTTP methods, response redaction and cache prevention.
 It appends only synthetic search/error events, without creating or changing
 patients. It intentionally retains accepted events.
 
+The client timestamps deliberately include nonzero milliseconds (`.123Z` and
+`.789Z`). The runner requires exact `occurredAt` readback, an unchanged event
+after sequential replay, and exactly one persisted event after three simultaneous
+retries, each acknowledging the same ID. It then changes only the client time by
+one millisecond: both the individual replay and a batch containing an earlier
+new insert must be rejected. Review must show the original evidence unchanged
+and no row from the rolled-back insert. Whole-second timestamps alone cannot
+exercise the OpenMRS date interceptor regression or establish these guarantees.
+
 The report lists checks, synthetic event IDs and actor UUIDs, without passwords
 or complete response bodies. Use a new report path for every execution. After
 acceptance, retire test accounts through OpenMRS; do not purge audit actors or

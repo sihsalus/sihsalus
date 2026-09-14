@@ -8,13 +8,14 @@ This test appends synthetic events; it does not create or modify patients.
 import argparse
 import base64
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import http.client
 import json
 from pathlib import Path
 import socket
 import ssl
 import stat
+from threading import Barrier
 import time
 from urllib.parse import urlsplit
 import uuid
@@ -95,7 +96,7 @@ class AuditAcceptance:
 
     def event(self, **changes):
         event = {'id': str(uuid.uuid4()), 'eventType': 'PATIENT_SEARCH',
-                 'timestamp': '2026-01-02T03:04:05Z',
+                 'timestamp': '2026-01-02T03:04:05.123Z',
                  'metadata': {'appName': 'esm-patient-search-app', 'outcome': 'SUCCESS', 'offline': True}}
         event.update(changes)
         return event
@@ -122,6 +123,13 @@ class AuditAcceptance:
     def passed_case(self, description):
         self.passed.append(description)
         print('[PASS] ' + description, flush=True)
+
+    def require_client_time(self, row, event):
+        expected = datetime.fromisoformat(event['timestamp'].replace('Z', '+00:00'))
+        self.require(expected.microsecond != 0, 'Precision acceptance must use nonzero milliseconds')
+        self.require(isinstance(row.get('occurredAt'), str), 'Review must include the stored client time')
+        actual = datetime.fromisoformat(row['occurredAt'].replace('Z', '+00:00'))
+        self.require(actual == expected, 'Stored client time must preserve the submitted milliseconds')
 
     def run(self):
         status, headers, _, _ = self.request('GET', '/openmrs/spa/build-info.json')
@@ -157,26 +165,46 @@ class AuditAcceptance:
         self.require(abs((received - started).total_seconds()) < 120, 'Server must supply receipt time')
         self.require(row['timestamp'] == row['receivedAt'], 'Timestamp alias must use receipt time')
         self.require(row.get('occurredAtAuthoritative') is False, 'Offline client time must be non-authoritative')
+        self.require_client_time(row, event)
         self.require('SYNTHETIC_FREE_TEXT_MUST_NOT_PERSIST' not in json.dumps(row),
                      'Unstructured client text must not become persistent evidence')
         self.require('sessionId' not in row, 'Session credentials must not appear in review')
-        self.passed_case('Server actor/time, non-authoritative offline time and metadata minimisation')
+        self.passed_case('Server actor/time, exact offline milliseconds and metadata minimisation')
 
         self.append(event)
-        self.require(len(self.find_events({event['id']})) == 1, 'Replaying an event must not duplicate it')
-        concurrent = self.event()
+        self.require(self.find_events({event['id']}) == [row],
+                     'Sequential replay must retain exactly one unchanged event with its milliseconds')
+        concurrent = self.event(timestamp='2026-01-02T03:04:05.789Z')
+        start = Barrier(3)
+
+        def replay_concurrently(_):
+            start.wait(timeout=10)
+            return self.audit('POST', 'record', [concurrent])
+
         with ThreadPoolExecutor(max_workers=3) as pool:
-            responses = list(pool.map(lambda _: self.audit('POST', 'record', [concurrent]), range(3)))
+            responses = list(pool.map(replay_concurrently, range(3)))
         self.require(all(result[0] in (200, 201) for result in responses), 'Concurrent replay must succeed')
-        self.require(len(self.find_events({concurrent['id']})) == 1, 'Concurrent replay must persist one event')
+        self.require(all(result[2].get('accepted') == [concurrent['id']] and result[2].get('count') == 1
+                         for result in responses), 'Every concurrent retry must acknowledge the same event ID')
+        concurrent_rows = self.find_events({concurrent['id']})
+        self.require(len(concurrent_rows) == 1, 'Concurrent replay must persist one event')
+        self.require_client_time(concurrent_rows[0], concurrent)
         self.created_ids.append(concurrent['id'])
-        self.passed_case('Sequential and concurrent retries are idempotent')
+        self.passed_case('Sequential and concurrent retries preserve exact milliseconds without duplicates')
+
+        changed_time = datetime.fromisoformat(event['timestamp'].replace('Z', '+00:00')) + timedelta(milliseconds=1)
+        conflict = dict(event, timestamp=changed_time.isoformat(timespec='milliseconds').replace('+00:00', 'Z'))
+        self.require(self.audit('POST', 'record', [conflict])[0] == 400,
+                     'Replay differing by only one millisecond must be rejected')
+        self.require(self.find_events({event['id']}) == [row],
+                     'A one-millisecond conflict must preserve the original event')
+        self.passed_case('One-millisecond replay conflict is rejected without changing stored evidence')
 
         first = self.event()
-        conflict = dict(event, eventType='UNHANDLED_ERROR')
         self.require(self.audit('POST', 'record', [first, conflict])[0] == 400, 'Conflicting replay must be rejected')
         self.require(not self.find_events({first['id']}), 'Failed batch must roll back its earlier insert')
-        self.passed_case('Conflicting replay rolls back the complete batch')
+        self.require(self.find_events({event['id']}) == [row], 'Rolled-back batch must preserve original evidence')
+        self.passed_case('One-millisecond conflict rolls back the complete batch, including its earlier insert')
 
         malformed = ([], [self.event(unknownField='rejected')],
                      [self.event(eventType='PATIENT_VIEW')], [self.event()] * 2,

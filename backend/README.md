@@ -91,7 +91,12 @@ assignments and retention decisions.
 
 The [DEV endpoint acceptance runner](../tests/backend/clinical-audit-smoke.md)
 uses three dedicated accounts and records synthetic events without changing
-patients. Database trigger checks and browser offline replay remain separate.
+patients. It verifies nonzero client milliseconds through persistence, replay,
+concurrent retries and a one-millisecond conflict with full batch rollback.
+This guards against OpenMRS' Hibernate interceptor truncating `Date` fields:
+the module persists client time as an `Instant` in the existing `datetime(3)`
+column, preserving its public API and client timestamp precision. Database
+trigger checks and browser offline replay remain separate.
 
 ### MariaDB installations with binary logging
 
