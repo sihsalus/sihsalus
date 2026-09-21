@@ -165,6 +165,16 @@ it grants no audit privileges and enables no scheduled task or retention policy.
 
 ## Distribution checks
 
+The audit source pin includes the scoped JDBC timestamp correction from
+[audit module PR #3](https://github.com/sihsalus/openmrs-module-sihsalus-audit/pull/3).
+The deployed MariaDB 10.11.7 / Connector/J 8.0.30 combination discards fractional
+seconds when Hibernate binds a `Timestamp`. The module binds UTC text into the
+existing `datetime(3)` column, preserving old evidence and avoiding a global
+driver change. The image check requires that mapping and its compiled type.
+Before promotion, the new immutable image must pass native endpoint readback,
+identical and concurrent replay, a 1 ms conflict, and browser offline acceptance.
+Prior acceptance on the old image failed precision readback and remains failed.
+
 Run these static checks from the repository root, without a backend or database:
 
 ```bash
