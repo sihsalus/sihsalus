@@ -12,6 +12,7 @@ OUTPUT_DIRECTORY="$3"
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIRECTORY="$(cd "$SCRIPT_DIRECTORY/../.." && pwd)"
 POLICY="$SCRIPT_DIRECTORY/image-policy.py"
+BOUNDED_TOOL="$SCRIPT_DIRECTORY/image-tool.py"
 EXCEPTIONS="$ROOT_DIRECTORY/security/image-exceptions.json"
 
 [[ "$IMAGE" =~ ^[a-z0-9][a-z0-9.:-]*(/[a-z0-9][a-z0-9._-]*)+@sha256:[0-9a-f]{64}$ ]] || {
@@ -38,11 +39,16 @@ cleanup() { rm -rf -- "$TEMP_DIRECTORY"; }
 trap cleanup EXIT
 PHASE=version
 failed() {
-  echo "[image-security] ${PHASE} failed; raw image configuration and scanner output are not displayed" >&2
+  local status=$?
+  if [ "$status" -eq 124 ]; then
+    echo "[image-security] ${PHASE} exceeded its external time budget" >&2
+  else
+    echo "[image-security] ${PHASE} failed; raw image configuration and scanner output are not displayed" >&2
+  fi
 }
 trap failed ERR
 
-trivy --version >"$TEMP_DIRECTORY/version.txt" 2>"$TEMP_DIRECTORY/tool-error.txt"
+python3 "$BOUNDED_TOOL" --timeout 30 -- trivy --version >"$TEMP_DIRECTORY/version.txt" 2>"$TEMP_DIRECTORY/tool-error.txt"
 SCANNER_VERSION="$(sed -n 's/^Version: \([0-9][0-9.]*\)$/\1/p' "$TEMP_DIRECTORY/version.txt")"
 [[ "$SCANNER_VERSION" == "0.74.0" ]] || {
   echo "[image-security] Trivy 0.74.0 is required for the reviewed report contract" >&2
@@ -50,10 +56,10 @@ SCANNER_VERSION="$(sed -n 's/^Version: \([0-9][0-9.]*\)$/\1/p' "$TEMP_DIRECTORY/
 }
 
 PHASE=index
-docker buildx imagetools inspect "$IMAGE" --raw >"$TEMP_DIRECTORY/index.json" 2>"$TEMP_DIRECTORY/tool-error.txt"
+python3 "$BOUNDED_TOOL" --timeout 120 -- docker buildx imagetools inspect "$IMAGE" --raw >"$TEMP_DIRECTORY/index.json" 2>"$TEMP_DIRECTORY/tool-error.txt"
 python3 "$POLICY" platforms "$IMAGE" "$TEMP_DIRECTORY/index.json" >"$TEMP_DIRECTORY/platforms.tsv"
 PHASE=sbom
-docker buildx imagetools inspect "$IMAGE" --format '{{json .SBOM}}' >"$TEMP_DIRECTORY/sbom.json" 2>"$TEMP_DIRECTORY/tool-error.txt"
+python3 "$BOUNDED_TOOL" --timeout 120 -- docker buildx imagetools inspect "$IMAGE" --format '{{json .SBOM}}' >"$TEMP_DIRECTORY/sbom.json" 2>"$TEMP_DIRECTORY/tool-error.txt"
 printf '{}\n' >"$TEMP_DIRECTORY/trivy.yaml"
 
 REPOSITORY="${IMAGE%@*}"
@@ -66,7 +72,7 @@ fi
 while IFS=$'\t' read -r platform child_digest; do
   PHASE="scan-${platform}"
   report="$TEMP_DIRECTORY/${platform/\//-}.json"
-  trivy image \
+  python3 "$BOUNDED_TOOL" --timeout 900 -- trivy image \
     --image-src remote \
     --platform "$platform" \
     --insecure="$INSECURE" \

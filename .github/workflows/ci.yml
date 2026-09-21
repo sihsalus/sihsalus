@@ -77,7 +77,7 @@ jobs:
           fi
 
           if [ "$can_diff" = "true" ] \
-            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml .github/workflows/build-backend.yml .github/workflows/build-gateway.yml .github/workflows/build-certbot.yml .github/actions/check-image/ scripts/security/image-policy.py scripts/security/scan-image.sh scripts/security/promote-image.sh security/image-exceptions.json tests/security/; then
+            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml .github/workflows/build-backend.yml .github/workflows/build-gateway.yml .github/workflows/build-certbot.yml .github/actions/check-image/ scripts/security/image-policy.py scripts/security/image-tool.py scripts/security/scan-image.sh scripts/security/promote-image.sh security/image-exceptions.json tests/security/; then
             image_security=false
           fi
 

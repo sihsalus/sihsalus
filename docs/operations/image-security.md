@@ -97,6 +97,13 @@ no concluyen, el job falla sin fabricar evidencia de éxito. El SPDX completo y
 la provenance permanecen adjuntos al índice en GHCR; conservar los digests de
 las releases necesarias para auditoría y rollback.
 
+Cada comando tiene además un límite externo: 30 segundos para consultar la
+versión, 120 para cada inspección del registry y 900 por escaneo de plataforma,
+incluida la descarga de las bases de vulnerabilidades y Java. Tras cinco segundos
+de gracia se detiene únicamente el grupo de procesos creado para ese comando.
+Esto también cubre descargas que no obedecen el timeout interno de Trivy; el
+control falla con código 124, sin fabricar evidencia ni promover la imagen.
+
 ## Verificar firma e inventario
 
 Usar el digest registrado en la release, y el workflow publicador correspondiente.

@@ -7,6 +7,7 @@ on:
       - '.github/workflows/build-backend.yml'
       - '.github/actions/check-image/**'
       - 'scripts/security/image-policy.py'
+      - 'scripts/security/image-tool.py'
       - 'scripts/security/scan-image.sh'
       - 'scripts/security/promote-image.sh'
       - 'security/image-exceptions.json'
