@@ -112,6 +112,9 @@ services:
       OMRS_CONFIG_CONNECTION_DATABASE: openmrs
       OMRS_CONFIG_CONNECTION_USERNAME: ${OPENMRS_DB_USER:-openmrs}
       OMRS_CONFIG_CONNECTION_PASSWORD: ${MYSQL_OPENMRS_PASSWORD:-openmrs}
+      # Metadata must finish loading before this backend can be promoted.
+      # The pinned runtime writes OMRS_EXTRA_* into runtime properties.
+      OMRS_EXTRA_INITIALIZER_STARTUP_LOAD: "fail_on_error"
       OMRS_OCL_TOKEN: ${OMRS_OCL_TOKEN:-}
       OAUTH2_ENABLED: "false"
       SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED: "${SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED:-true}"
