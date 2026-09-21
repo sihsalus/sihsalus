@@ -53,6 +53,8 @@ def exercise_profiles(env_file):
 
 
 def exercise_persistent_selection(directory, audit=False):
+    # Match the CLI's canonical paths (macOS /var aliases /private/var).
+    directory = directory.resolve()
     manifest = fixture()
     if audit:
         manifest["target"]["environment"] = "production"
