@@ -30,6 +30,8 @@ con aprobación explícita.
 
 - PR aprobado y mergeado.
 - CI requerido en verde.
+- Firma, inventario y evidencia vigente de la [política de imágenes](image-security.md)
+  verificados para los digests que se desplegarán; no usar tags `candidate-*` como releases.
 - Versiones a desplegar identificadas: backend, frontend, portal de ayuda, content package y perfiles habilitados.
 - Backup reciente confirmado.
 - Ruta de rollback definida.
