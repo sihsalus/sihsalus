@@ -1,4 +1,4 @@
-ARG FRONTEND_SOURCE_IMAGE=ghcr.io/sihsalus/sihsalus-frontend:sha-6cadce5b8a225bc6fe0715b9ff085ced5f9feacf@sha256:ada19c77f8d27ea50e89db4fdae7287bbdf3a51c9fab8ac95dd82eba36d9a28c
+ARG FRONTEND_SOURCE_IMAGE=ghcr.io/sihsalus/sihsalus-frontend:sha-a624206bca7e3e084c68b544e8d5b3ab0b037e27@sha256:ad79b27f913535048c676f8f922a77803d288c6ed0a5569e3ea98ea3a2ae8e26
 ARG STRIP_SOURCE_MAPS=true
 
 FROM ${FRONTEND_SOURCE_IMAGE} AS assemble
