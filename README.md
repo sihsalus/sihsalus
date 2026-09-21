@@ -18,6 +18,7 @@
 - [Profiles](#profiles)
 - [Arquitectura de infraestructura](docs/architecture/infrastructure.md)
 - [Cambio obligatorio de contraseña local](docs/operations/forced-password-change.md)
+- [Detección de secretos y atención de alertas](docs/operations/secret-scanning.md)
 - [Actualización en Producción](#actualización-en-producción)
 - [Docker Bake (Build)](#docker-bake-build)
 - [Configuración SSL/HTTPS](#configuración-sslhttps)
