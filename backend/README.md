@@ -62,7 +62,12 @@ bash backend/bin/build-source-omods.sh test-core28 initializer
 ```
 
 Packaging uses Java 21 and compiles sibling test JARs required by upstream
-reactors. Tests use Java 21 except Initializer: first install its full reactor
+reactors. OAuth2Login tests use Java 8, matching its upstream JUnit/PowerMock
+stack. Its pinned SIHSalus candidate registers routes through the native module
+servlet/filter lifecycle; acceptance also requires fresh Core 2.8 startup and
+actual Keycloak login, callback, session and logout.
+
+Other tests use Java 21 except Initializer: first install its full reactor
 with `test initializer` on Java 11, then run `test-core28 initializer` on Java 21
 using the same Maven repository. `OMOD_MAVEN_REPOSITORY` selects an isolated cache;
 `OMOD_TEST_REPORTS` selects the Surefire evidence directory.
