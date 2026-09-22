@@ -1,0 +1,34 @@
+name: Check immutable published candidate
+description: Require attached SPDX and scan each executable digest before signing or promotion
+inputs:
+  image:
+    description: Complete registry image reference by digest
+    required: true
+  source:
+    description: Complete source commit SHA
+    required: true
+  artifact-name:
+    description: Name for sanitized vulnerability and SBOM evidence
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Install the reviewed scanner version
+      uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514 # v0.2.6
+      with:
+        version: v0.74.0
+        cache: true
+    - name: Verify SBOMs and scan every immutable platform
+      shell: bash
+      env:
+        CANDIDATE_IMAGE: ${{ inputs.image }}
+        SOURCE_SHA: ${{ inputs.source }}
+      run: bash scripts/security/scan-image.sh "$CANDIDATE_IMAGE" "$SOURCE_SHA" security-evidence
+    - name: Retain only sanitized security evidence
+      if: ${{ always() && hashFiles('security-evidence/evidence.json') != '' }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: security-evidence/evidence.json
+        if-no-files-found: error
+        retention-days: 90

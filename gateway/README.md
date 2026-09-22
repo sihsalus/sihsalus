@@ -84,5 +84,6 @@ ficticios en redes separadas; sus puertos se publican solo en `127.0.0.1`.
 Cubren Grafana permitido, no configurado, vacío y fuera del rango, sin confiar
 en cabeceras reenviadas, además de conservar las rutas clínicas y de Imaging.
 Eliminan sus contenedores y redes al terminar. `GATEWAY_TEST_IMAGE` permite
-seleccionar una imagen Nginx 1.28 disponible y `GATEWAY_CONFIG_DIR` otra
+seleccionar otra imagen compatible; por defecto se prueba la base inmutable
+del `gateway/Dockerfile`. `GATEWAY_CONFIG_DIR` permite seleccionar otra
 carpeta con esta estructura de configuración.

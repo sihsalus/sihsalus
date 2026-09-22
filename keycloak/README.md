@@ -108,6 +108,12 @@ un contenedor que ya esté ejecutándose.
 
 El usuario autenticado debe poder mapearse a un usuario OpenMRS. Mantén el mismo `username` en ambos sistemas y administra roles clínicos dentro de OpenMRS. El realm importado configura OIDC, pero no sustituye la autorización clínica. Imaging es la excepción explícita: el gateway exige además el realm role `imaging-access` antes de exponer OHIF o DICOMweb.
 
+La cuenta de arranque del realm declara `requiredActions: ["UPDATE_PASSWORD"]`.
+En Keycloak 26.4.1, importar una credencial con `temporary: true` no agrega esa
+acción: el importador crea la contraseña y aplica por separado las acciones del
+usuario. La acción explícita obliga a cambiarla en el primer acceso. Afecta
+importaciones nuevas; no rota contraseñas ni modifica un realm ya existente.
+
 ## Diagnóstico
 
 ```bash

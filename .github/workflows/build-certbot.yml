@@ -5,6 +5,12 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/build-certbot.yml'
+      - '.github/actions/check-image/**'
+      - 'scripts/security/image-policy.py'
+      - 'scripts/security/image-tool.py'
+      - 'scripts/security/scan-image.sh'
+      - 'scripts/security/promote-image.sh'
+      - 'security/image-exceptions.json'
       - 'certbot/**'
   workflow_dispatch:
 
@@ -21,7 +27,14 @@ jobs:
       id-token: write
       packages: write
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate current exception policy
+        run: python3 scripts/security/image-policy.py check-policy security/image-exceptions.json
+
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          platforms: arm64
 
       - uses: docker/setup-buildx-action@v4
 
@@ -37,18 +50,58 @@ jobs:
           images: ghcr.io/sihsalus/sihsalus-certbot
           tags: |
             type=sha,prefix=sha-,format=long
-            type=raw,value=latest,enable={{is_default_branch}}
 
       - uses: docker/build-push-action@v7
         id: build
         with:
           context: ./certbot
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ghcr.io/sihsalus/sihsalus-certbot:candidate-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           labels: ${{ steps.meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha,scope=certbot
           cache-to: type=gha,scope=certbot,mode=max
+
+      - name: Require attested and scanned certbot digest
+        uses: ./.github/actions/check-image
+        with:
+          image: ghcr.io/sihsalus/sihsalus-certbot@${{ steps.build.outputs.digest }}
+          source: ${{ github.sha }}
+          artifact-name: certbot-image-security-${{ github.sha }}
+
+      - name: Verify the published certificate client contract
+        env:
+          IMAGE: ghcr.io/sihsalus/sihsalus-certbot@${{ steps.build.outputs.digest }}
+        run: |
+          docker run --rm --network none --entrypoint sh "$IMAGE" -ec '
+            certbot --version
+            certbot --help all > /tmp/certbot-help.txt
+            grep -q -- --preferred-profile /tmp/certbot-help.txt
+            grep -q -- --webroot /tmp/certbot-help.txt
+            certbot plugins --authenticators > /tmp/certbot-plugins.txt
+            grep -q -- webroot /tmp/certbot-plugins.txt
+            if python -m pip --version >/dev/null 2>&1; then
+              echo "The package installer must not remain in the runtime image" >&2
+              exit 1
+            fi
+            openssl version
+            sh -n /certbot/scripts/entrypoint.sh
+            mkdir -p /tmp/certificate-test/webroot/conf
+            openssl genpkey -genparam -algorithm DH -pkeyopt group:ffdhe2048 \
+              -out /tmp/certificate-test/webroot/conf/ssl-dhparams.pem
+            SSL_MODE=dev CERT_WEB_DOMAINS=localhost,127.0.0.1 \
+              CERT_ROOT_PATH=/tmp/certificate-test/certs \
+              CERTBOT_DATA_PATH=/tmp/certificate-test/webroot \
+              /certbot/scripts/entrypoint.sh
+            openssl x509 -noout -checkhost localhost \
+              -in /tmp/certificate-test/certs/live/localhost/fullchain.pem
+            openssl x509 -noout -checkip 127.0.0.1 \
+              -in /tmp/certificate-test/certs/live/localhost/fullchain.pem
+            test -f /tmp/certificate-test/webroot/.reload-nginx
+            test "$(stat -c %a /tmp/certificate-test/certs/live/localhost/privkey.pem)" = 600
+          '
 
       - name: Install cosign
         uses: sigstore/cosign-installer@v4.1.2
@@ -57,6 +110,12 @@ jobs:
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: cosign sign --yes "ghcr.io/sihsalus/sihsalus-certbot@${DIGEST}"
+
+      - name: Publish verified release aliases
+        env:
+          IMAGE: ghcr.io/sihsalus/sihsalus-certbot@${{ steps.build.outputs.digest }}
+          PROMOTE_LATEST: ${{ github.ref == 'refs/heads/main' }}
+        run: bash scripts/security/promote-image.sh "$IMAGE" "$GITHUB_SHA" "$PROMOTE_LATEST"
 
       - name: Make package public
         run: |

@@ -1,0 +1,26 @@
+services:
+  db:
+    image: mariadb:10.11.7
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?synthetic password required}
+      MARIADB_DATABASE: backup_drill
+    volumes:
+      - data:/var/lib/mysql
+      # Match the scratch mount expected by backup_full.sh in compose/core.yml.
+      - backup:/backup
+    healthcheck:
+      # The product probes SQL with configured credentials. healthcheck.sh
+      # depends on .my-healthcheck.cnf, which physical backup does not retain.
+      test: [CMD-SHELL, 'MYSQL_PWD="$${MARIADB_ROOT_PASSWORD}" mariadb --user=root --execute "SELECT 1"']
+      interval: 2s
+      timeout: 5s
+      retries: 60
+  # restore_full.sh controls db and backend. This inert service exercises that
+  # Compose contract without starting an application or creating clinical data.
+  backend:
+    image: busybox:latest
+    command: [sleep, infinity]
+volumes:
+  data:
+  backup:
