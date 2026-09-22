@@ -75,7 +75,10 @@ fallo del otro.
 
 Cada variante conserva durante siete días `result.json`, estados de servicios,
 identidades de imágenes, resultados de salud y logs depurados. Las contraseñas
-son aleatorias por ejecución. Antes de subir logs se eliminan esos valores y
+son aleatorias por ejecución y pasan a Compose y Playwright por variables de
+entorno. El fixture escrito contiene solo identidad y modo; la configuración
+resuelta de Compose se valida desde stdin, sin guardarla. Antes de subir logs se
+eliminan esos valores y
 sus formas codificadas, cabeceras de autenticación/cookies, tokens JWT y parámetros
 de callback. Se conservan hasta 2 MiB por log para diagnosticar fallos de arranque.
 

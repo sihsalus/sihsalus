@@ -65,9 +65,11 @@ assert_no_patients() {
 }
 
 BACKEND_DIGEST="${BACKEND_DIGEST:?the workflow must resolve a shared immutable backend digest}"
-PROJECT="$(python3 -B tests/runtime/fixtures.py prepare "$STATE" "$MODE" "$BACKEND_DIGEST")"
-export COMPOSE_PROJECT_NAME="$PROJECT"
-COMPOSE=(docker compose --project-name "$PROJECT" --env-file .env.template --env-file "$STATE/compose.env" -f docker-compose.yml)
+GENERATED_ENV="$(python3 -B tests/runtime/fixtures.py prepare "$STATE" "$MODE" "$BACKEND_DIGEST")"
+while IFS= read -r assignment; do export "$assignment"; done <<< "$GENERATED_ENV"
+unset GENERATED_ENV assignment
+PROJECT="${COMPOSE_PROJECT_NAME:?synthetic project required}"
+COMPOSE=(docker compose --project-name "$PROJECT" --env-file .env.template -f docker-compose.yml)
 BUILD=(gateway frontend)
 PULL=(backend db docs backend-oauth2-config)
 if [[ "$MODE" == keycloak ]]; then
@@ -78,8 +80,7 @@ else
   COMPOSE+=(-f tests/runtime/compose.yml)
 fi
 STAGE=validate-isolation
-"${COMPOSE[@]}" config --format json >"$STATE/compose.json"
-python3 -B tests/runtime/fixtures.py validate "$STATE" "$ROOT"
+"${COMPOSE[@]}" config --format json | python3 -B tests/runtime/fixtures.py validate "$STATE" "$ROOT"
 [[ -z "$(docker ps -aq --filter "label=com.docker.compose.project=$PROJECT")" ]]
 [[ -z "$(docker volume ls -q --filter "label=com.docker.compose.project=$PROJECT")" ]]
 

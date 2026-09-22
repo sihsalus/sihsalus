@@ -2,9 +2,14 @@ import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const fixture = JSON.parse(fs.readFileSync(path.join(process.env.SMOKE_STATE!, 'fixture.json'), 'utf8'));
+const fixture = {
+  ...JSON.parse(fs.readFileSync(path.join(process.env.SMOKE_STATE!, 'fixture.json'), 'utf8')),
+  initialPassword: process.env.SMOKE_INITIAL_PASSWORD,
+  replacementPassword: process.env.SMOKE_REPLACEMENT_PASSWORD,
+};
 const homeUrl = /\/openmrs\/spa\/home(?:[/?#]|$)/;
-if (fixture.baseURL !== 'http://127.0.0.1' || !['local', 'keycloak'].includes(fixture.mode)) {
+if (fixture.baseURL !== 'http://127.0.0.1' || !['local', 'keycloak'].includes(fixture.mode) ||
+    !fixture.initialPassword || !fixture.replacementPassword) {
   throw new Error('Runtime smoke accepts only its isolated loopback fixture');
 }
 

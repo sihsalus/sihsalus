@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import secrets
+import sys
 from urllib.parse import quote
 from uuid import uuid4
 
@@ -28,7 +29,8 @@ def prepare(directory, mode, digest):
         "MYSQL_ROOT_PASSWORD": password(), "MYSQL_OPENMRS_PASSWORD": password(),
         "OMRS_DB_REPL_PASSWORD": password(), "OMRS_DB_BACKUP_PASSWORD": password(),
         "OPENMRS_DB_USER": "openmrs", "OMRS_OCL_TOKEN": "",
-        "SMOKE_INITIAL_PASSWORD": initial, "KEYCLOAK_ADMIN_PASSWORD": initial,
+        "SMOKE_INITIAL_PASSWORD": initial, "SMOKE_REPLACEMENT_PASSWORD": replacement,
+        "KEYCLOAK_ADMIN_PASSWORD": initial,
         "KC_DB_PASSWORD": password(), "OAUTH2_CLIENT_SECRET": password(),
         "IMAGING_OIDC_CLIENT_SECRET": password(),
         "KEYCLOAK_PUBLIC_URL": "http://127.0.0.1/keycloak", "KC_HOSTNAME": "http://127.0.0.1/keycloak",
@@ -38,14 +40,10 @@ def prepare(directory, mode, digest):
         "BACKEND_TAG": "latest@" + digest, "FRONTEND_RUNTIME_IMAGE": project + "-frontend",
         "FRONTEND_RUNTIME_TAG": "test", "SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED": "true",
     }
-    fixture = {"project": project, "mode": mode, "baseURL": "http://127.0.0.1",
-               "initialPassword": initial, "replacementPassword": replacement,
-               "backendDigest": digest, "environment": environment}
-    for name, value in (("fixture.json", json.dumps(fixture)),
-                        ("compose.env", "\n".join(f"{key}={value}" for key, value in environment.items()))):
-        with (directory / name).open("x") as output:
-            output.write(value + "\n")
-    return fixture
+    metadata = {"project": project, "mode": mode, "baseURL": "http://127.0.0.1", "backendDigest": digest}
+    with (directory / "fixture.json").open("x") as output:
+        output.write(json.dumps(metadata) + "\n")
+    return {**metadata, "initialPassword": initial, "replacementPassword": replacement, "environment": environment}
 
 
 def validate_model(model, fixture, repository):
@@ -98,15 +96,20 @@ def main():
     args = parser.parse_args()
     if args.operation == "prepare":
         fixture = prepare(args.directory, *args.arguments)
-        print(fixture["project"])
+        # Consumed by Bash command substitution, never a file or CI log. Values
+        # contain no line breaks and export receives each assignment as data.
+        for key, value in fixture["environment"].items():
+            print(f"{key}={value}")
         return
     fixture = json.loads((args.directory / "fixture.json").read_text())
     if args.operation == "validate":
-        validate_model(json.loads((args.directory / "compose.json").read_text()), fixture, Path(args.arguments[0]))
+        validate_model(json.load(sys.stdin), fixture, Path(args.arguments[0]))
         print("PASS: isolated core Compose with immutable backend and loopback gateway")
         return
     destination = Path(args.arguments[0])
     destination.mkdir(parents=True, exist_ok=True)
+    fixture.update(initialPassword=os.environ["SMOKE_INITIAL_PASSWORD"],
+                   replacementPassword=os.environ["SMOKE_REPLACEMENT_PASSWORD"], environment=os.environ)
     for log in args.directory.glob("*.log"):
         # Bound retained evidence; raw files and browser artifacts stay private.
         with log.open("rb") as source:

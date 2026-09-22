@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from urllib.parse import quote
@@ -34,7 +35,7 @@ class RuntimeFixtureTests(unittest.TestCase):
     def render(self, directory, mode):
         fixture = fixtures.prepare(directory, mode, DIGEST)
         command = ["docker", "compose", "--project-name", fixture["project"], "--env-file", ".env.template",
-                   "--env-file", str(directory / "compose.env"), "-f", "docker-compose.yml"]
+                   "-f", "docker-compose.yml"]
         if mode == "keycloak":
             command += ["-f", "compose/keycloak.yml", "-f", "tests/runtime/compose.yml",
                         "-f", "tests/runtime/keycloak.yml", "--profile", "keycloak"]
@@ -42,7 +43,11 @@ class RuntimeFixtureTests(unittest.TestCase):
             command += ["-f", "tests/runtime/compose.yml"]
         # Explicit files prevent a developer's .env from selecting a live stack.
         result = subprocess.run(command + ["config", "--format", "json"], cwd=ROOT,
+                                env={**os.environ, **fixture["environment"]},
                                 capture_output=True, text=True, timeout=30, check=True)
+        subprocess.run([sys.executable, str(ROOT / "tests/runtime/fixtures.py"), "validate",
+                        str(directory), str(ROOT)], input=result.stdout,
+                       capture_output=True, text=True, timeout=10, check=True)
         return fixture, json.loads(result.stdout)
 
     def test_actual_local_and_keycloak_models_remain_isolated(self):
@@ -95,6 +100,17 @@ class RuntimeFixtureTests(unittest.TestCase):
             with self.assertRaises(ValueError): fixtures.prepare(path, "local", "latest")
             fixtures.prepare(path, "local", DIGEST)
             with self.assertRaises(FileExistsError): fixtures.prepare(path, "keycloak", DIGEST)
+
+    def test_generated_credentials_are_not_written_to_fixture_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            fixture = fixtures.prepare(path, "keycloak", DIGEST)
+            self.assertEqual(sorted(p.name for p in path.iterdir()), ["fixture.json"])
+            text = (path / "fixture.json").read_text()
+            self.assertEqual(set(json.loads(text)), {"project", "mode", "baseURL", "backendDigest"})
+            for key, value in fixture["environment"].items():
+                if value and any(part in key for part in ("PASSWORD", "SECRET", "TOKEN")):
+                    self.assertNotIn(value, text)
 
 
 if __name__ == "__main__":
