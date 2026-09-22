@@ -53,6 +53,12 @@ En modo `production`, el contenedor exige hostname y redirect URI HTTPS, habilit
 
 Los endpoints de token, user info y claves usan la red interna Docker. Las redirecciones del navegador usan `KEYCLOAK_PUBLIC_URL` a través del gateway.
 
+La propiedad `oauth2login.redirectUriAfterLogin` usa `/spa/home`, relativa al
+contexto de OpenMRS. Spring agrega `/openmrs` al resolver el redirect del
+controlador; incluir ese prefijo en la propiedad produce
+`/openmrs/openmrs/spa/home`. El archivo declarativo del override mantiene el
+destino; no requiere reescrituras en el gateway.
+
 ## OpenMRS local con Keycloak para Imaging
 
 Para usar el login local de OpenMRS y conservar Keycloak como proveedor de

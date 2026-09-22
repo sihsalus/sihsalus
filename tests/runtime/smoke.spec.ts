@@ -37,8 +37,7 @@ test('published core serves its SPA, authenticates, and ends the synthetic sessi
       await page.locator('#username').fill('admin');
       await page.locator('#password').fill(fixture.initialPassword);
       await page.locator('#kc-login').click();
-      // The actual realm imports a temporary password: exercise the required
-      // change instead of disabling that policy or altering realm metadata.
+      // Exercise the UPDATE_PASSWORD action declared by the actual realm.
       await page.locator('#password-new').fill(fixture.replacementPassword);
       await page.locator('#password-confirm').fill(fixture.replacementPassword);
       await page.locator('form [type="submit"]').click();
