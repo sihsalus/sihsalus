@@ -23,6 +23,7 @@ CLAUDE.md
 *.key
 *.log
 *_log.txt
+/runtime-smoke-results/
 
 # Generated, sanitized image-security evidence.
 /security-evidence/
