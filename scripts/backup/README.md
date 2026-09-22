@@ -66,6 +66,11 @@ Para ejecutar el backup físico sobre la réplica:
 
 La prueba inicia una MariaDB efímera, inserta datos, crea un dump cifrado, muta la tabla, restaura y verifica el valor original. CI la ejecuta cuando cambian los scripts o la propia prueba.
 
+El [simulacro físico semanal](../../docs/operations/physical-backup-drill.md)
+ejecuta además los scripts de backup y restore físicos, verifica checksums y
+filas, y provoca un fallo controlado para comprobar la recuperación del snapshot.
+Su ejecución completa se limita a runners efímeros de GitHub Actions.
+
 ## Regla operativa
 
 Un backup no se considera válido hasta verificar al menos checksum, descifrado y restore. Programa un restore periódico con datos no clínicos o en un ambiente aislado.
