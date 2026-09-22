@@ -91,9 +91,12 @@ wait_for_db() {
 
 # Fixed copy-back name belongs to the current operational script (#172 tracks
 # its removal). Refuse an existing owner; the negative case creates its own.
-! docker container inspect sihsalus-db-restore >/dev/null 2>&1
-! docker volume inspect "$DB_VOLUME" >/dev/null 2>&1
-! docker volume inspect "$SNAPSHOT" >/dev/null 2>&1
+if docker container inspect sihsalus-db-restore >/dev/null 2>&1 \
+   || docker volume inspect "$DB_VOLUME" >/dev/null 2>&1 \
+   || docker volume inspect "$SNAPSHOT" >/dev/null 2>&1; then
+  echo 'Physical drill refuses existing restore resources' >&2
+  exit 2
+fi
 STAGE=start
 timeout --kill-after=5s 180s docker compose pull >"$STATE/pull.log" 2>&1
 STARTED=true
@@ -123,7 +126,10 @@ wait_for_db
 RESTORE_SECONDS=$((SECONDS-phase_start))
 [[ "$(fingerprint)" == "$before" ]]
 [[ "$(sql --execute='SELECT COUNT(*) FROM probe')" == 3 ]]
-! docker volume inspect "$SNAPSHOT" >/dev/null 2>&1
+if docker volume inspect "$SNAPSHOT" >/dev/null 2>&1; then
+  echo 'Successful restore unexpectedly retained its snapshot' >&2
+  exit 1
+fi
 RESTORE_VERIFIED=true
 
 STAGE=rollback
