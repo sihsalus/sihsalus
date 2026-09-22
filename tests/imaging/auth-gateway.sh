@@ -12,7 +12,7 @@ ORTHANC_PROXY="${PREFIX}-orthanc-proxy"
 DENIED_GATEWAY="${PREFIX}-denied-gateway"
 REDIS="${PREFIX}-redis"
 SYNTHETIC_REDIS_PASSWORD=0123456789abcdef0123456789abcdef0123456789abcdef
-NGINX_TEST_IMAGE="${GATEWAY_TEST_IMAGE:-nginx:1.28-alpine}"
+NGINX_TEST_IMAGE="${GATEWAY_TEST_IMAGE:-$(awk '$1 == "FROM" { print $2; exit }' "$ROOT_DIR/gateway/Dockerfile")}"
 CREATED_CONTAINERS=()
 NETWORK_CREATED=false
 TEST_STAGE=initialization
