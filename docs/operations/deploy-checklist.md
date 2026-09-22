@@ -30,10 +30,26 @@ con aprobación explícita.
 
 - PR aprobado y mergeado.
 - CI requerido en verde.
+- La versión de content y sus migraciones fueron probadas con el estado de
+  entrada admitido. Los roles declarativos provienen de `sihsalus-content`;
+  no mantener copias de permisos ni parches SQL por servidor.
+- El modelo Compose efectivo conserva `OMRS_EXTRA_INITIALIZER_STARTUP_LOAD=fail_on_error`.
+  Verificar el valor resultante `initializer.startup.load` en las propiedades de
+  runtime y que no exista un `-Dinitializer.startup.load` en las opciones JVM
+  del contenedor: una propiedad del sistema tiene precedencia sobre runtime.
+  No imprimir archivos completos de propiedades o entorno que contengan secretos.
+- Firma, inventario y evidencia vigente de la [política de imágenes](image-security.md)
+  verificados para los digests que se desplegarán; no usar tags `candidate-*` como releases.
 - Versiones a desplegar identificadas: backend, frontend, portal de ayuda, content package y perfiles habilitados.
 - Backup reciente confirmado.
 - [Último simulacro físico exitoso de main](https://github.com/sihsalus/sihsalus/actions/workflows/physical-backup-drill.yml?query=branch%3Amain+is%3Asuccess) revisado; registrar URL, SHA y fecha. Si no existe, dejar el pendiente explícito. Ver [alcance del simulacro](physical-backup-drill.md).
 - Ruta de rollback definida.
+- Distinguir recuperación de imágenes y de base de datos. Volver a una imagen
+  anterior no deshace migraciones SQL ya confirmadas; una consolidación de roles
+  requiere el procedimiento coordinado de restauración del respaldo.
+- Para releases coordinadas, manifiestos anterior y candidato revisados,
+  imágenes conservadas y [procedimiento de aplicación/reversión](release-manifests.md)
+  probado en QLTY; registrar sus IDs y checksums junto a la evidencia.
 - Variables y secretos requeridos confirmados sin exponer valores.
 - `COMPOSE_FILE` y `COMPOSE_PROFILES` reflejan el stack real del servidor.
 - Si el entorno usa HTTPS, `COMPOSE_FILE` incluye `compose/ssl.yml` y `COMPOSE_PROFILES` incluye `ssl`.
@@ -107,6 +123,16 @@ Registrar:
 | Plan de rollback | |
 
 ## Smoke test posterior
+
+Antes de activar el frontend nuevo, verificar en el intento actual de arranque
+que Initializer terminó sin errores ni cargas abortadas. Comparar el historial
+de migraciones y la política final del rol canónico con el artefacto elegido,
+incluidas las asignaciones y referencias conservadas. Para llegadas no SIS,
+exigir el atributo Visit `090eb9b3-a306-450f-8623-9fc00b8d82fa` activo, datatype
+`org.openmrs.customdatatype.datatype.FreeTextDatatype`, cardinalidad `0..1`.
+Si falla cualquiera de estos controles, detener la promoción y ejecutar la
+recuperación prevista; no insertar metadata suelta ni borrar checksums para
+forzar un resultado saludable. Este control complementa la salud HTTP.
 
 Para confianza del certificado y diagnóstico HTTPS, usar el
 [runbook HTTPS](https.md#confianza-y-diagnóstico).
