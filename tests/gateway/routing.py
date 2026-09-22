@@ -17,7 +17,10 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = Path(os.environ.get("GATEWAY_CONFIG_DIR", ROOT / "gateway")).resolve()
-IMAGE = os.environ.get("GATEWAY_TEST_IMAGE", "nginx:1.28-alpine")
+IMAGE = os.environ.get("GATEWAY_TEST_IMAGE") or next(
+    line.split()[1] for line in (ROOT / "gateway/Dockerfile").read_text().splitlines()
+    if line.startswith("FROM ")
+)
 
 
 def command(*args):

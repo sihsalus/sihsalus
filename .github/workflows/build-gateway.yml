@@ -71,6 +71,11 @@ jobs:
           source: ${{ github.sha }}
           artifact-name: gateway-image-security-${{ github.sha }}
 
+      - name: Verify HTTP and HTTPS routes on the published candidate
+        env:
+          GATEWAY_TEST_IMAGE: ghcr.io/sihsalus/sihsalus-gateway@${{ steps.build.outputs.digest }}
+        run: python3 tests/gateway/routing.py
+
       - name: Install cosign
         uses: sigstore/cosign-installer@v4.1.2
 

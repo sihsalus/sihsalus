@@ -1,11 +1,16 @@
 # syntax=docker/dockerfile:1.3
-FROM certbot/certbot:v4.0.0
+FROM certbot/certbot:v5.8.0@sha256:f70ad0adbb7e117f0fe42a63c553f28ea451edabc0148757b6efcd9735acaa20
 
-RUN apk --no-cache add \
+RUN apk upgrade --no-cache && \
+    apk --no-cache add \
     curl \
     tzdata && \
     cp /usr/share/zoneinfo/America/Lima /etc/localtime && \
     echo "America/Lima" > /etc/timezone
+
+# Certbot is already installed. Keep its dependency check at build time and
+# remove the installer, including its unused vendored packages, from runtime.
+RUN python -m pip check && python -m pip uninstall --yes pip
 
 RUN mkdir -p /certbot/scripts /var/www/certbot/conf /etc/letsencrypt/live
 

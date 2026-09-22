@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+NGINX_TEST_IMAGE="$(awk '$1 == "FROM" && $2 ~ /^nginx:/ { print $2; exit }' "$ROOT_DIR/frontend/Dockerfile")"
 FIXTURE_DIR="$(mktemp -d)"
 CONTAINER_NAME="sihsalus-frontend-cache-test-$$"
 
@@ -41,7 +42,7 @@ docker run --detach --rm \
   --publish 127.0.0.1::80 \
   --volume "$ROOT_DIR/frontend/nginx.conf:/etc/nginx/nginx.conf:ro" \
   --volume "$FIXTURE_DIR:/usr/share/nginx/html:ro" \
-  nginx:1.28-alpine >/dev/null
+  "$NGINX_TEST_IMAGE" >/dev/null
 
 PORT="$(docker port "$CONTAINER_NAME" 80/tcp | sed -E 's/.*:([0-9]+)$/\1/' | head -n 1)"
 BASE_URL="http://127.0.0.1:$PORT"

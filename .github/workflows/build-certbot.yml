@@ -71,6 +71,38 @@ jobs:
           source: ${{ github.sha }}
           artifact-name: certbot-image-security-${{ github.sha }}
 
+      - name: Verify the published certificate client contract
+        env:
+          IMAGE: ghcr.io/sihsalus/sihsalus-certbot@${{ steps.build.outputs.digest }}
+        run: |
+          docker run --rm --network none --entrypoint sh "$IMAGE" -ec '
+            certbot --version
+            certbot --help all > /tmp/certbot-help.txt
+            grep -q -- --preferred-profile /tmp/certbot-help.txt
+            grep -q -- --webroot /tmp/certbot-help.txt
+            certbot plugins --authenticators > /tmp/certbot-plugins.txt
+            grep -q -- webroot /tmp/certbot-plugins.txt
+            if python -m pip --version >/dev/null 2>&1; then
+              echo "The package installer must not remain in the runtime image" >&2
+              exit 1
+            fi
+            openssl version
+            sh -n /certbot/scripts/entrypoint.sh
+            mkdir -p /tmp/certificate-test/webroot/conf
+            openssl genpkey -genparam -algorithm DH -pkeyopt group:ffdhe2048 \
+              -out /tmp/certificate-test/webroot/conf/ssl-dhparams.pem
+            SSL_MODE=dev CERT_WEB_DOMAINS=localhost,127.0.0.1 \
+              CERT_ROOT_PATH=/tmp/certificate-test/certs \
+              CERTBOT_DATA_PATH=/tmp/certificate-test/webroot \
+              /certbot/scripts/entrypoint.sh
+            openssl x509 -noout -checkhost localhost \
+              -in /tmp/certificate-test/certs/live/localhost/fullchain.pem
+            openssl x509 -noout -checkip 127.0.0.1 \
+              -in /tmp/certificate-test/certs/live/localhost/fullchain.pem
+            test -f /tmp/certificate-test/webroot/.reload-nginx
+            test "$(stat -c %a /tmp/certificate-test/certs/live/localhost/privkey.pem)" = 600
+          '
+
       - name: Install cosign
         uses: sigstore/cosign-installer@v4.1.2
 
