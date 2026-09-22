@@ -65,3 +65,6 @@ En Windows, `COMPOSE_PATH_SEPARATOR` puede cambiar el separador de `COMPOSE_FILE
 - Usar credenciales distintas por ambiente.
 
 Para reportar una vulnerabilidad, ver [SECURITY.md](../../SECURITY.md).
+
+Para SBOM, firmas, escaneo por digest y excepciones con vencimiento de imágenes
+publicadas, ver [seguridad de imágenes](../../docs/operations/image-security.md).

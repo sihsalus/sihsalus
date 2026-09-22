@@ -23,3 +23,6 @@ CLAUDE.md
 *.key
 *.log
 *_log.txt
+
+# Generated, sanitized image-security evidence.
+/security-evidence/

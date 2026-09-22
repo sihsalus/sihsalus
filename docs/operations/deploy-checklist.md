@@ -38,6 +38,8 @@ con aprobación explícita.
   runtime y que no exista un `-Dinitializer.startup.load` en las opciones JVM
   del contenedor: una propiedad del sistema tiene precedencia sobre runtime.
   No imprimir archivos completos de propiedades o entorno que contengan secretos.
+- Firma, inventario y evidencia vigente de la [política de imágenes](image-security.md)
+  verificados para los digests que se desplegarán; no usar tags `candidate-*` como releases.
 - Versiones a desplegar identificadas: backend, frontend, portal de ayuda, content package y perfiles habilitados.
 - Backup reciente confirmado.
 - [Último simulacro físico exitoso de main](https://github.com/sihsalus/sihsalus/actions/workflows/physical-backup-drill.yml?query=branch%3Amain+is%3Asuccess) revisado; registrar URL, SHA y fecha. Si no existe, dejar el pendiente explícito. Ver [alcance del simulacro](physical-backup-drill.md).
