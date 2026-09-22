@@ -17,6 +17,7 @@ CLAUDE.md
 .env.*
 !.env.template
 /secrets/
+/.env.release-state/
 *.pem
 *.crt
 *.key

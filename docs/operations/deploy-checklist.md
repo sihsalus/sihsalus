@@ -45,6 +45,9 @@ con aprobación explícita.
 - Distinguir recuperación de imágenes y de base de datos. Volver a una imagen
   anterior no deshace migraciones SQL ya confirmadas; una consolidación de roles
   requiere el procedimiento coordinado de restauración del respaldo.
+- Para releases coordinadas, manifiestos anterior y candidato revisados,
+  imágenes conservadas y [procedimiento de aplicación/reversión](release-manifests.md)
+  probado en QLTY; registrar sus IDs y checksums junto a la evidencia.
 - Variables y secretos requeridos confirmados sin exponer valores.
 - `COMPOSE_FILE` y `COMPOSE_PROFILES` reflejan el stack real del servidor.
 - Si el entorno usa HTTPS, `COMPOSE_FILE` incluye `compose/ssl.yml` y `COMPOSE_PROFILES` incluye `ssl`.

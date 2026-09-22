@@ -87,6 +87,10 @@ jobs:
           echo "Imaging auth runtime test required: $imaging"
           echo "Grafana OIDC runtime test required: $grafana_oidc"
 
+  release-manifests:
+    name: Release manifests
+    uses: ./.github/workflows/release-manifests.yml
+
   compose:
     name: Validate Compose
     runs-on: ubuntu-latest
@@ -395,12 +399,13 @@ jobs:
   gate:
     name: PR Gate
     if: always()
-    needs: [compose, source-omods, backend, backup, monitoring, imaging, grafana-oidc]
+    needs: [compose, release-manifests, source-omods, backend, backup, monitoring, imaging, grafana-oidc]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful validations
         env:
           COMPOSE_RESULT: ${{ needs.compose.result }}
+          MANIFEST_RESULT: ${{ needs.release-manifests.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
           OMOD_RESULT: ${{ needs.source-omods.result }}
           BACKUP_RESULT: ${{ needs.backup.result }}
@@ -409,6 +414,7 @@ jobs:
           GRAFANA_OIDC_RESULT: ${{ needs.grafana-oidc.result }}
         run: |
           [ "$COMPOSE_RESULT" = "success" ]
+          [ "$MANIFEST_RESULT" = "success" ]
           [ "$OMOD_RESULT" = "success" ] || [ "$OMOD_RESULT" = "skipped" ]
           [ "$BACKEND_RESULT" = "success" ] || [ "$BACKEND_RESULT" = "skipped" ]
           [ "$BACKUP_RESULT" = "success" ] || [ "$BACKUP_RESULT" = "skipped" ]

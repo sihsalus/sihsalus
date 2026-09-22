@@ -8,6 +8,15 @@ if [ "$#" -ne 1 ] || [[ ! "$1" =~ ^[a-z0-9-]+$ ]]; then
 fi
 
 LOG_PREFIX="$1"
+
+# Once a host consumes a reviewed manifest, individual auto-deployments must not
+# replace one component or prune images behind that retained release contract.
+if [ -f .env ] && grep -Eq '^[[:space:]]*(export[[:space:]]+)?SIHSALUS_RELEASE_MANIFEST[[:space:]]*=' .env &&
+  [ "${SIHSALUS_MANIFEST_APPLY:-false}" != true ]; then
+  echo "[${LOG_PREFIX}] host is managed by a release manifest; use release-manifest.py deploy or rollback" >&2
+  exit 1
+fi
+
 TRACKED_CHANGES="$(git status --porcelain=v1 --untracked-files=no)"
 
 for compose_override in docker-compose.override.yml docker-compose.override.yaml compose.override.yml compose.override.yaml; do
