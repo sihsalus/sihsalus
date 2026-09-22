@@ -17,7 +17,7 @@ docker context show
 [[ "$(docker context show)" == default ]] || exit 2
 docker info --format '{{.ServerVersion}}'
 umask 077
-STATE="$(mktemp -d "${RUNNER_TEMP:?}/runtime-smoke.XXXXXXXX")"
+STATE="${SMOKE_STATE:?the fixture launcher must prepare synthetic state}"
 EVIDENCE="$ROOT/runtime-smoke-results/$MODE"
 mkdir -p "$EVIDENCE"
 PROJECT=''
@@ -65,9 +65,6 @@ assert_no_patients() {
 }
 
 BACKEND_DIGEST="${BACKEND_DIGEST:?the workflow must resolve a shared immutable backend digest}"
-GENERATED_ENV="$(python3 -B tests/runtime/fixtures.py prepare "$STATE" "$MODE" "$BACKEND_DIGEST")"
-while IFS= read -r assignment; do export "$assignment"; done <<< "$GENERATED_ENV"
-unset GENERATED_ENV assignment
 PROJECT="${COMPOSE_PROJECT_NAME:?synthetic project required}"
 COMPOSE=(docker compose --project-name "$PROJECT" --env-file .env.template -f docker-compose.yml)
 BUILD=(gateway frontend)

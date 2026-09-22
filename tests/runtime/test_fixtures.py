@@ -27,7 +27,8 @@ class RuntimeFixtureTests(unittest.TestCase):
             docker.chmod(0o700)
             environment = {**os.environ, "PATH": str(root) + ":" + os.environ["PATH"],
                            "GITHUB_ACTIONS": "false", "RUNTIME_TEST_MARKER": str(marker)}
-            result = subprocess.run(["bash", str(ROOT / "tests/runtime/run.sh"), "local"], env=environment,
+            result = subprocess.run([sys.executable, str(ROOT / "tests/runtime/fixtures.py"),
+                                     "run", str(root / "state"), "local", DIGEST], env=environment,
                                     capture_output=True, timeout=10)
             self.assertEqual(result.returncode, 2)
             self.assertFalse(marker.exists())

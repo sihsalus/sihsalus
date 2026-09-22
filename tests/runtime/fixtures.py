@@ -37,7 +37,8 @@ def prepare(directory, mode, digest):
         "OPENMRS_REDIRECT_URI": "http://127.0.0.1/openmrs/*",
         "IMAGING_OAUTH_REDIRECT_URI": "http://127.0.0.1/imaging/oauth2/callback",
         "KEYCLOAK_MODE": "development", "SIHSALUS_NODE_ID": str(uuid4()),
-        "BACKEND_TAG": "latest@" + digest, "FRONTEND_RUNTIME_IMAGE": project + "-frontend",
+        "BACKEND_DIGEST": digest, "BACKEND_TAG": "latest@" + digest,
+        "FRONTEND_RUNTIME_IMAGE": project + "-frontend",
         "FRONTEND_RUNTIME_TAG": "test", "SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED": "true",
     }
     metadata = {"project": project, "mode": mode, "baseURL": "http://127.0.0.1", "backendDigest": digest}
@@ -90,17 +91,14 @@ def sanitize(text, fixture):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=("prepare", "validate", "sanitize"))
+    parser.add_argument("operation", choices=("run", "validate", "sanitize"))
     parser.add_argument("directory", type=Path)
     parser.add_argument("arguments", nargs="*")
     args = parser.parse_args()
-    if args.operation == "prepare":
+    if args.operation == "run":
         fixture = prepare(args.directory, *args.arguments)
-        # Consumed by Bash command substitution, never a file or CI log. Values
-        # contain no line breaks and export receives each assignment as data.
-        for key, value in fixture["environment"].items():
-            print(f"{key}={value}")
-        return
+        os.execvpe("bash", ["bash", str(Path(__file__).with_name("run.sh")), fixture["mode"]],
+                   {**os.environ, **fixture["environment"], "SMOKE_STATE": str(args.directory.resolve())})
     fixture = json.loads((args.directory / "fixture.json").read_text())
     if args.operation == "validate":
         validate_model(json.load(sys.stdin), fixture, Path(args.arguments[0]))

@@ -71,7 +71,10 @@ jobs:
         env:
           AUTHENTICATION_MODE: ${{ matrix.authentication }}
           BACKEND_DIGEST: ${{ needs.images.outputs.backend_digest }}
-        run: bash tests/runtime/run.sh "$AUTHENTICATION_MODE"
+        run: |
+          umask 077
+          state="$(mktemp -d "$RUNNER_TEMP/runtime-smoke.XXXXXXXX")"
+          python3 -B tests/runtime/fixtures.py run "$state" "$AUTHENTICATION_MODE" "$BACKEND_DIGEST"
       - name: Record validation scope
         if: always()
         env:
