@@ -246,6 +246,16 @@ core_generator = service(core, "backend-oauth2-config")
 core_docs = service(core, "docs")
 core_gateway = service(core, "gateway")
 
+# The no-volumes reference-application fixture uses a different upstream image.
+# Check every SIHSALUS model; core.yml owns the inherited runtime policy.
+for model in (core, fua, keycloak, ssl, imaging, keycloak_ssl, monitoring, imaging_auth, imaging_auth_ssl, seed, local_auth_rollback):
+    backend_environment = service(model, "backend").get("environment", {})
+    if backend_environment.get("OMRS_EXTRA_INITIALIZER_STARTUP_LOAD") != "fail_on_error":
+        fail("every SIHSALUS backend model must stop Initializer after a metadata error")
+    for option_key in ("OMRS_JAVA_SERVER_OPTS", "JAVA_OPTS", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS"):
+        if "initializer.startup.load" in str(backend_environment.get(option_key, "")):
+            fail("Initializer startup policy must have one runtime-property source, without JVM overrides")
+
 if "samba-backup" in core.get("services", {}):
     fail("Samba is managed independently and must not be part of this stack")
 for service_name, service_config in core.get("services", {}).items():

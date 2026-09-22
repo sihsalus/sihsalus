@@ -95,6 +95,13 @@ El gateway expone dos señales distintas:
 
 Durante bootstrap, `/startup` puede estar en `200` mientras `/ready` sigue en `503`. Eso es esperado: la BD puede tener concepts parcialmente cargados y aun así OpenMRS no estar listo para atender tráfico clínico. Si aparecen errores de import OCL en logs, el estado correcto sigue siendo no listo hasta que `/ready` responda `200`.
 
+La distribución configura `initializer.startup.load=fail_on_error` mediante
+`OMRS_EXTRA_INITIALIZER_STARTUP_LOAD` en `compose/core.yml`. Initializer debe
+detener la carga al primer error; no agregar otro valor mediante opciones JVM
+ni overrides locales. Una respuesta HTTP saludable por sí sola no acredita que
+el contenido se haya aplicado: antes de promover el frontend, comprobar la
+finalización de Initializer y los contratos de metadata de la versión elegida.
+
 Comandos útiles durante arranque o actualización:
 
 ```bash
