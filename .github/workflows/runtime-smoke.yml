@@ -1,0 +1,98 @@
+name: OpenMRS runtime smoke
+
+on:
+  schedule:
+    - cron: '23 8 * * *'
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/runtime-smoke.yml'
+      - 'tests/runtime/**'
+      - '.env.template'
+      - 'docker-compose.yml'
+      - 'compose/core.yml'
+      - 'compose/keycloak.yml'
+      - 'gateway/**'
+      - 'frontend/**'
+      - 'keycloak/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  images:
+    name: Resolve published backend once
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      backend_digest: ${{ steps.backend.outputs.digest }}
+    steps:
+      - name: Resolve the same immutable backend for both authentication cases
+        id: backend
+        run: |
+          docker context show
+          docker info --format '{{.ServerVersion}}'
+          digest="$(timeout --kill-after=5s 120s docker buildx imagetools inspect ghcr.io/sihsalus/sihsalus-backend:latest --format '{{.Manifest.Digest}}')"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+  runtime:
+    name: Fresh core (${{ matrix.authentication }})
+    needs: images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        authentication: [local, keycloak]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: tests/runtime/package-lock.json
+      - name: Test fixture isolation and log redaction
+        run: python3 -B -m unittest discover -s tests/runtime -p 'test_*.py' -v
+      - name: Install the browser test runner
+        run: npm ci --ignore-scripts --prefix tests/runtime
+      - name: Install Chromium and its system dependencies
+        working-directory: tests/runtime
+        run: npx playwright install --with-deps chromium
+      - name: Start actual core images and verify browser login
+        env:
+          AUTHENTICATION_MODE: ${{ matrix.authentication }}
+          BACKEND_DIGEST: ${{ needs.images.outputs.backend_digest }}
+        run: bash tests/runtime/run.sh "$AUTHENTICATION_MODE"
+      - name: Record validation scope
+        if: always()
+        env:
+          AUTHENTICATION_MODE: ${{ matrix.authentication }}
+        run: |
+          {
+            echo '## Fresh SIHSalus core runtime smoke'
+            echo "Authentication: $AUTHENTICATION_MODE"
+            echo "Checkout: $GITHUB_SHA"
+            echo 'Backend: current published image resolved once by digest.'
+            echo 'Frontend: immutable source configured in the distro template; current runtime wrapper.'
+            echo 'Gateway and optional Keycloak: current Dockerfiles and normal Compose configuration.'
+            echo 'Synthetic fresh databases; no real patient data or DEV/QLTY/PROD access.'
+            echo 'The result is a non-clinical runtime smoke, not clinical acceptance or a deployment.'
+            echo 'Only sanitized logs and selected identity/state fields are retained; no browser trace, cookies or .env.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload only sanitized runtime evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: runtime-smoke-${{ matrix.authentication }}-${{ github.sha }}
+          path: runtime-smoke-results/${{ matrix.authentication }}/
+          if-no-files-found: warn
+          retention-days: 7

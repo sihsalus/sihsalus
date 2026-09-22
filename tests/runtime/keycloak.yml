@@ -1,0 +1,13 @@
+services:
+  keycloak:
+    container_name: ${COMPOSE_PROJECT_NAME}-keycloak
+    mem_limit: 1g
+    restart: "no"
+    ports: !reset []
+  keycloak-db:
+    container_name: ${COMPOSE_PROJECT_NAME}-keycloak-db
+    restart: "no"
+    ports: !reset []
+volumes:
+  keycloak-data:
+    name: ${COMPOSE_PROJECT_NAME}_keycloak-data

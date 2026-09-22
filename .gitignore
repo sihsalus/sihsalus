@@ -22,3 +22,4 @@ CLAUDE.md
 *.key
 *.log
 *_log.txt
+/runtime-smoke-results/
