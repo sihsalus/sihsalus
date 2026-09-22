@@ -13,6 +13,9 @@ clínicas ni el [checklist de despliegue](deploy-checklist.md).
 
 - Backend publicado: se resuelve `ghcr.io/sihsalus/sihsalus-backend:latest` una
   sola vez por ejecución; ambas variantes consumen ese mismo digest inmutable.
+  La ejecución manual admite `backend_digest` para probar un candidato ya
+  publicado del mismo repositorio de imágenes. Solo acepta un digest SHA-256
+  completo y comprueba que la resolución devuelva exactamente ese digest.
 - Frontend: fuente fijada en `.env.template`, ensamblada con el Dockerfile actual
   y la configuración normal de cada modo de autenticación.
 - Gateway y Keycloak: Dockerfiles del checkout. Bases, configuración OAuth2 y
@@ -25,6 +28,12 @@ la revisión del backend publicado pueden ser diferentes: `sources.json`,
 `containers.json`, `images.json` y el SHA del frontend en `browser.log` identifican
 los bytes realmente probados. Un cambio de backend todavía no publicado requiere
 su propia validación de candidato; este workflow no lo incorpora por inferencia.
+
+Para validar una imagen candidata, registrar primero su commit de construcción,
+resultado de CI y digest. Ejecutar manualmente este workflow con ese digest en
+`backend_digest` y conservar el enlace al resultado. El control diario y las
+ejecuciones sin ese parámetro siguen comprobando `latest`. Esta selección no
+promueve imágenes ni cambia un entorno desplegado.
 
 ## Reutilización y aislamiento
 

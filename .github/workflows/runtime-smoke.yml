@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '23 8 * * *'
   workflow_dispatch:
+    inputs:
+      backend_digest:
+        description: 'Published SIHSalus backend sha256 digest; empty selects latest'
+        type: string
+        required: false
+        default: ''
   pull_request:
     branches: [main]
     paths:
@@ -34,11 +40,19 @@ jobs:
     steps:
       - name: Resolve the same immutable backend for both authentication cases
         id: backend
+        env:
+          REQUESTED_BACKEND_DIGEST: ${{ inputs.backend_digest }}
         run: |
           docker context show
           docker info --format '{{.ServerVersion}}'
-          digest="$(timeout --kill-after=5s 120s docker buildx imagetools inspect ghcr.io/sihsalus/sihsalus-backend:latest --format '{{.Manifest.Digest}}')"
+          image='ghcr.io/sihsalus/sihsalus-backend:latest'
+          if [[ -n "$REQUESTED_BACKEND_DIGEST" ]]; then
+            [[ "$REQUESTED_BACKEND_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+            image="ghcr.io/sihsalus/sihsalus-backend@$REQUESTED_BACKEND_DIGEST"
+          fi
+          digest="$(timeout --kill-after=5s 120s docker buildx imagetools inspect "$image" --format '{{.Manifest.Digest}}')"
           [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ -z "$REQUESTED_BACKEND_DIGEST" || "$digest" == "$REQUESTED_BACKEND_DIGEST" ]]
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
   runtime:
@@ -84,7 +98,7 @@ jobs:
             echo '## Fresh SIHSalus core runtime smoke'
             echo "Authentication: $AUTHENTICATION_MODE"
             echo "Checkout: $GITHUB_SHA"
-            echo 'Backend: current published image resolved once by digest.'
+            echo 'Backend: published SIHSalus image resolved once by digest; latest by default, or an explicit manual candidate.'
             echo 'Frontend: immutable source configured in the distro template; current runtime wrapper.'
             echo 'Gateway and optional Keycloak: current Dockerfiles and normal Compose configuration.'
             echo 'Synthetic fresh databases; no real patient data or DEV/QLTY/PROD access.'
