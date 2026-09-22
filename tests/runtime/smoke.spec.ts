@@ -92,7 +92,9 @@ test('published core serves its SPA, authenticates, and ends the synthetic sessi
     await expect(page.getByRole('banner').first()).toBeVisible();
     const current = await session();
     expect(current.authenticated).toBe(true);
-    expect(current.user.username).toBe('admin');
+    // OpenMRS also authenticates by systemId; the bootstrap administrator may
+    // have no username. Both fields are part of the REST session contract.
+    expect(current.user.username || current.user.systemId).toBe('admin');
     expect(errors).toEqual([]);
   });
 
