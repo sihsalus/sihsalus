@@ -50,6 +50,7 @@ other_gates = [
     "Resolve pinned OpenMRS security baseline",
     "Scan pinned OpenMRS baseline",
     "Enforce backend vulnerability ratchet",
+    "Validate current exception policy",
     "Install cosign",
     "Sign image",
 ]
@@ -60,8 +61,16 @@ def validate_structure(source):
         body = step(name, source)
         assert "        if:" not in body, name + " must run in both modes"
         assert "continue-on-error" not in body, name + " must remain blocking"
-    for name in image_gates + ["Produce backend Trivy evidence", "Sign image", "Promote verified backend image"]:
+    for name in image_gates + ["Produce backend Trivy evidence", "Sign image", "Publish verified release aliases"]:
         assert "${{ steps.image.outputs.digest }}" in step(name, source), name + " must use the resolved digest"
+    attestation = step("Require attested and scanned backend digest", source)
+    assert "!cancelled() && steps.image.outcome == 'success' && steps.image.outputs.digest != ''" in attestation
+    assert "image: ghcr.io/sihsalus/sihsalus-backend@${{ steps.image.outputs.digest }}" in attestation
+    assert "source: ${{ steps.request.outputs.source_sha }}" in attestation
+    assert "continue-on-error" not in attestation
+    assert source.index("name: Require attested and scanned backend digest") < source.index("name: Sign image")
+    assert "run: bash scripts/security/promote-image.sh" in step("Publish verified release aliases", source)
+    assert "PROMOTE_LATEST: ${{ github.ref == 'refs/heads/main' }}" in step("Publish verified release aliases", source)
     assert source.count("steps.build.outputs.digest") == 1
     assert "BUILD_DIGEST: ${{ steps.build.outputs.digest }}" in step("Resolve backend image for verification", source)
     assert "REUSE_DIGEST: ${{ steps.reuse.outputs.digest }}" in step("Resolve backend image for verification", source)
@@ -70,19 +79,20 @@ def validate_structure(source):
     assert "if: steps.request.outputs.mode == 'build'" in build
     assert "cache-to: type=gha,scope=backend,mode=max,ignore-error=true" in build
     assert "continue-on-error" not in build
-    assert "tags: ghcr.io/sihsalus/sihsalus-backend:sha-${{ github.sha }}" in build
+    assert "tags: ghcr.io/sihsalus/sihsalus-backend:candidate-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}" in build
     assert "SECURITY_REFRESH=${{ github.sha }}" in build
     assert "if: steps.request.outputs.mode == 'verify-existing'" in step("Verify existing immutable backend image", source)
     assert "if: steps.request.outputs.mode == 'verify-existing'" in step("Check out the existing image source", source)
-    assert "if: github.ref == 'refs/heads/main' && steps.request.outputs.mode == 'build'" in step("Promote verified backend image", source)
+    assert "if: steps.request.outputs.mode == 'build'" in step("Publish verified release aliases", source)
     assert "if: steps.request.outputs.mode == 'build'" in step("Make package public", source)
     assert "always() && steps.image.outcome == 'success' && steps.image.outputs.digest != ''" in step("Produce backend Trivy evidence", source)
     assert "always() && hashFiles('trivy-backend-results.sarif') != ''" in step("Upload backend Trivy evidence", source)
-    checkout = block(source, "uses: actions/checkout@v7.0.1")
+    checkout = block(source, "uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1")
     assert "ref: ${{ github.sha }}" in checkout
     assert "fetch-depth: ${{ steps.request.outputs.mode == 'verify-existing' && '0' || '1' }}" in checkout
     ordered = ["name: Validate backend workflow request", "uses: actions/checkout@", "name: Test backend workflow contract",
-               "name: Check out the existing image source", "name: Validate published O3 Forms dependency contract",
+               "name: Check out the existing image source", "name: Restore current image security policy",
+               "name: Validate current exception policy", "name: Validate published O3 Forms dependency contract",
                "uses: docker/login-action@"]
     positions = [source.index(value) for value in ordered]
     assert positions == sorted(positions), "Validate the workflow before checking out the image's source tests"
@@ -96,7 +106,9 @@ mutations = {
     "scan a mutable alias": workflow.replace("image-ref: ghcr.io/sihsalus/sihsalus-backend@${{ steps.image.outputs.digest }}",
         "image-ref: ghcr.io/sihsalus/sihsalus-backend:latest", 1),
     "skip reuse SARIF": workflow.replace("steps.image.outcome == 'success'", "steps.build.outcome == 'success'"),
-    "promote reuse": workflow.replace("if: github.ref == 'refs/heads/main' && steps.request.outputs.mode == 'build'",
+    "skip reused-image attestation": workflow.replace("!cancelled() && steps.image.outcome", "!cancelled() && steps.build.outcome"),
+    "attest wrong source": workflow.replace("source: ${{ steps.request.outputs.source_sha }}", "source: ${{ github.sha }}"),
+    "promote reuse": workflow.replace("if: steps.request.outputs.mode == 'build'",
         "if: github.ref == 'refs/heads/main'"),
     "publish reuse": workflow.replace("      - name: Make package public\n        if: steps.request.outputs.mode == 'build'",
         "      - name: Make package public"),
@@ -176,7 +188,14 @@ with TemporaryDirectory(prefix="sihsalus-backend-workflow-") as temporary:
     git("commit", "--quiet", "-m", "image source")
     source_sha = git("rev-parse", "HEAD")
     (repository / "source-lock").write_text("workflow source")
-    git("commit", "--quiet", "-am", "workflow source")
+    security_paths = [".github/actions/check-image/action.yml", "scripts/security/image-policy.py",
+                      "scripts/security/image-tool.py", "scripts/security/scan-image.sh", "security/image-exceptions.json"]
+    for name in security_paths:
+        target = repository / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("current reviewed policy")
+    git("add", ".")
+    git("commit", "--quiet", "-m", "workflow source")
     workflow_sha = git("rev-parse", "HEAD")
     unrelated = git("commit-tree", git("write-tree"), "-m", "unrelated source")
     git("commit", "--quiet", "--allow-empty", "-m", "future descendant")
@@ -188,6 +207,13 @@ with TemporaryDirectory(prefix="sihsalus-backend-workflow-") as temporary:
         if candidate == source_sha:
             assert (repository / "source-lock").read_text() == "image source"
     print("[OK] Exact source checkout accepts ancestors and rejects unrelated, future or missing commits")
+    execute("Check out the existing image source", dict(base, SOURCE_SHA=source_sha, GITHUB_SHA=workflow_sha), True, repository)
+    execute("Restore current image security policy", dict(base, GITHUB_SHA=workflow_sha), True, repository)
+    assert git("rev-parse", "HEAD") == source_sha
+    assert (repository / "source-lock").read_text() == "image source"
+    for name in security_paths:
+        assert (repository / name).read_text() == "current reviewed policy"
+    print("[OK] Historical image contracts retain current security action, scanner and exception policy")
 
     executable = directory / "bin"
     executable.mkdir()

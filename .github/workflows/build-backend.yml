@@ -5,6 +5,12 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/build-backend.yml'
+      - '.github/actions/check-image/**'
+      - 'scripts/security/image-policy.py'
+      - 'scripts/security/image-tool.py'
+      - 'scripts/security/scan-image.sh'
+      - 'scripts/security/promote-image.sh'
+      - 'security/image-exceptions.json'
       - 'pom.xml'
       - 'backend/**'
       - 'tests/backend/ocl-token-image.sh'
@@ -93,7 +99,7 @@ jobs:
             echo "source_sha=${SOURCE_SHA}"
           } >>"${GITHUB_OUTPUT}"
 
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: ${{ steps.request.outputs.mode == 'verify-existing' && '0' || '1' }}
@@ -114,6 +120,17 @@ jobs:
           fi
           git checkout --detach "${SOURCE_SHA}"
           test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+
+      - name: Restore current image security policy
+        if: steps.request.outputs.mode == 'verify-existing'
+        run: |
+          git restore --source="$GITHUB_SHA" --worktree -- \
+            .github/actions/check-image scripts/security/image-policy.py \
+            scripts/security/image-tool.py scripts/security/scan-image.sh \
+            security/image-exceptions.json
+
+      - name: Validate current exception policy
+        run: python3 scripts/security/image-policy.py check-policy security/image-exceptions.json
 
       - uses: actions/setup-java@v6
         with:
@@ -155,7 +172,7 @@ jobs:
           push: true
           provenance: mode=max
           sbom: true
-          tags: ghcr.io/sihsalus/sihsalus-backend:sha-${{ github.sha }}
+          tags: ghcr.io/sihsalus/sihsalus-backend:candidate-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
           build-args: |
@@ -257,8 +274,10 @@ jobs:
           echo "image=${baseline_image}" >>"${GITHUB_OUTPUT}"
 
       - name: Scan immutable backend candidate
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.74.0
+          scanners: vuln
           image-ref: ghcr.io/sihsalus/sihsalus-backend@${{ steps.image.outputs.digest }}
           format: json
           output: trivy-backend-candidate.json
@@ -268,8 +287,10 @@ jobs:
           vuln-type: os,library
 
       - name: Scan pinned OpenMRS baseline
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.74.0
+          scanners: vuln
           image-ref: ${{ steps.openmrs-baseline.outputs.image }}
           format: json
           output: trivy-openmrs-baseline.json
@@ -283,8 +304,10 @@ jobs:
 
       - name: Produce backend Trivy evidence
         if: ${{ always() && steps.image.outcome == 'success' && steps.image.outputs.digest != '' }}
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.74.0
+          scanners: vuln
           image-ref: ghcr.io/sihsalus/sihsalus-backend@${{ steps.image.outputs.digest }}
           format: sarif
           output: trivy-backend-results.sarif
@@ -304,24 +327,25 @@ jobs:
       - name: Install cosign
         uses: sigstore/cosign-installer@v4.1.2
 
+      - name: Require attested and scanned backend digest
+        if: ${{ !cancelled() && steps.image.outcome == 'success' && steps.image.outputs.digest != '' }}
+        uses: ./.github/actions/check-image
+        with:
+          image: ghcr.io/sihsalus/sihsalus-backend@${{ steps.image.outputs.digest }}
+          source: ${{ steps.request.outputs.source_sha }}
+          artifact-name: backend-image-security-${{ github.sha }}
+
       - name: Sign image
         env:
           DIGEST: ${{ steps.image.outputs.digest }}
         run: cosign sign --yes "ghcr.io/sihsalus/sihsalus-backend@${DIGEST}"
 
-      - name: Promote verified backend image
-        if: github.ref == 'refs/heads/main' && steps.request.outputs.mode == 'build'
+      - name: Publish verified release aliases
+        if: steps.request.outputs.mode == 'build'
         env:
-          DIGEST: ${{ steps.image.outputs.digest }}
-        run: |
-          set -euo pipefail
-          image='ghcr.io/sihsalus/sihsalus-backend'
-          docker buildx imagetools create --prefer-index=false --tag "${image}:latest" "${image}@${DIGEST}"
-          promoted_digest="$(docker buildx imagetools inspect "${image}:latest" --format '{{.Manifest.Digest}}')"
-          if [[ "${promoted_digest}" != "${DIGEST}" ]]; then
-            echo "::error::The promoted backend alias does not resolve to the scanned digest."
-            exit 1
-          fi
+          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.image.outputs.digest }}
+          PROMOTE_LATEST: ${{ github.ref == 'refs/heads/main' }}
+        run: bash scripts/security/promote-image.sh "$IMAGE" "$GITHUB_SHA" "$PROMOTE_LATEST"
 
       - name: Make package public
         if: steps.request.outputs.mode == 'build'

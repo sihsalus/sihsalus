@@ -29,7 +29,7 @@ RUN test -n "$SPA_CONFIG_URLS" || { echo "SPA_CONFIG_URLS build arg is required;
          find "$SPA_OUTPUT_DIR" -type f -name "*.map" -delete; \
        fi
 
-FROM nginx:1.28-alpine
+FROM nginx:1.30.5-alpine@sha256:a5f2157a0302eb0c5e300415effb63a9e70ed1eb9c107283819bf6d149ab607c
 
 ARG SIHSALUS_NODE_ID=unconfigured
 

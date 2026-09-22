@@ -62,7 +62,12 @@ bash backend/bin/build-source-omods.sh test-core28 initializer
 ```
 
 Packaging uses Java 21 and compiles sibling test JARs required by upstream
-reactors. Tests use Java 21 except Initializer: first install its full reactor
+reactors. OAuth2Login tests use Java 8, matching its upstream JUnit/PowerMock
+stack. Its pinned SIHSalus candidate registers routes through the native module
+servlet/filter lifecycle; acceptance also requires fresh Core 2.8 startup and
+actual Keycloak login, callback, session and logout.
+
+Other tests use Java 21 except Initializer: first install its full reactor
 with `test initializer` on Java 11, then run `test-core28 initializer` on Java 21
 using the same Maven repository. `OMOD_MAVEN_REPOSITORY` selects an isolated cache;
 `OMOD_TEST_REPORTS` selects the Surefire evidence directory.
@@ -116,7 +121,10 @@ source must be an ancestor of the workflow revision. The workflow checks out
 that source for the package contracts and pinned dependencies, verifies the
 image's digest, architecture and revision label, and runs the same image tests,
 security scans, vulnerability ratchet and signature as a new build. It records
-both the workflow and image source revisions. This mode does not promote a
+both the workflow and image source revisions. The security action, scanner tools
+and exception policy are restored from the workflow revision after checking out
+the historical source, so reverification cannot restore an older publication policy.
+This mode does not promote a
 release alias, change package visibility or deploy a service.
 
 Normal builds continue to fail on build, publication or verification errors.

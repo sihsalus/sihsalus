@@ -1,5 +1,10 @@
 # Despliegue del frontend
 
+Para una release coordinada de todos los servicios, usar el
+[procedimiento de manifiestos inmutables](../../docs/operations/release-manifests.md).
+Los hosts que adoptan ese flujo consumen el mismo manifiesto al desplegar y
+revertir; sus actualizaciones individuales quedan deshabilitadas.
+
 `deploy-frontend.sh` actualiza exclusivamente el frontend desde una imagen
 inmutable que ya fue publicada y analizada en `sihsalus-frontend`.
 

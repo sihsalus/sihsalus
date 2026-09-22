@@ -17,8 +17,12 @@ CLAUDE.md
 .env.*
 !.env.template
 /secrets/
+/.env.release-state/
 *.pem
 *.crt
 *.key
 *.log
 *_log.txt
+
+# Generated, sanitized image-security evidence.
+/security-evidence/
