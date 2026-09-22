@@ -24,6 +24,7 @@ jobs:
       monitoring: ${{ steps.scope.outputs.monitoring }}
       imaging: ${{ steps.scope.outputs.imaging }}
       grafana_oidc: ${{ steps.scope.outputs.grafana_oidc }}
+      image_security: ${{ steps.scope.outputs.image_security }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -40,6 +41,7 @@ jobs:
           monitoring=true
           imaging=true
           grafana_oidc=true
+          image_security=true
 
           can_diff=false
           if [ "$EVENT_NAME" != "workflow_dispatch" ] \
@@ -74,18 +76,28 @@ jobs:
             grafana_oidc=false
           fi
 
+          if [ "$can_diff" = "true" ] \
+            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml .github/workflows/build-backend.yml .github/workflows/build-gateway.yml .github/workflows/build-certbot.yml .github/actions/check-image/ scripts/security/image-policy.py scripts/security/image-tool.py scripts/security/scan-image.sh scripts/security/promote-image.sh security/image-exceptions.json tests/security/; then
+            image_security=false
+          fi
+
           {
             echo "backend=$backend"
             echo "backup=$backup"
             echo "monitoring=$monitoring"
             echo "imaging=$imaging"
             echo "grafana_oidc=$grafana_oidc"
+            echo "image_security=$image_security"
           } >> "$GITHUB_OUTPUT"
           echo "Backend build required: $backend"
           echo "Backup round-trip required: $backup"
           echo "Monitoring runtime test required: $monitoring"
           echo "Imaging auth runtime test required: $imaging"
           echo "Grafana OIDC runtime test required: $grafana_oidc"
+
+  release-manifests:
+    name: Release manifests
+    uses: ./.github/workflows/release-manifests.yml
 
   compose:
     name: Validate Compose
@@ -138,6 +150,11 @@ jobs:
 
       - name: Test backend vulnerability ratchet
         run: bash tests/backend/vulnerability-ratchet-config.sh
+
+      - name: Test immutable image policy and current exception ownership
+        run: |
+          python3 -B -m unittest discover -s tests/security -p 'test_image_*.py' -v
+          python3 -B scripts/security/image-policy.py check-policy security/image-exceptions.json
 
       - name: Test Tomcat rootless configuration directory contract
         run: bash tests/backend/tomcat-config-config.sh
@@ -281,8 +298,10 @@ jobs:
           echo "image=${baseline_image}" >>"${GITHUB_OUTPUT}"
 
       - name: Scan backend candidate
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.74.0
+          scanners: vuln
           image-ref: sihsalus-backend:ci
           format: json
           output: trivy-backend-candidate.json
@@ -292,8 +311,10 @@ jobs:
           vuln-type: os,library
 
       - name: Scan pinned OpenMRS baseline
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.74.0
+          scanners: vuln
           image-ref: ${{ steps.openmrs-baseline.outputs.image }}
           format: json
           output: trivy-openmrs-baseline.json
@@ -307,8 +328,10 @@ jobs:
 
       - name: Produce backend Trivy evidence
         if: always()
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.74.0
+          scanners: vuln
           image-ref: sihsalus-backend:ci
           format: sarif
           output: trivy-backend-results.sarif
@@ -392,26 +415,49 @@ jobs:
       - name: Test real Grafana roles, denied login, expired code and logout
         run: python3 -B tests/monitoring/oidc/runtime.py runtime
 
+  image-security:
+    name: Image attestations and policy
+    needs: changes
+    if: needs.changes.outputs.image_security == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          platforms: arm64
+      - uses: docker/setup-buildx-action@v4
+      - uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514 # v0.2.6
+        with:
+          version: v0.74.0
+          cache: true
+      - name: Verify real SPDX, scanner report binding and release aliases
+        run: python3 -B tests/security/image-security-runtime.py
+
   gate:
     name: PR Gate
     if: always()
-    needs: [compose, source-omods, backend, backup, monitoring, imaging, grafana-oidc]
+    needs: [compose, release-manifests, source-omods, backend, backup, monitoring, imaging, grafana-oidc, image-security]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful validations
         env:
           COMPOSE_RESULT: ${{ needs.compose.result }}
+          MANIFEST_RESULT: ${{ needs.release-manifests.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
           OMOD_RESULT: ${{ needs.source-omods.result }}
           BACKUP_RESULT: ${{ needs.backup.result }}
           MONITORING_RESULT: ${{ needs.monitoring.result }}
           IMAGING_RESULT: ${{ needs.imaging.result }}
           GRAFANA_OIDC_RESULT: ${{ needs.grafana-oidc.result }}
+          IMAGE_SECURITY_RESULT: ${{ needs.image-security.result }}
         run: |
           [ "$COMPOSE_RESULT" = "success" ]
+          [ "$MANIFEST_RESULT" = "success" ]
           [ "$OMOD_RESULT" = "success" ] || [ "$OMOD_RESULT" = "skipped" ]
           [ "$BACKEND_RESULT" = "success" ] || [ "$BACKEND_RESULT" = "skipped" ]
           [ "$BACKUP_RESULT" = "success" ] || [ "$BACKUP_RESULT" = "skipped" ]
           [ "$MONITORING_RESULT" = "success" ] || [ "$MONITORING_RESULT" = "skipped" ]
           [ "$IMAGING_RESULT" = "success" ] || [ "$IMAGING_RESULT" = "skipped" ]
           [ "$GRAFANA_OIDC_RESULT" = "success" ] || [ "$GRAFANA_OIDC_RESULT" = "skipped" ]
+          [ "$IMAGE_SECURITY_RESULT" = "success" ] || [ "$IMAGE_SECURITY_RESULT" = "skipped" ]

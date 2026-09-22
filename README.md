@@ -18,6 +18,7 @@
 - [Profiles](#profiles)
 - [Arquitectura de infraestructura](docs/architecture/infrastructure.md)
 - [Cambio obligatorio de contraseña local](docs/operations/forced-password-change.md)
+- [Detección de secretos y atención de alertas](docs/operations/secret-scanning.md)
 - [Actualización en Producción](#actualización-en-producción)
 - [Docker Bake (Build)](#docker-bake-build)
 - [Configuración SSL/HTTPS](#configuración-sslhttps)
@@ -93,6 +94,13 @@ El gateway expone dos señales distintas:
 - `GET /ready`: proxy a `/openmrs/health/started`; responde `200` solo cuando OpenMRS terminó de inicializar.
 
 Durante bootstrap, `/startup` puede estar en `200` mientras `/ready` sigue en `503`. Eso es esperado: la BD puede tener concepts parcialmente cargados y aun así OpenMRS no estar listo para atender tráfico clínico. Si aparecen errores de import OCL en logs, el estado correcto sigue siendo no listo hasta que `/ready` responda `200`.
+
+La distribución configura `initializer.startup.load=fail_on_error` mediante
+`OMRS_EXTRA_INITIALIZER_STARTUP_LOAD` en `compose/core.yml`. Initializer debe
+detener la carga al primer error; no agregar otro valor mediante opciones JVM
+ni overrides locales. Una respuesta HTTP saludable por sí sola no acredita que
+el contenido se haya aplicado: antes de promover el frontend, comprobar la
+finalización de Initializer y los contratos de metadata de la versión elegida.
 
 Comandos útiles durante arranque o actualización:
 

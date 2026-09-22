@@ -125,7 +125,15 @@ if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
   check_secret MYSQL_OPENMRS_PASSWORD
   check_secret MYSQL_ROOT_PASSWORD
 
-  if [ "$(env_value DEPLOYMENT_ENV)" = "production" ]; then
+  RELEASE_MANIFEST="$(env_value SIHSALUS_RELEASE_MANIFEST)"
+  if [ -n "$RELEASE_MANIFEST" ]; then
+    if python3 "$ROOT_DIR/scripts/deploy/release-manifest.py" check-selected "$RELEASE_MANIFEST" \
+      --root "$ROOT_DIR" --env-file "$ENV_ABSOLUTE"; then
+      ok "Every enabled service uses its reviewed immutable release image"
+    else
+      fail "Effective Compose selection does not match the reviewed release manifest"
+    fi
+  elif [ "$(env_value DEPLOYMENT_ENV)" = "production" ]; then
     check_pinned_tag BACKEND_TAG
     check_pinned_tag FRONTEND_SOURCE_TAG
     check_pinned_tag FRONTEND_RUNTIME_TAG
