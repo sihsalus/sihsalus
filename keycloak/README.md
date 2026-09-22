@@ -53,6 +53,12 @@ En modo `production`, el contenedor exige hostname y redirect URI HTTPS, habilit
 
 Los endpoints de token, user info y claves usan la red interna Docker. Las redirecciones del navegador usan `KEYCLOAK_PUBLIC_URL` a través del gateway.
 
+La propiedad `oauth2login.redirectUriAfterLogin` usa `/spa/home`, relativa al
+contexto de OpenMRS. Spring agrega `/openmrs` al resolver el redirect del
+controlador; incluir ese prefijo en la propiedad produce
+`/openmrs/openmrs/spa/home`. El archivo declarativo del override mantiene el
+destino; no requiere reescrituras en el gateway.
+
 ## OpenMRS local con Keycloak para Imaging
 
 Para usar el login local de OpenMRS y conservar Keycloak como proveedor de
@@ -107,6 +113,12 @@ un contenedor que ya esté ejecutándose.
 ## Usuarios y permisos
 
 El usuario autenticado debe poder mapearse a un usuario OpenMRS. Mantén el mismo `username` en ambos sistemas y administra roles clínicos dentro de OpenMRS. El realm importado configura OIDC, pero no sustituye la autorización clínica. Imaging es la excepción explícita: el gateway exige además el realm role `imaging-access` antes de exponer OHIF o DICOMweb.
+
+La cuenta de arranque del realm declara `requiredActions: ["UPDATE_PASSWORD"]`.
+En Keycloak 26.4.1, importar una credencial con `temporary: true` no agrega esa
+acción: el importador crea la contraseña y aplica por separado las acciones del
+usuario. La acción explícita obliga a cambiarla en el primer acceso. Afecta
+importaciones nuevas; no rota contraseñas ni modifica un realm ya existente.
 
 ## Diagnóstico
 

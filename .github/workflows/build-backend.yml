@@ -25,7 +25,22 @@ on:
       - 'tests/backend/ModuleDependencyVerifier.java'
       - 'tests/backend/vulnerability-ratchet.sh'
       - 'tests/backend/vulnerability-ratchet-config.sh'
+      - 'tests/backend/build-backend-config.sh'
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Build a new image or verify an already published immutable candidate
+        type: choice
+        options: [build, verify-existing]
+        default: build
+      source_sha:
+        description: 'verify-existing only: full lowercase source commit SHA'
+        type: string
+        required: false
+      image_digest:
+        description: 'verify-existing only: sha256 followed by a colon and 64 lowercase hexadecimal characters'
+        type: string
+        required: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -42,7 +57,77 @@ jobs:
       packages: write
       security-events: write
     steps:
+      - name: Validate backend workflow request
+        id: request
+        env:
+          MODE: ${{ inputs.mode || 'build' }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REPOSITORY}" != 'sihsalus/sihsalus' ]]; then
+            echo '::error::Backend publication and verification require the canonical repository.'
+            exit 1
+          fi
+          case "${MODE}" in
+            build)
+              if [[ -n "${SOURCE_SHA}" || -n "${IMAGE_DIGEST}" ]]; then
+                echo '::error::Existing-image inputs require explicit verify-existing mode.'
+                exit 1
+              fi
+              SOURCE_SHA="${GITHUB_SHA}"
+              ;;
+            verify-existing)
+              if [[ "${GITHUB_EVENT_NAME}" != 'workflow_dispatch' \
+                || "${GITHUB_REF}" != refs/heads/* || "${GITHUB_REF}" == 'refs/heads/main' ]]; then
+                echo '::error::verify-existing requires a manual run on a non-main branch.'
+                exit 1
+              fi
+              if [[ ! "${SOURCE_SHA}" =~ ^[0-9a-f]{40}$ \
+                || ! "${IMAGE_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+                echo '::error::Provide both an immutable full source SHA and a full sha256 image digest.'
+                exit 1
+              fi
+              ;;
+            *)
+              echo '::error::Unknown backend workflow mode.'
+              exit 1
+              ;;
+          esac
+          {
+            echo "mode=${MODE}"
+            echo "source_sha=${SOURCE_SHA}"
+          } >>"${GITHUB_OUTPUT}"
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: ${{ steps.request.outputs.mode == 'verify-existing' && '0' || '1' }}
+
+      - name: Test backend workflow contract
+        run: bash tests/backend/build-backend-config.sh
+
+      - name: Check out the existing image source
+        if: steps.request.outputs.mode == 'verify-existing'
+        env:
+          SOURCE_SHA: ${{ steps.request.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          if ! git cat-file -e "${SOURCE_SHA}^{commit}" \
+            || ! git merge-base --is-ancestor "${SOURCE_SHA}" "${GITHUB_SHA}"; then
+            echo '::error::The image source must be a commit in the workflow revision ancestry.'
+            exit 1
+          fi
+          git checkout --detach "${SOURCE_SHA}"
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+
+      - name: Restore current image security policy
+        if: steps.request.outputs.mode == 'verify-existing'
+        run: |
+          git restore --source="$GITHUB_SHA" --worktree -- \
+            .github/actions/check-image scripts/security/image-policy.py \
+            scripts/security/image-tool.py scripts/security/scan-image.sh \
+            security/image-exceptions.json
 
       - name: Validate current exception policy
         run: python3 scripts/security/image-policy.py check-policy security/image-exceptions.json
@@ -80,6 +165,7 @@ jobs:
 
       - uses: docker/build-push-action@v7
         id: build
+        if: steps.request.outputs.mode == 'build'
         with:
           context: .
           file: backend/Dockerfile
@@ -92,11 +178,60 @@ jobs:
           build-args: |
             SECURITY_REFRESH=${{ github.sha }}
           cache-from: type=gha,scope=backend
-          cache-to: type=gha,scope=backend,mode=max
+          cache-to: type=gha,scope=backend,mode=max,ignore-error=true
+
+      - name: Verify existing immutable backend image
+        id: reuse
+        if: steps.request.outputs.mode == 'verify-existing'
+        env:
+          SOURCE_SHA: ${{ steps.request.outputs.source_sha }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/sihsalus/sihsalus-backend@${IMAGE_DIGEST}"
+          manifest_digest="$(docker buildx imagetools inspect "${image}" --format '{{.Manifest.Digest}}')"
+          if [[ "${manifest_digest}" != "${IMAGE_DIGEST}" ]]; then
+            echo '::error::The existing image manifest does not match the requested digest.'
+            exit 1
+          fi
+          docker pull --platform linux/amd64 "${image}"
+          platform="$(docker image inspect "${image}" --format '{{.Os}}/{{.Architecture}}')"
+          revision="$(docker image inspect "${image}" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+          if [[ "${platform}" != 'linux/amd64' || "${revision}" != "${SOURCE_SHA}" ]]; then
+            echo '::error::The existing image must be linux/amd64 and match its immutable source revision.'
+            exit 1
+          fi
+          echo "digest=${IMAGE_DIGEST}" >>"${GITHUB_OUTPUT}"
+
+      - name: Resolve backend image for verification
+        id: image
+        env:
+          MODE: ${{ steps.request.outputs.mode }}
+          SOURCE_SHA: ${{ steps.request.outputs.source_sha }}
+          BUILD_DIGEST: ${{ steps.build.outputs.digest }}
+          REUSE_DIGEST: ${{ steps.reuse.outputs.digest }}
+        run: |
+          set -euo pipefail
+          if [[ "${MODE}" == 'verify-existing' ]]; then
+            digest="${REUSE_DIGEST}"
+          else
+            digest="${BUILD_DIGEST}"
+          fi
+          if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo '::error::Verification requires a resolved immutable image digest.'
+            exit 1
+          fi
+          echo "digest=${digest}" >>"${GITHUB_OUTPUT}"
+          {
+            echo "Backend verification mode: ${MODE}"
+            echo "Image source commit: ${SOURCE_SHA}"
+            echo "Workflow commit: ${GITHUB_SHA}"
+            echo "Image: ghcr.io/sihsalus/sihsalus-backend@${digest}"
+          } >>"${GITHUB_STEP_SUMMARY}"
 
       - name: Test published backend OCL token contract
         env:
-          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.image.outputs.digest }}
         run: |
           set -euo pipefail
           docker pull "${IMAGE}"
@@ -104,27 +239,27 @@ jobs:
 
       - name: Verify packaged versions, owned release bytes and compiled protections
         env:
-          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.image.outputs.digest }}
         run: bash tests/backend/source-omods-image.sh "$IMAGE"
 
       - name: Verify published O3 Forms bytes in backend image
         env:
-          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.image.outputs.digest }}
         run: bash tests/backend/o3forms-release-image.sh "$IMAGE"
 
       - name: Verify required OMOD dependency compatibility with packaged Core
         env:
-          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.image.outputs.digest }}
         run: bash tests/backend/module-dependencies-image.sh "$IMAGE"
 
       - name: Test published backend forced-password contract
         env:
-          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.image.outputs.digest }}
         run: ./tests/backend/forced-password-image.sh "${IMAGE}"
 
       - name: Test published backend Tomcat configuration directory permissions
         env:
-          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.image.outputs.digest }}
         run: bash tests/backend/tomcat-config-image.sh "$IMAGE"
 
       - name: Resolve pinned OpenMRS security baseline
@@ -143,7 +278,7 @@ jobs:
         with:
           version: v0.74.0
           scanners: vuln
-          image-ref: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+          image-ref: ghcr.io/sihsalus/sihsalus-backend@${{ steps.image.outputs.digest }}
           format: json
           output: trivy-backend-candidate.json
           severity: HIGH,CRITICAL
@@ -168,12 +303,12 @@ jobs:
         run: bash tests/backend/vulnerability-ratchet.sh trivy-backend-candidate.json trivy-openmrs-baseline.json
 
       - name: Produce backend Trivy evidence
-        if: ${{ always() && steps.build.outcome == 'success' && steps.build.outputs.digest != '' }}
+        if: ${{ always() && steps.image.outcome == 'success' && steps.image.outputs.digest != '' }}
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           version: v0.74.0
           scanners: vuln
-          image-ref: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+          image-ref: ghcr.io/sihsalus/sihsalus-backend@${{ steps.image.outputs.digest }}
           format: sarif
           output: trivy-backend-results.sarif
           severity: HIGH,CRITICAL
@@ -193,25 +328,27 @@ jobs:
         uses: sigstore/cosign-installer@v4.1.2
 
       - name: Require attested and scanned backend digest
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.build.outputs.digest != '' }}
+        if: ${{ !cancelled() && steps.image.outcome == 'success' && steps.image.outputs.digest != '' }}
         uses: ./.github/actions/check-image
         with:
-          image: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
-          source: ${{ github.sha }}
+          image: ghcr.io/sihsalus/sihsalus-backend@${{ steps.image.outputs.digest }}
+          source: ${{ steps.request.outputs.source_sha }}
           artifact-name: backend-image-security-${{ github.sha }}
 
       - name: Sign image
         env:
-          DIGEST: ${{ steps.build.outputs.digest }}
+          DIGEST: ${{ steps.image.outputs.digest }}
         run: cosign sign --yes "ghcr.io/sihsalus/sihsalus-backend@${DIGEST}"
 
       - name: Publish verified release aliases
+        if: steps.request.outputs.mode == 'build'
         env:
-          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.build.outputs.digest }}
+          IMAGE: ghcr.io/sihsalus/sihsalus-backend@${{ steps.image.outputs.digest }}
           PROMOTE_LATEST: ${{ github.ref == 'refs/heads/main' }}
         run: bash scripts/security/promote-image.sh "$IMAGE" "$GITHUB_SHA" "$PROMOTE_LATEST"
 
       - name: Make package public
+        if: steps.request.outputs.mode == 'build'
         run: |
           curl -s -X PATCH \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \

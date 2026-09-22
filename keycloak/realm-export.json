@@ -137,6 +137,7 @@
       "lastName": "User",
       "email": "admin@openmrs.org",
       "emailVerified": true,
+      "requiredActions": ["UPDATE_PASSWORD"],
             "credentials": [
                 {
                     "type": "password",

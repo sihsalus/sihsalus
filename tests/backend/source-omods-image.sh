@@ -37,6 +37,37 @@ for path in modules.glob('*.omod'):
         module, version = config.findtext('id'), config.findtext('version')
         assert module not in actual, f'Duplicate OMOD: {module}'
         actual[module] = version
+        if module == 'sihsalusaudit':
+            assert config.findtext('package') == 'org.openmrs.module.sihsalusaudit'
+            assert config.findtext('activator') == 'org.openmrs.module.sihsalusaudit.ClinicalAuditActivator', \
+                'Clinical audit must declare its OpenMRS lifecycle entry point'
+            assert {p.findtext('name') for p in config.findall('privilege')} == {
+                'Record Clinical Audit Events', 'View Clinical Audit Events'
+            }, 'Clinical audit ingestion/review privileges must remain separate'
+            patterns = {p.text for p in config.findall('filter-mapping/url-pattern')}
+            assert {'/ws/rest/v1/sihsalus/audit', '/ws/rest/v1/sihsalus/audit/*'} <= patterns
+            for entry in (
+                'org/openmrs/module/sihsalusaudit/web/ClinicalAuditController.class',
+                'org/openmrs/module/sihsalusaudit/web/filter/RestErrorSanitizingFilter.class',
+                'ClinicalAuditEvent.hbm.xml', 'liquibase.xml',
+            ):
+                assert entry in archive.namelist(), f'Clinical audit runtime resource missing: {entry}'
+            mapping = ET.fromstring(archive.read('ClinicalAuditEvent.hbm.xml'))
+            assert mapping.find('class').get('mutable') == 'false'
+            client_time = mapping.find("class/property[@name='clientOccurredAt']")
+            assert client_time is not None and client_time.get('access') == 'field'
+            assert client_time.get('type') == \
+                'org.openmrs.module.sihsalusaudit.api.db.hibernate.ClientAuditInstantType', \
+                'Client audit time must bypass JDBC fractional-second truncation'
+            assert client_time.find('column').get('name') == 'client_occurred_at'
+            assert client_time.find('column').get('sql-type') == 'datetime(3)'
+            api_entries = [n for n in archive.namelist()
+                           if n.startswith('lib/sihsalusaudit-api-') and n.endswith('.jar')]
+            assert len(api_entries) == 1, 'Expected one clinical audit API library'
+            with zipfile.ZipFile(io.BytesIO(archive.read(api_entries[0]))) as api:
+                assert 'org/openmrs/module/sihsalusaudit/model/ClinicalAuditEvent.class' in api.namelist()
+                assert 'org/openmrs/module/sihsalusaudit/ClinicalAuditActivator.class' in api.namelist()
+                assert 'org/openmrs/module/sihsalusaudit/api/db/hibernate/ClientAuditInstantType.class' in api.namelist()
         if module == 'webservices.rest':
             controller = archive.read('org/openmrs/module/webservices/rest/web/v1_0/controller/openmrs1_9/ClobDatatypeStorageController.class')
             for value in [b'text/plain;charset=UTF-8', b'X-Content-Type-Options', b'nosniff']:

@@ -72,7 +72,116 @@ with `test initializer` on Java 11, then run `test-core28 initializer` on Java 2
 using the same Maven repository. `OMOD_MAVEN_REPOSITORY` selects an isolated cache;
 `OMOD_TEST_REPORTS` selects the Surefire evidence directory.
 
+## Clinical audit candidate for DEV
+
+The standalone [clinical audit module](https://github.com/sihsalus/openmrs-module-sihsalus-audit)
+owns event ingestion and privileged review. While its release is pending,
+`omod-sources.lock` pins its source commit and archive checksum. The existing
+build compiles the module into the distribution; no audit Java source is
+vendored here and no external runtime script is required.
+
+The source-module CI matrix runs its tests. The packaged-image gate also checks
+the controller, response sanitizer, persistence resources and distinct record
+and review privileges. These checks do not establish clinical event coverage.
+
+DEV acceptance must cover MariaDB migration and restart, authenticated ingestion,
+separate review access, invalid payloads, idempotent replay and frontend offline
+delivery using dedicated test users. The module declares separate recording and
+review privileges. OpenMRS can also attach newly declared privileges to existing
+`Privilege Level: High` and `Privilege Level: Full` roles. Review their
+effective inheritance before assigning either role; a read-only auditor must not
+inherit recording or clinical editing rights. The candidate enables no retention
+deletion or visit-closing job. Wider rollout still requires event coverage, role
+assignments and retention decisions.
+
+The [DEV endpoint acceptance runner](../tests/backend/clinical-audit-smoke.md)
+uses three dedicated accounts and records synthetic events without changing
+patients. It verifies nonzero client milliseconds through persistence, replay,
+concurrent retries and a one-millisecond conflict with full batch rollback.
+This guards against OpenMRS' Hibernate interceptor truncating `Date` fields:
+the module persists client time as an `Instant` in the existing `datetime(3)`
+column, preserving its public API and client timestamp precision. Database
+trigger checks and browser offline replay remain separate.
+
+### Reverify an already published candidate
+
+`Build Backend` can finish publishing an image and then fail while exporting
+its build cache. A manual `verify-existing` run on a non-main branch verifies
+that exact image without rebuilding it:
+
+```bash
+gh workflow run build-backend.yml --repo sihsalus/sihsalus --ref REVIEW_BRANCH \
+  -f mode=verify-existing \
+  -f source_sha=FULL_SOURCE_COMMIT \
+  -f image_digest=sha256:FULL_IMAGE_DIGEST
+```
+
+Use the source commit and manifest digest from the original publication. The
+source must be an ancestor of the workflow revision. The workflow checks out
+that source for the package contracts and pinned dependencies, verifies the
+image's digest, architecture and revision label, and runs the same image tests,
+security scans, vulnerability ratchet and signature as a new build. It records
+both the workflow and image source revisions. The security action, scanner tools
+and exception policy are restored from the workflow revision after checking out
+the historical source, so reverification cannot restore an older publication policy.
+This mode does not promote a
+release alias, change package visibility or deploy a service.
+
+Normal builds continue to fail on build, publication or verification errors.
+Only [cache export failures](https://docs.docker.com/build/cache/backends/gha/)
+are non-fatal, so an unavailable cache cannot prevent the image gates from
+running after a successful publication.
+
+### MariaDB installations with binary logging
+
+MariaDB requires an operator with `SUPER` to create triggers when `log_bin=ON`
+and `log_bin_trust_function_creators=OFF` ([MariaDB documentation](https://mariadb.com/docs/server/ha-and-performance/standard-replication/replication-and-binary-log-system-variables#log_bin_trust_function_creators)).
+The application database user should keep its existing database-scoped grants.
+On these installations the first module migration creates the audit table and
+indexes, then stops at trigger creation. Overall OpenMRS readiness can still be
+healthy while the audit module has failed; check the module and endpoint too.
+
+After taking a database backup and confirming the target installation, an
+operator can apply the versioned [trigger migration](migrations/clinical-audit-append-only.sql)
+to the OpenMRS database. From the distro checkout, for the standard Compose
+database name `openmrs`:
+
+```bash
+docker compose exec -T db sh -c \
+  'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; exec mariadb --user=root openmrs' \
+  < backend/migrations/clinical-audit-append-only.sql
+```
+
+Run this within the deployment lock/window, then restart only the backend. The
+module resumes its recoverable migration and validates the complete schema and
+both trigger bodies. The SQL preserves existing triggers on repeat execution and
+does not change grants, replication settings or evidence rows. If an existing
+trigger is incompatible, startup validation must fail instead of replacing it.
+Verify the module starts, both audit privileges exist, and synthetic UPDATE and
+DELETE attempts are rejected. Image rollback leaves the audit schema and evidence
+in place. This operator step must be included in first-install acceptance before
+any wider rollout.
+
+After a failed lifecycle start, OpenMRS can persist `sihsalusaudit.started=false`.
+Replacing the OMOD then leaves it stopped. Once the corrected image and trigger
+migration are verified, start the module through OpenMRS administration. An
+operator recovering that specific failed-install state can instead apply
+[the narrow startup recovery SQL](migrations/clinical-audit-resume-after-failed-start.sql)
+with the same database command above, then restart the backend. Preserve an
+intentional module stop. This recovery changes only the module's autostart flag;
+it grants no audit privileges and enables no scheduled task or retention policy.
+
 ## Distribution checks
+
+The audit source pin includes the scoped JDBC timestamp correction from
+[audit module PR #3](https://github.com/sihsalus/openmrs-module-sihsalus-audit/pull/3).
+The deployed MariaDB 10.11.7 / Connector/J 8.0.30 combination discards fractional
+seconds when Hibernate binds a `Timestamp`. The module binds UTC text into the
+existing `datetime(3)` column, preserving old evidence and avoiding a global
+driver change. The image check requires that mapping and its compiled type.
+Before promotion, the new immutable image must pass native endpoint readback,
+identical and concurrent replay, a 1 ms conflict, and browser offline acceptance.
+Prior acceptance on the old image failed precision readback and remains failed.
 
 Run these static checks from the repository root, without a backend or database:
 
