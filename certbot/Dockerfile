@@ -8,6 +8,10 @@ RUN apk upgrade --no-cache && \
     cp /usr/share/zoneinfo/America/Lima /etc/localtime && \
     echo "America/Lima" > /etc/timezone
 
+# Certbot is already installed. Keep its dependency check at build time and
+# remove the installer, including its unused vendored packages, from runtime.
+RUN python -m pip check && python -m pip uninstall --yes pip
+
 RUN mkdir -p /certbot/scripts /var/www/certbot/conf /etc/letsencrypt/live
 
 COPY ./scripts /certbot/scripts

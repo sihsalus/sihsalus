@@ -8,9 +8,13 @@ Trivy del digest exacto de su manifiesto ejecutable.
 
 Gateway y el wrapper del frontend fijan la misma base Nginx 1.30.5 por digest;
 Certbot fija la versión 5.8.0 y actualiza los paquetes Alpine al construir.
+La construcción comprueba sus dependencias con `pip check` y desinstala `pip`:
+el instalador y sus bibliotecas vendorizadas no son necesarios para emitir o
+renovar certificados. Los plugins adicionales requieren reconstruir la imagen
+e instalarlos antes de retirar `pip`; no se instalan durante la ejecución.
 Las pruebas de rutas y caché toman la base del Dockerfile correspondiente para
 evitar validar una versión distinta. Antes de firmar, el publicador de Gateway
-ejercita sus rutas HTTP/HTTPS; el de Certbot verifica dependencias, opciones CLI
+ejercita sus rutas HTTP/HTTPS; el de Certbot verifica el plugin webroot, opciones CLI
 y la generación de un certificado sintético sin red. El cambio de base requiere
 reconstrucción y despliegue coordinado; no modifica certificados existentes.
 

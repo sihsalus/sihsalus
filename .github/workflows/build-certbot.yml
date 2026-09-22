@@ -80,7 +80,12 @@ jobs:
             certbot --help all > /tmp/certbot-help.txt
             grep -q -- --preferred-profile /tmp/certbot-help.txt
             grep -q -- --webroot /tmp/certbot-help.txt
-            python -m pip check
+            certbot plugins --authenticators > /tmp/certbot-plugins.txt
+            grep -q -- webroot /tmp/certbot-plugins.txt
+            if python -m pip --version >/dev/null 2>&1; then
+              echo "The package installer must not remain in the runtime image" >&2
+              exit 1
+            fi
             openssl version
             sh -n /certbot/scripts/entrypoint.sh
             mkdir -p /tmp/certificate-test/webroot/conf
