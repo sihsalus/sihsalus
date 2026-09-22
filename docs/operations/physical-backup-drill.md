@@ -28,6 +28,11 @@ El flujo de preparación y copia es el que documenta
 Se usa MariaDB 10.11.7, la versión que declara actualmente `restore_full.sh`.
 El resumen identifica la imagen real del contenedor.
 
+La salud se comprueba mediante SQL autenticado, como en el Compose del producto.
+No se depende del archivo `.my-healthcheck.cnf` del helper `healthcheck.sh`:
+[MariaDB documenta que requiere tratamiento adicional al restaurar](https://mariadb.com/docs/server/server-management/automated-mariadb-deployment-and-administration/docker-and-mariadb/docker-official-image-frequently-asked-questions).
+El test no regenera credenciales ni modifica el backup para suplir ese archivo.
+
 ## Alcance del fallo controlado
 
 El script operativo todavía asigna el nombre fijo `sihsalus-db-restore` al

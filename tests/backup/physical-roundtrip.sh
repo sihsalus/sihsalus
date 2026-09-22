@@ -36,6 +36,9 @@ cleanup() {
   trap - EXIT INT TERM
   if "$COLLISION_CREATED"; then docker rm -f sihsalus-db-restore >/dev/null 2>&1 || result=1; fi
   if "$STARTED"; then
+    if [[ "$result" != 0 ]]; then
+      timeout --kill-after=5s 20s docker compose logs --no-color --tail 40 db >"$STATE/database.log" 2>&1 || true
+    fi
     timeout --kill-after=5s 90s docker compose down --volumes --remove-orphans >"$STATE/cleanup.log" 2>&1 || result=1
     if docker volume inspect "$SNAPSHOT" >/dev/null 2>&1; then
       docker volume rm "$SNAPSHOT" >/dev/null 2>&1 || result=1
@@ -110,6 +113,7 @@ SQL
 before="$(fingerprint)"
 [[ "${before%%$'\n'*}" =~ ^backup_drill[.]probe$'\t'[0-9]+$ ]]
 STAGE=backup
+echo 'Physical drill: create encrypted backup'
 phase_start=$SECONDS
 timeout --kill-after=5s 180s bash scripts/backup/backup_full.sh --container "$DB_NAME" --dir "$STATE/backups" --max 2 >"$STATE/backup.log" 2>&1
 BACKUP_SECONDS=$((SECONDS-phase_start))
@@ -120,6 +124,7 @@ ARCHIVE_SHA="$(sha256sum "$archive" | cut -d' ' -f1)"
 sql --execute="UPDATE probe SET value='after-backup' WHERE id=1; DELETE FROM probe WHERE id=3;"
 [[ "$(fingerprint)" != "$before" ]]
 STAGE=restore
+echo 'Physical drill: restore and compare checksum/rows'
 phase_start=$SECONDS
 timeout --kill-after=5s 240s bash scripts/backup/restore_full.sh --container "$DB_NAME" --file "$archive" <<<s >"$STATE/restore.log" 2>&1
 wait_for_db
@@ -133,6 +138,7 @@ fi
 RESTORE_VERIFIED=true
 
 STAGE=rollback
+echo 'Physical drill: fail copy-back startup and verify snapshot recovery'
 sql --execute="UPDATE probe SET value='keep-after-failed-restore' WHERE id=1; INSERT INTO probe VALUES (4, 'snapshot-only-row', 42);"
 before_failure="$(fingerprint)"
 [[ "$before_failure" != "$before" ]]

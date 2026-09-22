@@ -10,7 +10,9 @@ services:
       # Match the scratch mount expected by backup_full.sh in compose/core.yml.
       - backup:/backup
     healthcheck:
-      test: [CMD, healthcheck.sh, --connect, --innodb_initialized]
+      # The product probes SQL with configured credentials. healthcheck.sh
+      # depends on .my-healthcheck.cnf, which physical backup does not retain.
+      test: [CMD-SHELL, 'MYSQL_PWD="$${MARIADB_ROOT_PASSWORD}" mariadb --user=root --execute "SELECT 1"']
       interval: 2s
       timeout: 5s
       retries: 60
