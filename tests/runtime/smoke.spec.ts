@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const fixture = JSON.parse(fs.readFileSync(path.join(process.env.SMOKE_STATE!, 'fixture.json'), 'utf8'));
+const homeUrl = /\/openmrs\/spa\/home(?:[/?#]|$)/;
 if (fixture.baseURL !== 'http://127.0.0.1' || !['local', 'keycloak'].includes(fixture.mode)) {
   throw new Error('Runtime smoke accepts only its isolated loopback fixture');
 }
@@ -60,10 +61,29 @@ test('published core serves its SPA, authenticates, and ends the synthetic sessi
       await expect.poll(() => new URL(page.url()).pathname).toMatch(/^\/openmrs\/spa\/(home|login\/location)/);
     }
     if (new URL(page.url()).pathname === '/openmrs/spa/login/location') {
-      await page.getByRole('radio').first().check();
-      await page.locator('form [type="submit"]').click();
+      // The application selects a sole/default location automatically. Wait
+      // for that navigation or an actual choice before interacting with Carbon.
+      await Promise.race([
+        page.waitForURL(homeUrl, { timeout: 60_000 }),
+        page.getByRole('radio').nth(1).waitFor({ state: 'attached', timeout: 60_000 }),
+      ]);
+      if (!homeUrl.test(page.url())) {
+        try {
+          const firstLocation = page.getByRole('radio').first();
+          const id = await firstLocation.getAttribute('id');
+          expect(id).toBeTruthy();
+          // Carbon's visible label covers the native radio input.
+          await page.locator(`label[for=${JSON.stringify(id)}]`).click();
+          await expect(firstLocation).toBeChecked();
+          await page.locator('form [type="submit"]').click();
+        } catch (error) {
+          // A configured default may navigate while its controls are mounting.
+          // Only reaching home can satisfy that automatic selection path.
+          if (!homeUrl.test(page.url())) throw error;
+        }
+      }
     }
-    await expect(page).toHaveURL(/\/openmrs\/spa\/home(?:[/?#]|$)/);
+    await expect(page).toHaveURL(homeUrl);
     await expect(page.getByRole('banner').first()).toBeVisible();
     const current = await session();
     expect(current.authenticated).toBe(true);
