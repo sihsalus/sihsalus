@@ -6,6 +6,14 @@ publica `linux/amd64`; gateway y certbot publican `linux/amd64` y `linux/arm64`.
 Cada plataforma debe tener un inventario SPDX adjunto por BuildKit y un escaneo
 Trivy del digest exacto de su manifiesto ejecutable.
 
+Gateway y el wrapper del frontend fijan la misma base Nginx 1.30.5 por digest;
+Certbot fija la versión 5.8.0 y actualiza los paquetes Alpine al construir.
+Las pruebas de rutas y caché toman la base del Dockerfile correspondiente para
+evitar validar una versión distinta. Antes de firmar, el publicador de Gateway
+ejercita sus rutas HTTP/HTTPS; el de Certbot verifica dependencias, opciones CLI
+y la generación de un certificado sintético sin red. El cambio de base requiere
+reconstrucción y despliegue coordinado; no modifica certificados existentes.
+
 ## Secuencia de publicación
 
 1. Validar el catálogo de excepciones vigente.

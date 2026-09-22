@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.3
-FROM nginx:1.28-alpine
+FROM nginx:1.30.5-alpine@sha256:a5f2157a0302eb0c5e300415effb63a9e70ed1eb9c107283819bf6d149ab607c
 
 # Patch all Alpine packages to eliminate known CVEs in the base image,
 # set up directories and permissions in a single layer.
