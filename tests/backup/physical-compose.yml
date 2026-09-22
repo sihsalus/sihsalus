@@ -1,0 +1,21 @@
+services:
+  db:
+    image: mariadb:10.11.7
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?synthetic password required}
+      MARIADB_DATABASE: backup_drill
+    volumes:
+      - data:/var/lib/mysql
+    healthcheck:
+      test: [CMD, healthcheck.sh, --connect, --innodb_initialized]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+  # restore_full.sh controls db and backend. This inert service exercises that
+  # Compose contract without starting an application or creating clinical data.
+  backend:
+    image: busybox:latest
+    command: [sleep, infinity]
+volumes:
+  data:
