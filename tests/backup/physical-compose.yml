@@ -7,6 +7,8 @@ services:
       MARIADB_DATABASE: backup_drill
     volumes:
       - data:/var/lib/mysql
+      # Match the scratch mount expected by backup_full.sh in compose/core.yml.
+      - backup:/backup
     healthcheck:
       test: [CMD, healthcheck.sh, --connect, --innodb_initialized]
       interval: 2s
@@ -19,3 +21,4 @@ services:
     command: [sleep, infinity]
 volumes:
   data:
+  backup:
