@@ -44,9 +44,7 @@ by OpenMRS, configuration ownership and startup of an empty HTTP server without
 an external network or database. This patch does not fix dependencies inside
 the Core WAR; those remain tracked in
 [issue #323](https://github.com/sihsalus/sihsalus/issues/323), and the full image
-security policy retains the findings. Its current `report-only` mode permits
-promotion with vulnerability warnings; image verification and functional tests
-remain required. See [image security](../docs/operations/image-security.md).
+security policy still controls release promotion.
 
 ## Module ownership
 

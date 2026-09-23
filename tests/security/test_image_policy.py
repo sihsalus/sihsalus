@@ -7,7 +7,6 @@ import json
 import os
 from pathlib import Path
 import subprocess
-import sys
 import tempfile
 import unittest
 
@@ -22,7 +21,6 @@ REPOSITORY = "ghcr.io/sihsalus/sihsalus-gateway"
 IMAGE = REPOSITORY + "@sha256:" + "0" * 64
 SOURCE = "a" * 40
 EMPTY_POLICY = {"schemaVersion": 1, "exceptions": []}
-REPORT_ONLY_POLICY = {**EMPTY_POLICY, "vulnerabilityMode": "report-only"}
 FINDING = {"VulnerabilityID": "CVE-2026-12345", "PkgName": "synthetic-library", "InstalledVersion": "1.0.0",
            "FixedVersion": "1.0.1", "Severity": "HIGH"}
 SECRET = "SYNTHETIC_CREDENTIAL_MUST_NOT_BE_RETAINED"
@@ -70,61 +68,6 @@ def evaluate(index=None, sbom=None, reports=None, exceptions=None):
 
 
 class PolicyContract(unittest.TestCase):
-    def test_report_only_retains_findings_and_distinguishes_them_from_clean_images(self):
-        _, _, reports = fixture()
-        for report in reports.values():
-            report["Results"][0]["Vulnerabilities"] = [{**FINDING, "Severity": "CRITICAL", "FixedVersion": ""}]
-        evidence = evaluate(reports=reports, exceptions=REPORT_ONLY_POLICY)
-        self.assertEqual(evidence["decision"], "warn")
-        self.assertEqual(evidence["blockedFindings"], 2)
-        self.assertTrue(all(p["findings"][0]["decision"] == "warn" for p in evidence["platforms"]))
-        self.assertNotIn(SECRET, json.dumps(evidence))
-        self.assertEqual(evaluate(exceptions=REPORT_ONLY_POLICY)["decision"], "pass")
-
-    def test_vulnerability_mode_is_explicit_and_validated(self):
-        self.assertEqual(policy.vulnerability_mode(policy.validate_policy(EMPTY_POLICY)), "enforce")
-        for mode in (None, False, "off", "report", "", []):
-            with self.subTest(mode=mode), self.assertRaises(policy.PolicyError):
-                policy.validate_policy({**EMPTY_POLICY, "vulnerabilityMode": mode})
-
-    def test_cli_report_only_succeeds_with_warnings_but_scan_errors_still_fail(self):
-        index, sbom, reports = fixture()
-        reports["linux/amd64"]["Results"][0]["Vulnerabilities"] = [FINDING]
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            for name, value in {"index": index, "sbom": sbom, "policy": REPORT_ONLY_POLICY,
-                                **{key.replace("/", "-"): report for key, report in reports.items()}}.items():
-                (root / (name + ".json")).write_text(json.dumps(value))
-            command = [sys.executable, str(ROOT / "scripts/security/image-policy.py"), "evaluate",
-                       "--image", IMAGE, "--source", SOURCE, "--scanner", "0.74.0", "--reports", str(root),
-                       "--index", str(root / "index.json"), "--sbom", str(root / "sbom.json"),
-                       "--policy", str(root / "policy.json"), "--output", str(root / "evidence.json")]
-            result = subprocess.run(command, capture_output=True, text=True)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("::warning::", result.stdout)
-            self.assertEqual(json.loads((root / "evidence.json").read_text())["blockedFindings"], 1)
-            (root / "evidence.json").unlink()
-            (root / "linux-arm64.json").unlink()
-            failed = subprocess.run(command, capture_output=True, text=True)
-            self.assertNotEqual(failed.returncode, 0)
-            self.assertFalse((root / "evidence.json").exists())
-
-    def test_report_only_still_requires_complete_and_matching_scan_evidence(self):
-        for missing in ("scan", "sbom", "attestation", "source", "malformed"):
-            index, sbom, reports = fixture()
-            if missing == "scan":
-                reports.pop("linux/arm64")
-            elif missing == "sbom":
-                sbom.pop("linux/arm64")
-            elif missing == "attestation":
-                index["manifests"].pop()
-            elif missing == "source":
-                reports["linux/arm64"]["Metadata"]["ImageConfig"]["config"]["Labels"].clear()
-            else:
-                reports["linux/arm64"] = {}
-            with self.subTest(missing=missing), self.assertRaises(policy.PolicyError):
-                evaluate(index, sbom, reports, exceptions=REPORT_ONLY_POLICY)
-
     def test_clean_multiarch_image_retains_only_safe_evidence(self):
         evidence = evaluate()
         self.assertEqual(evidence["decision"], "pass")
@@ -271,26 +214,6 @@ class PolicyContract(unittest.TestCase):
 
 
 class PromotionContract(unittest.TestCase):
-    def test_report_only_allows_current_warning_evidence_and_reenforcement_rejects_it(self):
-        _, _, reports = fixture()
-        reports["linux/amd64"]["Results"][0]["Vulnerabilities"] = [FINDING]
-        value = evaluate(reports=reports, exceptions=REPORT_ONLY_POLICY)
-        value["scannedAt"] = NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
-        self.assertEqual(policy.validate_promotion(value, IMAGE, SOURCE, REPORT_ONLY_POLICY, NOW), value)
-        with self.assertRaises(policy.PolicyError):
-            policy.validate_promotion(value, IMAGE, SOURCE, EMPTY_POLICY, NOW)
-        mutations = [lambda e: e.update(blockedFindings=0), lambda e: e.update(decision="pass"),
-                     lambda e: e["platforms"][0].update(findings=[]),
-                     lambda e: e["platforms"][0]["findings"][0].update(severity="LOW"),
-                     lambda e: e["platforms"][0].pop("sbom"),
-                     lambda e: e.update(scannedAt="2026-09-19T12:00:00Z"),
-                     lambda e: e.update(sourceCommit="b" * 40)]
-        for mutate in mutations:
-            candidate = deepcopy(value)
-            mutate(candidate)
-            with self.assertRaises(policy.PolicyError):
-                policy.validate_promotion(candidate, IMAGE, SOURCE, REPORT_ONLY_POLICY, NOW)
-
     def evidence(self):
         value = evaluate()
         value["scannedAt"] = NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
