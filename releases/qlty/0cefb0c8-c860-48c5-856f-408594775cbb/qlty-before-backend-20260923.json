@@ -1,0 +1,104 @@
+{
+  "compose": {
+    "files": [
+      "docker-compose.yml",
+      "compose/keycloak.yml",
+      "compose/imaging-auth.yml",
+      "compose/ssl.yml",
+      "compose/openmrs-local-auth.yml"
+    ],
+    "platform": "linux/amd64",
+    "profiles": [
+      "ssl",
+      "fua",
+      "keycloak",
+      "imaging"
+    ],
+    "project": "sihsalus"
+  },
+  "createdAt": "2026-09-23T18:33:57Z",
+  "releaseId": "qlty-before-backend-20260923",
+  "schemaVersion": 1,
+  "services": {
+    "backend": {
+      "image": "ghcr.io/sihsalus/sihsalus-backend:sha-11fceb91c3c21f1261b88e5c61196be673b88dba@sha256:73e4ca41fa1eeacdde500f88c910adef3728411e4aa30d22b147ed2805962681",
+      "imageId": "sha256:cb3e7cd14771102aa5cf7cbd281f5f231b212d2eb9bcf21b51996bc78b3ea97b"
+    },
+    "backend-oauth2-config": {
+      "image": "docker.io/library/alpine@sha256:fd791d74b68913cbb027c6546007b3f0d3bc45125f797758156952bc2d6daf40",
+      "imageId": "sha256:0d3e09a185d997484a3ba1743b3223ed08d633b891cc05bc9a3dea5556f89ca2"
+    },
+    "certbot": {
+      "image": "sha256:5812eb2c2ff4c567111cec8cff47760e5116a5fc44762f2c6f98107f475aac7c",
+      "imageId": "sha256:5812eb2c2ff4c567111cec8cff47760e5116a5fc44762f2c6f98107f475aac7c"
+    },
+    "db": {
+      "image": "docker.io/library/mariadb@sha256:27292753bb759cd22be72e3c8192f1259ef47010c8634b5da0bc886845efe9fd",
+      "imageId": "sha256:9200bd86da810533901767e7211ee0accd4d5a762792e6f4d7bff4c5210eb910"
+    },
+    "docs": {
+      "image": "ghcr.io/sihsalus/sihsalus-docs@sha256:75ea5488ba50177a03e8091df417d5bff63b4f1150276274f43e7a2f3d5d6690",
+      "imageId": "sha256:ff9fd83be8350cfd2fa6b8a9b47271c3d37aa1b67fd74ec22d2e8de806a220df"
+    },
+    "frontend": {
+      "image": "sha256:4aa5c2a707e5df92265a9ac83741221d765de2be1e9cd50fc01ec883cb1a7497",
+      "imageId": "sha256:4aa5c2a707e5df92265a9ac83741221d765de2be1e9cd50fc01ec883cb1a7497"
+    },
+    "fua-generator": {
+      "image": "ghcr.io/sihsalus/generador-de-fua@sha256:3eb442183c8dc0393f7391d9c65fa51cef993315d06bed055385ae60d9871d88",
+      "imageId": "sha256:7ec6835f642404388bfc5516aaaa1f2159449c04022fdc38a38a028f04ea1165"
+    },
+    "fua-generator-db": {
+      "image": "docker.io/library/postgres@sha256:67f41722b7a8cbdb868a44a4995c846eddfdc2973bccb291ce937dce88ad5675",
+      "imageId": "sha256:7296f210ae81031ec955dbad9a67a84fe958572a2153b8d0826a647522904dc1"
+    },
+    "gateway": {
+      "image": "sha256:076998f7f7e3f900bdfe11492ebdf5ce8aec4119b2138edde8f44cd65d4a518c",
+      "imageId": "sha256:076998f7f7e3f900bdfe11492ebdf5ce8aec4119b2138edde8f44cd65d4a518c"
+    },
+    "imaging-auth": {
+      "image": "quay.io/oauth2-proxy/oauth2-proxy@sha256:10a1165743a192e1940b4708fb9647027185ce11a681a1c5519b442ff7f1f561",
+      "imageId": "sha256:cf3a5d50849b1799260d6aca62367c333b33472f208cbbdaab243a831b1a622f"
+    },
+    "imaging-session-store": {
+      "image": "docker.io/library/redis@sha256:30abb90e62f14b737010746def3ba99cc79fe19dcdb3d37b41f21fc62e7da19d",
+      "imageId": "sha256:9b9bc2eb5b8859235a68b8d72b81977748d243badee819a91c18280612c3495c"
+    },
+    "keycloak": {
+      "image": "sha256:5a853a6d0c795aae1531e85a3a94dc882e4e5088de35706df42dda81c662e85b",
+      "imageId": "sha256:5a853a6d0c795aae1531e85a3a94dc882e4e5088de35706df42dda81c662e85b"
+    },
+    "keycloak-db": {
+      "image": "docker.io/library/postgres@sha256:67f41722b7a8cbdb868a44a4995c846eddfdc2973bccb291ce937dce88ad5675",
+      "imageId": "sha256:7296f210ae81031ec955dbad9a67a84fe958572a2153b8d0826a647522904dc1"
+    },
+    "ohif": {
+      "image": "sha256:dc1eb1ebb5606c71ad2c425519bf558dfe60d5ddaa1e9c9ad4797fb140c76b94",
+      "imageId": "sha256:dc1eb1ebb5606c71ad2c425519bf558dfe60d5ddaa1e9c9ad4797fb140c76b94"
+    },
+    "orthanc": {
+      "image": "docker.io/orthancteam/orthanc@sha256:add181f0fa9c115bc100f90c78dc2bd73531be741304cd0544f4f21bfc847ee2",
+      "imageId": "sha256:c77ca751bb8a906784b3fd0a535e84378e3ba0807cb0451f51e2434b554399a2"
+    },
+    "orthanc-proxy": {
+      "image": "docker.io/library/nginx@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236",
+      "imageId": "sha256:dc73b49f5124cf2ee538dfbdfbd121f0b4ccdcb20fea30f3a81bd477c02e2bb5"
+    }
+  },
+  "sources": {
+    "backend": {
+      "commit": "11fceb91c3c21f1261b88e5c61196be673b88dba",
+      "image": "ghcr.io/sihsalus/sihsalus-backend:sha-11fceb91c3c21f1261b88e5c61196be673b88dba@sha256:73e4ca41fa1eeacdde500f88c910adef3728411e4aa30d22b147ed2805962681"
+    },
+    "contentVersion": "1.25.19",
+    "distroCommit": "11fceb91c3c21f1261b88e5c61196be673b88dba",
+    "frontend": {
+      "commit": "f02bfaf9d3fe1761822a18fa0505adf3f5be8660",
+      "image": "ghcr.io/sihsalus/sihsalus-frontend:sha-f02bfaf9d3fe1761822a18fa0505adf3f5be8660@sha256:e2fe6d431b1ed1102453bca10f5af54f7b5030c86f1b5f675216f291bb2db9aa"
+    }
+  },
+  "target": {
+    "environment": "qlty",
+    "nodeId": "0cefb0c8-c860-48c5-856f-408594775cbb"
+  }
+}
