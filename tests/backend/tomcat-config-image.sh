@@ -47,7 +47,7 @@ timeout 60s docker run --rm --pull never --network none --cap-drop ALL \
     trap "/usr/local/tomcat/bin/catalina.sh stop >/dev/null 2>&1 || true" EXIT
     /usr/local/tomcat/bin/catalina.sh start
     attempt=0
-    while [ "$attempt" -lt 30 ]; do
+    while [ "$attempt" -lt 20 ]; do
       status="$(curl --silent --output /dev/null --write-out "%{http_code}" \
         --max-time 1 http://127.0.0.1:8080/ || true)"
       if [ "$status" = 404 ]; then
