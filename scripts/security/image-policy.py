@@ -100,7 +100,10 @@ def parse_day(value):
 
 def validate_policy(policy, today=None):
     today = today or datetime.now(timezone.utc).date()
-    fields(policy, {"schemaVersion", "exceptions"}, "Invalid exception policy fields")
+    require(isinstance(policy, dict) and set(policy) in (
+        {"schemaVersion", "exceptions"}, {"schemaVersion", "exceptions", "vulnerabilityMode"}),
+        "Invalid image policy fields")
+    require(vulnerability_mode(policy) in ("enforce", "report-only"), "Invalid vulnerability mode")
     require(type(policy["schemaVersion"]) is int and policy["schemaVersion"] == 1, "Unsupported exception policy version")
     require(isinstance(policy["exceptions"], list) and len(policy["exceptions"]) <= 500, "Invalid exception list")
     identifiers, scopes = set(), set()
@@ -129,6 +132,11 @@ def validate_policy(policy, today=None):
         identifiers.add(entry["id"])
         scopes.add(scope)
     return policy
+
+
+def vulnerability_mode(policy):
+    # Historical policies without this field retain their blocking behavior.
+    return policy.get("vulnerabilityMode", "enforce")
 
 
 def platform_sbom(document, platform, platforms):
@@ -201,6 +209,7 @@ def evaluate(image, source, scanner, index, sbom, reports, policy, today=None):
     require(matches(scanner, r"[0-9]+\.[0-9]+\.[0-9]+"), "An exact scanner version is required")
     platforms = executable_platforms(index)
     validate_policy(policy, today)
+    unaccepted = "warn" if vulnerability_mode(policy) == "report-only" else "block"
     require(set(reports) == set(platforms), "Every executable platform must have exactly one scan")
     exceptions = {tuple(entry[field] for field in MATCH_FIELDS): entry for entry in policy["exceptions"]}
     output = []
@@ -211,7 +220,7 @@ def evaluate(image, source, scanner, index, sbom, reports, policy, today=None):
         for finding in findings:
             scope = {"repository": repository, "platform": platform, **finding}
             exception = exceptions.get(tuple(scope[field] for field in MATCH_FIELDS))
-            finding["decision"] = "exception" if exception else "block"
+            finding["decision"] = "exception" if exception else unaccepted
             if exception:
                 finding["exception"] = {key: exception[key] for key in ("id", "owner", "expiresOn", "issue")}
             else:
@@ -220,7 +229,7 @@ def evaluate(image, source, scanner, index, sbom, reports, policy, today=None):
     return {"schemaVersion": 1, "image": image, "sourceCommit": source, "scanner": {"name": "Trivy", "version": scanner},
             "scannedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "policySha256": hashlib.sha256(json.dumps(policy, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
-            "platforms": output, "blockedFindings": blocked, "decision": "block" if blocked else "pass"}
+            "platforms": output, "blockedFindings": blocked, "decision": unaccepted if blocked else "pass"}
 
 
 def validate_promotion(evidence, image, source, policy, now=None):
@@ -233,7 +242,11 @@ def validate_promotion(evidence, image, source, policy, now=None):
     require(evidence["schemaVersion"] == 1 and evidence["image"] == image and evidence["sourceCommit"] == source,
             "Security evidence belongs to another image or commit")
     require(evidence["scanner"] == {"name": "Trivy", "version": "0.74.0"}, "Evidence uses an unreviewed scanner version")
-    require(evidence["decision"] == "pass" and type(evidence["blockedFindings"]) is int and evidence["blockedFindings"] == 0,
+    report_only = vulnerability_mode(policy) == "report-only"
+    require(type(evidence["blockedFindings"]) is int and evidence["blockedFindings"] >= 0,
+            "Invalid finding count")
+    expected_decision = "warn" if report_only and evidence["blockedFindings"] else "pass"
+    require(evidence["decision"] == expected_decision and (report_only or evidence["blockedFindings"] == 0),
             "Image security evidence does not permit promotion")
     expected = hashlib.sha256(json.dumps(policy, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     require(evidence["policySha256"] == expected, "Exception policy changed after the scan")
@@ -243,6 +256,7 @@ def validate_promotion(evidence, image, source, policy, now=None):
     platforms = evidence["platforms"]
     require(isinstance(platforms, list) and platforms, "Platform evidence is missing")
     seen = set()
+    warnings = 0
     for item in platforms:
         fields(item, {"platform", "image", "sbom", "findings"}, "Invalid platform evidence")
         require(item["platform"] in PLATFORMS and item["platform"] not in seen, "Invalid evidence platform coverage")
@@ -253,11 +267,24 @@ def validate_promotion(evidence, image, source, policy, now=None):
                 and type(item["sbom"]["packageCount"]) is int and item["sbom"]["packageCount"] > 0, "Invalid SPDX evidence")
         require(isinstance(item["findings"], list), "Invalid evidence findings")
         for finding in item["findings"]:
+            if report_only and isinstance(finding, dict) and finding.get("decision") == "warn":
+                fields(finding, {"vulnerabilityId", "packageName", "installedVersion", "fixedVersion", "severity",
+                                 "class", "type", "decision"}, "Invalid warning evidence")
+                require(matches(finding["vulnerabilityId"], r"[A-Za-z0-9][A-Za-z0-9._-]{2,127}")
+                        and safe_package(finding["packageName"]) and safe_package(finding["installedVersion"])
+                        and finding["severity"] in ("HIGH", "CRITICAL")
+                        and finding["class"] in ("os-pkgs", "lang-pkgs")
+                        and matches(finding["type"], r"[a-z][a-z0-9-]{0,63}")
+                        and matches(finding["fixedVersion"], r"[A-Za-z0-9_@+./:~%,= <>!-]{0,1024}"),
+                        "Invalid warning finding")
+                warnings += 1
+                continue
             require(isinstance(finding, dict) and finding.get("decision") == "exception", "Unaccepted finding in promotion evidence")
             scope = {"repository": image_repository(image), "platform": item["platform"], **finding}
             candidates = [entry for entry in policy["exceptions"] if all(entry[key] == scope.get(key) for key in MATCH_FIELDS)]
             require(len(candidates) == 1 and finding.get("exception") == {
                 key: candidates[0][key] for key in ("id", "owner", "expiresOn", "issue")}, "Finding lacks its current reviewed exception")
+    require(warnings == evidence["blockedFindings"], "Finding count differs from retained evidence")
     return evidence
 
 
@@ -272,6 +299,8 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     policy_command = commands.add_parser("check-policy")
     policy_command.add_argument("policy", type=Path)
+    mode_command = commands.add_parser("mode")
+    mode_command.add_argument("policy", type=Path)
     platforms_command = commands.add_parser("platforms")
     platforms_command.add_argument("image")
     platforms_command.add_argument("index", type=Path)
@@ -281,6 +310,9 @@ def main():
     for name in ("index", "sbom", "reports", "policy", "output"):
         check.add_argument("--" + name, required=True, type=Path)
     args = parser.parse_args()
+    if args.command == "mode":
+        print(vulnerability_mode(validate_policy(read_json(args.policy))))
+        return 0
     if args.command == "check-policy":
         policy = validate_policy(read_json(args.policy))
         print(f"Validated {len(policy['exceptions'])} current, explicitly scoped exceptions")
@@ -296,6 +328,8 @@ def main():
     evidence = evaluate(args.image, args.source, args.scanner, index, read_json(args.sbom), reports, read_json(args.policy))
     write_evidence(args.output, evidence)
     print(f"Image policy: {evidence['decision']}; {len(evidence['platforms'])} platforms; {evidence['blockedFindings']} unexcepted HIGH/CRITICAL findings")
+    if evidence["decision"] == "warn":
+        print(f"::warning::Image has {evidence['blockedFindings']} unexcepted HIGH/CRITICAL findings; vulnerability mode is report-only")
     return 1 if evidence["decision"] == "block" else 0
 
 

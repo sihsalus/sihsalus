@@ -6,6 +6,14 @@ publica `linux/amd64`; gateway y certbot publican `linux/amd64` y `linux/arm64`.
 Cada plataforma debe tener un inventario SPDX adjunto por BuildKit y un escaneo
 Trivy del digest exacto de su manifiesto ejecutable.
 
+El modo vigente es **`report-only`**, configurado en `vulnerabilityMode` de
+`scripts/security/image-exceptions.json`. Los hallazgos de vulnerabilidades se
+publican como advertencias y no bloquean PR ni releases. Esto aplica al backend,
+gateway y certbot, e incluye la comparación del backend con su base OpenMRS.
+Compilación, pruebas funcionales, escaneo completo, SBOM, firma e identidad del
+digest siguen siendo obligatorios. Para reactivar el bloqueo, cambiar ese campo
+a `enforce` y generar evidencia nueva; no hay que modificar los workflows.
+
 Gateway y el wrapper del frontend fijan la misma base Nginx 1.30.5 por digest;
 Certbot fija la versión 5.8.0 y actualiza los paquetes Alpine al construir.
 La construcción comprueba sus dependencias con `pip check` y desinstala `pip`:
@@ -38,26 +46,30 @@ reconstrucción y despliegue coordinado; no modifica certificados existentes.
    índice. Después de actualizar cada alias se exige que resuelva al digest
    escaneado. No se reconstruye la imagen para promoverla.
 
-Un fallo en inventario, escaneo, política o firma impide publicar los aliases de
-release. El candidato puede permanecer en GHCR para investigación y no debe
+Un fallo en inventario, ejecución del escaneo, validación de evidencia o firma
+impide publicar los aliases de release. En modo `enforce`, también los impiden
+los hallazgos sin excepción. El candidato puede permanecer en GHCR para investigación y no debe
 desplegarse como release. Una firma identifica al publicador; antes de desplegar
 se deben verificar también la decisión de la política y la aceptación del
 ambiente correspondiente.
 
 ## Política HIGH/CRITICAL y excepciones
 
-El comportamiento por defecto es bloquear cada hallazgo HIGH o CRITICAL,
-incluidos los que todavía no tienen corrección. No se agrega una excepción
-automática por estar presente en una imagen base. Los controles existentes del
-backend siguen siendo adicionales: una excepción no desactiva el rechazo de
-vulnerabilidades corregibles del sistema operativo ni el de hallazgos nuevos
-frente a la base OpenMRS.
+En `report-only`, cada hallazgo HIGH o CRITICAL conserva su identidad, versión y
+severidad, incluso si no tiene corrección. La decisión es `warn` cuando quedan
+hallazgos sin excepción, y `pass` cuando no los hay. Un escaneo fallido no se
+convierte en una advertencia ni en un informe limpio. El ratchet del backend
+también conserva sus conteos y advierte sobre paquetes del sistema corregibles
+y hallazgos nuevos frente a OpenMRS.
 
-`scripts/security/image-exceptions.json` empieza vacío. Una excepción requiere PR
+En `enforce` se bloquea cada hallazgo sin excepción y se aplican los rechazos del
+ratchet. Una política histórica sin `vulnerabilityMode` conserva este modo
+estricto; valores desconocidos son errores. El catálogo `exceptions` sigue vacío.
+Una excepción requiere PR
 revisado, responsable identificable y un issue de seguimiento. Su alcance
 incluye repositorio de imagen, plataforma, CVE/advisory, nombre y versión exacta
 del paquete, clase, ecosistema y severidad. Una versión, arquitectura, ecosistema
-o severidad diferente vuelve a bloquearse. No se admiten comodines.
+o severidad diferente deja de estar cubierta. No se admiten comodines.
 
 Cada entrada contiene:
 
@@ -81,11 +93,11 @@ vencida debe retirarse o renovarse mediante otra revisión con evidencia vigente
 no se renueva automáticamente. El control de promoción vuelve a validar el
 catálogo, su checksum y una evidencia de escaneo de menos de 24 horas.
 
-Este cambio puede detener una publicación que antes pasaba por heredar un
-hallazgo de OpenMRS. Resolverlo con una actualización probada o con una excepción
-explícitamente revisada; no sustituir el umbral por `exit-code: 0`, modificar el
-informe ni deshabilitar el control. Los valores del catálogo son decisiones de
-seguridad que los mantenedores deben revisar antes de incorporarlos.
+El modo informativo permite publicar con vulnerabilidades conocidas; no las
+marca como corregidas ni cierra las alertas. La remediación del backend sigue en
+[#323](https://github.com/sihsalus/sihsalus/issues/323). El modo y las excepciones
+forman parte del checksum de la política, de modo que un cambio invalida la
+evidencia anterior y exige un escaneo nuevo antes de promover.
 
 ## Evidencia sin credenciales
 
@@ -96,7 +108,8 @@ eliminan al terminar y no se suben como artefactos de Actions.
 
 La evidencia publicada contiene únicamente imagen/commit, versión del escáner,
 fecha UTC, checksum del catálogo, plataformas/digests, formato y checksum del
-SPDX, número de paquetes y hallazgos normalizados. Las excepciones utilizadas
+SPDX, número de paquetes y hallazgos normalizados. El campo histórico `blockedFindings`
+cuenta hallazgos sin excepción; con decisión `warn` es informativo. Las excepciones utilizadas
 se identifican por ID, responsable, vencimiento e issue. No incluye variables,
 descripciones libres, fragmentos de archivos, rutas objetivo ni resultados de
 escaneo de secretos. Los errores operativos muestran la fase fallida sin volcar
@@ -104,7 +117,7 @@ configuración ni salida cruda de las herramientas.
 
 Los artefactos `backend-image-security-<SHA>`, `gateway-image-security-<SHA>` y
 `certbot-image-security-<SHA>` se conservan durante **90 días**, tanto si la
-política acepta como si bloquea un informe válido. Si la inspección o el escaneo
+política acepta, advierte o bloquea un informe válido. Si la inspección o el escaneo
 no concluyen, el job falla sin fabricar evidencia de éxito. El SPDX completo y
 la provenance permanecen adjuntos al índice en GHCR; conservar los digests de
 las releases necesarias para auditoría y rollback.
@@ -144,15 +157,15 @@ attestations in-toto, descritas en la [documentación oficial de Docker](https:/
 La verificación de identidad y emisor sigue la [documentación de Cosign](https://docs.sigstore.dev/cosign/verifying/verify/).
 
 Para repetir la política con la base de vulnerabilidades vigente y obtener una
-nueva evidencia depurada, desde un checkout revisado y con Trivy 0.74.0:
+nueva evidencia depurada conforme al modo vigente, desde un checkout revisado y con Trivy 0.74.0:
 
 ```bash
 bash scripts/security/scan-image.sh "$IMAGE" '<SHA-fuente-completo>' nueva-evidencia
 ```
 
 El directorio debe ser nuevo. La comprobación puede fallar posteriormente por
-un nuevo advisory o una excepción vencida, aunque una release antigua hubiera
-pasado su CI.
+una excepción vencida o, en modo `enforce`, un nuevo advisory, aunque una release
+antigua hubiera pasado su CI.
 
 ## Pruebas y alcance
 
