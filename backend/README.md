@@ -31,6 +31,21 @@ Vaciar la variable no revoca una credencial ya persistida. Para rotarla, reempla
 archivo de entorno y recrea el backend; para retirarla sin reemplazo, revoca primero el token en OCL
 y elimina la propiedad desde la administración de OpenMRS durante una ventana controlada.
 
+## Tomcat security maintenance
+
+The pinned OpenMRS runtime contains Tomcat 9.0.120. The Dockerfile installs the
+complete official Tomcat 9.0.121 `bin` and `lib` directories from Apache's archive,
+verified by a literal SHA-256 pin. This fixes CVE-2026-65182, CVE-2026-65905 and
+CVE-2026-68525 while retaining OpenMRS's configuration, startup scripts and UID
+1001. The checksum was checked against Apache's published SHA-512 file.
+
+CI verifies the running Java version of Tomcat, the writable `setenv.sh` needed
+by OpenMRS, configuration ownership and startup of an empty HTTP server without
+an external network or database. This patch does not fix dependencies inside
+the Core WAR; those remain tracked in
+[issue #323](https://github.com/sihsalus/sihsalus/issues/323), and the full image
+security policy still controls release promotion.
+
 ## Module ownership
 
 The following repositories own their Java changes, patches, regression tests,
