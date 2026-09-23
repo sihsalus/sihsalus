@@ -1,5 +1,5 @@
 # module repository revision archive_sha256 upstream_version version
-initializer mekomsolutions/openmrs-module-initializer 3077975fb4f58c91ff3113d7fed1e3df88829476 a750faaa6485b7f5716db8dcd94552102710cd9af0a80b067982133b02365e69 2.13.0-SNAPSHOT 2.13.0-sihsalus.1
+initializer sihsalus/openmrs-module-initializer 806aec0a11fbb6b582629ecb2c89992e2e46107e a2d4deca889dbb1826360fd67e53b24edddacccea4f9acaea087794bcb1beb30 2.13.0-SNAPSHOT 2.13.0-sihsalus.2
 queue openmrs/openmrs-module-queue fb6de2acbf31b4dd50e518f74badf28163d6e67d 9ad7d77a6cb6a07d81c5dfb4368680a371d85f85deea6475fc2a3e87bb33750e 3.1.0-SNAPSHOT 3.1.0-sihsalus.1
 reporting openmrs/openmrs-module-reporting 45a4114ed72bba4dde86b7a0aa00563611030ba4 b127c0502f83cf834b7a96fa8cb64ac5bf1802a9c5f831d6ab8a3a27e022d5ba 2.2.0-SNAPSHOT 2.2.0-sihsalus.1
 reportingrest openmrs/openmrs-module-reportingrest 566d62b7d4078929fc65acbc8fdd0152e39716e6 185cee368451b9bdd94458810ede80fe25daacb7e0421a787353c47e9232bde0 2.1.0-SNAPSHOT 2.1.0-sihsalus.1

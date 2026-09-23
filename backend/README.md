@@ -81,6 +81,18 @@ archive checksums and distribution versions. The [build script](bin/build-source
 builds them without external patches; source pins and POM versions must move
 together. BedManagement has a separate source/checksum pin in the Dockerfile.
 
+Initializer `2.13.0-sihsalus.2` pins the tested retirement-reason fix in
+[the module repository](https://github.com/sihsalus/openmrs-module-initializer/pull/1).
+Creating an AMPATH form with `retired: true` previously failed native OpenMRS
+validation because its retirement reason was missing. The loader now applies
+the same default reason used for an existing form; content stays declarative
+and historical schemas remain intact. The fix is proposed
+[upstream](https://github.com/mekomsolutions/openmrs-module-initializer/pull/334).
+Tracking: [#336](https://github.com/sihsalus/sihsalus/issues/336), owner `@Duvet05`.
+Replace the temporary fork pin with an upstream revision containing the fix
+after validating fresh creation and version replacement. No SQL repair or
+runtime module installation is required.
+
 Run from the repository root with Maven and the appropriate JDK:
 
 ```bash
