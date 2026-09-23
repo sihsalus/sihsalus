@@ -251,9 +251,9 @@ def verify_selected_compose(manifest, root, env_file, manifest_path):
 def inspect_image(reference, root):
     # Never retrieve Config.Env: an image can contain baked-in credentials.
     template = ('{"id":{{json .Id}},"os":{{json .Os}},"arch":{{json .Architecture}},'
-                '"digests":{{json .RepoDigests}},"revision":'
-                '{{json (index .Config.Labels "org.opencontainers.image.revision")}},'
-                '"node":{{json (index .Config.Labels "org.sihsalus.node-id")}}}')
+                '"digests":{{json (index . "RepoDigests")}},"revision":'
+                '{{with index .Config "Labels"}}{{json (index . "org.opencontainers.image.revision")}}{{else}}null{{end}},'
+                '"node":{{with index .Config "Labels"}}{{json (index . "org.sihsalus.node-id")}}{{else}}null{{end}}}')
     return json.loads(run(["docker", "image", "inspect", reference, "--format", template], root=root))
 
 
