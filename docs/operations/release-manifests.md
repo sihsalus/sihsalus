@@ -149,6 +149,7 @@ identidad, versiones y salud técnica; no sustituye la aceptación clínica.
 
 ```bash
 python3 -B -m unittest discover -s tests/deploy -p test_release_manifest.py -v
+python3 -B tests/deploy/release-manifest-compose.py --catalog
 bash scripts/validate-compose.sh
 python3 -B scripts/deploy/release-manifest.py catalog
 python3 -B scripts/deploy/release-manifest.py catalog --base <SHA-base-del-PR>
@@ -156,6 +157,10 @@ python3 -B scripts/deploy/release-manifest.py catalog --base <SHA-base-del-PR>
 
 Las pruebas locales usan un Docker simulado para las mutaciones. La validación
 de Compose comprueba los perfiles del checkout sin arrancar servicios.
+El workflow de releases comprueba además que cada commit fuente forme parte
+del historial y que su Compose real quede cubierto por el manifiesto. Verifica
+la selección persistente y el auditor de seguridad con credenciales sintéticas;
+esta comprobación no requiere un daemon Docker.
 El catálogo verifica esquema, rutas, checksums e historial inmutable. Si todavía
 no hay manifiestos publicados, `releases/` puede estar ausente; eliminar un
 manifiesto presente en el commit base sigue siendo un error.

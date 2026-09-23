@@ -23,7 +23,9 @@ bash scripts/validate-compose.sh
 ```
 
 Requiere el plugin Docker Compose, sin arrancar servicios. CI ejecuta ambos
-comandos en cada PR, además de validar el catálogo de releases.
+comandos en cada PR, además de validar el catálogo de releases contra los
+commits fuente y su Compose real. Esta última comprobación también puede
+ejecutarse con `python3 -B tests/deploy/release-manifest-compose.py --catalog`.
 
 ## Comprobaciones de imágenes
 

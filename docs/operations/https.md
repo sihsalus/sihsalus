@@ -2,6 +2,12 @@
 
 La configuración vive en [compose/ssl.yml](../../compose/ssl.yml) y la emisión
 y renovación en [certbot/entrypoint.sh](../../certbot/entrypoint.sh).
+
+El entrypoint dentro de la imagen también es `/certbot/entrypoint.sh`.
+Actualizar cualquier override o script local que invoque la ruta anterior
+`/certbot/scripts/entrypoint.sh`, y recrear Certbot con la imagen nueva siguiendo
+el procedimiento de despliegue. Los volúmenes de certificados se conservan.
+
 El [gateway](../../gateway/README.md) comparte rutas entre HTTP y HTTPS.
 
 ## Configurar

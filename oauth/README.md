@@ -26,6 +26,20 @@ docker compose \
 
 Acceso: `http://localhost/keycloak/`.
 
+## Actualización desde la carpeta `keycloak/`
+
+Se conservan el servicio y perfil `keycloak`, la URL `/keycloak/` y los volúmenes
+existentes. El contexto de build y el archivo montado de OpenMRS ahora están bajo `oauth/`.
+Actualizar las rutas de cualquier override local que todavía apunte a la
+carpeta anterior.
+
+En una instalación con OpenMRS OAuth2, recrear el backend con la composición
+efectiva actual para aplicar el nuevo origen del montaje `oauth2login.xml`.
+El procedimiento de [redeploy](../scripts/deploy/README.md) ya usa esa
+composición. Un `docker restart` del contenedor anterior conserva el montaje
+viejo y puede fallar tras actualizar el checkout. El cambio no requiere borrar
+volúmenes ni reimportar el realm.
+
 ## Producción HTTPS
 
 Keycloak conserva HTTP únicamente dentro de Docker; el gateway termina TLS y envía headers `X-Forwarded-*`. No publiques `8180` en la red.
