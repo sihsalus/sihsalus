@@ -4,17 +4,6 @@ ARG OPENMRS_BUILD_IMAGE=openmrs/openmrs-core:2.8.x-dev-amazoncorretto-21
 # Keep the runtime base pinned; the distribution supplies its own Core WAR.
 ARG OPENMRS_RUNTIME_IMAGE=openmrs/openmrs-core:2.8.x-amazoncorretto-21@sha256:7f08dd72400c08d4fbf584cc9ac7cf17d96a2ae5fa0c43b4dc60a40ea7d0b760
 
-# Unpack in the build image: the minimal runtime intentionally has no tar.
-FROM ${OPENMRS_BUILD_IMAGE} AS tomcat-runtime
-ADD --checksum=sha256:d1a804502cddfd1c1436c1c37809ed4cb807a9c64a8a35fe1747d3ba9a0edeab \
-    https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.121/bin/apache-tomcat-9.0.121.tar.gz \
-    /tmp/apache-tomcat.tar.gz
-RUN mkdir /tmp/tomcat-runtime && \
-    tar -xzf /tmp/apache-tomcat.tar.gz -C /tmp/tomcat-runtime --strip-components=1 \
-      apache-tomcat-9.0.121/bin apache-tomcat-9.0.121/lib \
-      apache-tomcat-9.0.121/LICENSE apache-tomcat-9.0.121/NOTICE \
-      apache-tomcat-9.0.121/RELEASE-NOTES
-
 ### Build Stage
 # The dev tag provides Maven/OpenMRS build tooling for the 2.8 line.
 FROM ${OPENMRS_BUILD_IMAGE} AS dev
@@ -130,6 +119,16 @@ RUN cp /openmrs_distro/backend/target/sdk-distro/web/openmrs_core/openmrs.war /o
     cp -R /openmrs_distro/backend/target/sdk-distro/web/openmrs_config /openmrs/distribution/openmrs_config/
 
 
+# Unpack in the build image: the minimal runtime intentionally has no tar.
+ADD --checksum=sha256:d1a804502cddfd1c1436c1c37809ed4cb807a9c64a8a35fe1747d3ba9a0edeab \
+    https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.121/bin/apache-tomcat-9.0.121.tar.gz \
+    /tmp/apache-tomcat.tar.gz
+RUN mkdir /tmp/tomcat-runtime && \
+    tar -xzf /tmp/apache-tomcat.tar.gz -C /tmp/tomcat-runtime --strip-components=1 \
+      apache-tomcat-9.0.121/bin apache-tomcat-9.0.121/lib \
+      apache-tomcat-9.0.121/LICENSE apache-tomcat-9.0.121/NOTICE \
+      apache-tomcat-9.0.121/RELEASE-NOTES
+
 ### Run Stage
 # Keep OpenMRS startup/configuration pinned; update Tomcat independently below.
 FROM ${OPENMRS_RUNTIME_IMAGE}
@@ -151,7 +150,7 @@ RUN echo "Security refresh: ${SECURITY_REFRESH}" && \
 ENV TOMCAT_VERSION=9.0.121 \
     TOMCAT_SHA512=16494dd4745f808d3c506807b5275521fd71044d976f441d18eeeab0f5a38bc1b5344ca395292f6f26eb7612cd8c8e746d01ccdfb29893d394052d9f4b1f4c11
 RUN rm -rf /usr/local/tomcat/bin /usr/local/tomcat/lib
-COPY --from=tomcat-runtime /tmp/tomcat-runtime/ /usr/local/tomcat/
+COPY --from=dev /tmp/tomcat-runtime/ /usr/local/tomcat/
 RUN chmod -R g+rx /usr/local/tomcat/bin /usr/local/tomcat/lib && \
     touch /usr/local/tomcat/bin/setenv.sh && \
     chmod g+w /usr/local/tomcat/bin/setenv.sh && \
