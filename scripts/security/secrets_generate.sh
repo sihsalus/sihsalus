@@ -66,7 +66,8 @@ OMRS_OCL_TOKEN=
 
 # Pin immutable image tags before production deployment.
 BACKEND_TAG=latest
-FRONTEND_SOURCE_TAG=latest
+# La fuente frontend predeterminada se hereda de compose/core.yml.
+# En produccion fijar FRONTEND_SOURCE_TAG=sha-<commit>@sha256:<digest> revisado.
 FRONTEND_RUNTIME_TAG=latest
 DOCS_IMAGE_REF=ghcr.io/sihsalus/sihsalus-docs:latest
 STRIP_SOURCE_MAPS=true

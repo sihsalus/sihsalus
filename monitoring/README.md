@@ -485,9 +485,14 @@ Ver [compose/ssl.yml](../compose/ssl.yml)
 
 Los dashboards se versionan en [grafana/dashboards](grafana/dashboards/) y se
 cargan mediante [provisioning](grafana/provisioning/dashboards/dashboards.yml).
-Su respaldo y recuperación se hacen desde Git. Tras modificar esos JSON,
-comprueba su carga en una instancia aislada de Grafana; el provisioning
-deshabilita las ediciones persistentes desde la interfaz.
+Su respaldo y recuperación se hacen desde Git. Tras modificar esos JSON, ejecuta
+`bash tests/monitoring/config-validation.sh --static` para comprobar dashboards,
+contratos de alertas y el exportador UPS sin contenedores. Sin `--static`, el
+script también valida Alloy, Prometheus, alertas de VPN y Gatus con Docker.
+CI ejecuta esas pruebas y comprueba que el proxy Docker rechace escrituras cuando
+cambian archivos relacionados; la autorización OIDC de Grafana tiene su propio
+job. Ambos participan en `PR Gate`. El provisioning deshabilita las ediciones
+persistentes desde la interfaz.
 
 ---
 

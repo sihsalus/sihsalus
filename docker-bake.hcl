@@ -16,14 +16,44 @@ variable "REGISTRY" {
   default = ""
 }
 
+// Standalone HCL fallback. tests/frontend/build-config.py checks these values
+// against Compose; when Compose is loaded, its target arguments take precedence.
+FRONTEND_DEFAULT_SOURCE_TAG = "sha-a624206bca7e3e084c68b544e8d5b3ab0b037e27@sha256:ad79b27f913535048c676f8f922a77803d288c6ed0a5569e3ea98ea3a2ae8e26"
+
 variable "FRONTEND_SOURCE_TAG" {
-  default = "sha-6cadce5b8a225bc6fe0715b9ff085ced5f9feacf@sha256:ada19c77f8d27ea50e89db4fdae7287bbdf3a51c9fab8ac95dd82eba36d9a28c"
+  default = FRONTEND_DEFAULT_SOURCE_TAG
+}
+
+variable "FRONTEND_SOURCE_IMAGE" {
+  default = ""
+}
+
+variable "SIHSALUS_NODE_ID" {
+  default = "unconfigured"
+}
+
+variable "STRIP_SOURCE_MAPS" {
+  default = "true"
 }
 
 // ---- Shared base ----
 
 target "_base" {
   pull = true
+}
+
+target "_frontend_defaults" {
+  context    = "./frontend"
+  dockerfile = "Dockerfile"
+  args = {
+    FRONTEND_SOURCE_IMAGE = FRONTEND_SOURCE_IMAGE != "" ? FRONTEND_SOURCE_IMAGE : "ghcr.io/sihsalus/sihsalus-frontend:${FRONTEND_SOURCE_TAG != "" ? FRONTEND_SOURCE_TAG : FRONTEND_DEFAULT_SOURCE_TAG}"
+    SPA_PATH              = "/openmrs/spa"
+    API_URL               = "/openmrs"
+    SPA_CONFIG_URLS       = "/openmrs/spa/frontend.json"
+    SPA_DEFAULT_LOCALE    = "es"
+    SIHSALUS_NODE_ID       = SIHSALUS_NODE_ID != "" ? SIHSALUS_NODE_ID : "unconfigured"
+    STRIP_SOURCE_MAPS      = STRIP_SOURCE_MAPS != "" ? STRIP_SOURCE_MAPS : "true"
+  }
 }
 
 // ---- Groups ----
@@ -53,16 +83,8 @@ target "gateway" {
 }
 
 target "frontend" {
-  inherits   = ["_base"]
-  context    = "./frontend"
-  dockerfile = "Dockerfile"
-  args = {
-    FRONTEND_SOURCE_IMAGE = "ghcr.io/sihsalus/sihsalus-frontend:${FRONTEND_SOURCE_TAG}"
-    SPA_PATH              = "/openmrs/spa"
-    API_URL               = "/openmrs"
-    SPA_CONFIG_URLS       = "/openmrs/spa/frontend.json"
-    SPA_DEFAULT_LOCALE    = "es"
-  }
+  inherits   = ["_base", "_frontend_defaults"]
+  // Inherited defaults also support -f docker-bake.hcl without loading Compose.
   tags       = ["${REGISTRY}sihsalus-frontend-runtime:${TAG}"]
 }
 

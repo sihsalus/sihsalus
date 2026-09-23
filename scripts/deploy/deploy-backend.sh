@@ -15,6 +15,7 @@ TARGET_REFERENCE="${TARGET_TAG}@${TARGET_DIGEST}"
 TARGET_IMAGE="${BACKEND_REPOSITORY}:${TARGET_REFERENCE}"
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLEAN_CHECKOUT_HELPER="$SCRIPT_DIRECTORY/check-clean-checkout.sh"
+source "$SCRIPT_DIRECTORY/env.sh"
 
 if [[ ! "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   echo "[deploy-backend] invalid backend SHA" >&2
@@ -40,43 +41,6 @@ if [ ! -r "$CLEAN_CHECKOUT_HELPER" ]; then
   exit 2
 fi
 bash "$CLEAN_CHECKOUT_HELPER" deploy-backend
-
-read_env_value() {
-  local key="$1"
-  awk -F= -v key="$key" '
-    $1 == key {
-      sub(/^[^=]*=/, "")
-      value = $0
-    }
-    END { print value }
-  ' .env
-}
-
-write_env_value() {
-  local key="$1"
-  local value="$2"
-  local env_mode
-  local temporary_file
-  env_mode="$(stat -c %a .env 2>/dev/null || stat -f %Lp .env)"
-  temporary_file="$(mktemp ./.env.deploy-backend.XXXXXX)"
-  if ! awk -v key="$key" -v value="$value" '
-    BEGIN { found = 0 }
-    $0 ~ ("^" key "=") {
-      print key "=" value
-      found = 1
-      next
-    }
-    { print }
-    END {
-      if (!found) print key "=" value
-    }
-  ' .env >"$temporary_file"; then
-    rm -f "$temporary_file"
-    return 1
-  fi
-  chmod "$env_mode" "$temporary_file"
-  mv -f "$temporary_file" .env
-}
 
 container_health() {
   docker inspect sihsalus-backend \
@@ -154,10 +118,6 @@ trap 'rollback $?' ERR
 trap 'rollback 129' HUP
 trap 'rollback 130' INT
 trap 'rollback 143' TERM
-
-echo "[deploy-backend] updating distro checkout"
-git fetch origin main
-git merge --ff-only origin/main
 
 echo "[deploy-backend] pulling immutable image ${TARGET_IMAGE}"
 docker pull "$TARGET_IMAGE"

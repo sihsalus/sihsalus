@@ -15,8 +15,21 @@ The SDK writes `backend/target/sdk-distro`, packaged by the
 
 Initializer metadata comes from the selected content packages. SPA configuration
 belongs to the [frontend build](../frontend/README.md). Runtime setup, including
-OCL token reconciliation, lives in the [root README](../README.md); password
+OCL token reconciliation, is described below; password
 policy is documented in the [forced-password-change contract](../docs/operations/forced-password-change.md).
+
+## Configuración del token OCL
+
+El backend reconcilia `OMRS_OCL_TOKEN` después de copiar la configuración y antes de que
+Initializer la procese. Un valor no vacío se aplica en cada arranque, por lo que un recreate o una
+rotación convergen al token configurado sin crear otra propiedad. Si la variable está vacía, el
+backend elimina cualquier placeholder del paquete de content, no escribe un valor vacío y conserva
+el token que OpenMRS ya tuviera almacenado. En una base limpia, dejarla vacía mantiene deshabilitada
+la importación remota hasta configurar un token válido.
+
+Vaciar la variable no revoca una credencial ya persistida. Para rotarla, reemplaza el valor en el
+archivo de entorno y recrea el backend; para retirarla sin reemplazo, revoca primero el token en OCL
+y elimina la propiedad desde la administración de OpenMRS durante una ventana controlada.
 
 ## Module ownership
 
@@ -220,6 +233,22 @@ only a shell as UID 1001, without network or mounted runtime data, and removes i
 test container and anonymous volumes.
 
 ## Deployment and acceptance
+
+Use the OCI index reference `sha-<commit>@sha256:<index-digest>`; Docker selects
+the executable manifest for the host platform. GHCR entries marked
+`unknown/unknown` contain provenance/SBOM attestations, and `sha256-<digest>`
+tags may identify signature artifacts rather than runnable images. Inspect the
+chosen release without deploying it:
+
+```bash
+IMAGE='ghcr.io/sihsalus/sihsalus-backend:sha-<commit>@sha256:<index-digest>'
+docker buildx imagetools inspect "$IMAGE"
+docker buildx imagetools inspect "$IMAGE" --format '{{ json .Provenance.SLSA }}'
+docker buildx imagetools inspect "$IMAGE" --format '{{ json .SBOM.SPDX }}'
+```
+
+Build arguments appear in provenance. Pass build credentials through BuildKit
+secret mounts, never `ARG` or `--build-arg`.
 
 Branch builds publish immutable SHA/digests; successful main builds promote
 `latest`. Static/image checks and release publication do not authorize clinical

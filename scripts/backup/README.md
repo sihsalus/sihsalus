@@ -32,7 +32,23 @@ No guardes `BACKUP_ENCRYPTION_PASSWORD` dentro del repositorio ni junto al backu
 ./scripts/backup/restore_dump.sh --file /ruta/backups/dump_FECHA.sql.gz.enc
 ```
 
-El restore detiene y vuelve a iniciar únicamente `backend`; no reconcilia `gateway`, por lo que no elimina el override HTTPS.
+Antes de detener el backend o modificar la base, el restore descifra y
+descomprime el archivo completo en un directorio temporal privado. Rechaza un
+gzip inválido, truncado o vacío. Reserva espacio para el SQL descomprimido y,
+si hay cifrado, también para su gzip; `TMPDIR` permite elegir el disco temporal.
+Los temporales se eliminan al salir.
+
+Después comprueba que exista un contenedor `backend` en el proyecto Compose,
+incluidos los detenidos. Si falta o falla esa consulta, aborta sin tocar la base.
+Luego lo detiene y comprueba que no siga ejecutándose. Si falla la parada o la
+comprobación, también aborta antes de borrar la base. Importa los bytes ya
+validados y, solo si termina correctamente, usa `docker compose start backend`
+para reanudar el mismo contenedor, imagen y configuración. Una importación SQL
+fallida deja el backend detenido y requiere recuperación antes de reabrirlo.
+
+La validación del gzip no prueba que el SQL sea aplicable ni crea un respaldo
+previo de la base destino. Confirmar el backup de recuperación y probar el dump
+en una base aislada antes de una restauración operativa.
 
 Para automatización o cuando otro runbook controla la aplicación:
 
@@ -42,6 +58,13 @@ Para automatización o cuando otro runbook controla la aplicación:
   --yes \
   --no-app-control
 ```
+
+`--no-app-control` mantiene la validación del dump, pero delega por completo la
+parada y el arranque al operador. `--yes` solo omite la confirmación interactiva.
+Para recuperar un host donde todavía no existe el contenedor backend, usar
+`--no-app-control` con la base disponible y la aplicación fuera de servicio;
+crear y arrancar el backend por separado tras completar la importación, usando
+la composición y las imágenes revisadas del entorno.
 
 ## Backup físico
 
@@ -59,6 +82,9 @@ Para ejecutar el backup físico sobre la réplica:
 `restore_full.sh` detecta el volumen real montado en `/var/lib/mysql`, crea un snapshot temporal, restaura y levanta solo `db` y `backend`. Puede recibir `DB_VOLUME` explícitamente si el contenedor de base de datos no existe.
 
 ## Verificación de restauración
+
+Las regresiones locales de parada, integridad del archivo, importación y
+reinicio usan Docker simulado y forman parte de `bash tests/run.sh`.
 
 El workflow independiente `Backup and restore drills` comprueba semanalmente
 dump cifrado, semillas, restauración física y recuperación del snapshot ante

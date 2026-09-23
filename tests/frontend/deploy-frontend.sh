@@ -55,7 +55,8 @@ NODE_ID='00000000-0000-4000-8000-000000000002'
 make_fixture() {
   local fixture="$1"
   mkdir -p "$fixture/bin" "$fixture/state"
-  touch "$fixture/docker-compose.yml"
+  printf 'original compose definition\n' >"$fixture/docker-compose.yml"
+  cp "$fixture/docker-compose.yml" "$fixture/original-compose.yml"
   cat >"$fixture/.env" <<EOF
 FRONTEND_SOURCE_IMAGE=${SOURCE_REPOSITORY}@${OLD_DIGEST}
 FRONTEND_SOURCE_TAG=sha-${OLD_SHA}
@@ -74,6 +75,9 @@ EOF
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'git %s\n' "$*" >>"${FAKE_STATE_DIR}/commands"
+if [ "${1:-}" = merge ]; then
+  printf 'new main configuration\n' >docker-compose.yml
+fi
 if [ "$*" = 'status --porcelain=v1 --untracked-files=no' ] &&
   [ "${FAKE_TRACKED_DRIFT:-false}" = true ]; then
   printf '%s\n' ' M compose/fua.yml'
@@ -399,6 +403,7 @@ grep -Fqx \
 grep -q 'docker compose build --pull frontend' "$success_fixture/state/commands"
 grep -q 'docker compose up -d --no-deps --no-build --pull never --force-recreate frontend' "$success_fixture/state/commands"
 assert_frontend_only_mutations "$success_fixture/state/commands"
+cmp "$success_fixture/original-compose.yml" "$success_fixture/docker-compose.yml"
 assert_scoped_image_cleanup "$success_fixture/state/commands"
 
 cleanup_warning_fixture="$TEST_ROOT/cleanup-warning"
@@ -472,6 +477,7 @@ if grep -q '^docker compose up' "$rollback_fixture/state/commands"; then
   exit 1
 fi
 assert_frontend_only_mutations "$rollback_fixture/state/commands"
+cmp "$rollback_fixture/original-compose.yml" "$rollback_fixture/docker-compose.yml"
 
 verification_fixture="$TEST_ROOT/verification-rollback"
 make_fixture "$verification_fixture"
@@ -504,6 +510,7 @@ assert_value "2" \
   "$(grep -c '^docker compose up -d --no-deps --no-build --pull never --force-recreate frontend$' "$verification_fixture/state/commands")" \
   "verification rollback did not recreate only the new and previous frontend"
 assert_frontend_only_mutations "$verification_fixture/state/commands"
+cmp "$verification_fixture/original-compose.yml" "$verification_fixture/docker-compose.yml"
 
 rendered_frontend="$(
   cd "$ROOT"

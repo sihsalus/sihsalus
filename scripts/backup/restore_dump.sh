@@ -18,8 +18,7 @@ BACKUP_DIR="${BACKUP_DIR:-/home/${USER}/sihsalus-dumps}"
 BACKUP_FILE=""
 DB_NAME="openmrs"
 DB_USER="root"
-DB_PASSWORD="${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD no definido}"
-TEMP_DIR="/tmp/sihsalus-restore-dump-$$"
+TEMP_DIR=""
 ASSUME_YES="${RESTORE_ASSUME_YES:-false}"
 MANAGE_BACKEND="${RESTORE_MANAGE_BACKEND:-true}"
 
@@ -41,8 +40,13 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+DB_PASSWORD="${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD no definido}"
+for flag in "$ASSUME_YES" "$MANAGE_BACKEND"; do
+    case "$flag" in true|false) ;; *) echo "[ERROR] Las opciones de control deben ser true o false" >&2; exit 2;; esac
+done
+
 cleanup() {
-    rm -rf "$TEMP_DIR"
+    if [ -n "$TEMP_DIR" ]; then rm -rf "$TEMP_DIR"; fi
 }
 trap cleanup EXIT
 
@@ -97,19 +101,9 @@ if [ "$ASSUME_YES" != "true" ]; then
     [[ "$resp" =~ ^[sS]$ ]] || { echo "Cancelado."; exit 0; }
 fi
 
-# --- Detener backend (pero NO la DB) ---
-
-if [ "$MANAGE_BACKEND" = "true" ]; then
-    echo "[INFO] Deteniendo backend para evitar escrituras..."
-    docker compose stop backend 2>/dev/null || true
-    sleep 2
-else
-    echo "[INFO] Control del backend deshabilitado por --no-app-control"
-fi
-
-# --- Descifrar si es necesario ---
-
-mkdir -p "$TEMP_DIR"
+# Validate and stage the exact input before stopping the application or deleting data.
+umask 077
+TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/sihsalus-restore-dump.XXXXXX")"
 sql_source="$selected_file"
 
 if [[ "$selected_file" == *.enc ]]; then
@@ -132,6 +126,33 @@ if [[ "$selected_file" == *.enc ]]; then
     echo -e "${GREEN}[OK] Descifrado exitoso${NC}"
 fi
 
+validated_sql="$TEMP_DIR/validated.sql"
+if ! gzip -dc "$sql_source" >"$validated_sql" || [ ! -s "$validated_sql" ]; then
+    echo "[ERROR] Dump gzip invalido, incompleto o vacio; no se modifico la base de datos" >&2
+    exit 1
+fi
+
+if [ "$MANAGE_BACKEND" = "true" ]; then
+    backend_containers="$(docker compose ps --all --quiet backend)"
+    if [ -z "$backend_containers" ]; then
+        echo "[ERROR] No existe un contenedor backend en este proyecto Compose; restauracion cancelada antes de modificar la base" >&2
+        echo "[INFO] Para recuperacion con control externo de la aplicacion, usar --no-app-control y preparar su arranque por separado" >&2
+        exit 1
+    fi
+    echo "[INFO] Deteniendo backend para evitar escrituras..."
+    if ! docker compose stop backend; then
+        echo "[ERROR] No se pudo detener el backend; restauracion cancelada" >&2
+        exit 1
+    fi
+    running_backend="$(docker compose ps --status running --quiet backend)"
+    if [ -n "$running_backend" ]; then
+        echo "[ERROR] El backend sigue ejecutandose; restauracion cancelada" >&2
+        exit 1
+    fi
+else
+    echo "[INFO] Control del backend deshabilitado por --no-app-control"
+fi
+
 # --- Restaurar en caliente ---
 
 echo "[INFO] Restaurando dump en la base de datos (en caliente)..."
@@ -143,9 +164,9 @@ docker exec -i -e MYSQL_PWD="$DB_PASSWORD" "$CONTAINER_NAME" mariadb \
     -e "DROP DATABASE IF EXISTS ${DB_NAME}; CREATE DATABASE ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;"
 
 # Importar el dump
-gunzip -c "$sql_source" | docker exec -i -e MYSQL_PWD="$DB_PASSWORD" "$CONTAINER_NAME" mariadb \
+docker exec -i -e MYSQL_PWD="$DB_PASSWORD" "$CONTAINER_NAME" mariadb \
     --user="$DB_USER" \
-    "$DB_NAME"
+    "$DB_NAME" <"$validated_sql"
 
 echo -e "${GREEN}[OK] Dump restaurado exitosamente${NC}"
 
@@ -153,8 +174,8 @@ echo -e "${GREEN}[OK] Dump restaurado exitosamente${NC}"
 
 if [ "$MANAGE_BACKEND" = "true" ]; then
     echo "[INFO] Reiniciando backend..."
-    # Solo se apunta al backend: no se reconcilia gateway y no se degrada HTTPS.
-    docker compose up -d backend
+    # Resume the existing container with its original image and configuration.
+    docker compose start backend
 fi
 
 echo ""

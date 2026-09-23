@@ -15,6 +15,7 @@ TARGET_BACKEND_REFERENCE="${TARGET_BACKEND_TAG}@${TARGET_BACKEND_DIGEST}"
 EXPECTED_BACKEND_IMAGE="${BACKEND_REPOSITORY}:${TARGET_BACKEND_REFERENCE}"
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLEAN_CHECKOUT_HELPER="$SCRIPT_DIRECTORY/check-clean-checkout.sh"
+source "$SCRIPT_DIRECTORY/env.sh"
 
 if [[ ! "$TARGET_BACKEND_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   echo "[redeploy-environment] invalid backend SHA" >&2
@@ -53,36 +54,6 @@ if [[ ! "$NODE_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
   echo "[redeploy-environment] SIHSALUS_NODE_ID is required and must be a lowercase UUID" >&2
   exit 2
 fi
-
-write_env_value() {
-  local key="$1"
-  local value="$2"
-  local temporary_file
-  temporary_file="$(mktemp ./.env.redeploy.XXXXXX)"
-
-  if ! awk -v key="$key" -v value="$value" '
-    BEGIN { found = 0 }
-    $0 ~ ("^" key "=") {
-      print key "=" value
-      found = 1
-      next
-    }
-    { print }
-    END {
-      if (!found) {
-        print key "=" value
-      }
-    }
-  ' .env >"$temporary_file"; then
-    rm -f "$temporary_file"
-    return 1
-  fi
-
-  if ! chmod --reference=.env "$temporary_file" || ! mv -f "$temporary_file" .env; then
-    rm -f "$temporary_file"
-    return 1
-  fi
-}
 
 if [ ! -r "$CLEAN_CHECKOUT_HELPER" ]; then
   echo "[redeploy-environment] clean-checkout helper is not readable" >&2

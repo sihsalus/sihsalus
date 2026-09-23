@@ -6,7 +6,7 @@ mantienen sus pruebas funcionales en sus propios repositorios.
 
 ## Comprobación rápida
 
-Desde la raíz, con Bash, Python 3, Node.js, Git y jq:
+Desde la raíz, con Bash, Python 3, Node.js, Git, jq, gzip y OpenSSL:
 
 ```bash
 bash tests/run.sh
@@ -14,7 +14,9 @@ bash tests/run.sh
 
 Usa archivos temporales y comandos simulados. Comprueba los hooks del backend,
 los pins de módulos, despliegue y rollback, manifiestos, configuración del frontend,
-apagado seguro y política de imágenes. No requiere red ni un daemon Docker.
+apagado seguro, límites de fallo del restore SQL y política de imágenes. Incluye
+dashboards, contratos de alertas y el exportador UPS ViewPower. No requiere red
+ni un daemon Docker.
 
 Para renderizar Compose y comprobar los contratos de autenticación:
 
@@ -22,8 +24,11 @@ Para renderizar Compose y comprobar los contratos de autenticación:
 bash scripts/validate-compose.sh
 ```
 
-Requiere el plugin Docker Compose, sin arrancar servicios. CI ejecuta ambos
-comandos en cada PR, además de validar el catálogo de releases contra los
+Requiere los plugins Docker Compose y Buildx, sin arrancar servicios. También
+compara contexto, Dockerfile y argumentos del frontend entre Compose y Bake
+(automático, explícito y HCL aislado), incluida `.env.template` y la precedencia
+de overrides sobre los valores de respaldo del HCL.
+CI ejecuta ambos comandos en cada PR, además de validar el catálogo de releases contra los
 commits fuente y su Compose real. Esta última comprobación también puede
 ejecutarse con `python3 -B tests/deploy/release-manifest-compose.py --catalog`.
 
@@ -41,6 +46,38 @@ Certbot antes de promover sus imágenes; conservan escaneo, SBOM y firma.
 La matriz de pruebas de los diez módulos compilados desde fuente se ejecuta
 manualmente con la opción `source_omods` del workflow CI. El build normal sigue
 compilando sus revisiones fijadas y comprobando la imagen resultante.
+
+## Monitoreo
+
+La parte rápida también puede ejecutarse por separado:
+
+```bash
+bash tests/monitoring/config-validation.sh --static
+```
+
+Dos jobs con contenedores se activan por cambios relacionados y forman parte de
+`PR Gate`; una ejecución manual de CI activa ambos:
+
+| Job | Cobertura |
+| --- | --- |
+| `Monitoring configuration and Docker API proxy` | Configuración Alloy, Prometheus y Gatus; alertas con uno o ambos túneles VPN caídos; Docker API permite lectura y rechaza escritura con HTTP 403 |
+| `Grafana OIDC authorization` | Grafana real con proveedor sintético: roles, precedencia, usuarios sin permisos, códigos expirados, PKCE y cierre de sesión |
+
+`bash tests/monitoring/config-validation.sh` ejecuta también los validadores
+en contenedores y necesita Docker activo. `socket-proxy.sh` y el runtime OIDC
+requieren un runner efímero de GitHub. Los contratos OIDC pueden comprobarse
+localmente con Compose instalado, sin levantar servicios:
+
+```bash
+python3 -B -m unittest discover -s tests/monitoring/oidc -p 'test_*.py' -v
+```
+
+Los validadores de Alloy, Prometheus y Gatus toman las imágenes del modelo
+Compose, sin repetir sus versiones en el script. Cambios en `compose/status.yml`
+también activan el job de monitoreo.
+
+Los límites de la prueba sintética y la aceptación del IdP real están descritos
+en [Grafana OIDC](../docs/operations/grafana-oidc.md).
 
 ## Autenticación y restauración fuera del CI habitual
 
@@ -65,5 +102,5 @@ python3 -B -m unittest discover -s tests/runtime -p 'test_*.py' -v
 Ejecución y límites: [autenticación](../docs/operations/runtime-smoke.md) y
 [restauración](../docs/operations/physical-backup-drill.md). Registrar la evidencia
 en el [checklist de despliegue](../docs/operations/deploy-checklist.md).
-La autorización específica de Imaging y Grafana sigue requiriendo aceptación
-separada; no se recuperan sus proveedores sintéticos ni el registry de prueba.
+La autorización específica de Imaging sigue requiriendo aceptación separada;
+no se recuperan su proveedor sintético ni el registry de prueba.

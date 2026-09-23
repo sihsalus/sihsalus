@@ -98,7 +98,9 @@ El mismo comando se usa localmente y en CI:
 ./scripts/validate-compose.sh
 ```
 
-Además de renderizar todas las combinaciones soportadas, valida invariantes de OAuth2, TLS y el Compose sin volúmenes. Para conservar los modelos renderizados como evidencia:
+Requiere Compose y Buildx, sin daemon. Además de renderizar las combinaciones
+soportadas, valida OAuth2, TLS, el Compose sin volúmenes y la igualdad de los
+argumentos frontend entre Compose y Bake. Para conservar los modelos como evidencia:
 
 ```bash
 ./scripts/validate-compose.sh compose-validation
