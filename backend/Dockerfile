@@ -119,8 +119,18 @@ RUN cp /openmrs_distro/backend/target/sdk-distro/web/openmrs_core/openmrs.war /o
     cp -R /openmrs_distro/backend/target/sdk-distro/web/openmrs_config /openmrs/distribution/openmrs_config/
 
 
+# Unpack in the build image: the minimal runtime intentionally has no tar.
+ADD --checksum=sha256:d1a804502cddfd1c1436c1c37809ed4cb807a9c64a8a35fe1747d3ba9a0edeab \
+    https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.121/bin/apache-tomcat-9.0.121.tar.gz \
+    /tmp/apache-tomcat.tar.gz
+RUN mkdir /tmp/tomcat-runtime && \
+    tar -xzf /tmp/apache-tomcat.tar.gz -C /tmp/tomcat-runtime --strip-components=1 \
+      apache-tomcat-9.0.121/bin apache-tomcat-9.0.121/lib \
+      apache-tomcat-9.0.121/LICENSE apache-tomcat-9.0.121/NOTICE \
+      apache-tomcat-9.0.121/RELEASE-NOTES
+
 ### Run Stage
-# Runtime stays pinned to the exact OpenMRS patch version used in production.
+# Keep OpenMRS startup/configuration pinned; update Tomcat independently below.
 FROM ${OPENMRS_RUNTIME_IMAGE}
 
 # The upstream Amazon Linux 2 image is immutable, so apply the security updates
@@ -133,6 +143,18 @@ RUN echo "Security refresh: ${SECURITY_REFRESH}" && \
     yum -y update acl expat glib2 libacl libssh2 openssl-libs openssl11-libs python python-libs vim-data vim-minimal && \
     yum clean all && \
     rm -rf /var/cache/yum
+
+# The pinned upstream runtime still contains Tomcat 9.0.120. Replace the complete
+# Java runtime distribution, preserving OpenMRS's server.xml and rootless setup.
+# 9.0.121 fixes CVE-2026-65182, CVE-2026-65905 and CVE-2026-68525.
+ENV TOMCAT_VERSION=9.0.121 \
+    TOMCAT_SHA512=16494dd4745f808d3c506807b5275521fd71044d976f441d18eeeab0f5a38bc1b5344ca395292f6f26eb7612cd8c8e746d01ccdfb29893d394052d9f4b1f4c11
+RUN rm -rf /usr/local/tomcat/bin /usr/local/tomcat/lib
+COPY --from=dev /tmp/tomcat-runtime/ /usr/local/tomcat/
+RUN chmod -R g+rx /usr/local/tomcat/bin /usr/local/tomcat/lib && \
+    touch /usr/local/tomcat/bin/setenv.sh && \
+    chmod g+w /usr/local/tomcat/bin/setenv.sh && \
+    /usr/local/tomcat/bin/version.sh | grep -qF 'Apache Tomcat/9.0.121'
 
 COPY --chmod=0555 backend/bin/configure-ocl-token.sh \
     backend/bin/configure-forced-password-change.sh /usr/local/bin/
