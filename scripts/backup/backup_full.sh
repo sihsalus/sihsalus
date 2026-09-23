@@ -42,8 +42,18 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Logging
+# Validar antes de copiar datos o modificar el directorio de respaldos.
+if [ -z "${BACKUP_ENCRYPTION_PASSWORD:-}" ]; then
+    echo "[ERROR] Variable BACKUP_ENCRYPTION_PASSWORD no definida. No se inició el backup." >&2
+    exit 2
+fi
+if [ -z "$DB_BACKUP_PASSWORD" ]; then
+    echo "[ERROR] Define OMRS_DB_BACKUP_USER/OMRS_DB_BACKUP_PASSWORD o MYSQL_ROOT_PASSWORD antes de ejecutar el backup." >&2
+    exit 2
+fi
+umask 077
 
+# Logging
 # Rotación de logs: mantener solo los últimos 5 logs
 LOG_FILE="$FULL_BACKUP_DIR/fullBackup_log.txt"
 mkdir -p "$FULL_BACKUP_DIR"
@@ -58,11 +68,6 @@ fi
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "[INFO] Iniciando backup completo $TIMESTAMP para contenedor $CONTAINER_NAME"
-
-if [ -z "$DB_BACKUP_PASSWORD" ]; then
-    echo "[ERROR] Define OMRS_DB_BACKUP_USER/OMRS_DB_BACKUP_PASSWORD o MYSQL_ROOT_PASSWORD antes de ejecutar el backup." >&2
-    exit 2
-fi
 
 # Verificar existencia del contenedor
 if ! docker ps -a --format '{{.Names}}' | grep -q "^$CONTAINER_NAME$"; then
@@ -80,17 +85,14 @@ docker exec --user root -e MYSQL_PWD="$DB_BACKUP_PASSWORD" "$CONTAINER_NAME" \
     mariadb-backup --user="$DB_BACKUP_USER" --backup --target-dir="$TEMP_FULL_BACKUP_PATH"
 
 # Copiar backup al host
-docker cp "$CONTAINER_NAME:$TEMP_FULL_BACKUP_PATH" "$FULL_BACKUP_DIR/$BACKUP_NAME"
+mkdir -m 700 "$FULL_BACKUP_DIR/$BACKUP_NAME"
+docker cp "$CONTAINER_NAME:$TEMP_FULL_BACKUP_PATH/." "$FULL_BACKUP_DIR/$BACKUP_NAME"
 
 # Comprimir backup
 tar -czf "$FULL_BACKUP_DIR/$BACKUP_NAME.tar.gz" -C "$FULL_BACKUP_DIR" "$BACKUP_NAME"
 rm -rf "$FULL_BACKUP_DIR/$BACKUP_NAME"
 
 # Cifrar backup con openssl (AES-256)
-if [ -z "${BACKUP_ENCRYPTION_PASSWORD:-}" ]; then
-    echo "[ERROR] Variable BACKUP_ENCRYPTION_PASSWORD no definida. Abortando cifrado." >&2
-    exit 2
-fi
 openssl enc -aes-256-cbc -salt -pbkdf2 -pass env:BACKUP_ENCRYPTION_PASSWORD \
     -in "$FULL_BACKUP_DIR/$BACKUP_NAME.tar.gz" \
     -out "$FULL_BACKUP_DIR/$BACKUP_NAME.tar.gz.enc"

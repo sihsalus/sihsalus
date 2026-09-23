@@ -68,6 +68,9 @@ la composición y las imágenes revisadas del entorno.
 
 ## Backup físico
 
+El script exige las credenciales y la clave de cifrado antes de acceder a Docker
+o modificar respaldos y logs. Los archivos nuevos se crean con permisos privados.
+
 ```bash
 ./scripts/backup/backup_full.sh --dir /ruta/backups --max 10
 ./scripts/backup/restore_full.sh --file /ruta/backups/backup_FECHA.tar.gz.enc

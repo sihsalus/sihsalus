@@ -121,6 +121,8 @@ BACKUP_SECONDS=$((SECONDS-phase_start))
 archives=("$STATE"/backups/backup_*.tar.gz.enc)
 [[ ${#archives[@]} == 1 && -s "${archives[0]}" ]]
 archive="${archives[0]}"
+[[ "$(stat -c '%a' "$archive")" == 600 ]]
+[[ "$(stat -c '%a' "$STATE/backups/fullBackup_log.txt")" == 600 ]]
 ARCHIVE_SHA="$(sha256sum "$archive" | cut -d' ' -f1)"
 sql --execute="UPDATE probe SET value='after-backup' WHERE id=1; DELETE FROM probe WHERE id=3;"
 [[ "$(fingerprint)" != "$before" ]]
