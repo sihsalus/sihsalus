@@ -68,3 +68,5 @@ Para reportar una vulnerabilidad, ver [SECURITY.md](../../SECURITY.md).
 
 Para SBOM, firmas, escaneo por digest y excepciones con vencimiento de imágenes
 publicadas, ver [seguridad de imágenes](../../docs/operations/image-security.md).
+La política está en [image-exceptions.json](image-exceptions.json), junto a
+`scan-image.sh`, `promote-image.sh` y `check-backend-vulnerabilities.sh`.

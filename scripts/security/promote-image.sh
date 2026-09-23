@@ -22,7 +22,7 @@ spec.loader.exec_module(policy)
 try:
     image, source = sys.argv[1:]
     evidence = policy.read_json(Path('security-evidence/evidence.json'))
-    exceptions = policy.read_json(Path('security/image-exceptions.json'))
+    exceptions = policy.read_json(Path('scripts/security/image-exceptions.json'))
     policy.validate_promotion(evidence, image, source, exceptions)
 except (policy.PolicyError, OSError, ValueError, TypeError, KeyError):
     sys.exit('Verified image security evidence is required before promotion')

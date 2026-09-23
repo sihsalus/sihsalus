@@ -10,18 +10,6 @@ on:
         type: string
         required: false
         default: ''
-  pull_request:
-    branches: [main]
-    paths:
-      - '.github/workflows/runtime-smoke.yml'
-      - 'tests/runtime/**'
-      - '.env.template'
-      - 'docker-compose.yml'
-      - 'compose/core.yml'
-      - 'compose/keycloak.yml'
-      - 'gateway/**'
-      - 'frontend/**'
-      - 'keycloak/**'
 
 permissions:
   contents: read

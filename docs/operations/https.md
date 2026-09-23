@@ -1,7 +1,13 @@
 # HTTPS y certificados
 
 La configuración vive en [compose/ssl.yml](../../compose/ssl.yml) y la emisión
-y renovación en [certbot/scripts/entrypoint.sh](../../certbot/scripts/entrypoint.sh).
+y renovación en [certbot/entrypoint.sh](../../certbot/entrypoint.sh).
+
+El entrypoint dentro de la imagen también es `/certbot/entrypoint.sh`.
+Actualizar cualquier override o script local que invoque la ruta anterior
+`/certbot/scripts/entrypoint.sh`, y recrear Certbot con la imagen nueva siguiendo
+el procedimiento de despliegue. Los volúmenes de certificados se conservan.
+
 El [gateway](../../gateway/README.md) comparte rutas entre HTTP y HTTPS.
 
 ## Configurar
@@ -105,7 +111,6 @@ Desde la raíz del repositorio, con Docker activo, Python 3 y OpenSSL 3:
 
 ```bash
 python3 tests/gateway/routing.py
-bash tests/imaging/auth-gateway.sh
 bash scripts/validate-compose.sh
 ```
 

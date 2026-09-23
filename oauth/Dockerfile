@@ -1,4 +1,4 @@
-# keycloak/Dockerfile
+# oauth/Dockerfile
 FROM quay.io/keycloak/keycloak:26.4.1
 
 # Non-sensitive defaults. Credentials are injected by Compose at runtime.

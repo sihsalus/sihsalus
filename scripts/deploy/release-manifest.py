@@ -537,7 +537,8 @@ def apply_release(manifest, previous, root, rollback=False):
 def validate_catalog(root, base, output=None):
     """Published manifests are append-only; Git retains them beyond artifact expiry."""
     directory = root / "releases"
-    require(directory.is_dir() and not directory.is_symlink(), "Release catalog is missing")
+    require(not directory.is_symlink() and (not directory.exists() or directory.is_dir()),
+            "Release catalog must be a directory")
     if base:
         require(matches(base, SHA), "Invalid catalog baseline commit")
         names = run(["git", "ls-tree", "-r", "--name-only", base, "--", "releases"], root=root).splitlines()

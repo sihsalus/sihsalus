@@ -12,10 +12,9 @@ RUN apk upgrade --no-cache && \
 # remove the installer, including its unused vendored packages, from runtime.
 RUN python -m pip check && python -m pip uninstall --yes pip
 
-RUN mkdir -p /certbot/scripts /var/www/certbot/conf /etc/letsencrypt/live
+RUN mkdir -p /var/www/certbot/conf /etc/letsencrypt/live
 
-COPY ./scripts /certbot/scripts
-RUN chmod +x /certbot/scripts/entrypoint.sh
+COPY --chmod=0555 entrypoint.sh /certbot/entrypoint.sh
 
 ENV CERT_ROOT_PATH=/etc/letsencrypt \
     CERTBOT_DATA_PATH=/var/www/certbot \
@@ -34,4 +33,4 @@ ENV CERT_ROOT_PATH=/etc/letsencrypt \
     CERT_STATE="Loreto" \
     CERT_LOCALITY="Maynas"
 
-ENTRYPOINT [ "/certbot/scripts/entrypoint.sh" ]
+ENTRYPOINT [ "/certbot/entrypoint.sh" ]

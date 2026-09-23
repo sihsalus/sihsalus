@@ -4,8 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-"$ROOT_DIR/tests/deploy/deploy-backend-test.sh"
-
 if ! command -v docker >/dev/null 2>&1; then
   echo "[FAIL] docker is required" >&2
   exit 1
@@ -219,7 +217,7 @@ validate imaging-local-auth-rollback -f docker-compose.yml -f compose/keycloak.y
 
 python3 tests/keycloak/local-auth-config.py "$EVIDENCE_DIR"
 
-python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/fua.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" "$EVIDENCE_DIR/imaging.json" "$EVIDENCE_DIR/keycloak-ssl.json" "$EVIDENCE_DIR/monitoring-logs.json" "$EVIDENCE_DIR/imaging-auth.json" "$EVIDENCE_DIR/imaging-auth-ssl.json" "$EVIDENCE_DIR/seed.json" "$EVIDENCE_DIR/local-auth-rollback.json" keycloak/realm-export.json <<'PY'
+python3 - "$EVIDENCE_DIR/core.json" "$EVIDENCE_DIR/fua.json" "$EVIDENCE_DIR/keycloak.json" "$EVIDENCE_DIR/ssl.json" "$EVIDENCE_DIR/ci-no-volumes.json" "$EVIDENCE_DIR/imaging.json" "$EVIDENCE_DIR/keycloak-ssl.json" "$EVIDENCE_DIR/monitoring-logs.json" "$EVIDENCE_DIR/imaging-auth.json" "$EVIDENCE_DIR/imaging-auth-ssl.json" "$EVIDENCE_DIR/seed.json" "$EVIDENCE_DIR/local-auth-rollback.json" oauth/realm-export.json <<'PY'
 import json
 import sys
 

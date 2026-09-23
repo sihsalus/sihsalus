@@ -33,7 +33,7 @@ el runtime. El inventario de variables está en [.env.template](../.env.template
 `SPA_CONFIG_URLS` es obligatorio y admite varios JSON separados por comas, sin
 duplicados. El [override Keycloak](../compose/keycloak.yml) añade
 `frontend-keycloak.json`; para combinar Imaging con login local de OpenMRS, seguir
-el [contrato de autenticación](../keycloak/README.md#openmrs-local-con-keycloak-para-imaging).
+el [contrato de autenticación](../oauth/README.md#openmrs-local-con-keycloak-para-imaging).
 
 `patch-config-urls.js` exige que el bootstrap externo
 `sihsalus-spa-bootstrap.js` ya contenga las URLs solicitadas. Una discrepancia

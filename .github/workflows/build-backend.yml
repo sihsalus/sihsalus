@@ -10,22 +10,11 @@ on:
       - 'scripts/security/image-tool.py'
       - 'scripts/security/scan-image.sh'
       - 'scripts/security/promote-image.sh'
-      - 'security/image-exceptions.json'
+      - 'scripts/security/image-exceptions.json'
       - 'pom.xml'
       - 'backend/**'
-      - 'tests/backend/ocl-token-image.sh'
-      - 'tests/backend/forced-password-image.sh'
-      - 'tests/backend/tomcat-config-config.sh'
-      - 'tests/backend/tomcat-config-image.sh'
-      - 'tests/backend/o3forms-release-config.sh'
-      - 'tests/backend/o3forms-release-image.sh'
-      - 'tests/backend/owned-module-releases.py'
-      - 'tests/backend/source-omods-image.sh'
-      - 'tests/backend/module-dependencies-image.sh'
-      - 'tests/backend/ModuleDependencyVerifier.java'
-      - 'tests/backend/vulnerability-ratchet.sh'
-      - 'tests/backend/vulnerability-ratchet-config.sh'
-      - 'tests/backend/build-backend-config.sh'
+      - 'tests/backend/**'
+      - 'scripts/security/check-backend-vulnerabilities.sh'
   workflow_dispatch:
     inputs:
       mode:
@@ -127,10 +116,11 @@ jobs:
           git restore --source="$GITHUB_SHA" --worktree -- \
             .github/actions/check-image scripts/security/image-policy.py \
             scripts/security/image-tool.py scripts/security/scan-image.sh \
-            security/image-exceptions.json
+            scripts/security/check-backend-vulnerabilities.sh \
+            scripts/security/image-exceptions.json
 
       - name: Validate current exception policy
-        run: python3 scripts/security/image-policy.py check-policy security/image-exceptions.json
+        run: python3 scripts/security/image-policy.py check-policy scripts/security/image-exceptions.json
 
       - uses: actions/setup-java@v6
         with:
@@ -300,7 +290,7 @@ jobs:
           vuln-type: os,library
 
       - name: Enforce backend vulnerability ratchet
-        run: bash tests/backend/vulnerability-ratchet.sh trivy-backend-candidate.json trivy-openmrs-baseline.json
+        run: bash scripts/security/check-backend-vulnerabilities.sh trivy-backend-candidate.json trivy-openmrs-baseline.json
 
       - name: Produce backend Trivy evidence
         if: ${{ always() && steps.image.outcome == 'success' && steps.image.outputs.digest != '' }}

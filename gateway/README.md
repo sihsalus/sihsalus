@@ -74,8 +74,6 @@ Desde la raíz, con Docker activo, Python 3 y OpenSSL 3:
 
 ```sh
 python3 tests/gateway/routing.py
-bash tests/imaging/auth-gateway.sh
-bash tests/backend/realtime-notifications-config.sh
 bash scripts/validate-compose.sh
 ```
 

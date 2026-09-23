@@ -44,6 +44,15 @@ def exercise_profiles(env_file):
                 manifest["services"][service] = {"image": digest(service), "imageId": digest(service)}
         release.verify_compose(manifest, ROOT, env_file)
         print(f"PASS: production Compose selection {','.join(profiles) or 'core'} pins {len(active)} services")
+        if "keycloak" in active:
+            manifest["services"].pop("keycloak")
+            try:
+                release.verify_compose(manifest, ROOT, env_file)
+            except release.ManifestError:
+                pass
+            else:
+                raise AssertionError("Manifest missing an enabled Keycloak service was accepted")
+            print("PASS: incomplete optional-service manifest rejected against real Compose")
 
     # Explicit validation ignores inherited profiles, but the persistent audit
     # must reject an ordinary Compose invocation that selects another profile.

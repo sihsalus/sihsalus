@@ -18,7 +18,8 @@
 - [Profiles](#profiles)
 - [Arquitectura de infraestructura](docs/architecture/infrastructure.md)
 - [Cambio obligatorio de contraseña local](docs/operations/forced-password-change.md)
-- [Smoke periódico del runtime](docs/operations/runtime-smoke.md)
+- [Pruebas acotadas del distro](tests/README.md)
+- [Aceptación del runtime](docs/operations/runtime-smoke.md)
 - [Detección de secretos y atención de alertas](docs/operations/secret-scanning.md)
 - [Actualización en Producción](#actualización-en-producción)
 - [Docker Bake (Build)](#docker-bake-build)
@@ -307,7 +308,7 @@ backend/                        # Backend (Dockerfile, pom.xml, config)
 gateway/                        # Nginx gateway
 frontend/                       # SPA frontend
 certbot/                        # SSL certificates
-keycloak/                       # Keycloak auth
+oauth/                          # Keycloak auth
 imaging/                        # OHIF config
 compose/
   core.yml                      # gateway, portal de ayuda, frontend, backend, db

@@ -68,7 +68,7 @@ Orthanc para que las URL de recuperación de imágenes sean correctas.
 Si OpenMRS debe conservar su login local, añadir `compose/openmrs-local-auth.yml`
 después de `compose/keycloak.yml`, manteniendo `compose/imaging-auth.yml` y los
 profiles actuales. El override conserva la ACL, el rol `imaging-access` y las
-sesiones OIDC de Imaging. Ver [compatibilidad, orden y transición de autenticación](../keycloak/README.md#openmrs-local-con-keycloak-para-imaging)
+sesiones OIDC de Imaging. Ver [compatibilidad, orden y transición de autenticación](../oauth/README.md#openmrs-local-con-keycloak-para-imaging)
 antes de aplicarlo a un entorno existente.
 
 OHIF se construye con [Dockerfile](Dockerfile) desde un commit y checksum fijos.
@@ -150,7 +150,7 @@ Imaging; no reemplazar el realm completo ni eliminar usuarios:
 
 1. En el realm `openmrs`, comprobar o crear el realm role `imaging-access`.
 2. Comprobar o crear el cliente `sihsalus-imaging` usando
-   [realm-export.json](../keycloak/realm-export.json) como contrato. Debe ser
+   [realm-export.json](../oauth/realm-export.json) como contrato. Debe ser
    confidencial, con Standard Flow y PKCE S256; sin Implicit Flow, password grants
    ni service accounts.
 3. Configurar la callback exacta de ese entorno y sincronizar su secreto con

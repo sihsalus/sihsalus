@@ -189,7 +189,8 @@ with TemporaryDirectory(prefix="sihsalus-backend-workflow-") as temporary:
     source_sha = git("rev-parse", "HEAD")
     (repository / "source-lock").write_text("workflow source")
     security_paths = [".github/actions/check-image/action.yml", "scripts/security/image-policy.py",
-                      "scripts/security/image-tool.py", "scripts/security/scan-image.sh", "security/image-exceptions.json"]
+                      "scripts/security/image-tool.py", "scripts/security/scan-image.sh",
+                      "scripts/security/check-backend-vulnerabilities.sh", "scripts/security/image-exceptions.json"]
     for name in security_paths:
         target = repository / name
         target.parent.mkdir(parents=True, exist_ok=True)

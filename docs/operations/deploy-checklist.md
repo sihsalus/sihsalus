@@ -42,7 +42,8 @@ con aprobación explícita.
   verificados para los digests que se desplegarán; no usar tags `candidate-*` como releases.
 - Versiones a desplegar identificadas: backend, frontend, portal de ayuda, content package y perfiles habilitados.
 - Backup reciente confirmado.
-- [Último simulacro físico exitoso de main](https://github.com/sihsalus/sihsalus/actions/workflows/physical-backup-drill.yml?query=branch%3Amain+is%3Asuccess) revisado; registrar URL, SHA y fecha. Si no existe, dejar el pendiente explícito. Ver [alcance del simulacro](physical-backup-drill.md).
+- Último workflow `Backup and restore drills` exitoso de `main` revisado; registrar enlace, SHA y fecha, o el pendiente explícito. El resultado del dump no sustituye el del restore físico. Ver [procedimiento y alcance](physical-backup-drill.md).
+- Smoke de autenticación local y Keycloak revisado para el digest candidato; registrar enlace y resultado de ambas variantes. El control diario puede haber probado otro digest. Ver [alcance y ejecución](runtime-smoke.md).
 - Ruta de rollback definida.
 - Distinguir recuperación de imágenes y de base de datos. Volver a una imagen
   anterior no deshace migraciones SQL ya confirmadas; una consolidación de roles

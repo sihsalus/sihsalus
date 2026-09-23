@@ -77,7 +77,7 @@ docker compose ps
 - `OAUTH2_ENABLED` no se configura en `.env`: core lo fija en `false` y `compose/keycloak.yml` lo cambia a `true`.
 - `compose/openmrs-local-auth.yml` permite conservar autenticación local al usar
   Keycloak para Imaging. Se carga después de `compose/keycloak.yml`; consultar
-  [orden, compatibilidad y transición](../keycloak/README.md#openmrs-local-con-keycloak-para-imaging).
+  [orden, compatibilidad y transición](../oauth/README.md#openmrs-local-con-keycloak-para-imaging).
 - `SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED` vale `true` por defecto para autenticación local. `false` desactiva el filtro backend y requiere recrearlo; el rollback completo también debe restaurar el frontend coordinado. OAuth2 siempre desactiva el filtro local.
 - En producción se usan tags inmutables, no `latest`.
 - `DOCS_IMAGE_REF` fija por digest el portal de ayuda público-seguro. El gateway

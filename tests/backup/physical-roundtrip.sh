@@ -11,10 +11,11 @@ cd "$ROOT"
 docker info --format '{{.ServerVersion}}'
 umask 077
 STATE="$(mktemp -d "${RUNNER_TEMP:?}/physical-drill.XXXXXXXX")"
-export COMPOSE_PROJECT_NAME="physical-drill-$(openssl rand -hex 8)"
+COMPOSE_PROJECT_NAME="physical-drill-$(openssl rand -hex 8)"
 export COMPOSE_FILE="$ROOT/tests/backup/physical-compose.yml"
-export MYSQL_ROOT_PASSWORD="$(openssl rand -hex 24)"
-export BACKUP_ENCRYPTION_PASSWORD="$(openssl rand -hex 24)"
+MYSQL_ROOT_PASSWORD="$(openssl rand -hex 24)"
+BACKUP_ENCRYPTION_PASSWORD="$(openssl rand -hex 24)"
+export COMPOSE_PROJECT_NAME MYSQL_ROOT_PASSWORD BACKUP_ENCRYPTION_PASSWORD
 unset COMPOSE_PROFILES DB_VOLUME CONTAINER_NAME OMRS_DB_BACKUP_USER OMRS_DB_BACKUP_PASSWORD
 DB_NAME="$COMPOSE_PROJECT_NAME-db"
 DB_VOLUME="$COMPOSE_PROJECT_NAME"_data

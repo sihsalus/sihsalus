@@ -53,7 +53,7 @@ backend siguen siendo adicionales: una excepción no desactiva el rechazo de
 vulnerabilidades corregibles del sistema operativo ni el de hallazgos nuevos
 frente a la base OpenMRS.
 
-`security/image-exceptions.json` empieza vacío. Una excepción requiere PR
+`scripts/security/image-exceptions.json` empieza vacío. Una excepción requiere PR
 revisado, responsable identificable y un issue de seguimiento. Su alcance
 incluye repositorio de imagen, plataforma, CVE/advisory, nombre y versión exacta
 del paquete, clase, ecosistema y severidad. Una versión, arquitectura, ecosistema
@@ -161,12 +161,9 @@ python3 -B -m unittest discover -s tests/security -p 'test_image_*.py' -v
 bash tests/backend/vulnerability-ratchet-config.sh
 ```
 
-El job obligatorio `Image attestations and policy` utiliza un registry temporal
-en `127.0.0.1`, dos plataformas y paquetes sintéticos. Comprueba el recorrido real
-BuildKit/SPDX/Trivy y la promoción por el mismo digest, e incluye un valor falso
-de credencial para comprobar que no aparece en la evidencia. Elimina únicamente
-su builder, registry y volumen de prueba. No arranca servicios clínicos, no
-publica imágenes de producto y no modifica DEV, QLTY ni producción.
+La suite rápida comprueba la política con fixtures locales, sin registry ni
+builds de prueba. Los workflows de publicación siguen exigiendo SBOM, escaneo
+por digest, política de excepciones y firma antes de promover la imagen real.
 
 El frontend publica desde `sihsalus-frontend`, con su propio workflow y controles.
 Este documento cubre los tres publicadores de imágenes del distro; la promoción

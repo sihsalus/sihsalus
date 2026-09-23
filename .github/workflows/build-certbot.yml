@@ -10,7 +10,7 @@ on:
       - 'scripts/security/image-tool.py'
       - 'scripts/security/scan-image.sh'
       - 'scripts/security/promote-image.sh'
-      - 'security/image-exceptions.json'
+      - 'scripts/security/image-exceptions.json'
       - 'certbot/**'
   workflow_dispatch:
 
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Validate current exception policy
-        run: python3 scripts/security/image-policy.py check-policy security/image-exceptions.json
+        run: python3 scripts/security/image-policy.py check-policy scripts/security/image-exceptions.json
 
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
         with:
@@ -87,14 +87,14 @@ jobs:
               exit 1
             fi
             openssl version
-            sh -n /certbot/scripts/entrypoint.sh
+            sh -n /certbot/entrypoint.sh
             mkdir -p /tmp/certificate-test/webroot/conf
             openssl genpkey -genparam -algorithm DH -pkeyopt group:ffdhe2048 \
               -out /tmp/certificate-test/webroot/conf/ssl-dhparams.pem
             SSL_MODE=dev CERT_WEB_DOMAINS=localhost,127.0.0.1 \
               CERT_ROOT_PATH=/tmp/certificate-test/certs \
               CERTBOT_DATA_PATH=/tmp/certificate-test/webroot \
-              /certbot/scripts/entrypoint.sh
+              /certbot/entrypoint.sh
             openssl x509 -noout -checkhost localhost \
               -in /tmp/certificate-test/certs/live/localhost/fullchain.pem
             openssl x509 -noout -checkip 127.0.0.1 \

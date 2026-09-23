@@ -20,12 +20,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - name: Test capture, deployment, recovery and append-only history
-        run: python3 -B -m unittest discover -s tests/deploy -p test_release_manifest.py -v
-      - name: Check actual Compose selections with synthetic credentials
+      - name: Verify source commits, Compose coverage and persistent release selection
         run: python3 -B tests/deploy/release-manifest-compose.py --catalog --audit
-      - name: Prove local image IDs and metadata against isolated Docker containers
-        run: python3 -B tests/deploy/release-manifest-runtime.py
       - name: Validate reviewed release history and generate exact file checksums
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}

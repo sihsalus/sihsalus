@@ -58,18 +58,13 @@ Para ejecutar el backup físico sobre la réplica:
 
 `restore_full.sh` detecta el volumen real montado en `/var/lib/mysql`, crea un snapshot temporal, restaura y levanta solo `db` y `backend`. Puede recibir `DB_VOLUME` explícitamente si el contenedor de base de datos no existe.
 
-## Prueba automatizada
+## Verificación de restauración
 
-```bash
-./tests/backup/dump-roundtrip.sh
-```
-
-La prueba inicia una MariaDB efímera, inserta datos, crea un dump cifrado, muta la tabla, restaura y verifica el valor original. CI la ejecuta cuando cambian los scripts o la propia prueba.
-
-El [simulacro físico semanal](../../docs/operations/physical-backup-drill.md)
-ejecuta además los scripts de backup y restore físicos, verifica checksums y
-filas, y provoca un fallo controlado para comprobar la recuperación del snapshot.
-Su ejecución completa se limita a runners efímeros de GitHub Actions.
+El workflow independiente `Backup and restore drills` comprueba semanalmente
+dump cifrado, semillas, restauración física y recuperación del snapshot ante
+fallo. También admite ejecución manual. Consulta la
+[comprobación de restauración](../../docs/operations/physical-backup-drill.md)
+y registra resultado, versiones, checksum y fecha.
 
 ## Regla operativa
 
