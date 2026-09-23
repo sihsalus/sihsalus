@@ -53,7 +53,7 @@ backend siguen siendo adicionales: una excepción no desactiva el rechazo de
 vulnerabilidades corregibles del sistema operativo ni el de hallazgos nuevos
 frente a la base OpenMRS.
 
-`scripts/security/image-exceptions.json` empieza vacío. Una excepción requiere PR
+`scripts/security/image-exceptions.json` registra las aceptaciones temporales. Una excepción requiere PR
 revisado, responsable identificable y un issue de seguimiento. Su alcance
 incluye repositorio de imagen, plataforma, CVE/advisory, nombre y versión exacta
 del paquete, clase, ecosistema y severidad. Una versión, arquitectura, ecosistema
@@ -86,6 +86,31 @@ hallazgo de OpenMRS. Resolverlo con una actualización probada o con una excepci
 explícitamente revisada; no sustituir el umbral por `exit-code: 0`, modificar el
 informe ni deshabilitar el control. Los valores del catálogo son decisiones de
 seguridad que los mantenedores deben revisar antes de incorporarlos.
+
+## Aceptación temporal del backend del 23/09/2026
+
+El mantenedor autorizó habilitar la publicación del backend para continuar la
+actualización de QLTY. Se registran 43 excepciones exactas del escaneo
+[35887356865](https://github.com/sihsalus/sihsalus/actions/runs/35887356865):
+2 CRITICAL y 41 HIGH, todas bibliotecas Java de `linux/amd64`. Responsable:
+`@Duvet05`; seguimiento [#323](https://github.com/sihsalus/sihsalus/issues/323);
+vencimiento inclusivo: **30/09/2026 UTC**.
+
+La aceptación permite publicar una imagen que conserve esos hallazgos; no
+los corrige ni demuestra que sean inexplotables. El catálogo se aplica a la
+publicación del repositorio backend, no implementa una restricción por entorno.
+La intervención autorizada continúa en QLTY; esta decisión no constituye una
+aprobación de despliegue de ese backend en producción.
+
+Se reutiliza el mecanismo de excepciones existente, sin cambiar el evaluador,
+Trivy, SBOM, firma, comparación con OpenMRS ni rechazo de fallos operativos.
+Una CVE, paquete, versión, severidad, ecosistema o plataforma fuera del alcance
+registrado sigue bloqueando. Gateway, Certbot y frontend no reciben excepciones.
+
+Retirar cada entrada al publicar y verificar la corrección en el componente
+propietario. Si vence sin corrección, la publicación vuelve a bloquearse;
+renovar exige una nueva decisión explícita. Retirar las entradas revoca futuras
+promociones, pero no modifica imágenes ya publicadas ni revierte despliegues.
 
 ## Evidencia sin credenciales
 
