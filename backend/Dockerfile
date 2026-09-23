@@ -4,6 +4,17 @@ ARG OPENMRS_BUILD_IMAGE=openmrs/openmrs-core:2.8.x-dev-amazoncorretto-21
 # Keep the runtime base pinned; the distribution supplies its own Core WAR.
 ARG OPENMRS_RUNTIME_IMAGE=openmrs/openmrs-core:2.8.x-amazoncorretto-21@sha256:7f08dd72400c08d4fbf584cc9ac7cf17d96a2ae5fa0c43b4dc60a40ea7d0b760
 
+# Unpack in the build image: the minimal runtime intentionally has no tar.
+FROM ${OPENMRS_BUILD_IMAGE} AS tomcat-runtime
+ADD --checksum=sha256:d1a804502cddfd1c1436c1c37809ed4cb807a9c64a8a35fe1747d3ba9a0edeab \
+    https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.121/bin/apache-tomcat-9.0.121.tar.gz \
+    /tmp/apache-tomcat.tar.gz
+RUN mkdir /tmp/tomcat-runtime && \
+    tar -xzf /tmp/apache-tomcat.tar.gz -C /tmp/tomcat-runtime --strip-components=1 \
+      apache-tomcat-9.0.121/bin apache-tomcat-9.0.121/lib \
+      apache-tomcat-9.0.121/LICENSE apache-tomcat-9.0.121/NOTICE \
+      apache-tomcat-9.0.121/RELEASE-NOTES
+
 ### Build Stage
 # The dev tag provides Maven/OpenMRS build tooling for the 2.8 line.
 FROM ${OPENMRS_BUILD_IMAGE} AS dev
@@ -139,16 +150,9 @@ RUN echo "Security refresh: ${SECURITY_REFRESH}" && \
 # 9.0.121 fixes CVE-2026-65182, CVE-2026-65905 and CVE-2026-68525.
 ENV TOMCAT_VERSION=9.0.121 \
     TOMCAT_SHA512=16494dd4745f808d3c506807b5275521fd71044d976f441d18eeeab0f5a38bc1b5344ca395292f6f26eb7612cd8c8e746d01ccdfb29893d394052d9f4b1f4c11
-ADD --checksum=sha256:d1a804502cddfd1c1436c1c37809ed4cb807a9c64a8a35fe1747d3ba9a0edeab \
-    https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.121/bin/apache-tomcat-9.0.121.tar.gz \
-    /tmp/apache-tomcat.tar.gz
-RUN rm -rf /usr/local/tomcat/bin /usr/local/tomcat/lib && \
-    tar -xzf /tmp/apache-tomcat.tar.gz -C /usr/local/tomcat --strip-components=1 \
-      apache-tomcat-9.0.121/bin apache-tomcat-9.0.121/lib \
-      apache-tomcat-9.0.121/LICENSE apache-tomcat-9.0.121/NOTICE \
-      apache-tomcat-9.0.121/RELEASE-NOTES && \
-    rm /tmp/apache-tomcat.tar.gz && \
-    chmod -R g+rx /usr/local/tomcat/bin /usr/local/tomcat/lib && \
+RUN rm -rf /usr/local/tomcat/bin /usr/local/tomcat/lib
+COPY --from=tomcat-runtime /tmp/tomcat-runtime/ /usr/local/tomcat/
+RUN chmod -R g+rx /usr/local/tomcat/bin /usr/local/tomcat/lib && \
     touch /usr/local/tomcat/bin/setenv.sh && \
     chmod g+w /usr/local/tomcat/bin/setenv.sh && \
     /usr/local/tomcat/bin/version.sh | grep -qF 'Apache Tomcat/9.0.121'
