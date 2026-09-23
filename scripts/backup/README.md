@@ -38,8 +38,10 @@ gzip inválido, truncado o vacío. Reserva espacio para el SQL descomprimido y,
 si hay cifrado, también para su gzip; `TMPDIR` permite elegir el disco temporal.
 Los temporales se eliminan al salir.
 
-Después detiene `backend` y comprueba que no siga ejecutándose. Si falla la
-parada o la comprobación, aborta antes de borrar la base. Importa los bytes ya
+Después comprueba que exista un contenedor `backend` en el proyecto Compose,
+incluidos los detenidos. Si falta o falla esa consulta, aborta sin tocar la base.
+Luego lo detiene y comprueba que no siga ejecutándose. Si falla la parada o la
+comprobación, también aborta antes de borrar la base. Importa los bytes ya
 validados y, solo si termina correctamente, usa `docker compose start backend`
 para reanudar el mismo contenedor, imagen y configuración. Una importación SQL
 fallida deja el backend detenido y requiere recuperación antes de reabrirlo.
@@ -59,6 +61,10 @@ Para automatización o cuando otro runbook controla la aplicación:
 
 `--no-app-control` mantiene la validación del dump, pero delega por completo la
 parada y el arranque al operador. `--yes` solo omite la confirmación interactiva.
+Para recuperar un host donde todavía no existe el contenedor backend, usar
+`--no-app-control` con la base disponible y la aplicación fuera de servicio;
+crear y arrancar el backend por separado tras completar la importación, usando
+la composición y las imágenes revisadas del entorno.
 
 ## Backup físico
 

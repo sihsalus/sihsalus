@@ -25,7 +25,9 @@ bash scripts/validate-compose.sh
 ```
 
 Requiere los plugins Docker Compose y Buildx, sin arrancar servicios. También
-compara los argumentos del frontend entre Compose y Bake, incluida `.env.template`.
+compara contexto, Dockerfile y argumentos del frontend entre Compose y Bake
+(automático, explícito y HCL aislado), incluida `.env.template` y la precedencia
+de overrides sobre los valores de respaldo del HCL.
 CI ejecuta ambos comandos en cada PR, además de validar el catálogo de releases contra los
 commits fuente y su Compose real. Esta última comprobación también puede
 ejecutarse con `python3 -B tests/deploy/release-manifest-compose.py --catalog`.

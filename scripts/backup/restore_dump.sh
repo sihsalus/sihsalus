@@ -133,6 +133,12 @@ if ! gzip -dc "$sql_source" >"$validated_sql" || [ ! -s "$validated_sql" ]; then
 fi
 
 if [ "$MANAGE_BACKEND" = "true" ]; then
+    backend_containers="$(docker compose ps --all --quiet backend)"
+    if [ -z "$backend_containers" ]; then
+        echo "[ERROR] No existe un contenedor backend en este proyecto Compose; restauracion cancelada antes de modificar la base" >&2
+        echo "[INFO] Para recuperacion con control externo de la aplicacion, usar --no-app-control y preparar su arranque por separado" >&2
+        exit 1
+    fi
     echo "[INFO] Deteniendo backend para evitar escrituras..."
     if ! docker compose stop backend; then
         echo "[ERROR] No se pudo detener el backend; restauracion cancelada" >&2

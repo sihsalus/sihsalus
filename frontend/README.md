@@ -70,16 +70,24 @@ Desde la raíz del repositorio, conservando la
 docker compose build frontend
 ```
 
-El target `frontend` de [Docker Bake](../docker-bake.hcl) hereda el contexto y
-los argumentos de Compose. Ejecutado desde la raíz, `docker buildx bake frontend`
-lee primero `docker-compose.yml`. Para incluir Keycloak u otro override, pasar
+El target `frontend` de [Docker Bake](../docker-bake.hcl) usa el contexto y
+los argumentos de Compose cuando se carga ese archivo. Ejecutado desde la raíz,
+`docker buildx bake frontend` lee primero `docker-compose.yml`.
+Para incluir Keycloak u otro override, pasar
 los mismos archivos explícitamente y el HCL al final:
 
 ```sh
 docker buildx bake -f docker-compose.yml -f compose/keycloak.yml -f docker-bake.hcl frontend
 ```
 
-La referencia fuente predeterminada se mantiene solo en `compose/core.yml`.
+También se admite `docker buildx bake -f docker-bake.hcl frontend`: el HCL
+incluye un target de respaldo cuyos argumentos y referencia fuente se comparan
+con Compose en CI. Este modo usa las variables exportadas al proceso; para
+cargar `.env` o overrides Compose, incluir los archivos Compose como arriba.
+Cuando están presentes, sus argumentos prevalecen sobre el respaldo del HCL.
+
+La referencia fuente canónica se mantiene en `compose/core.yml`; al actualizarla,
+actualizar también `FRONTEND_DEFAULT_SOURCE_TAG` en `docker-bake.hcl`.
 Copiar `.env.template` no cambia esa versión. `FRONTEND_SOURCE_TAG` permite
 elegir otro tag/digest y `FRONTEND_SOURCE_IMAGE` tiene precedencia si se define.
 Un build directo del Dockerfile debe proporcionar `FRONTEND_SOURCE_IMAGE` y
@@ -106,8 +114,9 @@ python3 -B tests/frontend/build-config.py
 ```
 
 La segunda comprobación requiere Compose y Buildx, sin daemon Docker. Compara
-los argumentos resueltos por ambos, incluida la plantilla de entorno, los
-overrides de imagen/nodo y Keycloak; también corre en `validate-compose.sh`.
+contexto, Dockerfile y argumentos con Bake automático, explícito y HCL aislado,
+incluida la plantilla de entorno, los overrides de imagen/nodo y la precedencia
+de `.env` y Keycloak; también corre en `validate-compose.sh`.
 
 La prueba [cache-policy.sh](../tests/frontend/cache-policy.sh) usa Nginx real con
 fixtures locales y requiere Docker activo. Cubre archivos mutables, assets con

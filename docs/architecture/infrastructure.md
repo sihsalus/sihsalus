@@ -41,7 +41,7 @@ En servidores, la composición elegida se guarda en `COMPOSE_FILE` y `COMPOSE_PR
 | Variables | `.env.template` |
 | Combinaciones soportadas | `scripts/validate-compose.sh` |
 | Validación de PR | `.github/workflows/ci.yml`, check `PR Gate` |
-| Fuente y argumentos frontend | `compose/core.yml`; Bake los hereda |
+| Fuente y argumentos frontend | `compose/core.yml`; Bake los usa cuando se carga Compose y mantiene un respaldo HCL verificado por CI |
 | Targets de build y publicación | `docker-bake.hcl` y workflows `build-*.yml` |
 | Operación de despliegue | `docs/operations/deploy-checklist.md` |
 | Rutas y políticas del gateway | `gateway/templates/includes/` |
@@ -59,8 +59,8 @@ La documentación no debe copiar listas completas de variables o comandos si pue
 - El override TLS publica el puerto 443.
 - Cada combinación soportada produce un modelo Compose válido.
 - El Compose de CI no declara volúmenes persistentes.
-- Las regresiones rápidas del restore comprueban que los fallos de archivo o
-  parada aborten antes de borrar datos. El simulacro periódico valida además
+- Las regresiones rápidas del restore comprueban que los fallos de archivo,
+  ausencia de backend o parada aborten antes de borrar datos. El simulacro periódico valida además
   backup/restore real sobre MariaDB efímera, fuera de `PR Gate`.
 
 Los modelos renderizados se guardan como artifacts de CI para evidencia de cambio.
