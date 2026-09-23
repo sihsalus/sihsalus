@@ -57,6 +57,8 @@ trap 'exit 143' TERM
 
 assert_no_patients() {
   local count
+  # The database container expands its own credentials.
+  # shellcheck disable=SC2016
   count="$("${COMPOSE[@]}" exec -T db sh -c \
     'MYSQL_PWD="$MYSQL_PASSWORD" mariadb --user="$MYSQL_USER" --database=openmrs --batch --skip-column-names --execute="SELECT COUNT(*) FROM patient"' \
     2>>"$STATE/database-check.log")"

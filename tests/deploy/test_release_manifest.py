@@ -407,6 +407,25 @@ class RuntimeConsumption(unittest.TestCase):
 
 
 class CatalogHistory(unittest.TestCase):
+    def test_unused_catalog_can_be_absent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            release.validate_catalog(root, None, root / "index.json")
+            self.assertEqual(json.loads((root / "index.json").read_text()), {"manifests": []})
+            self.assertFalse((root / "releases").exists())
+
+    def test_catalog_rejects_a_file_or_symlink(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            catalog = root / "releases"
+            catalog.write_text("invalid")
+            with self.assertRaises(release.ManifestError):
+                release.validate_catalog(root, None)
+            catalog.unlink()
+            catalog.symlink_to(root / "missing")
+            with self.assertRaises(release.ManifestError):
+                release.validate_catalog(root, None)
+
     def test_history_is_append_only_and_index_contains_exact_file_checksums(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -428,6 +447,12 @@ class CatalogHistory(unittest.TestCase):
             with self.assertRaisesRegex(release.ManifestError, "changed or renamed"):
                 release.validate_catalog(root, base)
             path.unlink()
+            with self.assertRaisesRegex(release.ManifestError, "deleted"):
+                release.validate_catalog(root, base)
+            (parent / "second.json").unlink()
+            parent.rmdir()
+            parent.parent.rmdir()
+            parent.parent.parent.rmdir()
             with self.assertRaisesRegex(release.ManifestError, "deleted"):
                 release.validate_catalog(root, base)
 

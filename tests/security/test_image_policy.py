@@ -256,8 +256,7 @@ class PromotionContract(unittest.TestCase):
             root = Path(directory)
             (root / "scripts/security").mkdir(parents=True)
             (root / "scripts/security/image-policy.py").write_text((ROOT / "scripts/security/image-policy.py").read_text())
-            (root / "security").mkdir()
-            (root / "security/image-exceptions.json").write_text(json.dumps(EMPTY_POLICY))
+            (root / "scripts/security/image-exceptions.json").write_text(json.dumps(EMPTY_POLICY))
             (root / "security-evidence").mkdir()
             (root / "security-evidence/evidence.json").write_text(json.dumps({"decision": "pass", "image": IMAGE,
                                                                              "sourceCommit": SOURCE, "blockedFindings": 0}))

@@ -70,7 +70,7 @@ target "frontend" {
 
 target "keycloak" {
   inherits   = ["_base"]
-  context    = "./keycloak"
+  context    = "./oauth"
   dockerfile = "Dockerfile"
   tags       = ["${REGISTRY}sihsalus-keycloak:${TAG}"]
 }

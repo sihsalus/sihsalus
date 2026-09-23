@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      source_omods:
+        description: Run the full source-module test matrix
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,20 +21,15 @@ permissions:
 
 jobs:
   changes:
-    name: Detect relevant changes
+    name: Detect build and web changes
     runs-on: ubuntu-latest
     outputs:
       backend: ${{ steps.scope.outputs.backend }}
-      backup: ${{ steps.scope.outputs.backup }}
-      monitoring: ${{ steps.scope.outputs.monitoring }}
-      imaging: ${{ steps.scope.outputs.imaging }}
-      grafana_oidc: ${{ steps.scope.outputs.grafana_oidc }}
-      image_security: ${{ steps.scope.outputs.image_security }}
+      web: ${{ steps.scope.outputs.web }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-
       - name: Detect scoped changes
         id: scope
         env:
@@ -37,63 +37,23 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
           backend=true
-          backup=true
-          monitoring=true
-          imaging=true
-          grafana_oidc=true
-          image_security=true
-
-          can_diff=false
           if [ "$EVENT_NAME" != "workflow_dispatch" ] \
-            && [ -n "$BASE_SHA" ] \
-            && [[ ! "$BASE_SHA" =~ ^0+$ ]] \
-            && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
-            can_diff=true
-          fi
-
-          if [ "$can_diff" = "true" ] \
-            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml pom.xml backend/ tests/backend/; then
+            && [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] \
+            && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
+            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- \
+              .github/workflows/ci.yml .dockerignore pom.xml backend/ tests/backend/ scripts/security/; then
             backend=false
           fi
-
-          if [ "$can_diff" = "true" ] \
-            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml compose/seed.yml scripts/backup/ scripts/seed/ tests/backup/ tests/seed/; then
-            backup=false
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          web=true
+          if [ "$EVENT_NAME" != "workflow_dispatch" ] \
+            && [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] \
+            && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
+            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- \
+              .github/workflows/ci.yml frontend/ gateway/ tests/frontend/cache-policy.sh tests/gateway/; then
+            web=false
           fi
-
-          if [ "$can_diff" = "true" ] \
-            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml compose/monitoring.yml monitoring/ tests/monitoring/; then
-            monitoring=false
-          fi
-
-          if [ "$can_diff" = "true" ] \
-            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml docker-compose.yml compose/core.yml compose/keycloak.yml compose/openmrs-local-auth.yml compose/imaging.yml compose/imaging-auth.yml compose/ssl.yml gateway/ keycloak/ imaging/ tests/imaging/ tests/keycloak/; then
-            imaging=false
-          fi
-
-          if [ "$can_diff" = "true" ] \
-            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml compose/monitoring.yml compose/monitoring-oidc.yml compose/keycloak.yml tests/monitoring/oidc/ scripts/validate-compose.sh scripts/security-audit.sh scripts/security/ .env.template; then
-            grafana_oidc=false
-          fi
-
-          if [ "$can_diff" = "true" ] \
-            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- .github/workflows/ci.yml .github/workflows/build-backend.yml .github/workflows/build-gateway.yml .github/workflows/build-certbot.yml .github/actions/check-image/ scripts/security/image-policy.py scripts/security/image-tool.py scripts/security/scan-image.sh scripts/security/promote-image.sh security/image-exceptions.json tests/security/; then
-            image_security=false
-          fi
-
-          {
-            echo "backend=$backend"
-            echo "backup=$backup"
-            echo "monitoring=$monitoring"
-            echo "imaging=$imaging"
-            echo "grafana_oidc=$grafana_oidc"
-            echo "image_security=$image_security"
-          } >> "$GITHUB_OUTPUT"
-          echo "Backend build required: $backend"
-          echo "Backup round-trip required: $backup"
-          echo "Monitoring runtime test required: $monitoring"
-          echo "Imaging auth runtime test required: $imaging"
-          echo "Grafana OIDC runtime test required: $grafana_oidc"
+          echo "web=$web" >> "$GITHUB_OUTPUT"
 
   release-manifests:
     name: Release manifests
@@ -106,66 +66,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Test frontend bootstrap configuration
-        run: node --test frontend/patch-config-urls.test.js
-
-      - name: Test frontend cache policy
-        run: ./tests/frontend/cache-policy.sh
-
-      - name: Test frontend deployment and rollback
-        run: ./tests/frontend/deploy-frontend.sh
-
-      - name: Test guarded poweroff policy
-        run: ./tests/utils/safe-poweroff-policy.sh
-
-      - name: Test split-brain-resistant external verification
-        run: ./tests/deploy/verify-external-frontend-test.sh
-
-      - name: Validate full environment redeploy policy
-        run: ./tests/deploy/redeploy-environment-policy.sh
-
-      - name: Test OCL token runtime configuration
-        run: ./tests/backend/ocl-token-config.sh
-
-      - name: Test forced-password runtime configuration
-        run: ./tests/backend/forced-password-config.sh
-
-      - name: Test realtime notifications OMOD and gateway configuration
-        run: ./tests/backend/realtime-notifications-config.sh
-
-      - name: Test source OMOD report ownership and cleanup
-        run: bash tests/backend/source-omods-config.sh
-
-      - name: Test HTTP and HTTPS gateway routing
-        run: python3 tests/gateway/routing.py
-
-      - name: Test imaging readiness and compiled asset contracts
-        run: |
-          python3 tests/keycloak/healthcheck.py
-          python3 tests/imaging/orthanc-healthcheck.py
-          node --test tests/imaging/ohif-packaging.test.mjs
-
-      - name: Test backend security refresh cache policy
-        run: ./tests/backend/security-refresh-config.sh
-
-      - name: Test backend vulnerability ratchet
-        run: bash tests/backend/vulnerability-ratchet-config.sh
-
-      - name: Test immutable image policy and current exception ownership
-        run: |
-          python3 -B -m unittest discover -s tests/security -p 'test_image_*.py' -v
-          python3 -B scripts/security/image-policy.py check-policy security/image-exceptions.json
-
-      - name: Test Tomcat rootless configuration directory contract
-        run: bash tests/backend/tomcat-config-config.sh
-
-      - name: Validate published O3 Forms dependency contract
-        run: |
-          bash tests/backend/o3forms-release-config.sh
-          bash tests/backend/o3forms-release-image.sh --self-test
-
-      - name: Validate independently released REST and EMR API modules
-        run: python3 tests/backend/owned-module-releases.py --self-test
+      - name: Run focused configuration, deployment and security tests
+        run: bash tests/run.sh
 
       - name: Validate models and invariants
         run: ./scripts/validate-compose.sh compose-validation
@@ -194,10 +96,22 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  web:
+    name: Web routing and cache
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify frontend cache policy
+        run: bash tests/frontend/cache-policy.sh
+      - name: Verify HTTP and HTTPS gateway routes
+        run: python3 tests/gateway/routing.py
+
   source-omods:
     name: Test source OMOD (${{ matrix.module }})
-    needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    if: github.event_name == 'workflow_dispatch' && inputs.source_omods
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -324,7 +238,7 @@ jobs:
           vuln-type: os,library
 
       - name: Enforce backend vulnerability ratchet
-        run: bash tests/backend/vulnerability-ratchet.sh trivy-backend-candidate.json trivy-openmrs-baseline.json
+        run: bash scripts/security/check-backend-vulnerabilities.sh trivy-backend-candidate.json trivy-openmrs-baseline.json
 
       - name: Produce backend Trivy evidence
         if: always()
@@ -348,116 +262,24 @@ jobs:
           sarif_file: trivy-backend-results.sarif
           category: trivy-backend
 
-  backup:
-    name: Backup round-trip
-    needs: changes
-    if: needs.changes.outputs.backup == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Test encrypted dump and restore
-        run: ./tests/backup/dump-roundtrip.sh
-
-      - name: Test encrypted seed restore
-        run: ./tests/seed/roundtrip.sh
-
-  monitoring:
-    name: Docker API proxy
-    needs: changes
-    if: needs.changes.outputs.monitoring == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Verify read-only Docker API
-        run: ./tests/monitoring/socket-proxy.sh
-
-      - name: Validate monitoring configurations
-        run: ./tests/monitoring/config-validation.sh
-
-  imaging:
-    name: Imaging authorization and viewer
-    needs: changes
-    if: needs.changes.outputs.imaging == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Test anonymous denial, authorized access and logout
-        run: ./tests/imaging/auth-gateway.sh
-
-      - name: Test ephemeral imaging sessions
-        if: ${{ !cancelled() }}
-        run: python3 tests/imaging/session-store.py
-
-      - name: Test the pinned Orthanc and Explorer integration
-        if: ${{ !cancelled() }}
-        run: python3 tests/imaging/orthanc-service.py
-
-      - name: Build the pinned OHIF viewer and verify real assets
-        if: ${{ !cancelled() }}
-        run: docker build --tag sihsalus-ohif-ci ./imaging
-
-  grafana-oidc:
-    name: Grafana OIDC authorization
-    needs: changes
-    if: needs.changes.outputs.grafana_oidc == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Test synthetic provider and configuration contracts
-        run: python3 -B -m unittest discover -s tests/monitoring/oidc -p 'test_*.py' -v
-      - name: Test real Grafana roles, denied login, expired code and logout
-        run: python3 -B tests/monitoring/oidc/runtime.py runtime
-
-  image-security:
-    name: Image attestations and policy
-    needs: changes
-    if: needs.changes.outputs.image_security == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
-        with:
-          platforms: arm64
-      - uses: docker/setup-buildx-action@v4
-      - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
-        with:
-          version: v0.74.0
-          cache: true
-      - name: Verify real SPDX, scanner report binding and release aliases
-        run: python3 -B tests/security/image-security-runtime.py
-
   gate:
     name: PR Gate
     if: always()
-    needs: [compose, release-manifests, source-omods, backend, backup, monitoring, imaging, grafana-oidc, image-security]
+    needs: [changes, compose, release-manifests, web, source-omods, backend]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful validations
         env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
           COMPOSE_RESULT: ${{ needs.compose.result }}
           MANIFEST_RESULT: ${{ needs.release-manifests.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
           OMOD_RESULT: ${{ needs.source-omods.result }}
-          BACKUP_RESULT: ${{ needs.backup.result }}
-          MONITORING_RESULT: ${{ needs.monitoring.result }}
-          IMAGING_RESULT: ${{ needs.imaging.result }}
-          GRAFANA_OIDC_RESULT: ${{ needs.grafana-oidc.result }}
-          IMAGE_SECURITY_RESULT: ${{ needs.image-security.result }}
+          WEB_RESULT: ${{ needs.web.result }}
         run: |
+          [ "$CHANGES_RESULT" = "success" ]
           [ "$COMPOSE_RESULT" = "success" ]
           [ "$MANIFEST_RESULT" = "success" ]
           [ "$OMOD_RESULT" = "success" ] || [ "$OMOD_RESULT" = "skipped" ]
           [ "$BACKEND_RESULT" = "success" ] || [ "$BACKEND_RESULT" = "skipped" ]
-          [ "$BACKUP_RESULT" = "success" ] || [ "$BACKUP_RESULT" = "skipped" ]
-          [ "$MONITORING_RESULT" = "success" ] || [ "$MONITORING_RESULT" = "skipped" ]
-          [ "$IMAGING_RESULT" = "success" ] || [ "$IMAGING_RESULT" = "skipped" ]
-          [ "$GRAFANA_OIDC_RESULT" = "success" ] || [ "$GRAFANA_OIDC_RESULT" = "skipped" ]
-          [ "$IMAGE_SECURITY_RESULT" = "success" ] || [ "$IMAGE_SECURITY_RESULT" = "skipped" ]
+          [ "$WEB_RESULT" = "success" ] || [ "$WEB_RESULT" = "skipped" ]

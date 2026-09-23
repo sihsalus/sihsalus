@@ -485,9 +485,9 @@ Ver [compose/ssl.yml](../compose/ssl.yml)
 
 Los dashboards se versionan en [grafana/dashboards](grafana/dashboards/) y se
 cargan mediante [provisioning](grafana/provisioning/dashboards/dashboards.yml).
-Su respaldo y recuperación se hacen desde Git. Modifica esos JSON y valida con
-`tests/monitoring/config-validation.sh`; el provisioning deshabilita las
-ediciones persistentes desde la interfaz de Grafana.
+Su respaldo y recuperación se hacen desde Git. Tras modificar esos JSON,
+comprueba su carga en una instancia aislada de Grafana; el provisioning
+deshabilita las ediciones persistentes desde la interfaz.
 
 ---
 

@@ -22,12 +22,12 @@ services:
       OAUTH2_ENABLED: "true"
       OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:?OAUTH2_CLIENT_SECRET is required when Keycloak is enabled}
     volumes:
-      - ./keycloak/openmrs_config/globalproperties/oauth2login.xml:/openmrs/distribution/openmrs_config/globalproperties/oauth2login.xml:ro
+      - ./oauth/openmrs_config/globalproperties/oauth2login.xml:/openmrs/distribution/openmrs_config/globalproperties/oauth2login.xml:ro
 
   keycloak:
     container_name: sihsalus-keycloak
     build:
-      context: ./keycloak
+      context: ./oauth
       dockerfile: Dockerfile
     restart: "unless-stopped"
     profiles: [ keycloak ]

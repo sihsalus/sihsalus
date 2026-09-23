@@ -11,7 +11,7 @@ docker buildx bake backend
 before building the `backend` profile. [pom.xml](pom.xml) owns versions;
 [distro.properties](distro.properties) selects modules and content packages.
 The SDK writes `backend/target/sdk-distro`, packaged by the
-[assembly descriptor](src/main/assembly/assembly.xml).
+[assembly descriptor](assembly.xml).
 
 Initializer metadata comes from the selected content packages. SPA configuration
 belongs to the [frontend build](../frontend/README.md). Runtime setup, including
@@ -67,6 +67,7 @@ stack. Its pinned SIHSalus candidate registers routes through the native module
 servlet/filter lifecycle; acceptance also requires fresh Core 2.8 startup and
 actual Keycloak login, callback, session and logout.
 
+The source-module matrix is opt-in through the CI workflow `source_omods` input.
 Other tests use Java 21 except Initializer: first install its full reactor
 with `test initializer` on Java 11, then run `test-core28 initializer` on Java 21
 using the same Maven repository. `OMOD_MAVEN_REPOSITORY` selects an isolated cache;
@@ -80,7 +81,7 @@ owns event ingestion and privileged review. While its release is pending,
 build compiles the module into the distribution; no audit Java source is
 vendored here and no external runtime script is required.
 
-The source-module CI matrix runs its tests. The packaged-image gate also checks
+The optional source-module CI matrix runs its tests. The packaged-image gate also checks
 the controller, response sanitizer, persistence resources and distinct record
 and review privileges. These checks do not establish clinical event coverage.
 
@@ -94,14 +95,10 @@ inherit recording or clinical editing rights. The candidate enables no retention
 deletion or visit-closing job. Wider rollout still requires event coverage, role
 assignments and retention decisions.
 
-The [DEV endpoint acceptance runner](../tests/backend/clinical-audit-smoke.md)
-uses three dedicated accounts and records synthetic events without changing
-patients. It verifies nonzero client milliseconds through persistence, replay,
-concurrent retries and a one-millisecond conflict with full batch rollback.
-This guards against OpenMRS' Hibernate interceptor truncating `Date` fields:
-the module persists client time as an `Instant` in the existing `datetime(3)`
-column, preserving its public API and client timestamp precision. Database
-trigger checks and browser offline replay remain separate.
+Endpoint acceptance belongs to the module repository and the isolated DEV/QLTY
+release check. Verify client milliseconds through persistence, identical and
+concurrent replay, and a one-millisecond conflict with full batch rollback.
+Database trigger checks and browser offline replay remain separate.
 
 ### Reverify an already published candidate
 

@@ -10,10 +10,9 @@ IMAGE="$1"
 SOURCE_SHA="$2"
 OUTPUT_DIRECTORY="$3"
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIRECTORY="$(cd "$SCRIPT_DIRECTORY/../.." && pwd)"
 POLICY="$SCRIPT_DIRECTORY/image-policy.py"
 BOUNDED_TOOL="$SCRIPT_DIRECTORY/image-tool.py"
-EXCEPTIONS="$ROOT_DIRECTORY/security/image-exceptions.json"
+EXCEPTIONS="$SCRIPT_DIRECTORY/image-exceptions.json"
 
 [[ "$IMAGE" =~ ^[a-z0-9][a-z0-9.:-]*(/[a-z0-9][a-z0-9._-]*)+@sha256:[0-9a-f]{64}$ ]] || {
   echo "[image-security] an exact registry digest is required" >&2

@@ -149,16 +149,16 @@ identidad, versiones y salud técnica; no sustituye la aceptación clínica.
 
 ```bash
 python3 -B -m unittest discover -s tests/deploy -p test_release_manifest.py -v
-python3 -B tests/deploy/release-manifest-compose.py --catalog
+bash scripts/validate-compose.sh
+python3 -B scripts/deploy/release-manifest.py catalog
 python3 -B scripts/deploy/release-manifest.py catalog --base <SHA-base-del-PR>
 ```
 
-Las pruebas locales usan un Docker simulado para las mutaciones y Compose real
-sin daemon para comprobar los perfiles. CI también valida el Compose de cada
-commit referenciado por un manifiesto publicado, con credenciales sintéticas.
-Una prueba adicional de CI construye imágenes `scratch` con un binario mínimo,
-sin descargas, para comprobar la lectura de metadatos y una secuencia real de
-actualización/reversión por ID local. No arranca OpenMRS ni prueba un flujo clínico.
+Las pruebas locales usan un Docker simulado para las mutaciones. La validación
+de Compose comprueba los perfiles del checkout sin arrancar servicios.
+El catálogo verifica esquema, rutas, checksums e historial inmutable. Si todavía
+no hay manifiestos publicados, `releases/` puede estar ausente; eliminar un
+manifiesto presente en el commit base sigue siendo un error.
 El workflow publica el catálogo y sus checksums solo después de integrar en
 `main`; el historial versionado preserva los manifiestos anteriores sin límite
 de retención de Actions. No se generan manifiestos reales a partir de los datos

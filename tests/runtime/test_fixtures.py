@@ -62,6 +62,15 @@ class RuntimeFixtureTests(unittest.TestCase):
                 self.assertEqual(backend["environment"]["SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED"], "true")
                 self.assertEqual(backend["environment"]["OAUTH2_ENABLED"], "true" if mode == "keycloak" else "false")
                 self.assertEqual(model["services"]["frontend"]["build"]["dockerfile"], "Dockerfile")
+                if mode == "keycloak":
+                    context = Path(model["services"]["keycloak"]["build"]["context"])
+                    self.assertEqual(context, ROOT / "oauth")
+                    self.assertTrue((context / "Dockerfile").is_file())
+                    oauth_mount = next(mount for mount in backend["volumes"]
+                                       if mount["target"].endswith("/oauth2login.xml"))
+                    self.assertEqual(Path(oauth_mount["source"]),
+                                     ROOT / "oauth/openmrs_config/globalproperties/oauth2login.xml")
+                    self.assertTrue(Path(oauth_mount["source"]).is_file())
 
     def test_existing_external_resources_and_writable_binds_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
