@@ -30,6 +30,7 @@ for check in \
   echo "[CHECK] $check"
   bash "$check"
 done
+bash tests/monitoring/config-validation.sh --static
 bash tests/backend/o3forms-release-image.sh --self-test
 python3 -B tests/backend/owned-module-releases.py --self-test
 python3 -B -m unittest discover -s tests/deploy -p 'test_*.py' -v

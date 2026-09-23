@@ -14,7 +14,8 @@ bash tests/run.sh
 
 Usa archivos temporales y comandos simulados. Comprueba los hooks del backend,
 los pins de módulos, despliegue y rollback, manifiestos, configuración del frontend,
-apagado seguro y política de imágenes. No requiere red ni un daemon Docker.
+apagado seguro y política de imágenes. Incluye dashboards, contratos de alertas
+y el exportador UPS ViewPower. No requiere red ni un daemon Docker.
 
 Para renderizar Compose y comprobar los contratos de autenticación:
 
@@ -42,6 +43,34 @@ La matriz de pruebas de los diez módulos compilados desde fuente se ejecuta
 manualmente con la opción `source_omods` del workflow CI. El build normal sigue
 compilando sus revisiones fijadas y comprobando la imagen resultante.
 
+## Monitoreo
+
+La parte rápida también puede ejecutarse por separado:
+
+```bash
+bash tests/monitoring/config-validation.sh --static
+```
+
+Dos jobs con contenedores se activan por cambios relacionados y forman parte de
+`PR Gate`; una ejecución manual de CI activa ambos:
+
+| Job | Cobertura |
+| --- | --- |
+| `Monitoring configuration and Docker API proxy` | Configuración Alloy, Prometheus y Gatus; alertas con uno o ambos túneles VPN caídos; Docker API permite lectura y rechaza escritura con HTTP 403 |
+| `Grafana OIDC authorization` | Grafana real con proveedor sintético: roles, precedencia, usuarios sin permisos, códigos expirados, PKCE y cierre de sesión |
+
+`bash tests/monitoring/config-validation.sh` ejecuta también los validadores
+en contenedores y necesita Docker activo. `socket-proxy.sh` y el runtime OIDC
+requieren un runner efímero de GitHub. Los contratos OIDC pueden comprobarse
+localmente con Compose instalado, sin levantar servicios:
+
+```bash
+python3 -B -m unittest discover -s tests/monitoring/oidc -p 'test_*.py' -v
+```
+
+Los límites de la prueba sintética y la aceptación del IdP real están descritos
+en [Grafana OIDC](../docs/operations/grafana-oidc.md).
+
 ## Autenticación y restauración fuera del CI habitual
 
 Dos workflows independientes admiten ejecución manual y periódica, sin activarse
@@ -65,5 +94,5 @@ python3 -B -m unittest discover -s tests/runtime -p 'test_*.py' -v
 Ejecución y límites: [autenticación](../docs/operations/runtime-smoke.md) y
 [restauración](../docs/operations/physical-backup-drill.md). Registrar la evidencia
 en el [checklist de despliegue](../docs/operations/deploy-checklist.md).
-La autorización específica de Imaging y Grafana sigue requiriendo aceptación
-separada; no se recuperan sus proveedores sintéticos ni el registry de prueba.
+La autorización específica de Imaging sigue requiriendo aceptación separada;
+no se recuperan su proveedor sintético ni el registry de prueba.

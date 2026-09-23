@@ -101,19 +101,33 @@ revocación explícita de sesiones activas en Grafana y el IdP.
 
 ## Evidencia de pruebas y límites
 
+Las pruebas locales requieren el plugin Docker Compose, sin iniciar servicios.
+
 ```bash
-bash scripts/validate-compose.sh
+python3 -B -m unittest discover -s tests/monitoring/oidc -p 'test_*.py' -v
+./scripts/validate-compose.sh
 ```
 
-CI renderiza los modelos y comprueba roles configurados, URLs, redes,
-restricciones y que el override solo modifique Grafana. La suite acotada no
-levanta un proveedor OIDC sintético ni comprueba sesiones reales.
+El job `Grafana OIDC authorization` se ejecuta cuando cambian la configuración
+de identidad/Grafana, sus pruebas o los scripts que la validan. Forma parte de
+`PR Gate` y ejecuta además `python3 -B tests/monitoring/oidc/runtime.py runtime`
+en un runner GitHub-hosted efímero: Grafana real con la política renderizada y
+un proveedor OIDC sintético, sin Keycloak/OpenMRS ni datos o credenciales existentes. La red
+Docker es interna y no publica puertos; se descargan las imágenes antes de
+crear la red. Solo se montan los archivos de prueba de solo lectura y se borran
+los recursos creados con identidad comprobada, incluso ante fallo.
 
-Antes de activar el override en un establecimiento, verificar en un entorno
-isolado los tres roles, la denegación de usuarios sin rol, login, logout y la
-cuenta local de contingencia. Validar también TLS/SameSite, MFA, logout SSO y
-rotación de claves según la configuración del IdP. Registrar esa aceptación
-por separado del resultado de CI.
+La suite comprueba los tres roles, precedencia, cada fuente de claims, rechazo
+de roles ausentes/vacíos/desconocidos/ajenos/malformados, código de autorización
+expirado, PKCE inválido, login anónimo denegado y logout con cookie previa
+revocada. No confundir la expiración del **código** con una prueba de renovación
+o revocación temporal de la sesión real del IdP.
+
+El cliente HTTP con cookie jar no prueba UI, TLS/SameSite de navegadores, MFA,
+logout SSO, rotación de claves o configuración del Keycloak del establecimiento.
+Esos checks siguen pendientes antes de activar el override. Grafana 12.3 no
+expone las opciones nuevas de validación criptográfica de ID token de versiones
+posteriores: esta propuesta no añade un upgrade ni declara esa cobertura.
 
 Referencias primarias: [conector Grafana 12.3](https://github.com/grafana/grafana/blob/v12.3.0/pkg/login/social/connectors/generic_oauth.go),
 [opciones 12.3](https://github.com/grafana/grafana/blob/v12.3.0/conf/defaults.ini),

@@ -21,11 +21,13 @@ permissions:
 
 jobs:
   changes:
-    name: Detect build and web changes
+    name: Detect scoped changes
     runs-on: ubuntu-latest
     outputs:
       backend: ${{ steps.scope.outputs.backend }}
       web: ${{ steps.scope.outputs.web }}
+      monitoring: ${{ steps.scope.outputs.monitoring }}
+      grafana_oidc: ${{ steps.scope.outputs.grafana_oidc }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -54,6 +56,28 @@ jobs:
             web=false
           fi
           echo "web=$web" >> "$GITHUB_OUTPUT"
+          monitoring=true
+          if [ "$EVENT_NAME" != "workflow_dispatch" ] \
+            && [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] \
+            && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
+            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- \
+              .github/workflows/ci.yml docker-compose.yml compose/monitoring.yml \
+              monitoring/ tests/monitoring/ scripts/utils/viewpower.service; then
+            monitoring=false
+          fi
+          echo "monitoring=$monitoring" >> "$GITHUB_OUTPUT"
+          grafana_oidc=true
+          if [ "$EVENT_NAME" != "workflow_dispatch" ] \
+            && [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] \
+            && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
+            && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- \
+              .github/workflows/ci.yml docker-compose.yml compose/core.yml \
+              compose/monitoring.yml compose/monitoring-oidc.yml compose/keycloak.yml \
+              oauth/ tests/monitoring/oidc/ scripts/validate-compose.sh \
+              scripts/security-audit.sh scripts/security/ .env.template; then
+            grafana_oidc=false
+          fi
+          echo "grafana_oidc=$grafana_oidc" >> "$GITHUB_OUTPUT"
 
   release-manifests:
     name: Release manifests
@@ -66,7 +90,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Run focused configuration, deployment and security tests
+      - name: Run focused configuration, deployment, security and monitoring tests
         run: bash tests/run.sh
 
       - name: Validate models and invariants
@@ -108,6 +132,32 @@ jobs:
         run: bash tests/frontend/cache-policy.sh
       - name: Verify HTTP and HTTPS gateway routes
         run: python3 tests/gateway/routing.py
+
+  monitoring:
+    name: Monitoring configuration and Docker API proxy
+    needs: changes
+    if: needs.changes.outputs.monitoring == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify read-only Docker API
+        run: bash tests/monitoring/socket-proxy.sh
+      - name: Validate monitoring configurations and VPN failover alerts
+        run: bash tests/monitoring/config-validation.sh
+
+  grafana-oidc:
+    name: Grafana OIDC authorization
+    needs: changes
+    if: needs.changes.outputs.grafana_oidc == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify Grafana OIDC configuration and fixture contracts
+        run: python3 -B -m unittest discover -s tests/monitoring/oidc -p 'test_*.py' -v
+      - name: Exercise Grafana logins, roles, denial and logout
+        run: python3 -B tests/monitoring/oidc/runtime.py runtime
 
   source-omods:
     name: Test source OMOD (${{ matrix.module }})
@@ -265,7 +315,7 @@ jobs:
   gate:
     name: PR Gate
     if: always()
-    needs: [changes, compose, release-manifests, web, source-omods, backend]
+    needs: [changes, compose, release-manifests, web, monitoring, grafana-oidc, source-omods, backend]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful validations
@@ -276,6 +326,8 @@ jobs:
           BACKEND_RESULT: ${{ needs.backend.result }}
           OMOD_RESULT: ${{ needs.source-omods.result }}
           WEB_RESULT: ${{ needs.web.result }}
+          MONITORING_RESULT: ${{ needs.monitoring.result }}
+          GRAFANA_RESULT: ${{ needs.grafana-oidc.result }}
         run: |
           [ "$CHANGES_RESULT" = "success" ]
           [ "$COMPOSE_RESULT" = "success" ]
@@ -283,3 +335,5 @@ jobs:
           [ "$OMOD_RESULT" = "success" ] || [ "$OMOD_RESULT" = "skipped" ]
           [ "$BACKEND_RESULT" = "success" ] || [ "$BACKEND_RESULT" = "skipped" ]
           [ "$WEB_RESULT" = "success" ] || [ "$WEB_RESULT" = "skipped" ]
+          [ "$MONITORING_RESULT" = "success" ] || [ "$MONITORING_RESULT" = "skipped" ]
+          [ "$GRAFANA_RESULT" = "success" ] || [ "$GRAFANA_RESULT" = "skipped" ]
