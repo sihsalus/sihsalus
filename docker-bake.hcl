@@ -18,7 +18,7 @@ variable "REGISTRY" {
 
 // Standalone HCL fallback. tests/frontend/build-config.py checks these values
 // against Compose; when Compose is loaded, its target arguments take precedence.
-FRONTEND_DEFAULT_SOURCE_TAG = "sha-a624206bca7e3e084c68b544e8d5b3ab0b037e27@sha256:ad79b27f913535048c676f8f922a77803d288c6ed0a5569e3ea98ea3a2ae8e26"
+FRONTEND_DEFAULT_SOURCE_TAG = "sha-37e678e16126967eda957f8780f2fcb5f5210c6b@sha256:59f76de5b094af73776eea87b76a4d69c42096e0009e7bd441918a7018c0fbd2"
 
 variable "FRONTEND_SOURCE_TAG" {
   default = FRONTEND_DEFAULT_SOURCE_TAG
