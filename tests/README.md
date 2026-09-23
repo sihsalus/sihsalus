@@ -6,7 +6,7 @@ mantienen sus pruebas funcionales en sus propios repositorios.
 
 ## Comprobación rápida
 
-Desde la raíz, con Bash, Python 3, Node.js, Git y jq:
+Desde la raíz, con Bash, Python 3, Node.js, Git, jq, gzip y OpenSSL:
 
 ```bash
 bash tests/run.sh
@@ -14,8 +14,9 @@ bash tests/run.sh
 
 Usa archivos temporales y comandos simulados. Comprueba los hooks del backend,
 los pins de módulos, despliegue y rollback, manifiestos, configuración del frontend,
-apagado seguro y política de imágenes. Incluye dashboards, contratos de alertas
-y el exportador UPS ViewPower. No requiere red ni un daemon Docker.
+apagado seguro, límites de fallo del restore SQL y política de imágenes. Incluye
+dashboards, contratos de alertas y el exportador UPS ViewPower. No requiere red
+ni un daemon Docker.
 
 Para renderizar Compose y comprobar los contratos de autenticación:
 
@@ -23,8 +24,9 @@ Para renderizar Compose y comprobar los contratos de autenticación:
 bash scripts/validate-compose.sh
 ```
 
-Requiere el plugin Docker Compose, sin arrancar servicios. CI ejecuta ambos
-comandos en cada PR, además de validar el catálogo de releases contra los
+Requiere los plugins Docker Compose y Buildx, sin arrancar servicios. También
+compara los argumentos del frontend entre Compose y Bake, incluida `.env.template`.
+CI ejecuta ambos comandos en cada PR, además de validar el catálogo de releases contra los
 commits fuente y su Compose real. Esta última comprobación también puede
 ejecutarse con `python3 -B tests/deploy/release-manifest-compose.py --catalog`.
 
@@ -67,6 +69,10 @@ localmente con Compose instalado, sin levantar servicios:
 ```bash
 python3 -B -m unittest discover -s tests/monitoring/oidc -p 'test_*.py' -v
 ```
+
+Los validadores de Alloy, Prometheus y Gatus toman las imágenes del modelo
+Compose, sin repetir sus versiones en el script. Cambios en `compose/status.yml`
+también activan el job de monitoreo.
 
 Los límites de la prueba sintética y la aceptación del IdP real están descritos
 en [Grafana OIDC](../docs/operations/grafana-oidc.md).

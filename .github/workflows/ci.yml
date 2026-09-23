@@ -52,7 +52,8 @@ jobs:
             && [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] \
             && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
             && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- \
-              .github/workflows/ci.yml frontend/ gateway/ tests/frontend/cache-policy.sh tests/gateway/; then
+              .github/workflows/ci.yml docker-bake.hcl compose/core.yml .env.template \
+              frontend/ gateway/ tests/frontend/cache-policy.sh tests/gateway/; then
             web=false
           fi
           echo "web=$web" >> "$GITHUB_OUTPUT"
@@ -61,7 +62,7 @@ jobs:
             && [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] \
             && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
             && git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- \
-              .github/workflows/ci.yml docker-compose.yml compose/monitoring.yml \
+              .github/workflows/ci.yml docker-compose.yml compose/monitoring.yml compose/status.yml \
               monitoring/ tests/monitoring/ scripts/utils/viewpower.service; then
             monitoring=false
           fi

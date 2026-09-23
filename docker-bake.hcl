@@ -16,10 +16,6 @@ variable "REGISTRY" {
   default = ""
 }
 
-variable "FRONTEND_SOURCE_TAG" {
-  default = "sha-6cadce5b8a225bc6fe0715b9ff085ced5f9feacf@sha256:ada19c77f8d27ea50e89db4fdae7287bbdf3a51c9fab8ac95dd82eba36d9a28c"
-}
-
 // ---- Shared base ----
 
 target "_base" {
@@ -54,15 +50,7 @@ target "gateway" {
 
 target "frontend" {
   inherits   = ["_base"]
-  context    = "./frontend"
-  dockerfile = "Dockerfile"
-  args = {
-    FRONTEND_SOURCE_IMAGE = "ghcr.io/sihsalus/sihsalus-frontend:${FRONTEND_SOURCE_TAG}"
-    SPA_PATH              = "/openmrs/spa"
-    API_URL               = "/openmrs"
-    SPA_CONFIG_URLS       = "/openmrs/spa/frontend.json"
-    SPA_DEFAULT_LOCALE    = "es"
-  }
+  // Bake loads docker-compose.yml first; inherit its context and build arguments.
   tags       = ["${REGISTRY}sihsalus-frontend-runtime:${TAG}"]
 }
 

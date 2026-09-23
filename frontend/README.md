@@ -17,7 +17,8 @@ su imagen runtime y su integración con el gateway.
 La etapa `assemble` parte de `FRONTEND_SOURCE_IMAGE` y ejecuta
 `packages/tooling/scripts/assemble-importmap.js` de la imagen fuente. Genera el
 shell, importmap, rutas, configuración y assets en `/tmp/spa`. La etapa final usa
-`nginx:1.28-alpine` y sirve ese resultado desde `/usr/share/nginx/html`.
+la imagen Nginx fijada por digest en el Dockerfile y sirve ese resultado desde
+`/usr/share/nginx/html`.
 
 El [gateway](../gateway/README.md) publica `/openmrs/spa/`, elimina ese prefijo y
 envía la solicitud al puerto interno 80 del frontend. Esto incluye
@@ -69,8 +70,20 @@ Desde la raíz del repositorio, conservando la
 docker compose build frontend
 ```
 
-El target `frontend` de [Docker Bake](../docker-bake.hcl) también construye el
-wrapper con sus propios argumentos declarados.
+El target `frontend` de [Docker Bake](../docker-bake.hcl) hereda el contexto y
+los argumentos de Compose. Ejecutado desde la raíz, `docker buildx bake frontend`
+lee primero `docker-compose.yml`. Para incluir Keycloak u otro override, pasar
+los mismos archivos explícitamente y el HCL al final:
+
+```sh
+docker buildx bake -f docker-compose.yml -f compose/keycloak.yml -f docker-bake.hcl frontend
+```
+
+La referencia fuente predeterminada se mantiene solo en `compose/core.yml`.
+Copiar `.env.template` no cambia esa versión. `FRONTEND_SOURCE_TAG` permite
+elegir otro tag/digest y `FRONTEND_SOURCE_IMAGE` tiene precedencia si se define.
+Un build directo del Dockerfile debe proporcionar `FRONTEND_SOURCE_IMAGE` y
+`SPA_CONFIG_URLS`; no tiene una segunda versión predeterminada.
 
 Para actualizar o revertir un entorno, seguir la
 [guía de despliegue](../scripts/deploy/README.md). El procedimiento valida el SHA y
@@ -89,9 +102,14 @@ Desde la raíz:
 
 ```sh
 node --test frontend/patch-config-urls.test.js
+python3 -B tests/frontend/build-config.py
 ```
+
+La segunda comprobación requiere Compose y Buildx, sin daemon Docker. Compara
+los argumentos resueltos por ambos, incluida la plantilla de entorno, los
+overrides de imagen/nodo y Keycloak; también corre en `validate-compose.sh`.
 
 La prueba [cache-policy.sh](../tests/frontend/cache-policy.sh) usa Nginx real con
 fixtures locales y requiere Docker activo. Cubre archivos mutables, assets con
-hash, rutas SPA y adaptación de metadatos sociales al host. Ambas comprobaciones
+hash, rutas SPA y adaptación de metadatos sociales al host. Estas comprobaciones
 forman parte de CI.

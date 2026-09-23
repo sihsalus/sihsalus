@@ -15,6 +15,7 @@ SOURCE_REPOSITORY="ghcr.io/sihsalus/sihsalus-frontend"
 SOURCE_IMAGE="${SOURCE_REPOSITORY}@${TARGET_DIGEST}"
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLEAN_CHECKOUT_HELPER="$SCRIPT_DIRECTORY/check-clean-checkout.sh"
+source "$SCRIPT_DIRECTORY/env.sh"
 
 if [[ ! "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   echo "[deploy-frontend] invalid frontend SHA" >&2
@@ -26,7 +27,7 @@ if [[ ! "$TARGET_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
   exit 2
 fi
 
-for command in docker git awk cat cp df mktemp rm seq sleep; do
+for command in docker git awk cat cp df mktemp mv rm seq sleep; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "[deploy-frontend] missing command: $command" >&2
     exit 2
@@ -37,42 +38,6 @@ if [ ! -f docker-compose.yml ] || [ ! -f .env ]; then
   echo "[deploy-frontend] run from the sihsalus repository root" >&2
   exit 2
 fi
-
-read_env_value() {
-  local key="$1"
-  awk -F= -v key="$key" '
-    $1 == key {
-      sub(/^[^=]*=/, "")
-      value = $0
-    }
-    END { print value }
-  ' .env
-}
-
-write_env_value() {
-  local key="$1"
-  local value="$2"
-  local temporary_file
-  temporary_file="$(mktemp)"
-
-  awk -v key="$key" -v value="$value" '
-    BEGIN { found = 0 }
-    $0 ~ ("^" key "=") {
-      print key "=" value
-      found = 1
-      next
-    }
-    { print }
-    END {
-      if (!found) {
-        print key "=" value
-      }
-    }
-  ' .env >"$temporary_file"
-
-  cat "$temporary_file" >.env
-  rm -f "$temporary_file"
-}
 
 deployed_sha() {
   docker exec sihsalus-frontend \
@@ -211,10 +176,6 @@ trap 'rollback $?' ERR
 trap 'rollback 129' HUP
 trap 'rollback 130' INT
 trap 'rollback 143' TERM
-
-echo "[deploy-frontend] updating distro checkout"
-git fetch origin main
-git merge --ff-only origin/main
 
 echo "[deploy-frontend] pulling immutable source image ${SOURCE_IMAGE}"
 docker pull "$SOURCE_IMAGE"

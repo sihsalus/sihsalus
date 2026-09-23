@@ -21,7 +21,8 @@ Este directorio contiene las herramientas ejecutables del stack. La documentaci�
 - Usa el mismo `.env`, `COMPOSE_FILE` y `COMPOSE_PROFILES` del servidor.
 - No ejecutes scripts de restore sin backup previo y ventana operativa aprobada.
 - `BACKUP_ENCRYPTION_PASSWORD` debe venir del ambiente o de un gestor de secretos; Docker Compose no usa Docker secrets en este repositorio.
-- Los backups solo se cifran cuando `BACKUP_ENCRYPTION_PASSWORD` está definida. Producción debe definirla.
+- Los dumps SQL se cifran cuando `BACKUP_ENCRYPTION_PASSWORD` está definida;
+  el backup físico siempre la exige. Producción debe cifrar ambos.
 - Los seeds se cifran siempre y requieren `SIHSALUS_SEED_PASSPHRASE_FILE`.
 - No guardes claves, tokens, archivos `.env` o datos clínicos en Git ni en artifacts de CI.
 

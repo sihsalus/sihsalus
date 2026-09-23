@@ -54,6 +54,27 @@ Las ubicaciones con un `add_header` propio vuelven a incluir
 [herencia de Nginx](https://nginx.org/en/docs/http/ngx_http_headers_module.html#add_header).
 La página de contingencia usa CSS local para conservar su estilo con CSP activa.
 
+## Salud durante el arranque
+
+`/health` solo comprueba Nginx. `/startup` acepta que OpenMRS responda aunque
+siga en Initial Setup o cargando metadata. `/ready` consulta
+`/openmrs/health/started` y responde 200 cuando termina la inicialización.
+Por eso `/startup` puede responder 200 mientras `/ready` sigue en 503.
+
+```sh
+curl -i http://localhost/health
+curl -i http://localhost/startup
+curl -i http://localhost/ready
+docker compose logs --tail 100 backend
+```
+
+En HTTPS, usar el dominio y la CA confiable del establecimiento. Revisar también
+la finalización de Initializer y el estado de los módulos según el
+[checklist](../docs/operations/deploy-checklist.md); la salud HTTP no acredita
+por sí sola la aceptación del contenido.
+
+## Cabeceras y acceso
+
 `FRAME_ANCESTORS` configura los orígenes adicionales que pueden embeber la
 aplicación, separados por espacios. Las ACL de Imaging proceden de Compose.
 `X-Real-IP` se conserva por compatibilidad con proxies; si falta se usa la

@@ -5,6 +5,7 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REDEPLOY_SCRIPT_PATH="${REDEPLOY_SCRIPT_PATH:-$ROOT/redeploy-environment.sh}"
 CLEAN_CHECKOUT_HELPER_PATH="${CLEAN_CHECKOUT_HELPER_PATH:-$ROOT/check-clean-checkout.sh}"
+ENV_HELPER_PATH="$ROOT/env.sh"
 SSH_BIN="${SSH_BIN:-ssh}"
 POLL_INTERVAL_SECONDS="${REDEPLOY_POLL_INTERVAL_SECONDS:-10}"
 TIMEOUT_SECONDS="${REDEPLOY_TIMEOUT_SECONDS:-3300}"
@@ -43,6 +44,10 @@ if [ ! -r "$REDEPLOY_SCRIPT_PATH" ]; then
 fi
 if [ ! -r "$CLEAN_CHECKOUT_HELPER_PATH" ]; then
   echo "[remote-redeploy] clean-checkout helper is not readable" >&2
+  exit 2
+fi
+if [ ! -r "$ENV_HELPER_PATH" ]; then
+  echo "[remote-redeploy] environment helper is not readable" >&2
   exit 2
 fi
 if [[ ! "$REMOTE_TARGET" =~ ^[A-Za-z0-9._-]+@[A-Za-z0-9._:-]+$ ]]; then
@@ -194,6 +199,7 @@ upload_remote_file() {
 
 upload_remote_scripts() {
   upload_remote_file "$CLEAN_CHECKOUT_HELPER_PATH" "$REMOTE_CLEAN_CHECKOUT_HELPER" || return "$?"
+  upload_remote_file "$ENV_HELPER_PATH" "$REMOTE_RUN_DIRECTORY/env.sh" || return "$?"
   upload_remote_file "$REDEPLOY_SCRIPT_PATH" "$REMOTE_SCRIPT"
 }
 

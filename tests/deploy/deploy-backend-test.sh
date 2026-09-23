@@ -22,7 +22,8 @@ TARGET_IMAGE_ID='sha256:target-backend-image'
 make_fixture() {
   local fixture="$1"
   mkdir -p "$fixture/bin" "$fixture/state"
-  touch "$fixture/docker-compose.yml"
+  printf 'original compose definition\n' >"$fixture/docker-compose.yml"
+  cp "$fixture/docker-compose.yml" "$fixture/original-compose.yml"
   printf 'BACKEND_TAG=%s\nUNCHANGED_SECRET=keep-me\n' "$OLD_REFERENCE" >"$fixture/.env"
   chmod 600 "$fixture/.env"
   printf '%s\n' "$OLD_IMAGE" >"$fixture/state/image"
@@ -34,6 +35,9 @@ make_fixture() {
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'git %s\n' "$*" >>"${FAKE_STATE_DIR}/commands"
+if [ "${1:-}" = merge ]; then
+  printf 'new main configuration\n' >docker-compose.yml
+fi
 if [ "$*" = 'status --porcelain=v1 --untracked-files=no' ] && [ "${FAKE_TRACKED_DRIFT:-false}" = true ]; then
   printf '%s\n' ' M compose/core.yml'
 fi
@@ -208,6 +212,7 @@ grep -Fqx 'UNCHANGED_SECRET=keep-me' "$success/.env"
 grep -Fqx "$TARGET_IMAGE" "$success/state/image"
 grep -Fqx "docker pull ${TARGET_IMAGE}" "$success/state/commands"
 assert_backend_only "$success/state/commands"
+cmp "$success/original-compose.yml" "$success/docker-compose.yml"
 
 failure="$TEST_ROOT/failure"
 make_fixture "$failure"
@@ -217,6 +222,7 @@ if FAKE_FAIL_TARGET=true run_deploy "$failure" 2>/dev/null; then
   exit 1
 fi
 cmp "$failure/original.env" "$failure/.env"
+cmp "$failure/original-compose.yml" "$failure/docker-compose.yml"
 grep -Fqx "$OLD_IMAGE" "$failure/state/image"
 [ "$(grep -Fc 'docker compose up -d --no-deps --no-build --pull never --force-recreate backend' "$failure/state/commands")" -eq 2 ]
 assert_backend_only "$failure/state/commands"

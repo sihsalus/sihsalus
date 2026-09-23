@@ -58,30 +58,41 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Use the service images from Compose so dependency updates are tested too.
+monitoring_model="$(
+  unset COMPOSE_FILE COMPOSE_PROFILES
+  docker compose --env-file /dev/null -f docker-compose.yml -f compose/status.yml \
+    --profile monitoring --profile logs --profile status config --format json
+)"
+alloy_image="$(jq -er '.services.alloy.image' <<<"$monitoring_model")"
+prometheus_image="$(jq -er '.services.prometheus.image' <<<"$monitoring_model")"
+gatus_image="$(jq -er '.services.gatus.image' <<<"$monitoring_model")"
+unset monitoring_model
+
 docker run --rm \
   --entrypoint /bin/alloy \
   -v "$ROOT_DIR/monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro" \
-  grafana/alloy:v1.13.1 \
+  "$alloy_image" \
   validate /etc/alloy/config.alloy
 
 docker run --rm \
   --entrypoint /bin/promtool \
   -v "$ROOT_DIR/monitoring/prometheus:/etc/prometheus:ro" \
-  prom/prometheus:v3.2.1 \
+  "$prometheus_image" \
   check config /etc/prometheus/prometheus.yml
 
 docker run --rm \
   --entrypoint /bin/promtool \
   -v "$ROOT_DIR:/workspace:ro" \
   -w /workspace \
-  prom/prometheus:v3.2.1 \
+  "$prometheus_image" \
   test rules tests/monitoring/vpn-alerts.test.yml
 
 GATUS_TEST_CONTAINER="$(docker run -d --rm \
   -e GATUS_CONFIG_PATH=/config/config.yaml \
   --tmpfs /data \
   -v "$ROOT_DIR/monitoring/status/gatus/config.yaml:/config/config.yaml:ro" \
-  twinproduction/gatus:v5.20.0)"
+  "$gatus_image")"
 sleep 2
 
 if [ "$(docker inspect --format '{{.State.Running}}' "$GATUS_TEST_CONTAINER")" != "true" ]; then

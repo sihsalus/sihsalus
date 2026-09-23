@@ -1,396 +1,117 @@
 # SIH Salus
 
+Distribución OpenMRS para establecimientos de salud del Perú. Este repositorio
+mantiene las imágenes, Docker Compose y las herramientas de operación. La
+metadata clínica vive en `sihsalus-content` y los microfrontends en
+`sihsalus-frontend`.
 
-![OpenMRS 3.x](https://img.shields.io/badge/OpenMRS-3.6.0-f26522?style=flat-square)
-![Docker](https://img.shields.io/badge/Docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white)
-![MariaDB](https://img.shields.io/badge/MariaDB-10.11-003545?style=flat-square&logo=mariadb&logoColor=white)
-![Nginx](https://img.shields.io/badge/Nginx-SSL-009639?style=flat-square&logo=nginx&logoColor=white)
-![License](https://img.shields.io/badge/MPL_2.0-brightgreen?style=flat-square&label=License)
+## Inicio rápido
 
-> SIH Salus es una distribución OpenMRS 3.x para establecimientos de salud del Perú.
-> SSL auto-firmado o Let's Encrypt, despliegue offline, backups cifrados.
-
----
-
-## Tabla de Contenidos
-
-- [Inicio Rápido](#inicio-rápido)
-- [Profiles](#profiles)
-- [Arquitectura de infraestructura](docs/architecture/infrastructure.md)
-- [Cambio obligatorio de contraseña local](docs/operations/forced-password-change.md)
-- [Pruebas acotadas del distro](tests/README.md)
-- [Aceptación del runtime](docs/operations/runtime-smoke.md)
-- [Detección de secretos y atención de alertas](docs/operations/secret-scanning.md)
-- [Actualización en Producción](#actualización-en-producción)
-- [Docker Bake (Build)](#docker-bake-build)
-- [Configuración SSL/HTTPS](#configuración-sslhttps)
-- [Backup y Restore](#backup-y-restore)
-- [Apagado automático seguro](docs/operations/safe-poweroff.md)
-- [Políticas de Seguridad](#políticas-de-seguridad-cifrado-de-backups-y-retención-de-logs)
-
----
-
-## Inicio Rápido
-
-### 1. Configurar variables de entorno
-
-Para desarrollo local, `docker compose up -d` puede arrancar sin `.env`: las credenciales de base usan `openmrs` por defecto.
-
-Para producción o pruebas compartidas, crea `.env` y cambia las credenciales:
+Requiere Docker con Compose v2; Buildx permite usar los targets de Bake.
+Desde la raíz del repositorio:
 
 ```bash
 cp .env.template .env
-# Editar .env con tus valores
-```
-
-```env
-# Base de datos OpenMRS
-MYSQL_OPENMRS_PASSWORD=<password_seguro>
-MYSQL_ROOT_PASSWORD=<password_seguro>
-
-# Token API OCL crudo (40 caracteres hexadecimales en minúscula, sin el prefijo "Token")
-OMRS_OCL_TOKEN=<tu_token_de_ocl>
-```
-
-> No uses los defaults `openmrs`/`openmrs` en producción.
-
-El backend reconcilia `OMRS_OCL_TOKEN` después de copiar la configuración y antes de que
-Initializer la procese. Un valor no vacío se aplica en cada arranque, por lo que un recreate o una
-rotación convergen al token configurado sin crear otra propiedad. Si la variable está vacía, el
-backend elimina cualquier placeholder del paquete de content, no escribe un valor vacío y conserva
-el token que OpenMRS ya tuviera almacenado. En una base limpia, dejarla vacía mantiene deshabilitada
-la importación remota hasta configurar un token válido.
-
-Vaciar la variable no revoca una credencial ya persistida. Para rotarla, reemplaza el valor en el
-archivo de entorno y recrea el backend; para retirarla sin reemplazo, revoca primero el token en OCL
-y elimina la propiedad desde la administración de OpenMRS durante una ventana controlada.
-
-También puedes generar `.env.production` con credenciales aleatorias y auditarlo antes del despliegue:
-
-```bash
-./scripts/security/secrets_generate.sh
-./scripts/security-audit.sh .env.production
-```
-
-### 2. Construir e iniciar
-
-```bash
-# Core (gateway, portal de ayuda, frontend, backend, db)
+# Ajustar credenciales y servicios antes de usar un entorno compartido.
 docker compose up -d
-
-# http://localhost/openmrs/spa
-# http://localhost/ayuda/
 ```
 
-La primera vez, OpenMRS puede tardar bastante en quedar listo, especialmente si importa conceptos y mappings OCL. La señal principal de readiness es `http://localhost/openmrs/health/started` respondiendo `200`; después de eso `http://localhost/openmrs/login.htm` y la SPA en `http://localhost/openmrs/spa/` deben responder correctamente.
+La SPA queda en <http://localhost/openmrs/spa/> y el portal de ayuda en
+<http://localhost/ayuda/>. Para desarrollo local se puede arrancar sin `.env`;
+las contraseñas predeterminadas `openmrs` son solo para ese uso.
 
-El portal de ayuda es un servicio estático independiente. Su indisponibilidad no
-altera la salud del gateway, el frontend ni OpenMRS.
+[.env.template](.env.template) documenta las variables. Copiarla conserva la
+versión fuente del frontend fijada en [compose/core.yml](compose/core.yml).
+El token OCL puede quedar vacío para usar la terminología empaquetada; consultar
+su [configuración y rotación](backend/README.md#configuración-del-token-ocl).
+Para generar credenciales, usar la [guía de seguridad](scripts/security/README.md).
 
-### Health y readiness
-
-El gateway expone dos señales distintas:
-
-- `GET /health`: lo responde Nginx sin tocar upstreams; indica que el gateway está vivo.
-- `GET /startup`: comprueba que el backend/OpenMRS responde, aunque siga en Initial Setup o importando metadata.
-- `GET /ready`: proxy a `/openmrs/health/started`; responde `200` solo cuando OpenMRS terminó de inicializar.
-
-Durante bootstrap, `/startup` puede estar en `200` mientras `/ready` sigue en `503`. Eso es esperado: la BD puede tener concepts parcialmente cargados y aun así OpenMRS no estar listo para atender tráfico clínico. Si aparecen errores de import OCL en logs, el estado correcto sigue siendo no listo hasta que `/ready` responda `200`.
-
-La distribución configura `initializer.startup.load=fail_on_error` mediante
-`OMRS_EXTRA_INITIALIZER_STARTUP_LOAD` en `compose/core.yml`. Initializer debe
-detener la carga al primer error; no agregar otro valor mediante opciones JVM
-ni overrides locales. Una respuesta HTTP saludable por sí sola no acredita que
-el contenido se haya aplicado: antes de promover el frontend, comprobar la
-finalización de Initializer y los contratos de metadata de la versión elegida.
-
-Comandos útiles durante arranque o actualización:
-
-```bash
-curl -k -i https://localhost/health
-curl -k -i https://localhost/startup
-curl -k -i https://localhost/ready
-curl -k -i https://localhost/openmrs/health/started
-curl -k -i https://localhost/openmrs/ws/rest/v1/session
-curl -k -i https://localhost/openmrs/spa/home
-```
+El primer arranque puede tardar mientras OpenMRS carga metadata. `/health`
+indica que Nginx responde; `/ready` debe responder 200 cuando OpenMRS termine
+la inicialización. Ver [salud y diagnóstico del gateway](gateway/README.md).
+La distribución usa `initializer.startup.load=fail_on_error`; la aceptación de
+metadata y módulos requiere además el [checklist de despliegue](docs/operations/deploy-checklist.md).
 
 ## Profiles
 
-La infraestructura se organiza en **profiles** opcionales. Solo los servicios core (gateway, portal de ayuda, frontend, backend, db) se inician por defecto.
+El core incluye gateway, portal de ayuda, frontend, backend y MariaDB.
+Los módulos opcionales se activan mediante profiles y overrides:
 
 ```bash
-# Core solamente
-docker compose up -d
-
-# Core + FUA Generator
-docker compose --profile fua up -d
-
-# Core + HAPI FHIR
-docker compose --profile hapi up -d
-
-# Core + Medical Imaging autenticado (OHIF/Orthanc + Keycloak)
-docker compose -f docker-compose.yml -f compose/keycloak.yml -f compose/imaging-auth.yml --profile keycloak --profile imaging up -d
-
-# Core + Indicadores (Reportes SQL)
-docker compose --profile indicadores up -d
-
-# Core + Keycloak Auth
-docker compose -f docker-compose.yml -f compose/keycloak.yml --profile keycloak up -d
-
-# Core + Observabilidad (Grafana/Prometheus/Loki)
+# Core con observabilidad
 docker compose --profile monitoring up -d
 
-# Core + Semaforo local (Gatus)
-docker compose -f docker-compose.yml -f compose/status.yml --profile status up -d
-
-# Combinar profiles
-docker compose --profile fua --profile hapi --profile monitoring up -d
-
-# Core + SSL/HTTPS (override especial; requiere cargar compose/ssl.yml)
+# Core con HTTPS
 docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d
-
-# Core + SSL/HTTPS + FUA:
-docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl --profile fua up -d
-
-# Core + Keycloak Auth + SSL/HTTPS
-docker compose -f docker-compose.yml -f compose/keycloak.yml -f compose/ssl.yml --profile keycloak --profile ssl up -d
 ```
 
-Cada profile requiere sus variables en `.env`. Ver `.env.template` para la lista completa.
+La [guía Compose](compose/README.md) mantiene la lista de perfiles, los comandos
+para Keycloak/Imaging y la selección persistente de `COMPOSE_FILE` y
+`COMPOSE_PROFILES`. Conservar esa selección en todas las operaciones del host.
 
-El perfil `ssl` es un caso especial: no basta con pasar `--profile ssl` si solo se usa `docker-compose.yml`, porque la configuración SSL vive en `compose/ssl.yml` y ese archivo modifica el servicio `gateway` para exponer HTTPS.
-
-En servidores, define `COMPOSE_FILE` y `COMPOSE_PROFILES` en el archivo de entorno para conservar siempre la misma combinación. Ver [compose/README.md](compose/README.md).
-
-## Actualización en Producción
-
-En producción, el objetivo es desplegar imágenes versionadas y evitar builds locales cuando la imagen runtime ya está publicada.
-Mientras el runtime del frontend no se publique en un registry, el flujo actual reconstruye solo el wrapper `frontend` desde una imagen fuente versionada.
-
-### Frontend (flujo actual)
-
-Actualmente el frontend se despliega como una imagen runtime local (`sihsalus-frontend-runtime`) construida desde la imagen fuente publicada en GHCR (`ghcr.io/sihsalus/sihsalus-frontend`). Por eso, mientras no se publique una imagen runtime en el registry, la actualización de frontend en producción requiere reconstruir solo ese wrapper runtime.
+## Construcción
 
 ```bash
-# 2) Definir tag fuente del frontend publicado en GHCR
-export FRONTEND_SOURCE_TAG=sha-<digest>
-docker pull "ghcr.io/sihsalus/sihsalus-frontend:${FRONTEND_SOURCE_TAG}"
-
-# 3) Reconstruir y recrear solo frontend
-docker compose build frontend
-docker compose up -d --no-deps --no-build --force-recreate frontend
-docker compose ps frontend
-docker compose logs --tail 100 frontend
-```
-
-Si necesitas rollback, vuelve a exportar el tag anterior en `FRONTEND_SOURCE_TAG`, reconstruye `frontend` y recrea el servicio.
-
-### Frontend (sin build, cuando exista runtime publicado)
-
-La práctica más reproducible es publicar también la imagen runtime y desplegar por `pull + recreate`. Ese flujo requiere que exista `ghcr.io/sihsalus/sihsalus-frontend-runtime:<tag>` o una imagen equivalente.
-
-```bash
-export FRONTEND_RUNTIME_IMAGE=ghcr.io/sihsalus/sihsalus-frontend-runtime
-export FRONTEND_RUNTIME_TAG=sha-<digest>
-
-docker compose pull frontend
-docker compose up -d --no-deps --force-recreate frontend
-docker compose ps frontend
-docker compose logs --tail 100 frontend
-```
-
-### Frontend (producción sin `*.map`)
-
-Por defecto, en el build de runtime del frontend se eliminan los `*.map` de producción.
-
-`compose/core.yml` pasa `STRIP_SOURCE_MAPS` al build y el valor por defecto es `true`:
-
-```bash
-STRIP_SOURCE_MAPS=true  # true = elimina *.map, false = los conserva
-```
-
-Efecto esperado:
-
-- Si usas `docker compose build` / `docker compose up` para reconstruir `frontend`, la imagen resultante queda sin mapas de fuente.
-- Si usas una imagen preconstruida de registry, debe haberse publicado con `STRIP_SOURCE_MAPS=true` para que no lleve mapas.
-- Si necesitas mapas para depuración puntual de preproducción, puedes reconstruir con `STRIP_SOURCE_MAPS=false`.
-
-
-
-### Relevantar backend sin degradar HTTPS
-
-Regla operativa: usa el mismo set de archivos `-f` y `--profile` con el que levantaste el entorno. En un entorno HTTPS, no ejecutes un `docker compose up -d` genérico sin `compose/ssl.yml`, porque Compose puede reconciliar el servicio `gateway` con la configuración HTTP.
-
-Si solo necesitas reiniciar el proceso del backend:
-
-```bash
-# Stack HTTP/local
-docker compose restart backend
-
-# Stack HTTPS
-docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl restart backend
-```
-
-Si necesitas recrear el contenedor de backend con la configuración e imagen ya presentes, sin tocar `gateway`:
-
-```bash
-# Stack HTTP/local
-docker compose up -d --no-deps --force-recreate backend
-
-# Stack HTTPS
-docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d --no-deps --force-recreate backend
-```
-
-Si el entorno también usa Keycloak u otros overrides, añade esos mismos `-f` y perfiles al comando. La idea es no cambiar la definición efectiva del proyecto durante una operación parcial.
-
-### Backend (si cambió la imagen del backend)
-
-```bash
-export BACKEND_TAG=sha-<commit>@sha256:<digest>
-
-# Stack HTTP/local
-docker compose pull backend
-docker compose up -d --no-deps --force-recreate backend
-
-# Stack HTTPS
-docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl pull backend
-docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d --no-deps --force-recreate backend
-```
-
-#### Digests y attestations del backend
-
-El backend se publica como un índice OCI. Para despliegues usa siempre la
-referencia inmutable `sha-<commit>@sha256:<digest-del-indice>`: Docker elegirá
-automáticamente el manifiesto ejecutable correspondiente a la plataforma.
-
-GHCR también muestra entradas `unknown/unknown`. No son imágenes ejecutables:
-contienen la provenance SLSA y el SBOM SPDX asociados a la imagen. Del mismo
-modo, una versión con forma `sha256-<digest>` puede ser un artefacto de firma
-Cosign y no debe usarse para iniciar el backend.
-
-```bash
-IMAGE=ghcr.io/sihsalus/sihsalus-backend:sha-<commit>
-
-# Índice, plataformas y attestations publicadas
-docker buildx imagetools inspect "$IMAGE"
-
-# Evidencia sobre cómo fue construida la imagen
-docker buildx imagetools inspect "$IMAGE" --format '{{ json .Provenance.SLSA }}'
-
-# Inventario SPDX de componentes del runtime
-docker buildx imagetools inspect "$IMAGE" --format '{{ json .SBOM.SPDX }}'
-```
-
-La provenance de nivel máximo incluye el Dockerfile, los pasos de build y los
-valores de los build args. Nunca se deben pasar credenciales mediante `ARG` o
-`--build-arg`; para secretos de build se deben usar mounts de secretos de
-BuildKit.
-
-Cuando cambie la interfaz de API entre frontend y backend, actualiza primero backend y luego frontend en el mismo ciclo de despliegue.
-
-### Gateway (si cambió Nginx, SSL o health/readiness)
-
-```bash
-docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl build gateway
-docker compose -f docker-compose.yml -f compose/ssl.yml --profile ssl up -d --no-deps --force-recreate gateway
-curl -k -i https://localhost/health
-curl -k -i https://localhost/ready
-```
-
-### Estructura de archivos
-
-```
-docker-compose.yml              # Entry point (include + profiles + volumes + networks)
-docker-compose-no-volumes.yml   # CI/testing (standalone)
-docker-bake.hcl                 # Build definitions
-backend/                        # Backend (Dockerfile, pom.xml, config)
-gateway/                        # Nginx gateway
-frontend/                       # SPA frontend
-certbot/                        # SSL certificates
-oauth/                          # Keycloak auth
-imaging/                        # OHIF config
-compose/
-  core.yml                      # gateway, portal de ayuda, frontend, backend, db
-  fua.yml                       # profile: fua
-  indicadores.yml               # profile: indicadores
-  hapi.yml                      # profile: hapi
-  imaging.yml                   # profile: imaging
-  imaging-auth.yml              # override OIDC obligatorio para Imaging web
-  keycloak.yml                  # profile: keycloak
-  monitoring.yml                # profile: monitoring
-  status.yml                    # profile: status
-  ssl.yml                       # override con -f (modifica gateway)
-```
-
-Ver [arquitectura de infraestructura](docs/architecture/infrastructure.md) para límites, fuentes de verdad e invariantes de CI.
-
-## Docker Bake (Build)
-
-Para construir imágenes se puede usar `docker buildx bake`, que paraleliza y cachea builds:
-
-```bash
-# Build core (backend, gateway, frontend) en paralelo
+# Backend, gateway y frontend
 docker buildx bake
 
-# Build un target específico
-docker buildx bake backend
-
-# Build todos (+ keycloak, certbot)
-docker buildx bake all
-
-# Dry-run (ver config sin ejecutar)
-docker buildx bake --print
+# Resolver la configuración sin construir ni iniciar contenedores
+docker buildx bake --print frontend
 ```
 
-Alternativamente, `docker compose build` sigue funcionando.
+Bake lee `docker-compose.yml` y después [docker-bake.hcl](docker-bake.hcl).
+El frontend hereda sus argumentos de Compose; sus overrides y la construcción
+directa se documentan en [frontend/README.md](frontend/README.md#build-y-operación).
+El backend y sus módulos se documentan en [backend/README.md](backend/README.md).
 
-## Configuración SSL/HTTPS
-
-La instalación, confianza de certificados, renovación y diagnóstico están
-consolidados en el [runbook HTTPS](docs/operations/https.md). El override
-`compose/ssl.yml` debe cargarse con `-f`, además de activar `--profile ssl`;
-conserva también los demás overrides y perfiles del servidor.
-
-## Backup y Restore
-
-Los scripts se encuentran en `scripts/backup/`. Hay dos métodos:
-
-### Dump SQL (en caliente, sin downtime)
+## Validación local
 
 ```bash
-# Backup - DB sigue corriendo, sin interrupciones
-./scripts/backup/backup_dump.sh
+# Contratos rápidos con fixtures; sin red ni daemon Docker
+bash tests/run.sh
 
-# Restore - solo detiene el backend, DB sigue corriendo
-./scripts/backup/restore_dump.sh
+# Compose y Bake; requiere ambos plugins, sin iniciar servicios
+bash scripts/validate-compose.sh
 ```
 
-### Backup binario (en frío, más rápido)
+[tests/README.md](tests/README.md) distingue estas pruebas de las integraciones
+con imágenes, autenticación y restauración real. Un resultado local correcto no
+sustituye la aceptación del runtime.
 
-```bash
-# Backup con mariadb-backup
-./scripts/backup/backup_full.sh
+## Actualización en producción
 
-# Restore - detiene DB, crea snapshot de seguridad, restaura
-./scripts/backup/restore_full.sh
+Usar el [checklist](docs/operations/deploy-checklist.md) y elegir el procedimiento
+en la [guía de despliegue](scripts/deploy/README.md):
 
-# Especificar archivo directamente
-./scripts/backup/restore_full.sh --file ~/sihsalus-fullBackups/backup_2026-03-01.tar.gz.enc
-```
+- **Release coordinada o cambio de Compose:** manifiestos con imágenes y commit
+  del distro fijados, incluida la versión anterior para recuperación.
+- **Solo frontend o backend:** scripts de actualización individual sobre el
+  checkout limpio ya instalado. No actualizan Git durante el despliegue.
 
-| | Dump SQL (caliente) | Binario (frío) |
-|---|---|---|
-| Downtime | No (solo backend) | Sí (detiene DB) |
-| Velocidad | Más lento | Rápido |
-| Formato | `.sql.gz` | `.tar.gz` (mariadb-backup) |
-| Cifrado | Opcional (AES-256) | Obligatorio (AES-256) |
-| Idempotente | Sí | Sí (snapshot pre-restore) |
+El rollback de imágenes no revierte migraciones de base de datos. La guía
+especifica las verificaciones y los límites de recuperación de cada flujo.
 
-> Los backups cifrados requieren la variable `BACKUP_ENCRYPTION_PASSWORD`.
+## Backup y restore
 
-## Políticas de Seguridad: Cifrado de Backups y Retención de Logs
+La [guía de backups](scripts/backup/README.md) es la referencia para dump SQL,
+backup físico, cifrado, restauración y recuperación ante fallos. El dump puede
+hacerse en caliente; su restauración requiere detener el backend. El backup
+físico y las semillas siempre se cifran; los dumps SQL se cifran si se configura
+`BACKUP_ENCRYPTION_PASSWORD`, obligatorio para su uso en producción.
 
-Este proyecto implementa:
-- **Cifrado automático de backups**: Los archivos de respaldo se cifran con AES-256 usando openssl. La clave se provee vía la variable de entorno `BACKUP_ENCRYPTION_PASSWORD`. El backup sin cifrar se elimina tras el cifrado exitoso.
-- **Rotación y retención de logs**: Los scripts de backup mantienen solo los últimos 5 archivos de log, eliminando los más antiguos automáticamente.
+Los [simulacros](docs/operations/physical-backup-drill.md) prueban restauraciones
+con datos sintéticos. Registrar la evidencia correspondiente a la versión usada.
+
+## Documentación
+
+El [índice de documentación](docs/README.md) organiza las guías por tarea.
+
+| Área | Referencia |
+| --- | --- |
+| Arquitectura y responsabilidades | [Infraestructura](docs/architecture/infrastructure.md) |
+| Servicios, perfiles y variables | [Compose](compose/README.md) |
+| HTTPS y certificados | [Runbook HTTPS](docs/operations/https.md) |
+| Credenciales y políticas de imágenes | [Seguridad](scripts/security/README.md) |
+| Autenticación local y OIDC | [OAuth](oauth/README.md) |
+| Monitoreo, logs y UPS | [Monitoreo](monitoring/README.md) |
+| Scripts operativos | [Inventario](scripts/README.md) |

@@ -19,6 +19,8 @@ el wrapper runtime y recrea únicamente `frontend` con `--no-deps --pull never`.
 El despliegue no descarga, reconstruye ni recrea gateway, backend, bases de
 datos u otros servicios; el único pull permitido es el digest inmutable de la
 imagen fuente del frontend.
+Conserva el checkout instalado: una release que requiera cambiar el wrapper o
+Compose debe pasar primero por el procedimiento coordinado de manifiestos.
 
 El workflow también acepta `repository_dispatch` de tipo `frontend-published` y
 ejecución manual. La deploy key de señal no contiene credenciales de los
@@ -56,16 +58,23 @@ con aprobación explícita.
 - Si el entorno usa HTTPS, `COMPOSE_FILE` incluye `compose/ssl.yml` y `COMPOSE_PROFILES` incluye `ssl`.
 - El checkout del servidor no contiene parches en archivos versionados; todo
   ajuste permanente tiene un pull request revisado.
+- Para una actualización individual, el checkout corresponde a la configuración
+  instalada y es compatible con la imagen candidata. No actualizar Git durante
+  el intento ni como paso automático previo a ese rollback.
 
 ## Ejecución
 
 ```bash
-git pull --ff-only
-./scripts/security-audit.sh .env.production
+./scripts/security-audit.sh .env
 ./scripts/validate-compose.sh
 docker compose config --quiet
 docker compose ps
 ```
+
+Elegir el comando de aplicación en la [guía de despliegue](../../scripts/deploy/README.md).
+Los cambios de commit/configuración se preparan con el procedimiento coordinado;
+el script individual mantiene el checkout actual. Si se usa otro archivo de
+entorno, emplear ese mismo archivo al auditar y seleccionar Compose.
 
 Si el servidor todavía no usa selección persistente, pasa los overrides en cada comando. Ejemplo HTTPS:
 

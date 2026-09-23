@@ -13,7 +13,10 @@ SIH Salus usa Docker Compose como orquestador de un único host. El diseño prio
 | Imágenes | `ohif`, `orthanc`, `orthanc-proxy` | Visualización y almacenamiento DICOM |
 | Operación | `grafana`, `prometheus`, `loki`, `alloy`, `gatus` | Métricas, logs y estado local sin datos clínicos |
 
-Los servicios se descubren por el DNS de Compose. No se fijan subredes ni direcciones de contenedor porque eso crea conflictos con redes hospitalarias y no aporta estabilidad.
+Los servicios se descubren por el DNS de Compose. La red heredada
+`services-network` conserva `172.27.0.0/24` en el Compose principal; las demás
+redes dejan la asignación a Docker. Un cambio de esa subred requiere revisar las
+instalaciones que la usan.
 
 ## Composición
 
@@ -38,7 +41,8 @@ En servidores, la composición elegida se guarda en `COMPOSE_FILE` y `COMPOSE_PR
 | Variables | `.env.template` |
 | Combinaciones soportadas | `scripts/validate-compose.sh` |
 | Validación de PR | `.github/workflows/ci.yml`, check `PR Gate` |
-| Builds de imágenes | `docker-bake.hcl` y workflows `build-*.yml` |
+| Fuente y argumentos frontend | `compose/core.yml`; Bake los hereda |
+| Targets de build y publicación | `docker-bake.hcl` y workflows `build-*.yml` |
 | Operación de despliegue | `docs/operations/deploy-checklist.md` |
 | Rutas y políticas del gateway | `gateway/templates/includes/` |
 | HTTPS y certificados | `docs/operations/https.md` |
@@ -55,7 +59,9 @@ La documentación no debe copiar listas completas de variables o comandos si pue
 - El override TLS publica el puerto 443.
 - Cada combinación soportada produce un modelo Compose válido.
 - El Compose de CI no declara volúmenes persistentes.
-- Los scripts de dump cifrado completan un backup/restore real sobre MariaDB efímera.
+- Las regresiones rápidas del restore comprueban que los fallos de archivo o
+  parada aborten antes de borrar datos. El simulacro periódico valida además
+  backup/restore real sobre MariaDB efímera, fuera de `PR Gate`.
 
 Los modelos renderizados se guardan como artifacts de CI para evidencia de cambio.
 

@@ -1,9 +1,32 @@
-# Despliegue del frontend
+# Despliegue y recuperación
+
+Ejecutar desde la raíz del checkout instalado, con su `.env` y selección
+Compose. Completar el [checklist](../../docs/operations/deploy-checklist.md).
+
+| Cambio | Procedimiento |
+| --- | --- |
+| Release coordinada, imágenes y configuración del distro | [Manifiestos](../../docs/operations/release-manifests.md) |
+| Solo imagen frontend, compatible con el wrapper instalado | [Frontend únicamente](#frontend-únicamente) |
+| Solo imagen backend, compatible con Compose y el esquema existentes | [Backend únicamente](#backend-únicamente) |
+| Reconstrucción integral de DEV/QLTY sin manifiestos | [Redeploy integral](#redeploy-integral-no-destructivo) |
 
 Para una release coordinada de todos los servicios, usar el
 [procedimiento de manifiestos inmutables](../../docs/operations/release-manifests.md).
 Los hosts que adoptan ese flujo consumen el mismo manifiesto al desplegar y
 revertir; sus actualizaciones individuales quedan deshabilitadas.
+
+Los scripts individuales conservan el checkout: no ejecutan `git fetch` ni
+`git merge`. Así, ante un fallo, la imagen anterior se recrea con el mismo
+Compose usado al iniciar el intento. No actualizar Git en paralelo. Si el
+candidato necesita otro wrapper o configuración, preparar una release coordinada
+con su commit y el procedimiento de recuperación correspondiente.
+
+`env.sh` comparte la lectura de referencias/nodos y su escritura atómica en
+`.env`, conserva permisos y elimina asignaciones duplicadas de la clave
+gestionada. No ejecuta el contenido del archivo como shell. El runner remoto
+envía este helper junto al script y la comprobación de checkout limpio.
+
+## Frontend únicamente
 
 `deploy-frontend.sh` actualiza exclusivamente el frontend desde una imagen
 inmutable que ya fue publicada y analizada en `sihsalus-frontend`.
@@ -11,7 +34,7 @@ inmutable que ya fue publicada y analizada en `sihsalus-frontend`.
 El script:
 
 1. valida el SHA y digest solicitados;
-2. actualiza el checkout del distro mediante fast-forward;
+2. comprueba que el checkout instalado esté limpio y conserva su configuración;
 3. fija `FRONTEND_SOURCE_IMAGE` al digest inmutable y conserva el tag SHA como
    metadato operativo; el runtime local recibe un tag derivado del mismo digest
    para que un rebuild del mismo commit no destruya la ruta de rollback;
@@ -91,9 +114,7 @@ muestra el contenido del archivo. Un ajuste operativo que deba persistir se
 incorpora mediante un pull request; no se mantiene como parche en el checkout
 del servidor.
 
-## Redeploy integral no destructivo
-
-### Backend únicamente
+## Backend únicamente
 
 Cuando solo cambia un OMOD o la imagen clásica de OpenMRS, usa
 `deploy-backend.sh` para no recrear frontend, gateway, bases de datos ni perfiles
@@ -110,6 +131,12 @@ conserva su referencia e imagen local para rollback, recrea exclusivamente el
 servicio `backend`, espera `/openmrs/health/started` y solo entonces persiste
 `BACKEND_TAG`. Si falla, restaura `.env` y vuelve a levantar la imagen anterior
 sin tocar los demás servicios.
+
+El rollback individual no revierte migraciones SQL ni recupera un cambio previo
+del checkout. La versión candidata debe ser compatible con la configuración
+instalada; el backup y la ruta de recuperación de la base se preparan antes.
+
+## Redeploy integral no destructivo
 
 `redeploy-environment.sh` se usa para reconstruir y recrear un ambiente
 completo cuando una actualización exclusiva del frontend no es suficiente.
