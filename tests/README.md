@@ -28,9 +28,11 @@ Requiere los plugins Docker Compose y Buildx, sin arrancar servicios. También
 compara contexto, Dockerfile y argumentos del frontend entre Compose y Bake
 (automático, explícito y HCL aislado), incluida `.env.template` y la precedencia
 de overrides sobre los valores de respaldo del HCL.
-CI ejecuta ambos comandos en cada PR, además de validar el catálogo de releases contra los
-commits fuente y su Compose real. Esta última comprobación también puede
-ejecutarse con `python3 -B tests/deploy/release-manifest-compose.py --catalog`.
+CI ejecuta ambos comandos en cada PR y los contratos sintéticos de selección
+persistente. El workflow `Release manifests` también permite validar un archivo
+adjunto a una release inmutable mediante el input `release_tag`. La misma
+comprobación del commit fuente y su Compose puede ejecutarse con
+`python3 -B tests/deploy/release-manifest-compose.py --manifest /ruta/release-manifest.json`.
 
 ## Comprobaciones de imágenes
 

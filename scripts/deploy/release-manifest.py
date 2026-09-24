@@ -534,33 +534,6 @@ def apply_release(manifest, previous, root, rollback=False):
         print(f"Verified {status['operation']}: {manifest['releaseId']}; journal {attempt.name}")
 
 
-def validate_catalog(root, base, output=None):
-    """Published manifests are append-only; Git retains them beyond artifact expiry."""
-    directory = root / "releases"
-    require(not directory.is_symlink() and (not directory.exists() or directory.is_dir()),
-            "Release catalog must be a directory")
-    if base:
-        require(matches(base, SHA), "Invalid catalog baseline commit")
-        names = run(["git", "ls-tree", "-r", "--name-only", base, "--", "releases"], root=root).splitlines()
-        for name in names:
-            if name.endswith(".json"):
-                path = root / name
-                require(path.is_file() and not path.is_symlink(), "Published manifests cannot be deleted")
-                original = run(["git", "show", f"{base}:{name}"], root=root, binary=True)
-                require(path.read_bytes() == original, "Published manifests cannot be changed or renamed")
-    results = []
-    for path in sorted(directory.rglob("*.json")):
-        require(not path.is_symlink() and path.resolve().is_relative_to(directory.resolve()), "Unsafe catalog path")
-        manifest = validate_manifest(read_json(path))
-        target = manifest["target"]
-        expected = directory / target["environment"] / target["nodeId"] / (manifest["releaseId"] + ".json")
-        require(path == expected, "Manifest path must match its environment, node and release identifier")
-        results.append({"path": str(path.relative_to(root)), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
-    if output:
-        write_new(output, {"manifests": results})
-    print(f"Validated append-only release catalog: {len(results)} manifests")
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -587,14 +560,7 @@ def main():
         apply.add_argument("manifest", type=Path)
         apply.add_argument("--previous", type=Path, required=True, help="Retained previous/current release for recovery")
         apply.add_argument("--root", type=Path, default=Path.cwd())
-    catalog = subcommands.add_parser("catalog", help="Check immutable release history and emit a checksum index")
-    catalog.add_argument("--root", type=Path, default=Path.cwd())
-    catalog.add_argument("--base", help="Previous main or pull-request base commit")
-    catalog.add_argument("--output", type=Path)
     args = parser.parse_args()
-    if args.command == "catalog":
-        validate_catalog(args.root.resolve(), args.base, args.output)
-        return
     if args.command == "capture":
         manifest = capture(read_json(args.metadata), args.root.resolve(), args.env_file.resolve())
         write_new(args.output, manifest)

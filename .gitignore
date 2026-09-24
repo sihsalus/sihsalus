@@ -27,3 +27,7 @@ CLAUDE.md
 
 # Generated, sanitized image-security evidence.
 /security-evidence/
+
+# Operational manifests belong to GitHub Release assets, outside the source tree.
+/releases/
+/release-index.json
