@@ -103,26 +103,25 @@ def exercise_persistent_selection(directory, audit=False):
         print("PASS: production security audit consumes effective manifest pins with the existing secret/configuration checks")
 
 
-def exercise_catalog(env_file):
-    for path in sorted((ROOT / "releases").rglob("*.json")):
-        manifest = release.validate_manifest(release.read_json(path))
-        commit = manifest["sources"]["distroCommit"]
-        # Publication can only reference a distro commit present in this history.
-        release.run(["git", "merge-base", "--is-ancestor", commit, "HEAD"], root=ROOT)
-        with tempfile.TemporaryDirectory(prefix="release-source-") as directory:
-            checkout = Path(directory) / "checkout"
-            release.run(["git", "worktree", "add", "--detach", str(checkout), commit], root=ROOT)
-            try:
-                release.verify_checkout(manifest, checkout)
-                release.verify_compose(manifest, checkout, env_file)
-            finally:
-                release.run(["git", "worktree", "remove", str(checkout)], root=ROOT)
-        print(f"PASS: reviewed catalog release {manifest['releaseId']} covers its source Compose services")
+def exercise_manifest(path, env_file):
+    manifest = release.validate_manifest(release.read_json(path))
+    commit = manifest["sources"]["distroCommit"]
+    # An external artifact still has to reference reviewed distro history.
+    release.run(["git", "merge-base", "--is-ancestor", commit, "HEAD"], root=ROOT)
+    with tempfile.TemporaryDirectory(prefix="release-source-") as directory:
+        checkout = Path(directory) / "checkout"
+        release.run(["git", "worktree", "add", "--detach", str(checkout), commit], root=ROOT)
+        try:
+            release.verify_checkout(manifest, checkout)
+            release.verify_compose(manifest, checkout, env_file)
+        finally:
+            release.run(["git", "worktree", "remove", str(checkout)], root=ROOT)
+    print(f"PASS: release artifact {manifest['releaseId']} covers its source Compose services")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--catalog", action="store_true")
+    parser.add_argument("--manifest", type=Path, help="Validate a downloaded release artifact against its source Compose")
     parser.add_argument("--audit", action="store_true", help="Also exercise security-audit.sh; requires a clean committed checkout")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="release-compose-") as directory:
@@ -130,5 +129,5 @@ if __name__ == "__main__":
         env_file.write_text(SYNTHETIC_ENV)
         exercise_profiles(env_file)
         exercise_persistent_selection(Path(directory), audit=args.audit)
-        if args.catalog:
-            exercise_catalog(env_file)
+        if args.manifest:
+            exercise_manifest(args.manifest, env_file)

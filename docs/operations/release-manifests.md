@@ -1,4 +1,4 @@
-# Releases inmutables por nodo
+# Manifiestos de despliegue como artefactos
 
 `scripts/deploy/release-manifest.py` captura y consume las mismas referencias
 para despliegue y rollback. Reutiliza `redeploy-environment.sh` en modo offline:
@@ -13,7 +13,7 @@ real. El digest de la fuente frontend por sí solo no identifica ese wrapper.
 
 ## Preparar y revisar
 
-1. Completar el [checklist de despliegue](deploy-checklist.md): PR aprobado y
+1. Completar el [checklist de despliegue](deploy-checklist.md): PR del código aprobado y
    mergeado, CI verde, backup verificado, credenciales vigentes y ruta de
    recuperación. Mantener pausadas las automatizaciones individuales durante
    la transición a manifiestos. Producción conserva su aprobación explícita.
@@ -74,10 +74,11 @@ real. El digest de la fuente frontend por sí solo no identifica ese wrapper.
    deben corresponder a la promoción revisada. Se puede preparar el manifiesto
    candidato desde el anterior sustituyendo explícitamente las referencias y
    metadatos revisados; `deploy` comprobará sus bytes antes de recrear servicios.
-6. Incorporar cada JSON, anterior y candidato, a `releases/<environment>/<nodeId>/`
-   mediante PR. El commit `distroCommit` describe el código que se ejecutará,
-   anterior al commit que publica el JSON; no debe intentarse una referencia
-   circular al commit que contiene el propio manifiesto.
+6. Conservar cada JSON fuera del checkout y publicarlo como archivo adjunto a
+   una GitHub Release inmutable, según el procedimiento de abajo. El código y
+   las plantillas reutilizables se revisan por PR; un despliegue no añade carpetas
+   por ambiente/UUID ni commits de estado operativo. `distroCommit` identifica
+   el código ejecutado y también el destino del tag de la release.
 
 ## Aplicar y revertir
 
@@ -147,24 +148,76 @@ identidad, versiones y salud técnica; no sustituye la aceptación clínica.
 
 ## Validación y publicación
 
+El repositorio conserva el código de captura, validación y rollback. Los JSON
+reales se guardan como assets de GitHub Releases; `.env.release-state/` sigue
+reteniendo la selección y el journal privados del servidor. Publicar un registro
+no ejecuta un despliegue ni acredita aceptación clínica.
+
+Usar la inmutabilidad nativa de GitHub, ya habilitada en este repositorio. Una
+release publicada protege su tag y assets y ofrece una atestación verificable;
+los artefactos temporales de Actions no son el archivo de recuperación. No usar
+`--clobber`, mover tags ni sobrescribir registros: una corrección crea otra release.
+Ver [releases inmutables de GitHub](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases).
+
+Preparar únicamente el manifiesto revisado y su checksum en un directorio fuera
+del repositorio. No adjuntar `.env`, journals, configuraciones renderizadas,
+respaldos, credenciales ni datos clínicos. Los permisos de publicación existentes
+de GitHub se mantienen; CI solo necesita lectura.
+
 ```bash
-python3 -B -m unittest discover -s tests/deploy -p test_release_manifest.py -v
-python3 -B tests/deploy/release-manifest-compose.py --catalog
-bash scripts/validate-compose.sh
-python3 -B scripts/deploy/release-manifest.py catalog
-python3 -B scripts/deploy/release-manifest.py catalog --base <SHA-base-del-PR>
+artifact_dir="$(mktemp -d)"
+cp /ruta/candidato.json "$artifact_dir/release-manifest.json"
+python3 -B scripts/deploy/release-manifest.py validate "$artifact_dir/release-manifest.json"
+release_tag="deployment-$(jq -r .releaseId "$artifact_dir/release-manifest.json")"
+distro_commit="$(jq -r .sources.distroCommit "$artifact_dir/release-manifest.json")"
+(cd "$artifact_dir" && sha256sum release-manifest.json > SHA256SUMS)
+
+gh release create "$release_tag" "$artifact_dir/release-manifest.json" \
+  "$artifact_dir/SHA256SUMS" --repo sihsalus/sihsalus --draft \
+  --target "$distro_commit" --latest=false --notes-file /ruta/revision.md
 ```
 
-Las pruebas locales usan un Docker simulado para las mutaciones. La validación
-de Compose comprueba los perfiles del checkout sin arrancar servicios.
-El workflow de releases comprueba además que cada commit fuente forme parte
-del historial y que su Compose real quede cubierto por el manifiesto. Verifica
-la selección persistente y el auditor de seguridad con credenciales sintéticas;
-esta comprobación no requiere un daemon Docker.
-El catálogo verifica esquema, rutas, checksums e historial inmutable. Si todavía
-no hay manifiestos publicados, `releases/` puede estar ausente; eliminar un
-manifiesto presente en el commit base sigue siendo un error.
-El workflow publica el catálogo y sus checksums solo después de integrar en
-`main`; el historial versionado preserva los manifiestos anteriores sin límite
-de retención de Actions. No se generan manifiestos reales a partir de los datos
-sintéticos de las pruebas.
+Revisar los archivos, imágenes, evidencia de CI y rollback en el borrador antes
+de publicarlo. La publicación conserva los bytes revisados como evidencia;
+la aplicación al servidor requiere además la validación del artefacto:
+
+```bash
+gh release edit "$release_tag" --repo sihsalus/sihsalus --draft=false --latest=false
+gh release verify-asset "$release_tag" "$artifact_dir/release-manifest.json" --repo sihsalus/sihsalus
+gh workflow run release-manifests.yml --repo sihsalus/sihsalus --ref main \
+  -f release_tag="$release_tag"
+```
+
+El workflow `Release manifests` exige una release publicada e inmutable, verifica
+la atestación del archivo, su esquema, la coincidencia tag/identificador/commit,
+que el commit sea parte del historial revisado y la cobertura de su Compose real.
+Conservar el enlace al run aprobado junto a la revisión operativa. Un fallo
+bloquea la aplicación; publicar el asset por sí solo no autoriza el despliegue.
+Las comprobaciones sintéticas de perfiles, selección persistente, auditoría y
+metadatos de imágenes continúan ejecutándose en cada PR sin manifiestos reales.
+
+Para recuperar un manifiesto publicado en un directorio nuevo fuera del checkout:
+
+```bash
+gh release download "$release_tag" --repo sihsalus/sihsalus \
+  --pattern release-manifest.json --pattern SHA256SUMS --dir /ruta/recuperacion
+gh release verify-asset "$release_tag" /ruta/recuperacion/release-manifest.json \
+  --repo sihsalus/sihsalus
+(cd /ruta/recuperacion && sha256sum --check SHA256SUMS)
+python3 -B scripts/deploy/release-manifest.py validate /ruta/recuperacion/release-manifest.json
+```
+
+Pasar ese archivo a `deploy` o `rollback` con los controles descritos arriba.
+El traslado del catálogo histórico a assets conserva sus bytes y no cambia la
+selección activa, imágenes, volúmenes ni copias de recuperación del servidor.
+El historial Git anterior permanece disponible, sin reescribir commits.
+
+Pruebas locales sin Docker:
+
+```bash
+python3 -B -m unittest discover -s tests/deploy -p 'test_release*.py' -v
+bash tests/run.sh
+```
+
+En un runner con Compose disponible, la verificación de un archivo externo puede
+repetirse con `python3 -B tests/deploy/release-manifest-compose.py --manifest /ruta/release-manifest.json`.

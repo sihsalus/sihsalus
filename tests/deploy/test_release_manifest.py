@@ -406,56 +406,5 @@ class RuntimeConsumption(unittest.TestCase):
         self.assertIn("managed by a release manifest", result.stderr)
 
 
-class CatalogHistory(unittest.TestCase):
-    def test_unused_catalog_can_be_absent(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            release.validate_catalog(root, None, root / "index.json")
-            self.assertEqual(json.loads((root / "index.json").read_text()), {"manifests": []})
-            self.assertFalse((root / "releases").exists())
-
-    def test_catalog_rejects_a_file_or_symlink(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            catalog = root / "releases"
-            catalog.write_text("invalid")
-            with self.assertRaises(release.ManifestError):
-                release.validate_catalog(root, None)
-            catalog.unlink()
-            catalog.symlink_to(root / "missing")
-            with self.assertRaises(release.ManifestError):
-                release.validate_catalog(root, None)
-
-    def test_history_is_append_only_and_index_contains_exact_file_checksums(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            manifest = fixture()
-            parent = root / "releases" / "qlty" / manifest["target"]["nodeId"]
-            parent.mkdir(parents=True)
-            path = parent / "first.json"
-            release.write_new(path, manifest)
-            for command in (["git", "init", "-q"], ["git", "add", "."],
-                            ["git", "-c", "user.name=Release Test", "-c", "user.email=release@example.invalid", "commit", "-qm", "published"]):
-                subprocess.run(command, cwd=root, check=True, capture_output=True)
-            base = release.run(["git", "rev-parse", "HEAD"], root=root).strip()
-            release.write_new(parent / "second.json", fixture("second"))
-            release.validate_catalog(root, base, root / "index.json")
-            index = json.loads((root / "index.json").read_text())
-            self.assertEqual(len(index["manifests"]), 2)
-            self.assertEqual(index["manifests"][0]["sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
-            path.write_text(path.read_text() + "\n")
-            with self.assertRaisesRegex(release.ManifestError, "changed or renamed"):
-                release.validate_catalog(root, base)
-            path.unlink()
-            with self.assertRaisesRegex(release.ManifestError, "deleted"):
-                release.validate_catalog(root, base)
-            (parent / "second.json").unlink()
-            parent.rmdir()
-            parent.parent.rmdir()
-            parent.parent.parent.rmdir()
-            with self.assertRaisesRegex(release.ManifestError, "deleted"):
-                release.validate_catalog(root, base)
-
-
 if __name__ == "__main__":
     unittest.main()

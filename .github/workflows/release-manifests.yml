@@ -3,12 +3,17 @@ name: Release manifests
 on:
   workflow_call:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Published immutable deployment release to validate; empty runs synthetic contracts'
+        type: string
+        required: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-manifests-${{ github.ref }}
+  group: release-manifests-${{ github.ref }}-${{ inputs.release_tag || 'contracts' }}
   cancel-in-progress: true
 
 jobs:
@@ -20,27 +25,32 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - name: Verify source commits, Compose coverage and persistent release selection
-        run: python3 -B tests/deploy/release-manifest-compose.py --catalog --audit
+      - name: Verify Compose coverage and persistent release selection
+        run: python3 -B tests/deploy/release-manifest-compose.py --audit
       - name: Verify metadata from unlabeled and labeled runtime images
         run: python3 -B tests/deploy/release-manifest-images.py
-      - name: Validate reviewed release history and generate exact file checksums
+      - name: Verify published release asset against its source Compose
+        if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
-          args=()
-          if [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] && [[ ! "$BASE_SHA" =~ ^0+$ ]]; then
-            args+=(--base "$BASE_SHA")
-          fi
-          python3 -B scripts/deploy/release-manifest.py catalog "${args[@]}" --output release-index.json
-      - name: Publish reviewed manifests and checksum index
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
-        with:
-          name: release-manifests-${{ github.sha }}
-          path: |
-            releases/**/*.json
-            release-index.json
-          if-no-files-found: error
-          retention-days: 90
+          [[ "$RELEASE_TAG" =~ ^deployment-[a-z0-9][a-z0-9-]{0,63}$ ]]
+          gh api "repos/$GH_REPO/releases/tags/$RELEASE_TAG" \
+            --jq '.immutable == true and .draft == false' | grep -qx true
+          artifact_dir="$RUNNER_TEMP/release-asset"
+          mkdir "$artifact_dir"
+          gh release download "$RELEASE_TAG" --pattern release-manifest.json --dir "$artifact_dir"
+          manifest="$artifact_dir/release-manifest.json"
+          gh release verify-asset "$RELEASE_TAG" "$manifest"
+          python3 -B scripts/deploy/release-manifest.py validate "$manifest"
+          [[ "$RELEASE_TAG" == "deployment-$(jq -r .releaseId "$manifest")" ]]
+          [[ "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" == "$(jq -r .sources.distroCommit "$manifest")" ]]
+          python3 -B tests/deploy/release-manifest-compose.py --manifest "$manifest"
+          {
+            echo '## Verified operational artifact'
+            echo "$RELEASE_TAG"
+            sha256sum "$manifest"
+          } >> "$GITHUB_STEP_SUMMARY"
