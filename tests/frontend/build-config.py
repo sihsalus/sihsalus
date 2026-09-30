@@ -23,7 +23,7 @@ def check():
         (root / "frontend").mkdir()
         shutil.copyfile(ROOT / "frontend/Dockerfile", root / "frontend/Dockerfile")
 
-        def resolve(overrides=None, keycloak=False, bake_mode="explicit"):
+        def resolve(overrides=None, keycloak=False, bake_mode="explicit", local_auth=False):
             env = dict(environment, **(overrides or {}))
             if keycloak:
                 for key in ("OAUTH2_CLIENT_SECRET", "KEYCLOAK_ADMIN_PASSWORD",
@@ -32,6 +32,9 @@ def check():
             files = ["-f", "docker-compose.yml"]
             if keycloak:
                 files += ["-f", "compose/keycloak.yml"]
+
+            if local_auth:
+                files += ["-f", "compose/openmrs-local-auth.yml"]
 
             def run(command):
                 result = subprocess.run(command, cwd=root, env=env, check=True,
@@ -81,9 +84,10 @@ def check():
         assert "frontend-keycloak.json" in resolve(keycloak=True)["SPA_CONFIG_URLS"]
         config_urls = "/openmrs/spa/frontend.json,/openmrs/spa/frontend-realtime.json"
         for mode in ("explicit", "implicit", "standalone"):
-            assert resolve({"SPA_CONFIG_URLS": config_urls}, bake_mode=mode)["SPA_CONFIG_URLS"] == config_urls
+            assert resolve(dict(requested, SPA_CONFIG_URLS=config_urls), bake_mode=mode)["SPA_CONFIG_URLS"] == config_urls
+        assert resolve(dict(requested, SPA_CONFIG_URLS=config_urls), keycloak=True, local_auth=True)["SPA_CONFIG_URLS"] == config_urls
         oidc_urls = "/openmrs/spa/frontend.json,/openmrs/spa/frontend-keycloak.json,/openmrs/spa/frontend-realtime.json"
-        assert resolve({"SPA_CONFIG_URLS": oidc_urls}, keycloak=True)["SPA_CONFIG_URLS"] == oidc_urls
+        assert resolve(dict(requested, SPA_CONFIG_URLS=oidc_urls), keycloak=True)["SPA_CONFIG_URLS"] == oidc_urls
     print("[OK] Compose/Bake explicit, implicit and standalone builds, defaults, overrides and Keycloak")
 
 
