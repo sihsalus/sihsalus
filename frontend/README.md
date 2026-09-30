@@ -46,6 +46,55 @@ inicialización inline, adapta el único inicializador de `index.html`.
 `X-SIHSALUS-Node-ID` de los archivos de control; la operación de despliegue valida
 la identidad esperada del entorno.
 
+## Notificaciones de laboratorio y farmacia
+
+El runtime incluye `frontend-realtime.json`, pero no lo carga por defecto.
+Después de verificar `sihsalusnotifications` >= 1.2.0 iniciado y sus transportes
+con cuentas sintéticas en DEV/QLTY, añadirlo al final de `SPA_CONFIG_URLS` en
+el entorno autorizado y reconstruir el wrapper mediante el procedimiento de
+manifiestos existente:
+
+```dotenv
+# OpenMRS local; conservar todos los JSON que el entorno ya cargaba.
+SPA_CONFIG_URLS=/openmrs/spa/frontend.json,/openmrs/spa/frontend-realtime.json
+```
+
+Con login OIDC, conservar también `/openmrs/spa/frontend-keycloak.json` antes
+del JSON realtime. Compose core, Keycloak, login local y Bake aceptan la misma
+variable; omitirla conserva los valores anteriores. No cambiar la autenticación
+ni habilitarlo automáticamente en producción. El frontend utiliza SSE; el OMOD
+también ofrece WebSocket con ticket de un solo uso.
+
+La prueba manual usa cuentas nuevas con roles existentes `Laboratorio` y
+`SIHSALUS Consulta Externa`, proveedores sintéticos y la misma ubicación de
+sesión cuyo ancestro tenga el tag `Facility Location`. No asignar Super User ni
+alterar roles existentes. Mantener credenciales y journal de recursos fuera de
+Git, con permisos 0600; conservar las cuentas hasta terminar la prueba y después
+retirarlas junto con sus proveedores, conservando referencias históricas.
+
+1. Laboratorio abre su bandeja y confirma HTTP 200 y `text/event-stream` en
+   `notifications/sse?topics=laboratory`.
+2. Consulta Externa guarda una orden de laboratorio de un paciente sintético.
+   Laboratorio debe recibir `LAB_ORDER_CREATED`, refetch de la bandeja y aviso
+   sin F5. Finalizar un resultado debe producir `LAB_RESULT_READY`.
+3. Comprobar reconexión al finalizar la respuesta SSE acotada (25 segundos) y
+   tras un corte corto de red, sin avisos duplicados. Una respuesta pendiente
+   mientras fluye SSE es normal.
+4. Verificar que una cuenta sin el privilegio del departamento o de otra
+   IPRESS no recibe el evento; abrir un transporte no demuestra autorización
+   para recibir eventos ni aceptación clínica.
+
+Los eventos llevan solo referencias de orden, no nombres ni resultados. La
+bandeja REST sigue siendo la fuente de datos y el polling permanece como
+respaldo. Para rollback, quitar el JSON adicional de `SPA_CONFIG_URLS` y aplicar
+el wrapper/manifiesto anterior; no hay migración clínica. No borrar imágenes
+ni artefactos privados de recuperación antes de verificar la reversión.
+
+La suite `clinical-recovery` del frontend sigue en cuarentena: sus fixtures y
+su limpieza requieren revisión independiente. Estas instrucciones no habilitan
+ni eluden esa suite; distinguen la comprobación manual de transportes del smoke
+clínico pendiente y no autorizan datos reales ni producción.
+
 ## Caché y rutas
 
 La política canónica está en [nginx.conf](nginx.conf):

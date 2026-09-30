@@ -74,7 +74,7 @@ services:
         FRONTEND_SOURCE_IMAGE: ${FRONTEND_SOURCE_IMAGE:-ghcr.io/sihsalus/sihsalus-frontend:${FRONTEND_SOURCE_TAG:-sha-37e678e16126967eda957f8780f2fcb5f5210c6b@sha256:59f76de5b094af73776eea87b76a4d69c42096e0009e7bd441918a7018c0fbd2}}
         SPA_PATH: /openmrs/spa
         API_URL: /openmrs
-        SPA_CONFIG_URLS: /openmrs/spa/frontend.json
+        SPA_CONFIG_URLS: ${SPA_CONFIG_URLS:-/openmrs/spa/frontend.json}
         SPA_DEFAULT_LOCALE: es
         STRIP_SOURCE_MAPS: ${STRIP_SOURCE_MAPS:-true}
         SIHSALUS_NODE_ID: ${SIHSALUS_NODE_ID:-unconfigured}

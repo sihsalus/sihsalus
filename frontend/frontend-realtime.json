@@ -1,0 +1,8 @@
+{
+  "@sihsalus/esm-laboratory-app": {
+    "enableRealtimeLabResultNotifications": true
+  },
+  "@sihsalus/esm-dispensing-app": {
+    "enableRealtimeMedicationOrderNotifications": true
+  }
+}

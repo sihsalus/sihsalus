@@ -161,6 +161,10 @@ validate() {
 }
 
 validate core -f docker-compose.yml
+SPA_CONFIG_URLS=/openmrs/spa/frontend.json,/openmrs/spa/frontend-realtime.json \
+  validate realtime -f docker-compose.yml
+SPA_CONFIG_URLS=/openmrs/spa/frontend.json,/openmrs/spa/frontend-realtime.json \
+  validate realtime-local-auth -f docker-compose.yml -f compose/keycloak.yml -f compose/openmrs-local-auth.yml --profile keycloak
 SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED=false \
 validate local-auth-rollback -f docker-compose.yml
 validate ci-no-volumes -f docker-compose-no-volumes.yml

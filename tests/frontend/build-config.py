@@ -79,6 +79,11 @@ def check():
             for key in ("FRONTEND_SOURCE_IMAGE", "SIHSALUS_NODE_ID", "STRIP_SOURCE_MAPS"):
                 assert args[key] == requested[key], f"{mode}: HCL fallback replaced .env override: {key}"
         assert "frontend-keycloak.json" in resolve(keycloak=True)["SPA_CONFIG_URLS"]
+        config_urls = "/openmrs/spa/frontend.json,/openmrs/spa/frontend-realtime.json"
+        for mode in ("explicit", "implicit", "standalone"):
+            assert resolve({"SPA_CONFIG_URLS": config_urls}, bake_mode=mode)["SPA_CONFIG_URLS"] == config_urls
+        oidc_urls = "/openmrs/spa/frontend.json,/openmrs/spa/frontend-keycloak.json,/openmrs/spa/frontend-realtime.json"
+        assert resolve({"SPA_CONFIG_URLS": oidc_urls}, keycloak=True)["SPA_CONFIG_URLS"] == oidc_urls
     print("[OK] Compose/Bake explicit, implicit and standalone builds, defaults, overrides and Keycloak")
 
 

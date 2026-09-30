@@ -19,6 +19,7 @@ ENV SPA_OUTPUT_DIR=/tmp/spa \
 
 COPY patch-config-urls.js /app/patch-config-urls.js
 COPY frontend-keycloak.json /app/config/frontend-keycloak.json
+COPY frontend-realtime.json /app/config/frontend-realtime.json
 
 RUN test -n "$SPA_CONFIG_URLS" || { echo "SPA_CONFIG_URLS build arg is required; define it in compose/core.yml"; exit 1; } \
     && rm -rf "$SPA_OUTPUT_DIR" \
