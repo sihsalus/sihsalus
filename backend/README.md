@@ -18,6 +18,23 @@ belongs to the [frontend build](../frontend/README.md). Runtime setup, including
 OCL token reconciliation, is described below; password
 policy is documented in the [forced-password-change contract](../docs/operations/forced-password-change.md).
 
+## Runtime OS security maintenance
+
+The runtime base stays immutable. Its build-time `yum update` includes both
+`curl` and `libcurl`, so new Amazon Linux security patches are applied before
+returning to UID 1001. CI supplies the source SHA as `SECURITY_REFRESH` to
+invalidate the package-update layer on each revision.
+
+The isolated DEV runtime comparison on 2026-10-02 verified both RPMs at
+`8.3.0-1.amzn2.0.13`, the corrected release in
+[Amazon's advisory](https://alas.aws.amazon.com/AL2/ALAS2-2026-3953.html).
+Amazon backports fixes without changing curl's `8.3.0` version string; inspect
+`rpm -q curl libcurl` and the image scan, rather than that string alone.
+Trivy 0.74.0 reported zero HIGH/CRITICAL OS findings in the comparison image.
+Full Dockerfile packaging and comparison against the pinned OpenMRS baseline
+remain separate PR CI requirements. Existing Java findings and their limited
+acceptance are documented in [the image security policy](../docs/operations/image-security.md).
+
 ## Configuración del token OCL
 
 El backend reconcilia `OMRS_OCL_TOKEN` después de copiar la configuración y antes de que
@@ -36,8 +53,7 @@ y elimina la propiedad desde la administración de OpenMRS durante una ventana c
 The pinned OpenMRS runtime contains Tomcat 9.0.120. The Dockerfile installs the
 complete official Tomcat 9.0.121 `bin` and `lib` directories from Apache's archive,
 verified by a literal SHA-256 pin. This fixes CVE-2026-65182, CVE-2026-65905 and
-CVE-2026-68525 while retaining OpenMRS's configuration, startup scripts and UID
-1001. The checksum was checked against Apache's published SHA-512 file.
+CVE-2026-68525 while retaining OpenMRS's configuration, startup scripts and UID 1001. The checksum was checked against Apache's published SHA-512 file.
 
 CI verifies the running Java version of Tomcat, the writable `setenv.sh` needed
 by OpenMRS, configuration ownership and startup of an empty HTTP server without
@@ -51,11 +67,11 @@ security policy still controls release promotion.
 The following repositories own their Java changes, patches, regression tests,
 OMOD compilation and releases:
 
-| Module | Owning repository | Dockerfile version / POM property |
-| --- | --- | --- |
-| O3 Forms | [openmrs-module-o3forms](https://github.com/sihsalus/openmrs-module-o3forms) | `O3FORMS_VERSION` / `o3forms.version` |
-| REST | [openmrs-module-webservices.rest](https://github.com/sihsalus/openmrs-module-webservices.rest/tree/sihsalus-2.8) | `REST_VERSION` / `webservices.rest.version` |
-| EMR API | [openmrs-module-emrapi](https://github.com/sihsalus/openmrs-module-emrapi/tree/sihsalus-2.8) | `EMRAPI_VERSION` / `emrapi.version` |
+| Module   | Owning repository                                                                                                | Dockerfile version / POM property           |
+| -------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| O3 Forms | [openmrs-module-o3forms](https://github.com/sihsalus/openmrs-module-o3forms)                                     | `O3FORMS_VERSION` / `o3forms.version`       |
+| REST     | [openmrs-module-webservices.rest](https://github.com/sihsalus/openmrs-module-webservices.rest/tree/sihsalus-2.8) | `REST_VERSION` / `webservices.rest.version` |
+| EMR API  | [openmrs-module-emrapi](https://github.com/sihsalus/openmrs-module-emrapi/tree/sihsalus-2.8)                     | `EMRAPI_VERSION` / `emrapi.version`         |
 
 The image consumes their published OMODs with literal SHA-256 pins. Do not compile
 or patch them here, add them to `omod-sources.lock`, or install them manually into
@@ -73,6 +89,86 @@ automatic visit-closure batch on its first save or validation failure; it does n
 repair clinical rows or correct timestamp policy. Keep automatic closure paused
 pending actual OpenMRS + Queue integration, an agreed timestamp policy and
 synthetic DEV/QLTY acceptance. An image update does not authorize reactivation.
+
+## Official upstream modules
+
+[Attachments 4.1.0](https://github.com/openmrs/openmrs-module-attachments/releases/tag/4.1.0)
+fixes saving visit notes with multiple image attachments.
+[Authentication 2.4.0](https://github.com/openmrs/openmrs-module-authentication/releases/tag/2.4.0)
+adds the session-rotation and incomplete-2FA fixes missing from our earlier
+source pin. Both now use official released Maven artifacts. Authentication no
+longer needs a distribution-specific version, source build or source-test
+matrix entry. The existing packaged-image and required-module gates remain.
+Preserve forced-password-change and OAuth2 configuration contracts.
+
+The September/October upstream review also considered the following releases:
+
+- Address Hierarchy 3.0.0 remains pending. Native tests on Core 2.8.9 failed
+  repeated CSV import and an i18n address-update case with privilege errors.
+  Core requirements alone do not establish acceptance. ExtI18n 1.1.0 is optional;
+  introducing it is not required for the current address hierarchy integration.
+- Reporting 2.2.0 remains pending as a packaging simplification. Its PDF and
+  service-privilege changes are already in our source pin. Native Core 2.8.9
+  tests encounter an obsolete DrugOrder fixture and a confirmed H2 role-cache
+  deadlock: the test creates uncommitted roles while Core resolves privileges in
+  an independent transaction. Adapt and clean up isolated fixtures in the owning
+  test suite while preserving all allowed/denied assertions before replacing the
+  current source-built candidate.
+- FHIR2 stays on 4.3.0-sihsalus.1. Its pinned revision already contains FM2-669
+  (`c92f04ff7a5bc1d9cfb7a06af8f68d20f688d0be`); 2.5.2 backports that feature
+  to a different maintenance line.
+- Reference Application demo/showcase packages do not replace SIH Salus clinical
+  content. Report Builder and Metadata Export are separate optional products,
+  not upgrades to currently installed modules; introducing them requires an
+  actual consumer and acceptance scope.
+- REST stays checksum-pinned to its published SIH Salus release. Upstream 3.6.0
+  session and resource-order fixes must be tested and released in the owning
+  fork before changing this distribution pin.
+
+### Review validation, 2026-10-02
+
+These results apply to the module choices in commit
+`c42fe12be051a1572f0b8e222ac5b7d94efeafcb`, with Java 21 and Core 2.8.9 in
+isolated DEV resources, without application-data mounts:
+
+| Candidate               | Native reactor result                                                                    | Decision                                         |
+| ----------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Attachments 4.1.0       | PASSED: 43 tests, seven skipped, no failures/errors                                      | Use official Maven artifact                      |
+| Authentication 2.4.0    | PASSED: 155 tests, no skips/failures/errors                                              | Use official Maven artifact; remove source build |
+| Address Hierarchy 3.0.0 | FAILED: one assertion failure and one error from privilege checks                        | Preserve 2.21.0                                  |
+| Reporting 2.2.0         | FAILED: obsolete DrugOrder fixture; H2 role-cache deadlock required terminating the test | Preserve current source pin                      |
+
+Native commands used `mvn -B -ntp -Dstyle.color=never -Dformatter.skip=true
+-Dspotless.skip=true -Dmaven.javadoc.skip=true -DopenMRSVersion=2.8.9
+-DopenmrsVersion=2.8.9 -f MODULE/pom.xml verify`. The official Authentication
+OMOD also passed the compiled forced-password-change/`javax` contract check.
+
+The required-module gate (`tests/backend/module-dependencies-image.sh --files
+WAR MODULES`) PASSED on the final two-upgrade selection: all 34 module identities
+and required versions, plus the packaged Core comparator fixtures. Only
+distribution WAR/OMOD files were copied into a network-disabled test container;
+that container was removed successfully.
+
+These repository contract checks passed, and the final CI source-module matrix
+matches the nine remaining lock-file entries:
+
+```bash
+python3 tests/backend/owned-module-releases.py --self-test
+bash tests/backend/o3forms-release-config.sh
+bash tests/backend/forced-password-config.sh
+bash tests/backend/source-omods-config.sh
+```
+
+Full distribution packaging is validated separately by PR CI. Startup with
+these new modules, synthetic attachment saves and login/session acceptance are
+NOT RUN. Native green tests do not establish runtime or clinical acceptance.
+Logs and binaries remain in the isolated DEV test directory; native test
+containers were removed.
+
+Native module tests, packaged checks and synthetic DEV acceptance are separate
+requirements. Retain a verified database backup and previous immutable image
+before testing startup, attachment saves and login/session behavior. Image
+rollback does not restore a database.
 
 ## Source-built modules
 

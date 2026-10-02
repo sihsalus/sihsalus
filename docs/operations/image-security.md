@@ -61,19 +61,19 @@ o severidad diferente vuelve a bloquearse. No se admiten comodines.
 
 Cada entrada contiene:
 
-| Campo | Requisito |
-| --- | --- |
-| `id` | Identificador único y estable de la excepción |
-| `repository` | Repositorio exacto, por ejemplo `ghcr.io/sihsalus/sihsalus-backend` |
-| `platform` | `linux/amd64` o `linux/arm64` |
-| `vulnerabilityId` | Identificador exacto informado por Trivy |
-| `packageName`, `installedVersion` | Paquete y versión exactos |
-| `class`, `type` | Clase y ecosistema del informe, por ejemplo `lang-pkgs` / `jar` |
-| `severity` | `HIGH` o `CRITICAL` |
-| `owner` | Usuario o equipo GitHub que asume el seguimiento |
-| `issue` | Issue de SIHSalus que registra decisión, mitigación y resolución |
-| `rationale` | Justificación concreta; sin contraseñas ni configuración privada |
-| `createdOn`, `expiresOn` | Fechas ISO; vencimiento máximo a 30 días de la creación |
+| Campo                             | Requisito                                                           |
+| --------------------------------- | ------------------------------------------------------------------- |
+| `id`                              | Identificador único y estable de la excepción                       |
+| `repository`                      | Repositorio exacto, por ejemplo `ghcr.io/sihsalus/sihsalus-backend` |
+| `platform`                        | `linux/amd64` o `linux/arm64`                                       |
+| `vulnerabilityId`                 | Identificador exacto informado por Trivy                            |
+| `packageName`, `installedVersion` | Paquete y versión exactos                                           |
+| `class`, `type`                   | Clase y ecosistema del informe, por ejemplo `lang-pkgs` / `jar`     |
+| `severity`                        | `HIGH` o `CRITICAL`                                                 |
+| `owner`                           | Usuario o equipo GitHub que asume el seguimiento                    |
+| `issue`                           | Issue de SIHSalus que registra decisión, mitigación y resolución    |
+| `rationale`                       | Justificación concreta; sin contraseñas ni configuración privada    |
+| `createdOn`, `expiresOn`          | Fechas ISO; vencimiento máximo a 30 días de la creación             |
 
 Las fechas se evalúan en UTC, incluyendo el día de vencimiento. El día siguiente
 la excepción falla, aunque la imagen o el paquete no hayan cambiado. Una entrada
@@ -111,6 +111,43 @@ Retirar cada entrada al publicar y verificar la corrección en el componente
 propietario. Si vence sin corrección, la publicación vuelve a bloquearse;
 renovar exige una nueva decisión explícita. Retirar las entradas revoca futuras
 promociones, pero no modifica imágenes ya publicadas ni revierte despliegues.
+
+## Revisión y renovación propuesta del 02/10/2026
+
+El mantenedor pidió actualizar los paquetes de la imagen y revisar el catálogo
+vencido en [PR #345](https://github.com/sihsalus/sihsalus/pull/345). La revisión
+propone renovar únicamente las 43 entradas anteriores, conservando IDs,
+responsable, issue y todos sus campos de alcance. La nueva vigencia empieza el
+**02/10/2026** y termina el **09/10/2026 UTC**, inclusive; no es una renovación
+automática ni una ampliación a paquetes o hallazgos nuevos.
+
+La comparación aislada de DEV usó el backend existente de main, los OMOD
+oficiales Attachments 4.1.0 y Authentication 2.4.0, y el bloque de actualización
+de paquetes del Dockerfile revisado. Trivy 0.74.0 descargó bases nuevas y terminó
+el escaneo el **02/10/2026 a las 23:07 UTC**, incluyendo HIGH/CRITICAL sin
+corrección disponible. La imagen local de comparación fue
+`sha256:59468213bcf725bd18f67bacbecb1e78f689e19215ba053491e4849a4ac022d8`.
+La evidencia depurada confirmó:
+
+- Cero hallazgos HIGH/CRITICAL del sistema operativo; `curl` y `libcurl` quedaron
+  en `8.3.0-1.amzn2.0.13`.
+- Las 43 entradas anteriores todavía coinciden exactamente: dos CRITICAL y
+  41 HIGH Java. No hubo entradas obsoletas que retirar.
+- Cinco alcances HIGH Java adicionales quedan fuera del catálogo y siguen
+  bloqueando la publicación. Esta revisión no los acepta ni los oculta.
+
+La línea oficial de Core mantiene 2.8.9 como último tag 2.8 disponible en esta
+revisión. Las correcciones Java requieren una release validada en el componente
+propietario; se conserva [#323](https://github.com/sihsalus/sihsalus/issues/323)
+como seguimiento. La renovación temporal no corrige esas dependencias ni
+demuestra que sean inexplotables. Su incorporación requiere revisión del PR.
+
+Esta comparación local no tiene índice de release, SBOM adjunto ni firma y no
+sirve como evidencia de promoción. El CI del PR debe construir el Dockerfile
+completo y pasar el control de vulnerabilidades corregibles y la comparación
+con OpenMRS. La publicación sigue exigiendo su propio escaneo del digest
+inmutable, SBOM, política completa y firma. No se autorizan merge, despliegue
+ni ampliación de aceptación por este cambio.
 
 ## Evidencia sin credenciales
 
