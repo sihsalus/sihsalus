@@ -140,7 +140,7 @@ USER root
 # layer after the distribution repositories publish new security fixes.
 ARG SECURITY_REFRESH=local
 RUN echo "Security refresh: ${SECURITY_REFRESH}" && \
-    yum -y update acl expat glib2 libacl libssh2 openssl-libs openssl11-libs python python-libs vim-data vim-minimal && \
+    yum -y update acl curl expat glib2 libacl libcurl libssh2 openssl-libs openssl11-libs python python-libs vim-data vim-minimal && \
     yum clean all && \
     rm -rf /var/cache/yum
 

@@ -18,6 +18,23 @@ belongs to the [frontend build](../frontend/README.md). Runtime setup, including
 OCL token reconciliation, is described below; password
 policy is documented in the [forced-password-change contract](../docs/operations/forced-password-change.md).
 
+## Runtime OS security maintenance
+
+The runtime base stays immutable. Its build-time `yum update` includes both
+`curl` and `libcurl`, so new Amazon Linux security patches are applied before
+returning to UID 1001. CI supplies the source SHA as `SECURITY_REFRESH` to
+invalidate the package-update layer on each revision.
+
+The isolated DEV runtime comparison on 2026-10-02 verified both RPMs at
+`8.3.0-1.amzn2.0.13`, the corrected release in
+[Amazon's advisory](https://alas.aws.amazon.com/AL2/ALAS2-2026-3953.html).
+Amazon backports fixes without changing curl's `8.3.0` version string; inspect
+`rpm -q curl libcurl` and the image scan, rather than that string alone.
+Trivy 0.74.0 reported zero HIGH/CRITICAL OS findings in the comparison image.
+Full Dockerfile packaging and comparison against the pinned OpenMRS baseline
+remain separate PR CI requirements. Existing Java findings and their limited
+acceptance are documented in [the image security policy](../docs/operations/image-security.md).
+
 ## Configuración del token OCL
 
 El backend reconcilia `OMRS_OCL_TOKEN` después de copiar la configuración y antes de que
@@ -142,10 +159,11 @@ bash tests/backend/forced-password-config.sh
 bash tests/backend/source-omods-config.sh
 ```
 
-Full distribution image build, startup with these new modules, synthetic
-attachment saves and login/session acceptance are NOT RUN. Native green tests
-do not establish runtime or clinical acceptance. Logs and binaries remain in
-the isolated DEV test directory; native test containers were removed.
+Full distribution packaging is validated separately by PR CI. Startup with
+these new modules, synthetic attachment saves and login/session acceptance are
+NOT RUN. Native green tests do not establish runtime or clinical acceptance.
+Logs and binaries remain in the isolated DEV test directory; native test
+containers were removed.
 
 Native module tests, packaged checks and synthetic DEV acceptance are separate
 requirements. Retain a verified database backup and previous immutable image
