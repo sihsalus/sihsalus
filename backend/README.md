@@ -108,6 +108,45 @@ The September/October upstream review also considered the following releases:
   session and resource-order fixes must be tested and released in the owning
   fork before changing this distribution pin.
 
+### Review validation, 2026-10-02
+
+These results apply to the module choices in commit
+`c42fe12be051a1572f0b8e222ac5b7d94efeafcb`, with Java 21 and Core 2.8.9 in
+isolated DEV resources, without application-data mounts:
+
+| Candidate               | Native reactor result                                                                    | Decision                                         |
+| ----------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Attachments 4.1.0       | PASSED: 43 tests, seven skipped, no failures/errors                                      | Use official Maven artifact                      |
+| Authentication 2.4.0    | PASSED: 155 tests, no skips/failures/errors                                              | Use official Maven artifact; remove source build |
+| Address Hierarchy 3.0.0 | FAILED: one assertion failure and one error from privilege checks                        | Preserve 2.21.0                                  |
+| Reporting 2.2.0         | FAILED: obsolete DrugOrder fixture; H2 role-cache deadlock required terminating the test | Preserve current source pin                      |
+
+Native commands used `mvn -B -ntp -Dstyle.color=never -Dformatter.skip=true
+-Dspotless.skip=true -Dmaven.javadoc.skip=true -DopenMRSVersion=2.8.9
+-DopenmrsVersion=2.8.9 -f MODULE/pom.xml verify`. The official Authentication
+OMOD also passed the compiled forced-password-change/`javax` contract check.
+
+The required-module gate (`tests/backend/module-dependencies-image.sh --files
+WAR MODULES`) PASSED on the final two-upgrade selection: all 34 module identities
+and required versions, plus the packaged Core comparator fixtures. Only
+distribution WAR/OMOD files were copied into a network-disabled test container;
+that container was removed successfully.
+
+These repository contract checks passed, and the final CI source-module matrix
+matches the nine remaining lock-file entries:
+
+```bash
+python3 tests/backend/owned-module-releases.py --self-test
+bash tests/backend/o3forms-release-config.sh
+bash tests/backend/forced-password-config.sh
+bash tests/backend/source-omods-config.sh
+```
+
+Full distribution image build, startup with these new modules, synthetic
+attachment saves and login/session acceptance are NOT RUN. Native green tests
+do not establish runtime or clinical acceptance. Logs and binaries remain in
+the isolated DEV test directory; native test containers were removed.
+
 Native module tests, packaged checks and synthetic DEV acceptance are separate
 requirements. Retain a verified database backup and previous immutable image
 before testing startup, attachment saves and login/session behavior. Image
