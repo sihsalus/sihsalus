@@ -149,6 +149,39 @@ con OpenMRS. La publicación sigue exigiendo su propio escaneo del digest
 inmutable, SBOM, política completa y firma. No se autorizan merge, despliegue
 ni ampliación de aceptación por este cambio.
 
+## Aceptación adicional para DEV y QLTY del 03/10/2026 UTC
+
+Después del merge de PR #345, el mantenedor aceptó expresamente los cinco
+hallazgos HIGH adicionales de Jackson/Core, únicamente para continuar los
+despliegues de DEV y QLTY. Se agregan cinco entradas exactas al catálogo;
+las 43 entradas anteriores permanecen intactas. Responsable: `@Duvet05`;
+seguimiento [#323](https://github.com/sihsalus/sihsalus/issues/323). La aceptación
+empieza el **03/10/2026 UTC** y vence el **09/10/2026 UTC**, inclusive.
+
+La evidencia del [Build Backend 37078656482](https://github.com/sihsalus/sihsalus/actions/runs/37078656482)
+corresponde al Dockerfile completo del commit
+`e0645a6e4cc7e1325d49c812d1b7c2f523e71dd3` y al índice inmutable
+`sha256:dfa4649ba5cd586fdd6f45240d4430dc0848b3fa19699a19bad3d3016dec6b15`.
+Trivy 0.74.0 terminó el escaneo el **03/10/2026 a las 00:06:59 UTC**;
+el inventario SPDX contiene 432 paquetes. Encontró 48 alcances Java:
+dos CRITICAL y 46 HIGH, sin hallazgos HIGH/CRITICAL del sistema operativo.
+El control bloqueó cinco alcances que no tenían excepción; esas son exactamente
+las entradas adicionales aceptadas. No se amplía ningún otro alcance.
+
+El catálogo gobierna la publicación del repositorio de imagen y no restringe
+técnicamente el entorno. Esta decisión **no autoriza despliegues en producción**.
+Mantiene la plataforma `linux/amd64`, los paquetes y versiones exactos, la
+comparación con OpenMRS y todos los controles de SBOM, escaneo vigente, firma y
+promoción por digest. El candidato rechazado no se despliega como release.
+
+Antes de intervenir DEV o QLTY se requiere una imagen que haya superado los
+controles de publicación y el smoke de autenticación local y Keycloak del digest
+correspondiente, además del [checklist de despliegue](deploy-checklist.md).
+La aceptación es temporal: no corrige Core ni demuestra que los hallazgos sean
+inexplotables. Retirar cada entrada cuando una release probada del componente
+propietario resuelva su alcance; el día posterior al vencimiento se vuelve a
+bloquear la publicación y cualquier renovación exige otra decisión explícita.
+
 ## Evidencia sin credenciales
 
 El escáner se limita explícitamente a vulnerabilidades. Incluso así, su JSON
