@@ -44,6 +44,14 @@ def project(record, fields):
     return {field: record.get(field) for field in fields}
 
 
+def source_metadata(record):
+    """Omit only OCL's generated export duration; preserve every catalog extra."""
+    result = project(record, SOURCE_FIELDS)
+    if isinstance(result['extras'], dict):
+        result['extras'] = {key: value for key, value in result['extras'].items() if key != '__export_time'}
+    return result
+
+
 def locales(records, text, kind):
     """Locale order may change; text, external UUIDs and retirement must not."""
     fields = (text, kind, 'locale', 'locale_preferred', 'external_id', 'retired', 'retire_reason')
@@ -139,13 +147,14 @@ def main():
         if hashlib.sha256(original).hexdigest() != batch['sha256']:
             raise ValueError('Source metadata checksum mismatch.')
         with ZipFile(io.BytesIO(original)) as archive:
-            expected_source = project(json.loads(archive.read('export.json'))['source'], SOURCE_FIELDS)
+            expected_source = source_metadata(json.loads(archive.read('export.json'))['source'])
         with request(source_path) as response:
             current_source = json.load(response)
         if (current_source['short_code'] != source['source'] or current_source['owner'] != 'SIHSALUS'
                 or current_source['external_id'] != expected_source['external_id']):
             raise ValueError('Source identity differs from the original catalog.')
-        differences = {key: value for key, value in expected_source.items() if current_source.get(key) != value}
+        differences = {key: value for key, value in expected_source.items()
+                       if source_metadata(current_source).get(key) != value}
         if differences and args.restore_source_settings:
             before_path = output / (source['source'] + '-settings-before.json')
             if not before_path.exists():
@@ -155,7 +164,8 @@ def main():
                     raise ValueError('Source settings were not saved.')
             with request(source_path) as response:
                 current_source = json.load(response)
-            differences = {key: value for key, value in expected_source.items() if current_source.get(key) != value}
+            differences = {key: value for key, value in expected_source.items()
+                           if source_metadata(current_source).get(key) != value}
         if differences:
             raise ValueError(source['source'] + ': source settings differ: ' + ', '.join(differences))
         path = source_path + urllib.parse.quote(version, safe='') + '/export/'
@@ -190,7 +200,7 @@ def main():
             raise ValueError('Unexpected source or version in export.')
         if args.published and exported.get('released') != source['released']:
             raise ValueError('Published state differs from the original release.')
-        if args.published and project(exported.get('source') or {}, SOURCE_FIELDS) != expected_source:
+        if args.published and source_metadata(exported.get('source') or {}) != expected_source:
             raise ValueError('Published source settings differ from the original release.')
         for kind in ('concepts', 'mappings'):
             expected = (args.catalogs / source[kind]['file']).read_bytes()
