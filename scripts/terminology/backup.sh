@@ -3,9 +3,11 @@
 set -euo pipefail
 umask 077
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ENV_FILE="${1:?Usage: backup.sh /absolute/private.env /absolute/backup-directory}"
+ENV_FILE="${1:?Usage: backup.sh /absolute/private.env /absolute/backup-directory [resume|leave-stopped]}"
 BACKUP_DIR="${2:?Backup directory required}"
+AFTER_BACKUP="${3:-resume}"
 [[ "$ENV_FILE" = /* && "$BACKUP_DIR" = /* ]] || exit 2
+[[ "$AFTER_BACKUP" == resume || "$AFTER_BACKUP" == leave-stopped ]] || exit 2
 cd "$ROOT_DIR"
 source scripts/deploy/env.sh
 [[ "$(cat /etc/machine-id)" == "$(read_env_value TERMINOLOGY_MACHINE_ID "$ENV_FILE")" ]]
@@ -26,13 +28,17 @@ stopped=false
 resume() {
   result=$?
   trap - EXIT
-  if [[ "$stopped" == true ]]; then
+  # Updates start the new revision next; a failed backup still resumes the old one.
+  if [[ "$stopped" == true && ( "$result" != 0 || "$AFTER_BACKUP" == resume ) ]]; then
     "${COMPOSE[@]}" start storage || result=1
     "${COMPOSE[@]}" start --wait --wait-timeout 180 api worker importer scheduler web || result=1
   fi
   if [[ "$result" == 0 ]]; then
     rm -rf -- "$STAGE"
     printf 'Backup completed: %s\n' "$OUTPUT"
+    if [[ "$AFTER_BACKUP" == leave-stopped ]]; then
+      printf 'Application and object storage remain stopped for the deployment.\n'
+    fi
   else
     printf 'Backup failed; recovery files retained in %s\n' "$STAGE" >&2
   fi

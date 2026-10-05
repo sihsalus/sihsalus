@@ -173,6 +173,11 @@ Comprueba que no haya tareas en curso en PostgreSQL, en ambos workers y en el
 broker; detiene brevemente las escrituras y guarda
 PostgreSQL, objetos, uploads, configuración y referencias de imágenes en un
 archivo cifrado. Restaura el servicio al terminar, incluso si falla la copia.
+Durante una actualización, el despliegue usa `leave-stopped`: una copia correcta
+deja aplicación y almacenamiento detenidos hasta iniciar la nueva revisión,
+evitando arrancar y volver a parar inmediatamente los workers. Si el respaldo
+falla, se intenta reanudar la revisión anterior. El timer usa la reanudación
+normal.
 Instalar el servicio y timer de `terminology/` solo después de probar una copia
 y su restauración: programa las 03:15 de Lima. Conservar una copia cifrada y la
 clave fuera de la VM. Revisar el resultado en `journalctl` y el espacio disponible.

@@ -66,7 +66,7 @@ else
   [[ -f "$ACTIVE_ENV" ]] || fail 'missing configuration of the currently running deployment'
   [[ "$(read_env_value TERMINOLOGY_MACHINE_ID "$ACTIVE_ENV")" == "$EXPECTED_NODE" ]] || fail 'previous deployment belongs to a different node'
   cp "$ACTIVE_ENV" "$STATE_DIR/previous.env"
-  bash scripts/terminology/backup.sh "$ACTIVE_ENV" "$BACKUP_DIR" > "$STATE_DIR/backup.log" 2>&1
+  bash scripts/terminology/backup.sh "$ACTIVE_ENV" "$BACKUP_DIR" leave-stopped > "$STATE_DIR/backup.log" 2>&1
   "${COMPOSE[@]}" stop scheduler web api importer worker
   "${COMPOSE[@]}" up -d --wait --wait-timeout 300 db redis es storage
   "${COMPOSE[@]}" --profile maintenance run --rm --no-deps bootstrap \
