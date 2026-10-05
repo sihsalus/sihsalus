@@ -81,7 +81,7 @@ para comparar códigos, `external_id`, nombres y relaciones después de cargar.
 Los lotes tienen hasta 500 registros para limitar el trabajo por tarea. Esta
 cifra es un límite operativo de importación, no una restricción del catálogo.
 
-Cargar los lotes en el orden del manifiesto mediante `/manage/bulk-import/`, con
+Cargar los lotes en el orden del manifiesto mediante `/importers/bulk-import/`, con
 `parallel=1`: primero todos los conceptos y después todos los mappings. Los ZIP
 de trabajo se marcan `HEAD` para que el importador oficial de OCL no publique una
 versión antes de terminar sus mappings. No cambian los códigos ni los UUID de

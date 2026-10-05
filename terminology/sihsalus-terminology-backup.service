@@ -1,0 +1,15 @@
+[Unit]
+Description=Encrypted SIHSALUS terminology backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=gidis-f1
+WorkingDirectory=/home/gidis-f1/sihsalus-distro
+ExecStart=/bin/bash scripts/terminology/backup.sh /home/gidis-f1/sihsalus-distro/.env.terminology /home/gidis-f1/terminology-backups
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=20min
+UMask=0077
+
