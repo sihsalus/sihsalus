@@ -41,6 +41,8 @@ x-app: &app
     CSRF_TRUSTED_ORIGINS: https://${TERMINOLOGY_HOST},https://${TERMINOLOGY_HOST}:8443
     TRUST_PROXY_HTTPS: "TRUE"
     REQUIRE_AUTHENTICATION: "true"
+    ALLOW_SELF_REGISTRATION: "false"
+    ENABLE_THROTTLING: "true"
     ANALYTICS_API: ""
     EXPORT_SERVICE: core.services.storages.cloud.minio.MinIO
     MINIO_ENDPOINT: storage:9000
