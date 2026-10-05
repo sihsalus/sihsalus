@@ -16,7 +16,7 @@ class TerminologyComposition(unittest.TestCase):
         for key in ("DB_PASSWORD", "SECRET_KEY", "ADMIN_PASSWORD", "ADMIN_TOKEN",
                     "STORAGE_ACCESS_KEY", "STORAGE_SECRET_KEY"):
             env["TERMINOLOGY_" + key] = "synthetic-render-only"
-        for app in ("API", "WEB"):
+        for app in ("API", "WEB", "POSTGRES", "REDIS", "ELASTICSEARCH"):
             env["TERMINOLOGY_" + app + "_IMAGE"] = (
                 "ghcr.io/sihsalus/terminology-" + app.lower() + "@sha256:" + "a" * 64)
         command = ["docker", "compose", "-f", "docker-compose.terminology.yml"]
@@ -40,6 +40,10 @@ class TerminologyComposition(unittest.TestCase):
         self.assertEqual(services["redis"]["command"][-1], "noeviction")
         self.assertIn("bulk_import_root", ",".join(services["importer"]["command"]))
         self.assertIn("concurrent", ",".join(services["worker"]["command"]))
+        for name in ("api", "worker", "importer", "scheduler"):
+            self.assertNotIn("API_SUPERUSER_PASSWORD", services[name]["environment"])
+            self.assertEqual(services[name]["environment"]["ALLOW_SELF_REGISTRATION"], "false")
+            self.assertEqual(services[name]["environment"]["ENABLE_THROTTLING"], "true")
 
     def test_bootstrap_is_explicit_and_bounded(self):
         services = self.render(maintenance=True)

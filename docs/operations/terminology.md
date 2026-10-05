@@ -7,9 +7,13 @@ digest; no se compila en `gidis-terminology`.
 
 ## Preparación
 
-1. Construir y verificar las imágenes API y web en el workflow `Terminology
-   runtime`. Exigir pruebas, análisis de dependencias y escaneo de ambas imágenes
+1. Construir y verificar las imágenes API, web, PostgreSQL, Redis y Elasticsearch
+   en el workflow `Terminology runtime`. Exigir pruebas, análisis de dependencias y escaneo de las imágenes
    satisfactorios en el mismo commit que se despliega.
+   El workflow `Terminology service images` comprueba además el almacenamiento
+   consumido directamente por digest. Las imágenes derivadas conservan las
+   versiones de servicio y actualizan sus dependencias; su arranque se comprueba
+   en CI antes de llegar al host.
 2. Conservar backups cifrados de los volúmenes anteriores fuera de la VM.
    Inspeccionar copias de sus bases antes de seleccionar qué datos migrar.
    No renombrar ni reutilizar automáticamente los volúmenes `ocl_*` o `oclweb2_*`.
@@ -44,6 +48,10 @@ El navegador usa HTTPS en 443, la API en 8443 y las exportaciones firmadas en
 `/terminology-exports/`. Nginx consume servicios ligados a localhost. PostgreSQL,
 Redis y Elasticsearch no publican puertos. Las credenciales iniciales del usuario
 `ocladmin` están en el archivo privado; no se incluyen en logs ni en informes.
+El navegador ofrece acceso con cuentas locales cuando no hay un proveedor OIDC
+configurado. El registro público está deshabilitado; el administrador crea las
+cuentas. La API no instala el middleware que registra cuerpos de peticiones y
+respuestas, pues pueden contener credenciales.
 
 ## Aceptación
 

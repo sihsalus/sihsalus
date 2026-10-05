@@ -27,10 +27,15 @@ jobs:
           export TERMINOLOGY_HOST=terminology.example.org
           export TERMINOLOGY_API_IMAGE=ghcr.io/sihsalus/terminology-api:scan-render-only
           export TERMINOLOGY_WEB_IMAGE=ghcr.io/sihsalus/terminology-web:scan-render-only
+          export TERMINOLOGY_POSTGRES_IMAGE=ghcr.io/sihsalus/terminology-postgres:scan-render-only
+          export TERMINOLOGY_REDIS_IMAGE=ghcr.io/sihsalus/terminology-redis:scan-render-only
+          export TERMINOLOGY_ELASTICSEARCH_IMAGE=ghcr.io/sihsalus/terminology-elasticsearch:scan-render-only
           docker compose --env-file "$RUNNER_TEMP/terminology.env" -f docker-compose.terminology.yml config --format json > "$RUNNER_TEMP/terminology.json"
           mkdir reports
           failed=0
-          for service in db redis es storage; do
+          # The runtime workflow builds and scans the five SIHSALUS images.
+          # Storage is consumed directly from its verified upstream digest.
+          for service in storage; do
             image=$(jq -r --arg service "$service" '.services[$service].image' "$RUNNER_TEMP/terminology.json")
             trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --format json --output "reports/$service.json" "$image" || failed=1
           done

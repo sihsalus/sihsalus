@@ -32,9 +32,9 @@ timeout 15 docker info >/dev/null
 
 COMPOSE=(docker compose --parallel 1 --env-file "$ENV_FILE" -f docker-compose.terminology.yml)
 "${COMPOSE[@]}" config --quiet
-for app in API WEB; do
+for app in API WEB POSTGRES REDIS ELASTICSEARCH; do
   ref="$(read_env_value "TERMINOLOGY_${app}_IMAGE" "$ENV_FILE")"
-  [[ "$ref" =~ ^ghcr\.io/sihsalus/terminology-(api|web)@sha256:[0-9a-f]{64}$ ]] || fail 'image must use a verified digest'
+  [[ "$ref" =~ ^ghcr\.io/sihsalus/terminology-${app,,}@sha256:[0-9a-f]{64}$ ]] || fail 'image must use the expected repository and a verified digest'
 done
 
 STATE_DIR="$ROOT_DIR/.env.terminology-state/$(date -u +%Y%m%dT%H%M%SZ)"
@@ -44,7 +44,7 @@ git rev-parse HEAD > "$STATE_DIR/distro-commit"
 "${COMPOSE[@]}" images --format json > "$STATE_DIR/previous-images.json"
 
 "${COMPOSE[@]}" pull
-for app in API WEB; do
+for app in API WEB POSTGRES REDIS ELASTICSEARCH; do
   ref="$(read_env_value "TERMINOLOGY_${app}_IMAGE" "$ENV_FILE")"
   revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$ref")"
   [[ "$revision" == "$SOURCE_SHA" ]] || fail 'candidate revision differs from requested source commit'

@@ -57,7 +57,7 @@ x-app: &app
 services:
   db:
     <<: *service
-    image: postgres:14.24-alpine@sha256:4ea9e5ed06591da7ea23eb65465e8d3187fe79f4d5ec3ae976d29a33b013e77a
+    image: ${TERMINOLOGY_POSTGRES_IMAGE:?Set the verified PostgreSQL image digest}
     mem_limit: 640m
     cpus: 0.75
     shm_size: 128m
@@ -74,7 +74,7 @@ services:
 
   redis:
     <<: *service
-    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    image: ${TERMINOLOGY_REDIS_IMAGE:?Set the verified Redis image digest}
     mem_limit: 256m
     cpus: 0.25
     command: [redis-server, --appendonly, "yes", --maxmemory, 128mb, --maxmemory-policy, noeviction]
@@ -88,7 +88,7 @@ services:
 
   es:
     <<: *service
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.22@sha256:e98f9c3b09beb2fbb9eaf667d602df3f0e00bd3644138b8458dc17ba1a675595
+    image: ${TERMINOLOGY_ELASTICSEARCH_IMAGE:?Set the verified Elasticsearch image digest}
     mem_limit: 1536m
     cpus: 0.75
     environment:
