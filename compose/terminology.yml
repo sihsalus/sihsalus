@@ -23,6 +23,8 @@ x-app: &app
     DEBUG: "FALSE"
     NO_LM: "TRUE"
     NO_ENCODER: "TRUE"
+    # Bounded migration batches finish within this cache window; reports persist in PostgreSQL.
+    CELERY_RESULT_EXPIRES: "3600"
     DB_HOST: db
     DB_PORT: "5432"
     DB: postgres

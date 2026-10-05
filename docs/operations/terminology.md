@@ -94,6 +94,14 @@ y solo entonces crear las versiones indicadas en el manifiesto y exportarlas.
 El procedimiento inicial requiere fuentes vacías; una actualización de catálogos
 existentes necesita revisar el diff y conservar la versión anterior.
 
+Redis conserva los resultados completados durante una hora; los informes de
+tareas persistentes permanecen en PostgreSQL y los lotes aceptados tienen
+además su resultado en el directorio privado de migración. Esta ventana evita
+acumular copias completas de toda la migración en la memoria del broker.
+Mantener los lotes y sus tareas coordinadoras por debajo de una hora y revisar
+este límite antes de ejecutar importaciones mayores. No se aplica una política
+de expulsión a las colas de Redis.
+
 `import-catalogs.py` conserva el identificador de cada tarea antes de consultar
 su resultado y bloquea una segunda ejecución sobre el mismo directorio.
 Crear un archivo `PAUSE` en el directorio privado de catálogos permite terminar
