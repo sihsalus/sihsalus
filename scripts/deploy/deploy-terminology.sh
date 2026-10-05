@@ -55,6 +55,8 @@ if [[ "$MODE" == bootstrap ]]; then
   [[ -z "$("${COMPOSE[@]}" ps -aq api)" ]] || fail 'bootstrap cannot reset an existing application'
   "${COMPOSE[@]}" up -d --wait --wait-timeout 300 db redis es storage
   "${COMPOSE[@]}" --profile maintenance run --rm --no-deps bootstrap
+  # Create explicit mappings before queued indexing tasks can auto-create indexes.
+  "${COMPOSE[@]}" --profile maintenance run --rm --no-deps bootstrap python manage.py search_index --create
 else
   fail 'Updates require a verified database backup and migration review; use the documented maintenance procedure.'
 fi
