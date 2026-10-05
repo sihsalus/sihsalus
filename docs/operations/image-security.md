@@ -61,19 +61,19 @@ o severidad diferente vuelve a bloquearse. No se admiten comodines.
 
 Cada entrada contiene:
 
-| Campo | Requisito |
-| --- | --- |
-| `id` | Identificador único y estable de la excepción |
-| `repository` | Repositorio exacto, por ejemplo `ghcr.io/sihsalus/sihsalus-backend` |
-| `platform` | `linux/amd64` o `linux/arm64` |
-| `vulnerabilityId` | Identificador exacto informado por Trivy |
-| `packageName`, `installedVersion` | Paquete y versión exactos |
-| `class`, `type` | Clase y ecosistema del informe, por ejemplo `lang-pkgs` / `jar` |
-| `severity` | `HIGH` o `CRITICAL` |
-| `owner` | Usuario o equipo GitHub que asume el seguimiento |
-| `issue` | Issue de SIHSalus que registra decisión, mitigación y resolución |
-| `rationale` | Justificación concreta; sin contraseñas ni configuración privada |
-| `createdOn`, `expiresOn` | Fechas ISO; vencimiento máximo a 30 días de la creación |
+| Campo                             | Requisito                                                           |
+| --------------------------------- | ------------------------------------------------------------------- |
+| `id`                              | Identificador único y estable de la excepción                       |
+| `repository`                      | Repositorio exacto, por ejemplo `ghcr.io/sihsalus/sihsalus-backend` |
+| `platform`                        | `linux/amd64` o `linux/arm64`                                       |
+| `vulnerabilityId`                 | Identificador exacto informado por Trivy                            |
+| `packageName`, `installedVersion` | Paquete y versión exactos                                           |
+| `class`, `type`                   | Clase y ecosistema del informe, por ejemplo `lang-pkgs` / `jar`     |
+| `severity`                        | `HIGH` o `CRITICAL`                                                 |
+| `owner`                           | Usuario o equipo GitHub que asume el seguimiento                    |
+| `issue`                           | Issue de SIHSalus que registra decisión, mitigación y resolución    |
+| `rationale`                       | Justificación concreta; sin contraseñas ni configuración privada    |
+| `createdOn`, `expiresOn`          | Fechas ISO; vencimiento máximo a 30 días de la creación             |
 
 Las fechas se evalúan en UTC, incluyendo el día de vencimiento. El día siguiente
 la excepción falla, aunque la imagen o el paquete no hayan cambiado. Una entrada
@@ -111,6 +111,76 @@ Retirar cada entrada al publicar y verificar la corrección en el componente
 propietario. Si vence sin corrección, la publicación vuelve a bloquearse;
 renovar exige una nueva decisión explícita. Retirar las entradas revoca futuras
 promociones, pero no modifica imágenes ya publicadas ni revierte despliegues.
+
+## Revisión y renovación propuesta del 02/10/2026
+
+El mantenedor pidió actualizar los paquetes de la imagen y revisar el catálogo
+vencido en [PR #345](https://github.com/sihsalus/sihsalus/pull/345). La revisión
+propone renovar únicamente las 43 entradas anteriores, conservando IDs,
+responsable, issue y todos sus campos de alcance. La nueva vigencia empieza el
+**02/10/2026** y termina el **09/10/2026 UTC**, inclusive; no es una renovación
+automática ni una ampliación a paquetes o hallazgos nuevos.
+
+La comparación aislada de DEV usó el backend existente de main, los OMOD
+oficiales Attachments 4.1.0 y Authentication 2.4.0, y el bloque de actualización
+de paquetes del Dockerfile revisado. Trivy 0.74.0 descargó bases nuevas y terminó
+el escaneo el **02/10/2026 a las 23:07 UTC**, incluyendo HIGH/CRITICAL sin
+corrección disponible. La imagen local de comparación fue
+`sha256:59468213bcf725bd18f67bacbecb1e78f689e19215ba053491e4849a4ac022d8`.
+La evidencia depurada confirmó:
+
+- Cero hallazgos HIGH/CRITICAL del sistema operativo; `curl` y `libcurl` quedaron
+  en `8.3.0-1.amzn2.0.13`.
+- Las 43 entradas anteriores todavía coinciden exactamente: dos CRITICAL y
+  41 HIGH Java. No hubo entradas obsoletas que retirar.
+- Cinco alcances HIGH Java adicionales quedan fuera del catálogo y siguen
+  bloqueando la publicación. Esta revisión no los acepta ni los oculta.
+
+La línea oficial de Core mantiene 2.8.9 como último tag 2.8 disponible en esta
+revisión. Las correcciones Java requieren una release validada en el componente
+propietario; se conserva [#323](https://github.com/sihsalus/sihsalus/issues/323)
+como seguimiento. La renovación temporal no corrige esas dependencias ni
+demuestra que sean inexplotables. Su incorporación requiere revisión del PR.
+
+Esta comparación local no tiene índice de release, SBOM adjunto ni firma y no
+sirve como evidencia de promoción. El CI del PR debe construir el Dockerfile
+completo y pasar el control de vulnerabilidades corregibles y la comparación
+con OpenMRS. La publicación sigue exigiendo su propio escaneo del digest
+inmutable, SBOM, política completa y firma. No se autorizan merge, despliegue
+ni ampliación de aceptación por este cambio.
+
+## Aceptación adicional para DEV y QLTY del 03/10/2026 UTC
+
+Después del merge de PR #345, el mantenedor aceptó expresamente los cinco
+hallazgos HIGH adicionales de Jackson/Core, únicamente para continuar los
+despliegues de DEV y QLTY. Se agregan cinco entradas exactas al catálogo;
+las 43 entradas anteriores permanecen intactas. Responsable: `@Duvet05`;
+seguimiento [#323](https://github.com/sihsalus/sihsalus/issues/323). La aceptación
+empieza el **03/10/2026 UTC** y vence el **09/10/2026 UTC**, inclusive.
+
+La evidencia del [Build Backend 37078656482](https://github.com/sihsalus/sihsalus/actions/runs/37078656482)
+corresponde al Dockerfile completo del commit
+`e0645a6e4cc7e1325d49c812d1b7c2f523e71dd3` y al índice inmutable
+`sha256:dfa4649ba5cd586fdd6f45240d4430dc0848b3fa19699a19bad3d3016dec6b15`.
+Trivy 0.74.0 terminó el escaneo el **03/10/2026 a las 00:06:59 UTC**;
+el inventario SPDX contiene 432 paquetes. Encontró 48 alcances Java:
+dos CRITICAL y 46 HIGH, sin hallazgos HIGH/CRITICAL del sistema operativo.
+El control bloqueó cinco alcances que no tenían excepción; esas son exactamente
+las entradas adicionales aceptadas. No se amplía ningún otro alcance.
+
+El catálogo gobierna la publicación del repositorio de imagen y no restringe
+técnicamente el entorno. Esta decisión **no autoriza despliegues en producción**.
+Mantiene la plataforma `linux/amd64`, los paquetes y versiones exactos, la
+comparación con OpenMRS y todos los controles de SBOM, escaneo vigente, firma y
+promoción por digest. El candidato rechazado no se despliega como release.
+
+Antes de intervenir DEV o QLTY se requiere una imagen que haya superado los
+controles de publicación y el smoke de autenticación local y Keycloak del digest
+correspondiente, además del [checklist de despliegue](deploy-checklist.md).
+La aceptación es temporal: no corrige Core ni demuestra que los hallazgos sean
+inexplotables. Retirar cada entrada cuando una release probada del componente
+propietario resuelva su alcance; el día posterior al vencimiento se vuelve a
+bloquear la publicación y cualquier renovación exige otra decisión explícita.
 
 ## Evidencia sin credenciales
 

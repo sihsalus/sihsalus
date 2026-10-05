@@ -13,9 +13,9 @@
       "severity": "CRITICAL",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2020-13936-936ebb90",
@@ -29,9 +29,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2022-3509-270c3622",
@@ -45,9 +45,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2022-3510-270c3622",
@@ -61,9 +61,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2023-22102-835393ac",
@@ -77,9 +77,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2023-49735-4396710d",
@@ -93,9 +93,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2023-5236-2c4fd1e8",
@@ -109,9 +109,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2024-22243-a5563be9",
@@ -125,9 +125,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2024-22259-a5563be9",
@@ -141,9 +141,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2024-22262-a5563be9",
@@ -157,9 +157,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2024-38816-edb01766",
@@ -173,9 +173,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2024-38819-edb01766",
@@ -189,9 +189,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2024-7254-270c3622",
@@ -205,9 +205,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2025-41249-25215b40",
@@ -221,9 +221,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2025-55163-c1ef163e",
@@ -237,9 +237,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-0603-93b3ce50",
@@ -253,9 +253,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-27727-d2b6dc06",
@@ -269,9 +269,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-27830-cf60ae96",
@@ -285,9 +285,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-33870-c2f15264",
@@ -301,9 +301,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-33871-c1ef163e",
@@ -317,9 +317,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-41842-edb01766",
@@ -333,9 +333,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-41845-edb01766",
@@ -349,9 +349,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-41849-b923e60e",
@@ -365,9 +365,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-41850-b923e60e",
@@ -381,9 +381,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-42198-c84c3810",
@@ -397,9 +397,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-42583-72609bae",
@@ -413,9 +413,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-42584-c2f15264",
@@ -429,9 +429,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-42587-c2f15264",
@@ -445,9 +445,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-42587-c1ef163e",
@@ -461,9 +461,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-44249-d8dcdcfe",
@@ -477,9 +477,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-45416-d8dcdcfe",
@@ -493,9 +493,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-50010-d8dcdcfe",
@@ -509,9 +509,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-54291-c84c3810",
@@ -525,9 +525,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-54512-20f7863f",
@@ -541,9 +541,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-54513-20f7863f",
@@ -557,9 +557,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-55153-d2b6dc06",
@@ -573,9 +573,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-55831-c2f15264",
@@ -589,9 +589,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-55833-c2f15264",
@@ -605,9 +605,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-56745-c2f15264",
@@ -621,9 +621,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-56819-c1ef163e",
@@ -637,9 +637,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-59901-72609bae",
@@ -653,9 +653,9 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-cve-2026-75595-d8dcdcfe",
@@ -669,9 +669,9 @@
       "severity": "CRITICAL",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
     },
     {
       "id": "backend-323-ghsa-r7wm-3cxj-wff9-22247f9b",
@@ -685,9 +685,89 @@
       "severity": "HIGH",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Temporary acceptance explicitly authorized by the maintainer on 2026-09-23 to unblock backend publication and QLTY validation. This exact upstream Java finding was recorded by run 35887356865; remediation remains tracked in #323. This acceptance does not claim the dependency is fixed or authorize a production deployment.",
-      "createdOn": "2026-09-23",
-      "expiresOn": "2026-09-30"
+      "rationale": "Renewal requested by the maintainer on 2026-10-02 for PR #345 after a fresh Trivy 0.74.0 DEV comparison confirmed this exact finding. It remains in the Core 2.8.9 dependency inventory; remediation requires a tested owning-component release tracked in #323. Limited acceptance through 2026-10-09; no claim of remediation, coverage of new findings, or production deployment approval.",
+      "createdOn": "2026-10-02",
+      "expiresOn": "2026-10-09"
+    },
+    {
+      "id": "backend-323-cve-2026-68497-55755e73",
+      "repository": "ghcr.io/sihsalus/sihsalus-backend",
+      "platform": "linux/amd64",
+      "vulnerabilityId": "CVE-2026-68497",
+      "packageName": "com.fasterxml.jackson.core:jackson-databind",
+      "installedVersion": "2.19.1",
+      "class": "lang-pkgs",
+      "type": "jar",
+      "severity": "HIGH",
+      "owner": "@Duvet05",
+      "issue": "https://github.com/sihsalus/sihsalus/issues/323",
+      "rationale": "Explicit maintainer acceptance on 2026-10-03 UTC for this additional exact HIGH finding, limited to DEV and QLTY through 2026-10-09 UTC inclusive. Build Backend run 37078656482 scanned the immutable Core 2.8.9 inventory with Trivy 0.74.0. A tested owning-component release is tracked in #323. This acceptance does not remediate the dependency or authorize production deployment.",
+      "createdOn": "2026-10-03",
+      "expiresOn": "2026-10-09"
+    },
+    {
+      "id": "backend-323-cve-2026-89407-d70a8a65",
+      "repository": "ghcr.io/sihsalus/sihsalus-backend",
+      "platform": "linux/amd64",
+      "vulnerabilityId": "CVE-2026-89407",
+      "packageName": "com.fasterxml.jackson.core:jackson-core",
+      "installedVersion": "2.19.1",
+      "class": "lang-pkgs",
+      "type": "jar",
+      "severity": "HIGH",
+      "owner": "@Duvet05",
+      "issue": "https://github.com/sihsalus/sihsalus/issues/323",
+      "rationale": "Explicit maintainer acceptance on 2026-10-03 UTC for this additional exact HIGH finding, limited to DEV and QLTY through 2026-10-09 UTC inclusive. Build Backend run 37078656482 scanned the immutable Core 2.8.9 inventory with Trivy 0.74.0. A tested owning-component release is tracked in #323. This acceptance does not remediate the dependency or authorize production deployment.",
+      "createdOn": "2026-10-03",
+      "expiresOn": "2026-10-09"
+    },
+    {
+      "id": "backend-323-cve-2026-89425-d70a8a65",
+      "repository": "ghcr.io/sihsalus/sihsalus-backend",
+      "platform": "linux/amd64",
+      "vulnerabilityId": "CVE-2026-89425",
+      "packageName": "com.fasterxml.jackson.core:jackson-core",
+      "installedVersion": "2.19.1",
+      "class": "lang-pkgs",
+      "type": "jar",
+      "severity": "HIGH",
+      "owner": "@Duvet05",
+      "issue": "https://github.com/sihsalus/sihsalus/issues/323",
+      "rationale": "Explicit maintainer acceptance on 2026-10-03 UTC for this additional exact HIGH finding, limited to DEV and QLTY through 2026-10-09 UTC inclusive. Build Backend run 37078656482 scanned the immutable Core 2.8.9 inventory with Trivy 0.74.0. A tested owning-component release is tracked in #323. This acceptance does not remediate the dependency or authorize production deployment.",
+      "createdOn": "2026-10-03",
+      "expiresOn": "2026-10-09"
+    },
+    {
+      "id": "backend-323-cve-2026-91776-55755e73",
+      "repository": "ghcr.io/sihsalus/sihsalus-backend",
+      "platform": "linux/amd64",
+      "vulnerabilityId": "CVE-2026-91776",
+      "packageName": "com.fasterxml.jackson.core:jackson-databind",
+      "installedVersion": "2.19.1",
+      "class": "lang-pkgs",
+      "type": "jar",
+      "severity": "HIGH",
+      "owner": "@Duvet05",
+      "issue": "https://github.com/sihsalus/sihsalus/issues/323",
+      "rationale": "Explicit maintainer acceptance on 2026-10-03 UTC for this additional exact HIGH finding, limited to DEV and QLTY through 2026-10-09 UTC inclusive. Build Backend run 37078656482 scanned the immutable Core 2.8.9 inventory with Trivy 0.74.0. A tested owning-component release is tracked in #323. This acceptance does not remediate the dependency or authorize production deployment.",
+      "createdOn": "2026-10-03",
+      "expiresOn": "2026-10-09"
+    },
+    {
+      "id": "backend-323-cve-2026-91777-55755e73",
+      "repository": "ghcr.io/sihsalus/sihsalus-backend",
+      "platform": "linux/amd64",
+      "vulnerabilityId": "CVE-2026-91777",
+      "packageName": "com.fasterxml.jackson.core:jackson-databind",
+      "installedVersion": "2.19.1",
+      "class": "lang-pkgs",
+      "type": "jar",
+      "severity": "HIGH",
+      "owner": "@Duvet05",
+      "issue": "https://github.com/sihsalus/sihsalus/issues/323",
+      "rationale": "Explicit maintainer acceptance on 2026-10-03 UTC for this additional exact HIGH finding, limited to DEV and QLTY through 2026-10-09 UTC inclusive. Build Backend run 37078656482 scanned the immutable Core 2.8.9 inventory with Trivy 0.74.0. A tested owning-component release is tracked in #323. This acceptance does not remediate the dependency or authorize production deployment.",
+      "createdOn": "2026-10-03",
+      "expiresOn": "2026-10-09"
     }
   ]
 }
