@@ -43,6 +43,7 @@ def prepare(repo, revision, output, batch_size):
         name = source['short_code']
         entry = sources.setdefault(name, {
             'owner': source['owner'], 'source': name, 'version': export['version'],
+            'released': export.get('released', False), 'version_description': export.get('description'),
             'concepts': [], 'mappings': [], 'inputs': [],
         })
         if entry['version'] != export['version']:
