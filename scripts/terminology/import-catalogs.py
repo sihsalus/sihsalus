@@ -26,6 +26,8 @@ def main():
     parser.add_argument('--env', type=Path, required=True)
     parser.add_argument('--catalogs', type=Path, required=True)
     parser.add_argument('--limit', type=int, default=0, help='Maximum new batches in this invocation; 0 loads all.')
+    parser.add_argument('--parallel', type=int, choices=(1, 2), default=2,
+                        help='At most two execution tasks share the existing CPU and memory limits.')
     args = parser.parse_args()
     os.umask(0o077)
     if args.env.stat().st_mode & 0o077:
@@ -90,7 +92,7 @@ def main():
             save()
             boundary = 'terminology-' + uuid.uuid4().hex
             body = (
-                f'--{boundary}\r\nContent-Disposition: form-data; name="parallel"\r\n\r\n1\r\n'
+                f'--{boundary}\r\nContent-Disposition: form-data; name="parallel"\r\n\r\n{args.parallel}\r\n'
                 f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="export.zip"\r\n'
                 'Content-Type: application/zip\r\n\r\n'
             ).encode() + raw + f'\r\n--{boundary}--\r\n'.encode()

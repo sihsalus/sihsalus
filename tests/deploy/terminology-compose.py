@@ -42,6 +42,10 @@ class TerminologyComposition(unittest.TestCase):
         self.assertEqual(services["web"]["environment"]["API_URL"], "https://api.terminology.example.org")
         self.assertIn("bulk_import_root", ",".join(services["importer"]["command"]))
         self.assertIn("concurrent", ",".join(services["worker"]["command"]))
+        self.assertEqual(services["worker"]["command"][0], "celery")
+        self.assertEqual(services["worker"]["command"][-1], "2")
+        self.assertEqual(services["importer"]["command"][0], "celery")
+        self.assertEqual(services["importer"]["command"][-1], "1")
         for name in ("api", "worker", "importer", "scheduler"):
             self.assertNotIn("API_SUPERUSER_PASSWORD", services[name]["environment"])
             self.assertEqual(services[name]["environment"]["ALLOW_SELF_REGISTRATION"], "false")

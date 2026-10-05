@@ -84,7 +84,9 @@ Los lotes tienen hasta 500 registros para limitar el trabajo por tarea. Esta
 cifra es un límite operativo de importación, no una restricción del catálogo.
 
 Cargar los lotes en el orden del manifiesto mediante `/importers/bulk-import/`, con
-`parallel=1`: primero todos los conceptos y después todos los mappings. Los ZIP
+`parallel=2`: primero todos los conceptos y después todos los mappings. Los dos
+procesos comparten el límite de CPU y memoria del worker; el coordinador usa un
+proceso separado. Celery recibe directamente las señales de parada de Docker. Los ZIP
 de trabajo se marcan `HEAD` para que el importador oficial de OCL no publique una
 versión antes de terminar sus mappings. No cambian los códigos ni los UUID de
 los registros. Comprobar cada resultado, reconciliar los registros persistidos

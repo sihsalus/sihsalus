@@ -162,10 +162,8 @@ services:
     <<: *app
     mem_limit: 768m
     cpus: 1.0
-    environment:
-      <<: *app-env
-      CELERY_WORKER_NAME: executor
-    command: [bash, ./start_celery_worker.sh, -P, prefork, -Q, "default,indexing,concurrent", -c, "1"]
+    # Direct PID 1 receives Docker's stop signal and finishes active tasks gracefully.
+    command: [celery, -A, core, worker, -n, "executor@%h", --loglevel=INFO, -E, -P, prefork, -Q, "default,indexing,concurrent", -c, "2"]
     depends_on:
       api: {condition: service_healthy}
 
@@ -173,11 +171,8 @@ services:
     <<: *app
     mem_limit: 384m
     cpus: 0.50
-    environment:
-      <<: *app-env
-      CELERY_WORKER_NAME: importer
     # Import coordinators wait for tasks on concurrent; keep separate consumers.
-    command: [bash, ./start_celery_worker.sh, -P, prefork, -Q, "bulk_import_root,bulk_import_0,bulk_import_1,bulk_import_2,bulk_import_3", -c, "1"]
+    command: [celery, -A, core, worker, -n, "importer@%h", --loglevel=INFO, -E, -P, prefork, -Q, "bulk_import_root,bulk_import_0,bulk_import_1,bulk_import_2,bulk_import_3", -c, "1"]
     depends_on:
       api: {condition: service_healthy}
 
