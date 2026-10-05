@@ -43,6 +43,8 @@ x-app: &app
     REQUIRE_AUTHENTICATION: "true"
     ALLOW_SELF_REGISTRATION: "false"
     ENABLE_THROTTLING: "true"
+    # Managed accounts use administrator support until an SMTP service is configured.
+    EMAIL_BACKEND: django.core.mail.backends.dummy.EmailBackend
     ANALYTICS_API: ""
     EXPORT_SERVICE: core.services.storages.cloud.minio.MinIO
     MINIO_ENDPOINT: storage:9000

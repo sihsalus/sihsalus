@@ -50,7 +50,8 @@ Redis y Elasticsearch no publican puertos. Las credenciales iniciales del usuari
 `ocladmin` están en el archivo privado; no se incluyen en logs ni en informes.
 El navegador ofrece acceso con cuentas locales cuando no hay un proveedor OIDC
 configurado. El registro público está deshabilitado; el administrador crea las
-cuentas. La API no instala el middleware que registra cuerpos de peticiones y
+cuentas. El envío de correo está desactivado hasta configurar y autorizar un
+servicio SMTP; el acceso local usa el soporte del administrador. La API no instala el middleware que registra cuerpos de peticiones y
 respuestas, pues pueden contener credenciales.
 
 ## Aceptación
