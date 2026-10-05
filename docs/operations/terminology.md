@@ -92,9 +92,25 @@ existentes necesita revisar el diff y conservar la versión anterior.
 
 ## Actualización y recuperación
 
-El script de bootstrap no es una actualización de un servicio existente. La
-operación de actualización debe guardar la configuración e imágenes anteriores,
-respaldar PostgreSQL y los objetos, y revisar las migraciones antes de sustituir
-la API. Volver a una imagen no revierte el esquema de PostgreSQL. Si una migración
+```sh
+bash scripts/deploy/deploy-terminology.sh /ruta/privada/.env.terminology update /ruta/privada/backups
+```
+
+La actualización conserva la configuración anterior registrada en `active.env`,
+ejecuta un respaldo cifrado, guarda el plan de migraciones y aplica únicamente
+las migraciones. No vuelve a cargar fixtures ni restablece la cuenta inicial.
+Revisar las migraciones del cambio antes de ejecutar el comando. Una migración
+fallida deja los servicios de aplicación detenidos para conservar el estado de
+recuperación; inspeccionar el journal antes de reintentar. Volver a una imagen no
+revierte el esquema de PostgreSQL. Si una migración
 no permite retroceso, restaurar la copia en volúmenes nuevos y verificarla antes
 de cambiar el servicio activo. Nunca usar `down -v` ni podas globales de Docker.
+
+El respaldo requiere `recovery.key` con permisos 600 en el directorio privado.
+Comprueba que no haya tareas en curso, detiene brevemente las escrituras y guarda
+PostgreSQL, objetos, uploads, configuración y referencias de imágenes en un
+archivo cifrado. Restaura el servicio al terminar, incluso si falla la copia.
+Instalar el servicio y timer de `terminology/` solo después de probar una copia
+y su restauración: programa las 03:15 de Lima. Conservar una copia cifrada y la
+clave fuera de la VM. Revisar el resultado en `journalctl` y el espacio disponible;
+este procedimiento no elimina automáticamente copias anteriores.

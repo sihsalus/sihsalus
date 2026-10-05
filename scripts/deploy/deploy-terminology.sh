@@ -4,10 +4,14 @@ set -euo pipefail
 umask 077
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ENV_FILE="${1:?Usage: deploy-terminology.sh /absolute/private.env [bootstrap|update]}"
+ENV_FILE="${1:?Usage: deploy-terminology.sh /absolute/private.env [bootstrap|update] [/absolute/backup-directory]}"
 MODE="${2:-update}"
+BACKUP_DIR="${3:-}"
 [[ "$ENV_FILE" = /* && -f "$ENV_FILE" ]] || { echo 'An absolute private env file is required.' >&2; exit 1; }
 [[ "$MODE" == bootstrap || "$MODE" == update ]] || exit 2
+[[ "$MODE" == bootstrap || ( "$BACKUP_DIR" = /* && -d "$BACKUP_DIR" ) ]] || {
+  echo 'Updates require an absolute backup directory with recovery.key.' >&2; exit 2;
+}
 cd "$ROOT_DIR"
 # shellcheck source=env.sh
 source "$ROOT_DIR/scripts/deploy/env.sh"
@@ -38,6 +42,7 @@ for app in API WEB POSTGRES REDIS ELASTICSEARCH; do
 done
 
 STATE_DIR="$ROOT_DIR/.env.terminology-state/$(date -u +%Y%m%dT%H%M%SZ)"
+ACTIVE_ENV="$ROOT_DIR/.env.terminology-state/active.env"
 mkdir -p "$STATE_DIR"
 cp "$ENV_FILE" "$STATE_DIR/target.env"
 git rev-parse HEAD > "$STATE_DIR/distro-commit"
@@ -58,11 +63,21 @@ if [[ "$MODE" == bootstrap ]]; then
   # Create explicit mappings before queued indexing tasks can auto-create indexes.
   "${COMPOSE[@]}" --profile maintenance run --rm --no-deps bootstrap python manage.py search_index --create
 else
-  fail 'Updates require a verified database backup and migration review; use the documented maintenance procedure.'
+  [[ -f "$ACTIVE_ENV" ]] || fail 'missing configuration of the currently running deployment'
+  [[ "$(read_env_value TERMINOLOGY_MACHINE_ID "$ACTIVE_ENV")" == "$EXPECTED_NODE" ]] || fail 'previous deployment belongs to a different node'
+  cp "$ACTIVE_ENV" "$STATE_DIR/previous.env"
+  bash scripts/terminology/backup.sh "$ACTIVE_ENV" "$BACKUP_DIR" > "$STATE_DIR/backup.log" 2>&1
+  "${COMPOSE[@]}" stop scheduler web api importer worker
+  "${COMPOSE[@]}" up -d --wait --wait-timeout 300 db redis es storage
+  "${COMPOSE[@]}" --profile maintenance run --rm --no-deps bootstrap \
+    python manage.py migrate --plan > "$STATE_DIR/migration-plan.log" 2>&1
+  # Updates run migrations only: fixtures and setup_superuser would reset managed data.
+  "${COMPOSE[@]}" --profile maintenance run --rm --no-deps bootstrap python manage.py migrate
 fi
 
 "${COMPOSE[@]}" up -d --no-deps --wait --wait-timeout 180 api
 "${COMPOSE[@]}" up -d --no-deps worker importer scheduler
 "${COMPOSE[@]}" up -d --no-deps --wait --wait-timeout 60 web
 "${COMPOSE[@]}" ps
+cp "$ENV_FILE" "$ACTIVE_ENV"
 printf 'Runtime started. Complete authenticated functional checks before accepting this deployment.\n'
