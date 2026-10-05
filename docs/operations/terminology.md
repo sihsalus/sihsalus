@@ -102,6 +102,19 @@ Mantener los lotes y sus tareas coordinadoras por debajo de una hora y revisar
 este límite antes de ejecutar importaciones mayores. No se aplica una política
 de expulsión a las colas de Redis.
 
+El ejecutor prefork reutiliza conexiones PostgreSQL durante 60 segundos mediante
+`DB_CONN_MAX_AGE`. Django comprueba su salud y el ciclo de tareas de Celery cierra
+las conexiones caducadas o inutilizables. La API, el coordinador y el scheduler
+conservan el valor predeterminado cero. Se mantienen dos procesos ejecutores y
+el máximo de 40 conexiones de PostgreSQL; comprobar conexiones activas, recursos
+y rendimiento real después de una actualización de Django o Celery.
+
+Aceptar un lote no significa que hayan terminado todas sus tareas derivadas.
+Antes de publicar o respaldar, comprobar también los workers y las colas.
+Si una exportación espera detrás de miles de actualizaciones de relaciones,
+mantener la importación pausada hasta completar la comparación; conservar el
+identificador de la tarea y revisar su estado antes de reenviar una operación.
+
 `import-catalogs.py` conserva el identificador de cada tarea antes de consultar
 su resultado y bloquea una segunda ejecución sobre el mismo directorio.
 Crear un archivo `PAUSE` en el directorio privado de catálogos permite terminar

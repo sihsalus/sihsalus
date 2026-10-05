@@ -164,6 +164,10 @@ services:
     <<: *app
     mem_limit: 768m
     cpus: 1.0
+    environment:
+      <<: *app-env
+      # Reuse connections only in the bounded prefork executor processes.
+      DB_CONN_MAX_AGE: "60"
     # Direct PID 1 receives Docker's stop signal and finishes active tasks gracefully.
     command: [celery, -A, core, worker, -n, "executor@%h", --loglevel=INFO, -E, -P, prefork, -Q, "default,indexing,concurrent", -c, "2"]
     depends_on:
