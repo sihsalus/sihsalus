@@ -113,5 +113,8 @@ PostgreSQL, objetos, uploads, configuración y referencias de imágenes en un
 archivo cifrado. Restaura el servicio al terminar, incluso si falla la copia.
 Instalar el servicio y timer de `terminology/` solo después de probar una copia
 y su restauración: programa las 03:15 de Lima. Conservar una copia cifrada y la
-clave fuera de la VM. Revisar el resultado en `journalctl` y el espacio disponible;
-este procedimiento no elimina automáticamente copias anteriores.
+clave fuera de la VM. Revisar el resultado en `journalctl` y el espacio disponible.
+La retención predeterminada es de 14 copias `runtime-*` y solo se aplica después
+de verificar una copia nueva; `TERMINOLOGY_BACKUP_KEEP` permite ajustarla (mínimo
+dos). Los backups del despliegue anterior `legacy-*` se conservan. El respaldo
+no comienza si quedan menos de 10 GiB libres para proteger la capacidad del host.

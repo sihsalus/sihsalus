@@ -10,7 +10,10 @@ cd "$ROOT_DIR"
 source scripts/deploy/env.sh
 [[ "$(cat /etc/machine-id)" == "$(read_env_value TERMINOLOGY_MACHINE_ID "$ENV_FILE")" ]]
 [[ -f "$BACKUP_DIR/recovery.key" && "$(stat -c '%a' "$BACKUP_DIR/recovery.key")" == 600 ]]
-[[ "$(df -Pk "$BACKUP_DIR" | awk 'NR==2 {print $4}')" -ge 2097152 ]]
+[[ "$(df -Pk "$BACKUP_DIR" | awk 'NR==2 {print $4}')" -ge 10485760 ]]
+KEEP_COPIES="$(read_env_value TERMINOLOGY_BACKUP_KEEP "$ENV_FILE")"
+KEEP_COPIES="${KEEP_COPIES:-14}"
+[[ "$KEEP_COPIES" =~ ^[0-9]+$ && "$KEEP_COPIES" -ge 2 ]]
 COMPOSE=(docker compose --env-file "$ENV_FILE" -f docker-compose.terminology.yml)
 "${COMPOSE[@]}" config --quiet
 
@@ -60,3 +63,15 @@ openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass "file:$BACKUP_DIR/recover
   -in "$OUTPUT.partial" | tar -tf - > /dev/null
 mv "$OUTPUT.partial" "$OUTPUT"
 sha256sum "$OUTPUT" > "$OUTPUT.sha256"
+python3 - "$BACKUP_DIR" "$KEEP_COPIES" <<'PY'
+from pathlib import Path
+import re
+import sys
+directory = Path(sys.argv[1])
+backups = sorted(path for path in directory.iterdir()
+                 if re.fullmatch(r'runtime-[0-9]{8}T[0-9]{6}Z\.tar\.enc', path.name)
+                 and path.is_file() and not path.is_symlink())
+for old in backups[:-int(sys.argv[2])]:
+    old.unlink()
+    old.with_name(old.name + '.sha256').unlink(missing_ok=True)
+PY
