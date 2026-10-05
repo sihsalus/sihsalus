@@ -26,6 +26,26 @@ cookie_secret() {
   openssl rand -base64 32 | tr -- '+/' '-_' | tr -d '\n'
 }
 
+if [[ "${2:-}" == terminology ]]; then
+  cat > "$OUTPUT_FILE" <<EOF
+# Private terminology configuration. Complete public deployment metadata below.
+TERMINOLOGY_HOST=
+TERMINOLOGY_MACHINE_ID=
+TERMINOLOGY_SOURCE_SHA=
+TERMINOLOGY_API_IMAGE=
+TERMINOLOGY_WEB_IMAGE=
+TERMINOLOGY_DB_PASSWORD=$(secret)
+TERMINOLOGY_SECRET_KEY=$(secret)$(secret)
+TERMINOLOGY_ADMIN_PASSWORD=$(secret)
+TERMINOLOGY_ADMIN_TOKEN=$(openssl rand -hex 20)
+TERMINOLOGY_STORAGE_ACCESS_KEY=$(openssl rand -hex 12)
+TERMINOLOGY_STORAGE_SECRET_KEY=$(secret)
+EOF
+  chmod 600 "$OUTPUT_FILE"
+  printf 'Created private terminology configuration: %s\n' "$OUTPUT_FILE"
+  exit 0
+fi
+
 MYSQL_OPENMRS_PASSWORD="$(secret)"
 MYSQL_ROOT_PASSWORD="$(secret)"
 OMRS_DB_REPL_PASSWORD="$(secret)"

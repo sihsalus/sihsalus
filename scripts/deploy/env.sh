@@ -3,7 +3,7 @@
 # deployment scripts. Never source an environment file as shell code.
 
 read_env_value() {
-  local key="$1"
+  local key="$1" env_file="${2:-.env}"
   [[ "$key" =~ ^[A-Z][A-Z0-9_]*$ ]] || return 2
   awk -v key="$key" '
     $0 ~ ("^[[:space:]]*(export[[:space:]]+)?" key "[[:space:]]*=") {
@@ -21,7 +21,7 @@ read_env_value() {
       }
     }
     END { print value }
-  ' .env
+  ' "$env_file"
 }
 
 write_env_value() {

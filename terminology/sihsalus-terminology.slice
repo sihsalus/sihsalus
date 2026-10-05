@@ -1,0 +1,14 @@
+[Unit]
+Description=Resource budget for SIHSALUS Terminology
+
+[Slice]
+CPUAccounting=true
+CPUQuota=150%
+MemoryAccounting=true
+MemoryHigh=4608M
+MemoryMax=5G
+MemorySwapMax=1G
+TasksMax=1024
+
+[Install]
+WantedBy=multi-user.target

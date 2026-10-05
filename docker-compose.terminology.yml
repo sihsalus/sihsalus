@@ -1,0 +1,4 @@
+# Dedicated terminology host: this entry point never includes the clinical stack.
+name: sihsalus-terminology
+include:
+  - compose/terminology.yml

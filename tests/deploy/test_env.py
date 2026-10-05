@@ -45,6 +45,12 @@ class DeploymentEnvironment(unittest.TestCase):
         self.assertEqual(self.call("write_env_value", "SIHSALUS_NODE_ID", "node-id").returncode, 0)
         self.assertEqual(self.call("read_env_value", "SIHSALUS_NODE_ID").stdout, "node-id\n")
 
+    def test_read_explicit_environment_leaves_clinical_file_unchanged(self):
+        other = self.root / ".env.terminology"
+        other.write_text("BACKEND_TAG=independent\n")
+        self.assertEqual(self.call("read_env_value", "BACKEND_TAG", str(other)).stdout, "independent\n")
+        self.assertEqual(self.env_file.read_text(), self.original)
+
     def test_failed_replace_preserves_original_and_cleans_temporary(self):
         binary = self.root / "bin"
         binary.mkdir()

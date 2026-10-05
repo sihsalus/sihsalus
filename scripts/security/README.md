@@ -21,6 +21,11 @@ El archivo contiene credenciales para el core y los perfiles opcionales. Antes d
 3. Define `COMPOSE_FILE` y `COMPOSE_PROFILES` para el stack del servidor.
 4. Guarda una copia cifrada en el gestor de secretos institucional.
 
+Para el host independiente de terminología, usa
+`./scripts/security/secrets_generate.sh .env.terminology terminology`. Genera
+solamente sus credenciales y deja vacíos el hostname, la identidad del nodo,
+el commit fuente y los digests que deben completar la release verificada.
+
 No se crean archivos duplicados bajo `secrets/`: `.env.production` es la única salida local y ya está excluida de Git.
 
 El archivo generado usa `DEPLOYMENT_ENV=production` y conserva `latest` como marcador visible. `security-audit.sh` fallará hasta reemplazar esos tags por versiones inmutables; esto evita desplegar accidentalmente una imagen distinta durante un recreate o rollback.
