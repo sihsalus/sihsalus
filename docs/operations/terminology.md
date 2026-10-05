@@ -108,6 +108,50 @@ Crear un archivo `PAUSE` en el directorio privado de catálogos permite terminar
 el lote actual sin enviar el siguiente. Para continuar, retirar ese archivo y
 ejecutar de nuevo el mismo comando; no se repiten los lotes aceptados.
 
+### Comparar y publicar
+
+Al terminar la carga, recuperar las opciones de edición de las fuentes y
+comparar una exportación nueva de cada catálogo:
+
+```sh
+python3 scripts/terminology/reconcile-catalogs.py \
+  --env /ruta/privada/.env.terminology --catalogs /ruta/privada/catalogos \
+  --restore-source-settings
+```
+
+El importador ZIP de OCL no traslada todas las opciones de generación de códigos
+y UUID. El comando las recupera mediante la API de fuentes, junto con sus
+metadatos originales. Esta operación se hace después de cargar los registros,
+para conservar también los identificadores originalmente nulos. Guarda la
+configuración anterior en el directorio privado. Sin `--restore-source-settings`
+solo compara y detiene el proceso si encuentra diferencias.
+
+La comparación exige todos los lotes de la fuente aceptados y excluye una
+importación simultánea. Comprueba códigos, UUID externos, nombres, descripciones,
+idiomas, retiros, relaciones jerárquicas, mappings y metadatos de la fuente.
+Conserva los ZIP verificados y sus hashes en `reconciled-head/`; `--source NOMBRE`
+permite trabajar con un catálogo sin borrar los informes de los demás.
+Una importación con estado `SUCCESS` no sustituye esta comparación.
+
+Solo después de reconciliar todos los catálogos, crear secuencialmente las
+versiones originales con `POST /orgs/SIHSALUS/sources/FUENTE/versions/`, usando
+`version`, `version_description` y `released` del manifiesto como los campos
+`id`, `description` y `released`. La respuesta inicial puede representar trabajo
+asíncrono: consultar cada versión hasta que exista y termine su procesamiento.
+No enviar de nuevo una publicación cuyo resultado sea desconocido.
+
+```sh
+python3 scripts/terminology/reconcile-catalogs.py \
+  --env /ruta/privada/.env.terminology --catalogs /ruta/privada/catalogos \
+  --published
+```
+
+Esta segunda comparación usa las versiones publicadas y conserva su evidencia
+en `reconciled-published/`. Resolver cualquier diferencia antes de configurar
+consumidores clínicos. Los catálogos provienen de una revisión inmutable de
+`sihsalus-content`; la migración conserva sus versiones y no constituye una
+nueva aceptación clínica ni incorpora códigos SNOMED CT adicionales.
+
 ## Actualización y recuperación
 
 ```sh
