@@ -25,6 +25,7 @@ jobs:
         run: |
           bash scripts/security/secrets_generate.sh "$RUNNER_TEMP/terminology.env" terminology
           export TERMINOLOGY_HOST=terminology.example.org
+          export TERMINOLOGY_API_HOST=api.terminology.example.org
           export TERMINOLOGY_API_IMAGE=ghcr.io/sihsalus/terminology-api:scan-render-only
           export TERMINOLOGY_WEB_IMAGE=ghcr.io/sihsalus/terminology-web:scan-render-only
           export TERMINOLOGY_POSTGRES_IMAGE=ghcr.io/sihsalus/terminology-postgres:scan-render-only

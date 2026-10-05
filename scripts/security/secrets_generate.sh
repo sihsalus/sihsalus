@@ -30,6 +30,7 @@ if [[ "${2:-}" == terminology ]]; then
   cat > "$OUTPUT_FILE" <<EOF
 # Private terminology configuration. Complete public deployment metadata below.
 TERMINOLOGY_HOST=
+TERMINOLOGY_API_HOST=
 TERMINOLOGY_MACHINE_ID=
 TERMINOLOGY_SOURCE_SHA=
 TERMINOLOGY_API_IMAGE=

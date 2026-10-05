@@ -29,7 +29,7 @@ digest; no se compila en `gidis-terminology`.
    después del pull y espacio adicional para backups y la versión anterior.
 6. Instalar la plantilla Nginx con el hostname real y los certificados
    existentes; validar con `nginx -t` antes de recargar. Solo sustituir
-   `${TERMINOLOGY_HOST}`: las variables de Nginx deben permanecer literales.
+   `${TERMINOLOGY_HOST}` y `${TERMINOLOGY_API_HOST}`: las variables de Nginx deben permanecer literales.
    Conservar `certbot.timer` y verificar que renueva el certificado.
 
 ## Primera instalación
@@ -44,7 +44,8 @@ No elimina contenedores ni volúmenes anteriores. Un bootstrap fallido conserva
 su estado; se inspecciona antes de reintentar. Los journals privados quedan en
 `.env.terminology-state/` y nunca se publican.
 
-El navegador usa HTTPS en 443, la API en 8443 y las exportaciones firmadas en
+El navegador y la API usan nombres DNS distintos con HTTPS en 443, y el
+certificado debe cubrir ambos nombres. Las exportaciones firmadas usan
 `/terminology-exports/`. Nginx consume servicios ligados a localhost. PostgreSQL,
 Redis y Elasticsearch no publican puertos. Las credenciales iniciales del usuario
 `ocladmin` están en el archivo privado; no se incluyen en logs ni en informes.

@@ -32,10 +32,10 @@ def main():
         parser.error('The private environment file must have mode 600.')
     env = dict(line.split('=', 1) for line in args.env.read_text().splitlines()
                if line and not line.startswith('#') and '=' in line)
-    host = env['TERMINOLOGY_HOST']
+    host = env['TERMINOLOGY_API_HOST']
     if not re.fullmatch(r'[a-zA-Z0-9.-]+', host):
         parser.error('Invalid deployment hostname.')
-    base = 'https://' + host + ':8443'
+    base = 'https://' + host
     opener = urllib.request.build_opener(NoRedirect())
 
     def api(path, data=None, content_type='application/json'):

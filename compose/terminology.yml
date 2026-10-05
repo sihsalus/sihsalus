@@ -33,12 +33,12 @@ x-app: &app
     ES_HOSTS: es:9200
     ES_SCHEME: http
     SECRET_KEY: ${TERMINOLOGY_SECRET_KEY:?Set the Django secret}
-    ALLOWED_HOSTS: ${TERMINOLOGY_HOST:?Set the public hostname},api,localhost,127.0.0.1
+    ALLOWED_HOSTS: ${TERMINOLOGY_API_HOST:?Set the public API hostname},${TERMINOLOGY_HOST:?Set the public hostname},api,localhost,127.0.0.1
     WEB_URL: https://${TERMINOLOGY_HOST}
-    API_BASE_URL: https://${TERMINOLOGY_HOST}:8443
+    API_BASE_URL: https://${TERMINOLOGY_API_HOST}
     API_INTERNAL_BASE_URL: http://api:8000
     CORS_ALLOWED_ORIGINS: https://${TERMINOLOGY_HOST}
-    CSRF_TRUSTED_ORIGINS: https://${TERMINOLOGY_HOST},https://${TERMINOLOGY_HOST}:8443
+    CSRF_TRUSTED_ORIGINS: https://${TERMINOLOGY_HOST},https://${TERMINOLOGY_API_HOST}
     TRUST_PROXY_HTTPS: "TRUE"
     REQUIRE_AUTHENTICATION: "true"
     ALLOW_SELF_REGISTRATION: "false"
@@ -195,7 +195,7 @@ services:
     mem_limit: 64m
     cpus: 0.25
     environment:
-      API_URL: https://${TERMINOLOGY_HOST}:8443
+      API_URL: https://${TERMINOLOGY_API_HOST}
       NODE_ENV: production
       WEB_PORT: "4002"
       ANALYTICS_API: ""

@@ -13,6 +13,7 @@ class TerminologyComposition(unittest.TestCase):
 
     def render(self, maintenance=False):
         env = dict(os.environ, TERMINOLOGY_HOST="terminology.example.org")
+        env["TERMINOLOGY_API_HOST"] = "api.terminology.example.org"
         for key in ("DB_PASSWORD", "SECRET_KEY", "ADMIN_PASSWORD", "ADMIN_TOKEN",
                     "STORAGE_ACCESS_KEY", "STORAGE_SECRET_KEY"):
             env["TERMINOLOGY_" + key] = "synthetic-render-only"
@@ -38,6 +39,7 @@ class TerminologyComposition(unittest.TestCase):
             for port in service.get("ports", []):
                 self.assertEqual(port["host_ip"], "127.0.0.1", name)
         self.assertEqual(services["redis"]["command"][-1], "noeviction")
+        self.assertEqual(services["web"]["environment"]["API_URL"], "https://api.terminology.example.org")
         self.assertIn("bulk_import_root", ",".join(services["importer"]["command"]))
         self.assertIn("concurrent", ",".join(services["worker"]["command"]))
         for name in ("api", "worker", "importer", "scheduler"):
