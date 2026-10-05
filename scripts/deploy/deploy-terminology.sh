@@ -36,6 +36,16 @@ timeout 15 docker info >/dev/null
 
 COMPOSE=(docker compose --parallel 1 --env-file "$ENV_FILE" -f docker-compose.terminology.yml)
 "${COMPOSE[@]}" config --quiet
+MAIL_BACKEND="$(read_env_value TERMINOLOGY_EMAIL_BACKEND "$ENV_FILE")"
+case "${MAIL_BACKEND:-django.core.mail.backends.dummy.EmailBackend}" in
+  django.core.mail.backends.dummy.EmailBackend) ;;
+  django.core.mail.backends.smtp.EmailBackend)
+    for key in EMAIL_HOST_USER EMAIL_HOST_PASSWORD DEFAULT_FROM_EMAIL COMMUNITY_EMAIL REPORTS_EMAIL; do
+      [[ -n "$(read_env_value "TERMINOLOGY_$key" "$ENV_FILE")" ]] || fail "missing SMTP setting: TERMINOLOGY_$key"
+    done
+    ;;
+  *) fail 'unsupported email backend; choose dummy or authenticated SMTP' ;;
+esac
 for app in API WEB POSTGRES REDIS ELASTICSEARCH; do
   ref="$(read_env_value "TERMINOLOGY_${app}_IMAGE" "$ENV_FILE")"
   [[ "$ref" =~ ^ghcr\.io/sihsalus/terminology-${app,,}@sha256:[0-9a-f]{64}$ ]] || fail 'image must use the expected repository and a verified digest'

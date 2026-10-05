@@ -45,8 +45,19 @@ x-app: &app
     REQUIRE_AUTHENTICATION: "true"
     ALLOW_SELF_REGISTRATION: "false"
     ENABLE_THROTTLING: "true"
-    # Managed accounts use administrator support until an SMTP service is configured.
-    EMAIL_BACKEND: django.core.mail.backends.dummy.EmailBackend
+    # Enable SMTP explicitly after provisioning the installation's sender.
+    EMAIL_BACKEND: ${TERMINOLOGY_EMAIL_BACKEND:-django.core.mail.backends.dummy.EmailBackend}
+    EMAIL_HOST: ${TERMINOLOGY_EMAIL_HOST:-smtp.gmail.com}
+    EMAIL_PORT: ${TERMINOLOGY_EMAIL_PORT:-587}
+    EMAIL_USE_TLS: "true"
+    EMAIL_TIMEOUT: "20"
+    EMAIL_HOST_USER: ${TERMINOLOGY_EMAIL_HOST_USER:-}
+    EMAIL_HOST_PASSWORD: ${TERMINOLOGY_EMAIL_HOST_PASSWORD:-}
+    DEFAULT_FROM_EMAIL: ${TERMINOLOGY_DEFAULT_FROM_EMAIL:-webmaster@localhost}
+    COMMUNITY_EMAIL: ${TERMINOLOGY_COMMUNITY_EMAIL:-}
+    REPORTS_EMAIL: ${TERMINOLOGY_REPORTS_EMAIL:-}
+    # Error notifications remain opt-in; they can include request diagnostics.
+    ADMIN_EMAIL: ${TERMINOLOGY_ADMIN_EMAIL:-}
     ANALYTICS_API: ""
     EXPORT_SERVICE: core.services.storages.cloud.minio.MinIO
     MINIO_ENDPOINT: storage:9000

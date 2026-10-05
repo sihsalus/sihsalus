@@ -1,0 +1,14 @@
+{
+  "source_commit": "e1bdda3b8831e095659cfe7490af4e6de5cb2b6c",
+  "workflow_run": "https://github.com/sihsalus/sihsalus-terminology/actions/runs/37389215326",
+  "runtime_security": "HIGH/CRITICAL: 0 findings across all five images",
+  "images": {
+    "api": "ghcr.io/sihsalus/terminology-api@sha256:82d988af61d661a9145debdbc6aa43b7a4aa9a957ca6f0d5f05eed37a5418e7a",
+    "web": "ghcr.io/sihsalus/terminology-web@sha256:82462e74f913153a41358813f3891cef19066350a41bf1e32ecb64663b042bd0",
+    "postgres": "ghcr.io/sihsalus/terminology-postgres@sha256:3dcaffdf831e98b4b0d9d689683b56bc22539c68e634710306a7560b1c7dcb29",
+    "redis": "ghcr.io/sihsalus/terminology-redis@sha256:49f3b1c4d47d5a897a75873c69ddd3508417ae3bc3ffa528ee8c696ebdecc32e",
+    "elasticsearch": "ghcr.io/sihsalus/terminology-elasticsearch@sha256:4a6da9a6ed33bc770212a55b2a4b562ee69b81c5addc9bf6aa2da6ca89ce64b2"
+  },
+  "storage": "rustfs/rustfs@sha256:1803faef57627e2d9c2e7d89d655d712ddded5389040054987163043fecb6a3c",
+  "storage_scan": "https://github.com/sihsalus/sihsalus/actions/runs/37344962541"
+}

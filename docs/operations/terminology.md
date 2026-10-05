@@ -55,6 +55,43 @@ cuentas. El envío de correo está desactivado hasta configurar y autorizar un
 servicio SMTP; el acceso local usa el soporte del administrador. La API no instala el middleware que registra cuerpos de peticiones y
 respuestas, pues pueden contener credenciales.
 
+## Correo SMTP
+
+La configuración se guarda en `.env.terminology` con permisos 600. Para activar
+el envío, establecer `TERMINOLOGY_EMAIL_BACKEND` en
+`django.core.mail.backends.smtp.EmailBackend` y completar las variables
+`TERMINOLOGY_EMAIL_HOST_USER`, `TERMINOLOGY_EMAIL_HOST_PASSWORD`,
+`TERMINOLOGY_DEFAULT_FROM_EMAIL`, `TERMINOLOGY_COMMUNITY_EMAIL` y
+`TERMINOLOGY_REPORTS_EMAIL`. El remitente debe estar autorizado por el proveedor;
+los dos últimos campos identifican los destinatarios propios de soporte y
+reportes. El despliegue rechaza SMTP autenticado si falta cualquiera de ellos.
+
+Los valores predeterminados son `smtp.gmail.com`, puerto 587, STARTTLS obligatorio
+y espera máxima de 20 segundos por operación. `TERMINOLOGY_EMAIL_HOST` y
+`TERMINOLOGY_EMAIL_PORT` permiten seleccionar otro proveedor con STARTTLS.
+Para Gmail se usa la contraseña de aplicación de la cuenta, nunca la contraseña
+habitual ni los códigos de respaldo. Guardarla únicamente en la configuración
+privada, también incluida en el respaldo cifrado; no imprimir el modelo Compose
+resuelto ni las variables de los contenedores.
+
+`TERMINOLOGY_ADMIN_EMAIL` es opcional y queda vacío para evitar informes
+automáticos de errores. Solo activarlo si se aprueba el destino y el contenido
+diagnóstico. La imagen debe incluir la configuración de correo local, sin los
+destinatarios predeterminados de OCL. Aplicar el cambio mediante el procedimiento
+de actualización, que conserva la configuración y las imágenes anteriores.
+
+Comprobar conexión, certificado TLS y autenticación desde el contenedor de la
+aplicación mediante `django.core.mail.get_connection().open()`, cerrando después
+la conexión. Esta comprobación no envía mensajes ni demuestra entrega al buzón.
+El envío de un mensaje de prueba requiere acordar previamente el destinatario
+y su contenido. La recuperación de contraseña usa la URL HTTPS del navegador
+configurada en `WEB_URL`; el registro público continúa deshabilitado.
+
+Para desactivar el correo, volver a
+`TERMINOLOGY_EMAIL_BACKEND=django.core.mail.backends.dummy.EmailBackend` y
+recrear los servicios de aplicación conservando los datos. No revertir a una
+imagen que mantenga destinatarios de OCL con SMTP habilitado.
+
 ## Aceptación
 
 - Verificar el digest y revisión de las imágenes ejecutadas, salud de todos los
