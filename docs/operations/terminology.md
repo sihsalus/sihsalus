@@ -117,7 +117,8 @@ no permite retroceso, restaurar la copia en volúmenes nuevos y verificarla ante
 de cambiar el servicio activo. Nunca usar `down -v` ni podas globales de Docker.
 
 El respaldo requiere `recovery.key` con permisos 600 en el directorio privado.
-Comprueba que no haya tareas en curso, detiene brevemente las escrituras y guarda
+Comprueba que no haya tareas en curso en PostgreSQL, en ambos workers y en el
+broker; detiene brevemente las escrituras y guarda
 PostgreSQL, objetos, uploads, configuración y referencias de imágenes en un
 archivo cifrado. Restaura el servicio al terminar, incluso si falla la copia.
 Instalar el servicio y timer de `terminology/` solo después de probar una copia
@@ -127,3 +128,7 @@ La retención predeterminada es de 14 copias `runtime-*` y solo se aplica despu�
 de verificar una copia nueva; `TERMINOLOGY_BACKUP_KEEP` permite ajustarla (mínimo
 dos). Los backups del despliegue anterior `legacy-*` se conservan. El respaldo
 no comienza si quedan menos de 10 GiB libres para proteger la capacidad del host.
+`active-distro-commit` identifica la revisión realmente desplegada, aunque el
+checkout ya tenga una actualización pendiente. Las instalaciones anteriores a
+este registro deben establecerlo a partir de su despliegue verificado antes
+del siguiente respaldo.

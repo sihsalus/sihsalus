@@ -40,13 +40,17 @@ resume() {
 }
 trap resume EXIT
 stopped=true
-"${COMPOSE[@]}" stop scheduler web api importer worker
+"${COMPOSE[@]}" stop scheduler web api
+"${COMPOSE[@]}" exec -T worker python < scripts/terminology/check-idle.py
+"${COMPOSE[@]}" stop importer worker
 # A request may have queued work between the initial check and stopping the API.
 busy="$("${COMPOSE[@]}" exec -T db psql -U postgres -d postgres -Atc \
   "SELECT count(*) FROM celery_tasks WHERE state IN ('PENDING','STARTED','RETRY')")"
 [[ "$busy" == 0 ]] || { echo 'Backup deferred: work arrived before quiescence.' >&2; exit 75; }
 cp "$ENV_FILE" "$STAGE/deployment.env"
-git rev-parse HEAD > "$STAGE/distribution-commit"
+ACTIVE_COMMIT="$ROOT_DIR/.env.terminology-state/active-distro-commit"
+[[ -f "$ACTIVE_COMMIT" && "$(cat "$ACTIVE_COMMIT")" =~ ^[0-9a-f]{40}$ ]]
+cp "$ACTIVE_COMMIT" "$STAGE/distribution-commit"
 "${COMPOSE[@]}" images --format json > "$STAGE/images.json"
 "${COMPOSE[@]}" exec -T db pg_dump -U postgres -Fc postgres > "$STAGE/database.dump"
 "${COMPOSE[@]}" exec -T db pg_restore --list < "$STAGE/database.dump" > /dev/null

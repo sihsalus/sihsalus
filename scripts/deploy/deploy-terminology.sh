@@ -80,4 +80,5 @@ fi
 "${COMPOSE[@]}" up -d --no-deps --wait --wait-timeout 60 web
 "${COMPOSE[@]}" ps
 cp "$ENV_FILE" "$ACTIVE_ENV"
+cp "$STATE_DIR/distro-commit" "$ROOT_DIR/.env.terminology-state/active-distro-commit"
 printf 'Runtime started. Complete authenticated functional checks before accepting this deployment.\n'
