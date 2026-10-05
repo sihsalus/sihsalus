@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Load prepared draft batches sequentially, retaining task IDs for safe resumption."""
 import argparse
+import fcntl
 import hashlib
 import json
 import os
@@ -30,6 +31,8 @@ def main():
                         help='At most two execution tasks share the existing CPU and memory limits.')
     args = parser.parse_args()
     os.umask(0o077)
+    lock_file = (args.catalogs / '.import.lock').open('a')
+    fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
     if args.env.stat().st_mode & 0o077:
         parser.error('The private environment file must have mode 600.')
     env = dict(line.split('=', 1) for line in args.env.read_text().splitlines()
@@ -82,6 +85,9 @@ def main():
         if state and state.get('accepted'):
             continue
         if args.limit and completed >= args.limit:
+            break
+        if not state and (args.catalogs / 'PAUSE').exists():
+            print('Pause requested; no further batch submitted.', flush=True)
             break
         raw = (args.catalogs / filename).read_bytes()
         if hashlib.sha256(raw).hexdigest() != batch['sha256']:

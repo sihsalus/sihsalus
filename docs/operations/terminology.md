@@ -94,6 +94,12 @@ y solo entonces crear las versiones indicadas en el manifiesto y exportarlas.
 El procedimiento inicial requiere fuentes vacías; una actualización de catálogos
 existentes necesita revisar el diff y conservar la versión anterior.
 
+`import-catalogs.py` conserva el identificador de cada tarea antes de consultar
+su resultado y bloquea una segunda ejecución sobre el mismo directorio.
+Crear un archivo `PAUSE` en el directorio privado de catálogos permite terminar
+el lote actual sin enviar el siguiente. Para continuar, retirar ese archivo y
+ejecutar de nuevo el mismo comando; no se repiten los lotes aceptados.
+
 ## Actualización y recuperación
 
 ```sh
