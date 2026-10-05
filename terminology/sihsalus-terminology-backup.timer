@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily terminology backup at 03:15 Lima
+
+[Timer]
+OnCalendar=*-*-* 08:15:00 UTC
+Persistent=true
+RandomizedDelaySec=5min
+Unit=sihsalus-terminology-backup.service
+
+[Install]
+WantedBy=timers.target
