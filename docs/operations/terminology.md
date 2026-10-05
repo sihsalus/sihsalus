@@ -67,6 +67,29 @@ respuestas, pues pueden contener credenciales.
 - Integrar únicamente versiones publicadas en SIHSALUS; mantener la terminología
   empaquetada para que las pantallas clínicas no dependan de este host.
 
+## Preparar la migración de catálogos
+
+```sh
+python3 scripts/terminology/prepare-import.py \
+  --repo /ruta/sihsalus-content --ref COMMIT_REVISADO \
+  --output /ruta/privada/catalogos
+```
+
+El directorio de salida debe ser nuevo. El manifiesto identifica el commit, los
+hashes de los ZIP originales y los lotes, y conserva los registros esperados
+para comparar códigos, `external_id`, nombres y relaciones después de cargar.
+Los lotes tienen hasta 500 registros para limitar el trabajo por tarea. Esta
+cifra es un límite operativo de importación, no una restricción del catálogo.
+
+Cargar los lotes en el orden del manifiesto mediante `/manage/bulk-import/`, con
+`parallel=1`: primero todos los conceptos y después todos los mappings. Los ZIP
+de trabajo se marcan `HEAD` para que el importador oficial de OCL no publique una
+versión antes de terminar sus mappings. No cambian los códigos ni los UUID de
+los registros. Comprobar cada resultado, reconciliar los registros persistidos
+y solo entonces crear las versiones indicadas en el manifiesto y exportarlas.
+El procedimiento inicial requiere fuentes vacías; una actualización de catálogos
+existentes necesita revisar el diff y conservar la versión anterior.
+
 ## Actualización y recuperación
 
 El script de bootstrap no es una actualización de un servicio existente. La
