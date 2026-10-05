@@ -1,12 +1,16 @@
 # Installed on the dedicated terminology host; TLS is renewed by certbot.timer.
+# Signed export query strings carry temporary credentials; log only the URI path.
+log_format terminology '$remote_addr [$time_local] "$request_method $uri $server_protocol" $status $body_bytes_sent';
 server {
     listen 80;
+    access_log /var/log/nginx/terminology_access.log terminology;
     server_name ${TERMINOLOGY_HOST};
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl;
+    access_log /var/log/nginx/terminology_access.log terminology;
     server_name ${TERMINOLOGY_HOST};
     ssl_certificate /etc/letsencrypt/live/${TERMINOLOGY_HOST}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${TERMINOLOGY_HOST}/privkey.pem;
@@ -32,6 +36,7 @@ server {
 
 server {
     listen 8443 ssl;
+    access_log /var/log/nginx/terminology_access.log terminology;
     server_name ${TERMINOLOGY_HOST};
     ssl_certificate /etc/letsencrypt/live/${TERMINOLOGY_HOST}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${TERMINOLOGY_HOST}/privkey.pem;
