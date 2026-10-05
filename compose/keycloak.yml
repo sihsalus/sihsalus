@@ -6,7 +6,7 @@ services:
   frontend:
     build:
       args:
-        SPA_CONFIG_URLS: /openmrs/spa/frontend.json,/openmrs/spa/frontend-keycloak.json
+        SPA_CONFIG_URLS: ${SPA_CONFIG_URLS:-/openmrs/spa/frontend.json,/openmrs/spa/frontend-keycloak.json}
 
   backend-oauth2-config:
     environment:

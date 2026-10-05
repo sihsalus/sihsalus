@@ -36,6 +36,10 @@ variable "STRIP_SOURCE_MAPS" {
   default = "true"
 }
 
+variable "SPA_CONFIG_URLS" {
+  default = ""
+}
+
 // ---- Shared base ----
 
 target "_base" {
@@ -49,7 +53,7 @@ target "_frontend_defaults" {
     FRONTEND_SOURCE_IMAGE = FRONTEND_SOURCE_IMAGE != "" ? FRONTEND_SOURCE_IMAGE : "ghcr.io/sihsalus/sihsalus-frontend:${FRONTEND_SOURCE_TAG != "" ? FRONTEND_SOURCE_TAG : FRONTEND_DEFAULT_SOURCE_TAG}"
     SPA_PATH              = "/openmrs/spa"
     API_URL               = "/openmrs"
-    SPA_CONFIG_URLS       = "/openmrs/spa/frontend.json"
+    SPA_CONFIG_URLS       = SPA_CONFIG_URLS != "" ? SPA_CONFIG_URLS : "/openmrs/spa/frontend.json"
     SPA_DEFAULT_LOCALE    = "es"
     SIHSALUS_NODE_ID       = SIHSALUS_NODE_ID != "" ? SIHSALUS_NODE_ID : "unconfigured"
     STRIP_SOURCE_MAPS      = STRIP_SOURCE_MAPS != "" ? STRIP_SOURCE_MAPS : "true"
