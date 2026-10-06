@@ -25,10 +25,9 @@ Keycloak, HTTPS y Status son overrides porque cambian o dependen de servicios de
 El servicio de archivos Samba se administra en el repositorio independiente
 `sihsalus-samba-backup`. Este stack no crea contenedores ni publica puertos SMB.
 
-El host dedicado de terminología usa `docker-compose.terminology.yml`, que
-incluye exclusivamente `compose/terminology.yml`. Es una composición
-independiente para `gidis-terminology`; nunca se combina con el core clínico.
-Ver [despliegue de terminología](../docs/operations/terminology.md).
+El servidor de terminología se despliega desde
+[`sihsalus-terminology`](https://github.com/sihsalus/sihsalus-terminology).
+Esta distribución conserva la configuración de OpenMRS como cliente.
 
 ## Comandos comunes
 
