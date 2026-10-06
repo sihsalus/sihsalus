@@ -1,6 +1,5 @@
-"""Configuration synchronization contracts using synthetic settings and a mock deployer."""
+"""Receiver tests with real dotenv files and a simulated deployment."""
 import contextlib
-import copy
 import fcntl
 import importlib.util
 import io
@@ -33,7 +32,7 @@ class ReceiverTests(unittest.TestCase):
         self.settings.update(TERMINOLOGY_MACHINE_ID='a'*32, TERMINOLOGY_BACKUP_KEEP='14',
                              TERMINOLOGY_EMAIL_PORT='587', TERMINOLOGY_ADMIN_EMAIL='',
                              TERMINOLOGY_EMAIL_BACKEND='django.core.mail.backends.smtp.EmailBackend')
-        # This default was originally implicit on the real host.
+        # Omit retention to exercise its default.
         self.original = '# preserve comment\nUNMANAGED_IMAGE=image@sha256:abc\n' + ''.join(
             key + "='" + value + "'\n" for key, value in self.settings.items()
             if key != 'TERMINOLOGY_BACKUP_KEEP')
@@ -42,13 +41,12 @@ class ReceiverTests(unittest.TestCase):
         for path in (self.env, self.active):
             path.write_text(self.original)
             path.chmod(0o600)
-        self.payload = dict(commit=COMMIT, mode='apply', settings=copy.copy(self.settings))
+        self.payload = dict(commit=COMMIT, mode='apply', settings=self.settings.copy())
         self.calls = []
         self.compose_failure = False
         self.deploy_failure = False
         self.dirty = False
         self.machine = 'a'*32
-        real_output = subprocess.check_output
         real_read = Path.read_text
 
         def check_output(args, **kwargs):
@@ -56,7 +54,7 @@ class ReceiverTests(unittest.TestCase):
                 return COMMIT + '\n'
             if args[:2] == ['git', 'status']:
                 return ' M tracked\n' if self.dirty else ''
-            return real_output(args, **kwargs)
+            return subprocess.check_output(args, **kwargs)
 
         def read_text(path, *args, **kwargs):
             if str(path) == '/etc/machine-id':
@@ -77,19 +75,15 @@ class ReceiverTests(unittest.TestCase):
                 self.fail('Unexpected command')
             return subprocess.CompletedProcess(args, 0)
 
-        self.stack = contextlib.ExitStack()
-        self.addCleanup(self.stack.close)
-        self.stack.enter_context(patch.object(module, 'ROOT', self.root))
-        self.stack.enter_context(patch.object(module.subprocess, 'check_output', check_output))
-        # check_output itself uses run, so mock only calls made directly by receiver.
-        self.real_run = module.subprocess.run
-        def route_run(args, **kwargs):
-            if args[0] == 'bash' and len(args) > 1 and args[1] == '-c':
-                return self.real_run(args, **kwargs)
-            return run(args, **kwargs)
-        self.stack.enter_context(patch.object(module.subprocess, 'run', route_run))
-        self.stack.enter_context(patch.object(Path, 'read_text', read_text))
-        self.stack.enter_context(patch.dict(os.environ, SSH_ORIGINAL_COMMAND='terminology-config'))
+        stack = contextlib.ExitStack()
+        self.addCleanup(stack.close)
+        stack.enter_context(patch.object(module, 'ROOT', self.root))
+        commands = stack.enter_context(patch.object(module, 'subprocess'))
+        commands.check_output.side_effect = check_output
+        commands.run.side_effect = run
+        commands.STDOUT = subprocess.STDOUT
+        stack.enter_context(patch.object(Path, 'read_text', read_text))
+        stack.enter_context(patch.dict(os.environ, SSH_ORIGINAL_COMMAND='terminology-config'))
         previous = os.umask(0o077)
         self.addCleanup(os.umask, previous)
 
