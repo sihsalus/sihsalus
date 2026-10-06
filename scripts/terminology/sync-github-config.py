@@ -12,7 +12,8 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SECRET_KEYS = tuple("TERMINOLOGY_" + key for key in (
+# Public environment variable names only; credential values arrive separately.
+CREDENTIAL_SETTING_NAMES = tuple("TERMINOLOGY_" + key for key in (
     "DB_PASSWORD", "SECRET_KEY", "ADMIN_PASSWORD", "ADMIN_TOKEN",
     "STORAGE_ACCESS_KEY", "STORAGE_SECRET_KEY", "EMAIL_HOST_PASSWORD",
 ))
@@ -21,7 +22,7 @@ VARIABLE_KEYS = tuple("TERMINOLOGY_" + key for key in (
     "EMAIL_HOST", "EMAIL_PORT", "EMAIL_HOST_USER", "DEFAULT_FROM_EMAIL",
     "COMMUNITY_EMAIL", "REPORTS_EMAIL", "ADMIN_EMAIL",
 ))
-CONFIG_KEYS = SECRET_KEYS + VARIABLE_KEYS
+CONFIG_KEYS = CREDENTIAL_SETTING_NAMES + VARIABLE_KEYS
 DEFAULTS = {"TERMINOLOGY_BACKUP_KEEP": "14"}
 
 
@@ -110,7 +111,7 @@ def receive():
         require(Path("/etc/machine-id").read_text().strip() == current["TERMINOLOGY_MACHINE_ID"],
                 "Unexpected host identity")
         # Changing these values alone cannot rotate the persisted service credentials.
-        immutable = set(SECRET_KEYS) - {"TERMINOLOGY_EMAIL_HOST_PASSWORD"}
+        immutable = set(CREDENTIAL_SETTING_NAMES) - {"TERMINOLOGY_EMAIL_HOST_PASSWORD"}
         immutable.update({"TERMINOLOGY_HOST", "TERMINOLOGY_API_HOST", "TERMINOLOGY_MACHINE_ID"})
         for name in immutable:
             require(settings[name] == current[name], "Requires a coordinated migration or rotation: " + name)
