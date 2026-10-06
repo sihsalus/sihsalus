@@ -21,10 +21,9 @@ El archivo contiene credenciales para el core y los perfiles opcionales. Antes d
 3. Define `COMPOSE_FILE` y `COMPOSE_PROFILES` para el stack del servidor.
 4. Guarda una copia cifrada en el gestor de secretos institucional.
 
-Para el host independiente de terminología, usa
-`./scripts/security/secrets_generate.sh .env.terminology terminology`. Genera
-solamente sus credenciales y deja vacíos el hostname, la identidad del nodo,
-el commit fuente y los digests que deben completar la release verificada.
+Las credenciales del servidor de terminología se administran en
+[`sihsalus-terminology`](https://github.com/sihsalus/sihsalus-terminology).
+`OMRS_OCL_TOKEN` permanece aquí como credencial del cliente OpenMRS.
 
 No se crean archivos duplicados bajo `secrets/`: `.env.production` es la única salida local y ya está excluida de Git.
 

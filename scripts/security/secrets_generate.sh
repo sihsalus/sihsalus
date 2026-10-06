@@ -4,6 +4,11 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
+if [[ "$#" -gt 1 ]]; then
+  echo 'Usage: secrets_generate.sh [output-file]. Terminology configuration belongs to sihsalus-terminology.' >&2
+  exit 2
+fi
+
 OUTPUT_FILE="${1:-.env.production}"
 
 if [ -e "$OUTPUT_FILE" ]; then
@@ -26,39 +31,6 @@ cookie_secret() {
   openssl rand -base64 32 | tr -- '+/' '-_' | tr -d '\n'
 }
 
-if [[ "${2:-}" == terminology ]]; then
-  cat > "$OUTPUT_FILE" <<EOF
-# Private terminology configuration. Complete public deployment metadata below.
-TERMINOLOGY_HOST=
-TERMINOLOGY_API_HOST=
-TERMINOLOGY_MACHINE_ID=
-TERMINOLOGY_SOURCE_SHA=
-TERMINOLOGY_API_IMAGE=
-TERMINOLOGY_WEB_IMAGE=
-TERMINOLOGY_POSTGRES_IMAGE=
-TERMINOLOGY_REDIS_IMAGE=
-TERMINOLOGY_ELASTICSEARCH_IMAGE=
-TERMINOLOGY_BACKUP_KEEP=14
-TERMINOLOGY_EMAIL_BACKEND=django.core.mail.backends.dummy.EmailBackend
-TERMINOLOGY_EMAIL_HOST=smtp.gmail.com
-TERMINOLOGY_EMAIL_PORT=587
-TERMINOLOGY_EMAIL_HOST_USER=
-TERMINOLOGY_EMAIL_HOST_PASSWORD=
-TERMINOLOGY_DEFAULT_FROM_EMAIL=
-TERMINOLOGY_COMMUNITY_EMAIL=
-TERMINOLOGY_REPORTS_EMAIL=
-TERMINOLOGY_ADMIN_EMAIL=
-TERMINOLOGY_DB_PASSWORD=$(secret)
-TERMINOLOGY_SECRET_KEY=$(secret)$(secret)
-TERMINOLOGY_ADMIN_PASSWORD=$(secret)
-TERMINOLOGY_ADMIN_TOKEN=$(openssl rand -hex 20)
-TERMINOLOGY_STORAGE_ACCESS_KEY=$(openssl rand -hex 12)
-TERMINOLOGY_STORAGE_SECRET_KEY=$(secret)
-EOF
-  chmod 600 "$OUTPUT_FILE"
-  printf 'Created private terminology configuration: %s\n' "$OUTPUT_FILE"
-  exit 0
-fi
 
 MYSQL_OPENMRS_PASSWORD="$(secret)"
 MYSQL_ROOT_PASSWORD="$(secret)"

@@ -578,4 +578,3 @@ validate monitoring-oidc -f docker-compose.yml -f compose/keycloak.yml -f compos
 
 python3 tests/monitoring/oidc/config.py "$EVIDENCE_DIR/monitoring-oidc.json" "$EVIDENCE_DIR/monitoring-keycloak.json"
 python3 -B tests/frontend/build-config.py
-python3 -B tests/deploy/terminology-compose.py
