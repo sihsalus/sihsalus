@@ -7,6 +7,12 @@ on:
   pull_request:
     paths: [compose/terminology.yml, .github/workflows/terminology-images.yml]
   workflow_dispatch:
+    inputs:
+      configuration:
+        description: Synchronize GitHub environment settings with the installed terminology release
+        type: choice
+        options: [none, check, apply]
+        default: none
 
 permissions:
   contents: read
@@ -47,3 +53,44 @@ jobs:
           name: terminology-service-security
           path: reports/
           if-no-files-found: error
+
+  configuration:
+    name: Synchronize terminology configuration
+    if: github.event_name == 'workflow_dispatch' && inputs.configuration != 'none'
+    needs: scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment:
+      name: terminology
+      url: https://${{ vars.TERMINOLOGY_HOST }}
+    concurrency:
+      group: terminology-configuration
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Apply the private environment through restricted SSH
+        env:
+          CONFIGURATION_MODE: ${{ inputs.configuration }}
+          TERMINOLOGY_SSH_TARGET: ${{ vars.TERMINOLOGY_SSH_TARGET }}
+          TERMINOLOGY_SSH_KNOWN_HOSTS: ${{ vars.TERMINOLOGY_SSH_KNOWN_HOSTS }}
+          TERMINOLOGY_SSH_PRIVATE_KEY: ${{ secrets.TERMINOLOGY_SSH_PRIVATE_KEY }}
+          TERMINOLOGY_DB_PASSWORD: ${{ secrets.TERMINOLOGY_DB_PASSWORD }}
+          TERMINOLOGY_SECRET_KEY: ${{ secrets.TERMINOLOGY_SECRET_KEY }}
+          TERMINOLOGY_ADMIN_PASSWORD: ${{ secrets.TERMINOLOGY_ADMIN_PASSWORD }}
+          TERMINOLOGY_ADMIN_TOKEN: ${{ secrets.TERMINOLOGY_ADMIN_TOKEN }}
+          TERMINOLOGY_STORAGE_ACCESS_KEY: ${{ secrets.TERMINOLOGY_STORAGE_ACCESS_KEY }}
+          TERMINOLOGY_STORAGE_SECRET_KEY: ${{ secrets.TERMINOLOGY_STORAGE_SECRET_KEY }}
+          TERMINOLOGY_EMAIL_HOST_PASSWORD: ${{ secrets.TERMINOLOGY_EMAIL_HOST_PASSWORD }}
+          TERMINOLOGY_HOST: ${{ vars.TERMINOLOGY_HOST }}
+          TERMINOLOGY_API_HOST: ${{ vars.TERMINOLOGY_API_HOST }}
+          TERMINOLOGY_MACHINE_ID: ${{ vars.TERMINOLOGY_MACHINE_ID }}
+          TERMINOLOGY_BACKUP_KEEP: ${{ vars.TERMINOLOGY_BACKUP_KEEP }}
+          TERMINOLOGY_EMAIL_BACKEND: ${{ vars.TERMINOLOGY_EMAIL_BACKEND }}
+          TERMINOLOGY_EMAIL_HOST: ${{ vars.TERMINOLOGY_EMAIL_HOST }}
+          TERMINOLOGY_EMAIL_PORT: ${{ vars.TERMINOLOGY_EMAIL_PORT }}
+          TERMINOLOGY_EMAIL_HOST_USER: ${{ vars.TERMINOLOGY_EMAIL_HOST_USER }}
+          TERMINOLOGY_DEFAULT_FROM_EMAIL: ${{ vars.TERMINOLOGY_DEFAULT_FROM_EMAIL }}
+          TERMINOLOGY_COMMUNITY_EMAIL: ${{ vars.TERMINOLOGY_COMMUNITY_EMAIL }}
+          TERMINOLOGY_REPORTS_EMAIL: ${{ vars.TERMINOLOGY_REPORTS_EMAIL }}
+          TERMINOLOGY_ADMIN_EMAIL: ${{ vars.TERMINOLOGY_ADMIN_EMAIL }}
+        run: python3 scripts/terminology/sync-github-config.py send

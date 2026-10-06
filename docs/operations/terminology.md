@@ -92,6 +92,56 @@ Para desactivar el correo, volver a
 recrear los servicios de aplicación conservando los datos. No revertir a una
 imagen que mantenga destinatarios de OCL con SMTP habilitado.
 
+## GitHub Secrets y sincronización manual
+
+El entorno `terminology` del repositorio `sihsalus/sihsalus` administra los
+parámetros de la instalación. El workflow **Terminology service images** mantiene
+su análisis habitual y permite elegir `configuration=check` o `apply` al
+ejecutarlo manualmente. Push y PR solo analizan imágenes; no usan los secretos
+del entorno ni actualizan el servidor.
+
+Guardar como **Secrets** `TERMINOLOGY_DB_PASSWORD`, `TERMINOLOGY_SECRET_KEY`,
+`TERMINOLOGY_ADMIN_PASSWORD`, `TERMINOLOGY_ADMIN_TOKEN`,
+`TERMINOLOGY_STORAGE_ACCESS_KEY`, `TERMINOLOGY_STORAGE_SECRET_KEY`,
+`TERMINOLOGY_EMAIL_HOST_PASSWORD` y `TERMINOLOGY_SSH_PRIVATE_KEY`.
+Guardar como **Variables** los doce parámetros no secretos enumerados en
+`VARIABLE_KEYS` de `scripts/terminology/sync-github-config.py`, además de
+`TERMINOLOGY_SSH_TARGET` (`usuario@host`, puerto 22) y
+`TERMINOLOGY_SSH_KNOWN_HOSTS`. `TERMINOLOGY_ADMIN_EMAIL` puede omitirse para
+mantener desactivados los informes de errores.
+
+La clave SSH es exclusiva de esta integración. Instalar su clave pública en
+`authorized_keys` con `restrict` y un comando forzado que ejecute
+`python3 /ruta/sihsalus/scripts/terminology/sync-github-config.py receive`.
+No copiar una clave personal ni las claves de DEV/QLTY. Obtener la clave pública
+del host mediante una conexión previamente verificada y fijarla en
+`TERMINOLOGY_SSH_KNOWN_HOSTS`; el cliente exige comprobación estricta.
+Limitar las ramas del entorno a `main`. Una rama exacta puede habilitarse durante
+la puesta en marcha autorizada y debe retirarse al finalizar.
+
+Antes de ejecutar el workflow, instalar en el servidor el mismo commit de
+operación que se seleccionará en GitHub, con checkout limpio. El receptor
+rechaza un SHA distinto, un nodo distinto, claves desconocidas o un despliegue
+pendiente. Los valores llegan por stdin cifrado por SSH y no aparecen en sus
+argumentos ni en los logs. El script usa el lector dotenv del despliegue y
+admite valores escalares sin saltos de línea ni comillas simples.
+
+`check` informa únicamente los nombres de parámetros diferentes. `apply`
+conserva la versión instalada y sus imágenes por digest; si la configuración
+coincide, no escribe el archivo ni reinicia los servicios. Si cambia, conserva
+un journal privado y aplica el procedimiento existente de actualización,
+incluidos el respaldo cifrado y los límites de recursos. Un fallo conserva la
+evidencia y requiere revisar el journal antes de reintentar.
+No se rotan mediante este flujo las credenciales persistidas de base de datos,
+almacenamiento y administración, ni la clave Django o la identidad del host:
+requieren un procedimiento coordinado. La contraseña SMTP sí puede actualizarse.
+
+Los secretos permanecen también en `.env.terminology` con permisos 600 para
+que la aplicación pueda arrancar y recuperarse sin depender de GitHub. El
+archivo forma parte del respaldo cifrado. `recovery.key` se conserva en su
+ubicación privada y fuera de la VM; no se guarda en GitHub Secrets ni en
+artifacts. Cambiar un Secret en GitHub no cambia la VM hasta ejecutar `apply`.
+
 ## Aceptación
 
 - Verificar el digest y revisión de las imágenes ejecutadas, salud de todos los
