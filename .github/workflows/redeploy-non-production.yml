@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 60
     env:
       REDEPLOY_EXPECTED_REMOTE_MAC: '00:0c:29:86:a3:3b'
-      REDEPLOY_EXPECTED_NODE_ID: '3eb58bb0-ff08-4e2d-839c-11cedca0b043'
+      REDEPLOY_EXPECTED_NODE_ID: '700e430a-1c32-5241-b7cf-78ccea17f8c1'
       REDEPLOY_TIMEOUT_SECONDS: '3000'
     environment:
       name: development
