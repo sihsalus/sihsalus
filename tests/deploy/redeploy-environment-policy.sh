@@ -57,7 +57,7 @@ grep -Fq 'backend_digest:' "$WORKFLOW"
 [ "$(grep -Fc 'REDEPLOY_EXPECTED_REMOTE_MAC:' "$WORKFLOW")" -eq 2 ]
 [ "$(grep -Fc 'REDEPLOY_EXPECTED_NODE_ID:' "$WORKFLOW")" -eq 2 ]
 [ "$(grep -Fc "REDEPLOY_TIMEOUT_SECONDS: '3000'" "$WORKFLOW")" -eq 2 ]
-[ "$(grep -Fc '00:0c:29:ad:be:90' "$WORKFLOW")" -eq 1 ]
+[ "$(grep -Fc '00:0c:29:86:a3:3b' "$WORKFLOW")" -eq 1 ]
 [ "$(grep -Fc '00:0c:29:1c:f7:78' "$WORKFLOW")" -eq 1 ]
 [ "$(grep -Fc '3eb58bb0-ff08-4e2d-839c-11cedca0b043' "$WORKFLOW")" -eq 1 ]
 [ "$(grep -Fc '0cefb0c8-c860-48c5-856f-408594775cbb' "$WORKFLOW")" -eq 1 ]

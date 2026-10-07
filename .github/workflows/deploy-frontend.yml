@@ -131,7 +131,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      REDEPLOY_EXPECTED_REMOTE_MAC: '00:0c:29:ad:be:90'
+      REDEPLOY_EXPECTED_REMOTE_MAC: '00:0c:29:86:a3:3b'
       REDEPLOY_EXPECTED_NODE_ID: '3eb58bb0-ff08-4e2d-839c-11cedca0b043'
     environment:
       name: development

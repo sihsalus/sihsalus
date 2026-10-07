@@ -89,6 +89,14 @@ SSH no puede recibir el script ni ejecutar Docker, y tampoco puede aprobar la
 verificación HTTP con otra identidad. La MAC se comprueba dentro de cada
 conexión SSH porque un preflight separado no protege la siguiente conexión.
 
+La identidad física de DEV es `00:0c:29:86:a3:3b`, confirmada por el responsable
+de infraestructura el 6 de octubre de 2026 y comprobada por SSH el 7 de octubre.
+La MAC anterior `00:0c:29:ad:be:90` corresponde al host retirado. El UUID lógico
+de DEV sigue siendo `3eb58bb0-ff08-4e2d-839c-11cedca0b043`; el despliegue lo
+entrega únicamente después de verificar la MAC vigente. La incidencia
+[#243](https://github.com/sihsalus/sihsalus/issues/243) conserva el antecedente
+de alternancia. Si vuelve a responder el host antiguo, el control debe rechazarlo.
+
 El sondeo es una defensa probabilística: una réplica que no reciba ninguna de
 las conexiones dentro de la ventana todavía puede escapar. La corrección
 definitiva de direcciones duplicadas y VMs clonadas sigue correspondiendo a la
