@@ -21,9 +21,9 @@ grep -Fq 'Verify DEV externally' "$WORKFLOW"
 grep -Fq 'Verify QLTY externally' "$WORKFLOW"
 grep -Fq 'https://gidis-hsc-dev.inf.pucp.edu.pe' "$WORKFLOW"
 grep -Fq 'https://gidis-hsc-qlty.inf.pucp.edu.pe' "$WORKFLOW"
-grep -Fq "REDEPLOY_EXPECTED_REMOTE_MAC: '00:0c:29:ad:be:90'" "$WORKFLOW"
+grep -Fq "REDEPLOY_EXPECTED_REMOTE_MAC: '00:0c:29:86:a3:3b'" "$WORKFLOW"
 grep -Fq "REDEPLOY_EXPECTED_REMOTE_MAC: '00:0c:29:1c:f7:78'" "$WORKFLOW"
-grep -Fq "REDEPLOY_EXPECTED_NODE_ID: '3eb58bb0-ff08-4e2d-839c-11cedca0b043'" "$WORKFLOW"
+grep -Fq "REDEPLOY_EXPECTED_NODE_ID: '700e430a-1c32-5241-b7cf-78ccea17f8c1'" "$WORKFLOW"
 grep -Fq "REDEPLOY_EXPECTED_NODE_ID: '0cefb0c8-c860-48c5-856f-408594775cbb'" "$WORKFLOW"
 if grep -Fq 'actual_sha=' "$WORKFLOW"; then
   echo "frontend workflow still trusts a single external build-info response" >&2
