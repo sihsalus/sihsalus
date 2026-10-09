@@ -28,8 +28,8 @@ ARG REST_VERSION=3.5.1-sihsalus.1
 ADD --checksum=sha256:8dda51c6534a2cec362bc2a1c10d40021bb3f1ef962f5c291804f2e6840b0f96 \
     https://github.com/sihsalus/openmrs-module-webservices.rest/releases/download/${REST_VERSION}/webservices.rest-${REST_VERSION}.omod \
     /tmp/webservices.rest.omod
-ARG EMRAPI_VERSION=3.5.1-sihsalus.1
-ADD --checksum=sha256:963122a092828b8d7bb5a20e25d99c0383d4355ef0ae5a99c4e30b620b6ab216 \
+ARG EMRAPI_VERSION=3.5.1-sihsalus.2
+ADD --checksum=sha256:684c3e93035dbc553c3ff3d03a2c51b394c0dfeb094ab3368eb7d62cfeec9084 \
     https://github.com/sihsalus/openmrs-module-emrapi/releases/download/${EMRAPI_VERSION}/emrapi-${EMRAPI_VERSION}.omod \
     /tmp/emrapi.omod
 
