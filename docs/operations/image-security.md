@@ -182,6 +182,55 @@ inexplotables. Retirar cada entrada cuando una release probada del componente
 propietario resuelva su alcance; el día posterior al vencimiento se vuelve a
 bloquear la publicación y cualquier renovación exige otra decisión explícita.
 
+## Aceptación adicional para QLTY del 09/10/2026 UTC
+
+El mantenedor aceptó expresamente dos hallazgos adicionales para continuar la
+instalación de EmrApi `3.5.1-sihsalus.2` en **QLTY únicamente**. Se agregan dos
+entradas exactas; las 48 anteriores conservan todos sus valores y su vencimiento
+**09/10/2026 UTC**. Responsable: `@Duvet05`; seguimiento
+[#323](https://github.com/sihsalus/sihsalus/issues/323).
+
+La evidencia del [Build Backend 37992692656, intento 2](https://github.com/sihsalus/sihsalus/actions/runs/37992692656/attempts/2)
+corresponde al commit `23cd14b02d75e2d5186061894785693b7015077a`.
+Trivy 0.74.0 terminó el escaneo el **09/10/2026 a las 21:44:24 UTC**;
+el SPDX 2.3 contiene 432 paquetes y sitúa ambos componentes en el WAR de Core.
+Los dos alcances son `linux/amd64`, `lang-pkgs` / `jar`:
+
+| Hallazgo | Paquete y versión | Severidad del escáner |
+| --- | --- | --- |
+| CVE-2026-47884 | `org.springframework:spring-webmvc` 5.3.30 | CRITICAL |
+| CVE-2026-68494 | `com.fasterxml.jackson.core:jackson-core` 2.19.1 | HIGH |
+
+Core 2.8.9 es el componente propietario. Para Spring, la corrección compatible
+5.3.50 requiere [acceso Enterprise](https://spring.io/security/cve-2026-47884/);
+la alternativa OSS 7.0.9 cambia de `javax` a `jakarta` y exige una migración del
+stack actual de Core y Tomcat 9, según la
+[matriz oficial de Spring](https://github.com/spring-projects/spring-framework/wiki/Spring-Framework-Versions).
+Para Jackson, el escáner informa 2.18.8 y 2.21.4 como versiones corregidas;
+actualizar a 2.21.4 requiere una release probada de Core y sus dependencias
+Jackson coordinadas. No se sustituye un JAR anidado desde infraestructura.
+
+Las dos entradas se crean el **09/10/2026** y vencen el **10/10/2026 UTC**,
+inclusive, la fecha mínima válida del contrato existente. Esto **no renueva las
+48 entradas anteriores**: el catálogo completo sólo permite publicación mientras
+todas estén vigentes, y vuelve a fallar el 10/10 por las 48 vencidas.
+
+El catálogo gobierna la publicación global de la imagen; no impone restricciones
+por entorno. QLTY es el alcance operativo autorizado para esta aceptación;
+no se amplía a DEV ni producción. La aceptación no corrige las dependencias,
+no declara falsos positivos ni demuestra que sean inexplotables.
+Retirar cada entrada cuando una release verificada de Core elimine su hallazgo
+y pase compatibilidad, runtime y seguridad; cualquier renovación necesita otra
+decisión explícita del mantenedor.
+
+El intento 2 también falló al obtener un token de Docker Hub durante el escaneo
+de la baseline OpenMRS (HTTP 504). Ese fallo operativo sigue bloqueando: esta
+aceptación no lo ignora ni convierte el candidato en una release. Se conservan
+la comparación con OpenMRS, SBOM, escaneo vigente del digest exacto, política,
+firma y promoción nativas. Antes de instalar en QLTY se requieren además el
+[smoke de autenticación](runtime-smoke.md), el
+[checklist de despliegue](deploy-checklist.md) y la aceptación funcional del módulo.
+
 ## Evidencia sin credenciales
 
 El escáner se limita explícitamente a vulnerabilidades. Incluso así, su JSON

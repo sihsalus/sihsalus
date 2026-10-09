@@ -768,6 +768,38 @@
       "rationale": "Explicit maintainer acceptance on 2026-10-03 UTC for this additional exact HIGH finding, limited to DEV and QLTY through 2026-10-09 UTC inclusive. Build Backend run 37078656482 scanned the immutable Core 2.8.9 inventory with Trivy 0.74.0. A tested owning-component release is tracked in #323. This acceptance does not remediate the dependency or authorize production deployment.",
       "createdOn": "2026-10-03",
       "expiresOn": "2026-10-09"
+    },
+    {
+      "id": "backend-323-cve-2026-47884-6a000bcb",
+      "repository": "ghcr.io/sihsalus/sihsalus-backend",
+      "platform": "linux/amd64",
+      "vulnerabilityId": "CVE-2026-47884",
+      "packageName": "org.springframework:spring-webmvc",
+      "installedVersion": "5.3.30",
+      "class": "lang-pkgs",
+      "type": "jar",
+      "severity": "CRITICAL",
+      "owner": "@Duvet05",
+      "issue": "https://github.com/sihsalus/sihsalus/issues/323",
+      "rationale": "Explicit maintainer acceptance on 2026-10-09 UTC for this exact Trivy 0.74.0 finding from native publisher run 37992692656 attempt 2, source 23cd14b02d75e2d5186061894785693b7015077a, solely to continue the EmrApi .2 installation in QLTY. Core 2.8.9 owns spring-webmvc 5.3.30. The compatible fixed 5.3.50 line requires Spring Enterprise access; OSS 7.0.9 changes javax to Jakarta and is incompatible with the current Core/Tomcat 9 stack. Owner @Duvet05 tracks removal in #323 upon a verified Core release that removes this finding and passes compatibility, runtime and security gates. No remediation, false-positive or non-exploitability claim is made. Created 2026-10-09; minimum valid expiry 2026-10-10. The 48 existing exceptions remain unchanged and expire 2026-10-09, so the complete policy only permits publication while all entries are current. The policy governs global image publication and does not enforce environments; no DEV or production installation is authorized by this acceptance.",
+      "createdOn": "2026-10-09",
+      "expiresOn": "2026-10-10"
+    },
+    {
+      "id": "backend-323-cve-2026-68494-4eb2f298",
+      "repository": "ghcr.io/sihsalus/sihsalus-backend",
+      "platform": "linux/amd64",
+      "vulnerabilityId": "CVE-2026-68494",
+      "packageName": "com.fasterxml.jackson.core:jackson-core",
+      "installedVersion": "2.19.1",
+      "class": "lang-pkgs",
+      "type": "jar",
+      "severity": "HIGH",
+      "owner": "@Duvet05",
+      "issue": "https://github.com/sihsalus/sihsalus/issues/323",
+      "rationale": "Explicit maintainer acceptance on 2026-10-09 UTC for this exact Trivy 0.74.0 finding from native publisher run 37992692656 attempt 2, source 23cd14b02d75e2d5186061894785693b7015077a, solely to continue the EmrApi .2 installation in QLTY. Core 2.8.9 WAR owns jackson-core 2.19.1. Moving to the reported fixed 2.21.4 requires a tested owning Core release and coordinated Jackson dependencies; replacing a nested WAR JAR in infrastructure is not a verified remediation. Owner @Duvet05 tracks removal in #323 upon a verified Core release that removes this finding and passes compatibility, runtime and security gates. No remediation, false-positive or non-exploitability claim is made. Created 2026-10-09; minimum valid expiry 2026-10-10. The 48 existing exceptions remain unchanged and expire 2026-10-09, so the complete policy only permits publication while all entries are current. The policy governs global image publication and does not enforce environments; no DEV or production installation is authorized by this acceptance.",
+      "createdOn": "2026-10-09",
+      "expiresOn": "2026-10-10"
     }
   ]
 }
