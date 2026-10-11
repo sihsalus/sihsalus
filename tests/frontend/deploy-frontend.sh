@@ -189,7 +189,13 @@ case "${1:-}" in
 esac
 EOF
 
-  chmod +x "$fixture/bin/docker" "$fixture/bin/git"
+  cat >"$fixture/bin/df" <<'EOF_DF'
+#!/usr/bin/env bash
+printf 'Filesystem 1048576-blocks Used Available Capacity Mounted on\n'
+printf '/dev/fake 46080 37888 8192 82%% /\n'
+EOF_DF
+
+  chmod +x "$fixture/bin/docker" "$fixture/bin/git" "$fixture/bin/df"
 }
 
 install_low_disk_df() {
