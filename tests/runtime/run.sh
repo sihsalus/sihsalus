@@ -66,6 +66,40 @@ assert_no_patients() {
   echo 'patients=0' >>"$EVIDENCE/health.log"
 }
 
+assert_clinical_audit_database() {
+  local checks
+  # Use the same schema-scoped account as OpenMRS, never the database root.
+  # These read-only checks require the module's own migrations to have created
+  # both triggers; the smoke does not install or repair any audit metadata.
+  # shellcheck disable=SC2016
+  checks="$("${COMPOSE[@]}" exec -T db sh -c \
+    'MYSQL_PWD="$MYSQL_PASSWORD" mariadb --user="$MYSQL_USER" --database=openmrs --batch --skip-column-names' \
+    2>>"$STATE/database-check.log" <<'SQL'
+SELECT @@log_bin = 1 AND @@binlog_format = 'ROW' AND @@global.log_bin_trust_function_creators = 1;
+SELECT COUNT(*) = 0 FROM information_schema.USER_PRIVILEGES
+ WHERE GRANTEE = CONCAT(QUOTE(SUBSTRING_INDEX(CURRENT_USER(), '@', 1)), '@',
+                        QUOTE(SUBSTRING_INDEX(CURRENT_USER(), '@', -1)))
+   AND PRIVILEGE_TYPE <> 'USAGE';
+SELECT COUNT(*) = 2 FROM information_schema.TRIGGERS
+ WHERE TRIGGER_SCHEMA = DATABASE() AND EVENT_OBJECT_SCHEMA = DATABASE()
+   AND EVENT_OBJECT_TABLE = 'sihsalus_clinical_audit_event'
+   AND ACTION_TIMING = 'BEFORE' AND ACTION_ORIENTATION = 'ROW'
+   AND DEFINER = CURRENT_USER()
+   AND ((TRIGGER_NAME = 'sihsalus_audit_no_update' AND EVENT_MANIPULATION = 'UPDATE')
+     OR (TRIGGER_NAME = 'sihsalus_audit_no_delete' AND EVENT_MANIPULATION = 'DELETE'));
+SELECT COUNT(*) = 4 AND SUM(ID IN ('sihsalusaudit-20260819-09-validate',
+                                  'sihsalusaudit-20260819-10-mariadb-validate')
+                           AND EXECTYPE IN ('EXECUTED', 'RERAN')) = 2
+ FROM liquibasechangelog WHERE AUTHOR = 'sihsalus'
+   AND ID IN ('sihsalusaudit-20260819-07-no-update', 'sihsalusaudit-20260819-08-no-delete',
+              'sihsalusaudit-20260819-09-validate', 'sihsalusaudit-20260819-10-mariadb-validate')
+   AND EXECTYPE IN ('EXECUTED', 'RERAN', 'MARK_RAN');
+SQL
+  )"
+  [[ "$checks" == $'1\n1\n1\n1' ]]
+  echo 'audit=app-account-no-global-privileges,row-binlog,triggers-and-validations-passed' >>"$EVIDENCE/health.log"
+}
+
 BACKEND_DIGEST="${BACKEND_DIGEST:?the workflow must resolve a shared immutable backend digest}"
 PROJECT="${COMPOSE_PROJECT_NAME:?synthetic project required}"
 COMPOSE=(docker compose --project-name "$PROJECT" --env-file .env.template -f docker-compose.yml)
@@ -100,6 +134,8 @@ for endpoint in startup ready; do
   echo "$endpoint=$status" >>"$EVIDENCE/health.log"
 done
 assert_no_patients
+STAGE=clinical-audit-database
+assert_clinical_audit_database
 mapfile -t containers < <("${COMPOSE[@]}" ps --all -q)
 docker inspect "${containers[@]}" \
   | jq 'map({service: .Config.Labels["com.docker.compose.service"], image: .Config.Image, imageId: .Image})' \

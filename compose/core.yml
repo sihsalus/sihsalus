@@ -172,7 +172,9 @@ services:
     container_name: sihsalus-db-master
     image: mariadb:10.11.7
     restart: "unless-stopped"
-    command: "mariadbd --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci --server-id=1 --log-bin=mysql-bin --binlog-format=ROW --sync-binlog=1 --log-slave-updates=1"
+    # Module migrations create audit triggers with the schema-scoped OpenMRS user.
+    # Keep row-based binary logging without requiring global SUPER privileges.
+    command: "mariadbd --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci --server-id=1 --log-bin=mysql-bin --binlog-format=ROW --log-bin-trust-function-creators=1 --sync-binlog=1 --log-slave-updates=1"
     healthcheck:
       test: [ "CMD-SHELL", "mariadb --user=\"$${MYSQL_USER}\" --password=\"$${MYSQL_PASSWORD}\" --execute 'SHOW DATABASES;'" ]
       interval: 10s

@@ -97,6 +97,16 @@ test('published core serves its SPA, authenticates, and ends the synthetic sessi
     expect(errors).toEqual([]);
   });
 
+  await test.step('clinical audit starts with its migrations complete', async () => {
+    const response = await context.request.get(
+      '/openmrs/ws/rest/v1/module/sihsalusaudit?v=custom:(uuid,started,startupErrorMessage)',
+    );
+    expect(response.status()).toBe(200);
+    const audit = await response.json();
+    expect(audit).toMatchObject({ uuid: 'sihsalusaudit', started: true });
+    expect(audit.startupErrorMessage).toBeFalsy();
+  });
+
   await test.step('logout invalidates the server session and requires login again', async () => {
     await page.goto('/openmrs/spa/logout');
     if (fixture.mode === 'keycloak') {
