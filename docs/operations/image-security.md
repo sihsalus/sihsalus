@@ -8,6 +8,10 @@ Trivy del digest exacto de su manifiesto ejecutable.
 
 Gateway y el wrapper del frontend fijan la misma base Nginx 1.30.5 por digest;
 Certbot fija la versión 5.8.0 y actualiza los paquetes Alpine al construir.
+También fija su dependencia Python `urllib3` en 2.8.0 mediante `pip`, porque la
+imagen base contiene una versión anterior y `apk upgrade` no actualiza paquetes
+Python instalados por ese mecanismo. Retirar esta actualización cuando una base
+oficial fijada incluya la versión corregida y pase los mismos controles de imagen.
 La construcción comprueba sus dependencias con `pip check` y desinstala `pip`:
 el instalador y sus bibliotecas vendorizadas no son necesarios para emitir o
 renovar certificados. Los plugins adicionales requieren reconstruir la imagen
