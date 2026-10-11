@@ -16,6 +16,20 @@ La réplica mejora recuperación y permite ejecutar backups fuera del master, pe
 
 Los scripts bajo `/docker-entrypoint-initdb.d` solo se ejecutan cuando el volumen de datos está vacío. Cambiar variables después no modifica usuarios existentes automáticamente.
 
+El master mantiene `binlog_format=ROW` y
+`log_bin_trust_function_creators=1` en su comando de arranque. Las migraciones de
+los módulos, incluidos los disparadores de auditoría que impiden actualizar o
+eliminar eventos, pueden así ejecutarse con los permisos del usuario OpenMRS
+sobre su esquema, sin concederle `SUPER`. Esta opción confía en las cuentas que
+ya tienen permisos para crear rutinas o disparadores; esos permisos deben quedar
+limitados a las cuentas de aplicación y administración previstas.
+
+Si una instalación anterior falló con el error MariaDB 1419 al crear esos
+disparadores, desplegar esta configuración requiere recrear `db` y volver a
+arrancar el backend conservando sus volúmenes. Liquibase reintenta las migraciones
+pendientes del módulo; no se modifican sus identidades ni checksums aplicados.
+Ver [registro binario de rutinas en MariaDB](https://mariadb.com/docs/server/server-usage/stored-routines/binary-logging-of-stored-routines).
+
 ## Variables
 
 ```env
