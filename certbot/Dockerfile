@@ -8,9 +8,10 @@ RUN apk upgrade --no-cache && \
     cp /usr/share/zoneinfo/America/Lima /etc/localtime && \
     echo "America/Lima" > /etc/timezone
 
-# Certbot is already installed. Keep its dependency check at build time and
-# remove the installer, including its unused vendored packages, from runtime.
-RUN python -m pip check && python -m pip uninstall --yes pip
+# Update the Python HTTP dependency independently of Alpine packages. Keep the
+# dependency check and remove the installer and its vendored runtime packages.
+RUN python -m pip install --no-cache-dir --upgrade urllib3==2.8.0 && \
+    python -m pip check && python -m pip uninstall --yes pip
 
 RUN mkdir -p /var/www/certbot/conf /etc/letsencrypt/live
 
