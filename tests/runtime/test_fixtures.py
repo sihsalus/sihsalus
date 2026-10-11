@@ -4,6 +4,7 @@ from copy import deepcopy
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -18,6 +19,80 @@ DIGEST = "sha256:" + "a" * 64
 
 
 class RuntimeFixtureTests(unittest.TestCase):
+    def test_audit_database_failure_cannot_pass_healthy_core_or_reach_browser(self):
+        cases = {
+            "valid": ("1\n1\n1\n1\n", 0),
+            "binlog-or-trust-invalid": ("0\n1\n1\n1\n", 0),
+            "global-privileges": ("1\n0\n1\n1\n", 0),
+            "missing-or-wrong-trigger": ("1\n1\n0\n1\n", 0),
+            "missing-validation": ("1\n1\n1\n0\n", 0),
+            "database-error": ("", 42),
+            "unexpected-output": ("1\n1\n1\n1\n1\n", 0),
+        }
+        for name, (checks, sql_exit) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                temporary = Path(directory)
+                state = temporary / "state"
+                fixture, model = self.render(state, "local")
+                repository = temporary / "repository"
+                runtime = repository / "tests/runtime"
+                runtime.mkdir(parents=True)
+                for script in ("run.sh", "fixtures.py"):
+                    shutil.copyfile(ROOT / "tests/runtime" / script, runtime / script)
+                for service in model["services"].values():
+                    for mount in service.get("volumes", []):
+                        if mount["type"] == "bind":
+                            mount["source"] = str(repository / Path(mount["source"]).relative_to(ROOT))
+                (temporary / "model.json").write_text(json.dumps(model))
+                commands = temporary / "bin"
+                commands.mkdir()
+                docker = commands / "docker"
+                docker.write_text("#!/usr/bin/env python3\n" + '''import json, os, pathlib, sys
+args = sys.argv[1:]
+if args == ['context', 'show']: print('default')
+elif args[0] == 'info': print('synthetic-version')
+elif args[0] == 'compose':
+    if 'config' in args: print(pathlib.Path(os.environ['AUDIT_TEST_MODEL']).read_text())
+    elif 'exec' in args:
+        command = args[-1]
+        if '--user="$MYSQL_USER"' not in command or 'MYSQL_PWD="$MYSQL_PASSWORD"' not in command:
+            sys.exit(90)
+        if 'SELECT COUNT(*) FROM patient' in command: print(0)
+        else:
+            query = sys.stdin.read()
+            pathlib.Path(os.environ['AUDIT_TEST_SQL']).write_text(query)
+            sys.stdout.write(os.environ['AUDIT_TEST_CHECKS'])
+            sys.exit(int(os.environ['AUDIT_TEST_SQL_EXIT']))
+    elif 'ps' in args and 'json' in args: print('[]')
+elif args[0] == 'inspect' or args[:2] == ['image', 'inspect']: print('[]')
+''')
+                (commands / "curl").write_text("#!/bin/sh\nprintf '200'\n")
+                (commands / "npm").write_text('#!/bin/sh\ntouch "$AUDIT_TEST_BROWSER"\n')
+                (commands / "timeout").write_text('#!/bin/sh\nshift 2\nexec "$@"\n')
+                for command in commands.iterdir(): command.chmod(0o700)
+                browser = temporary / "browser-called"
+                environment = {**os.environ, **fixture["environment"],
+                               "PATH": str(commands) + ":" + os.environ["PATH"],
+                               "GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted", "RUNNER_OS": "Linux",
+                               "GITHUB_SHA": "a" * 40, "SMOKE_STATE": str(state),
+                               "DOCKER_HOST": "", "DOCKER_CONTEXT": "",
+                               "AUDIT_TEST_MODEL": str(temporary / "model.json"),
+                               "AUDIT_TEST_SQL": str(temporary / "checks.sql"),
+                               "AUDIT_TEST_CHECKS": checks, "AUDIT_TEST_SQL_EXIT": str(sql_exit),
+                               "AUDIT_TEST_BROWSER": str(browser)}
+                result = subprocess.run(["bash", str(runtime / "run.sh"), "local"],
+                                        env=environment, capture_output=True, timeout=20)
+                recorded = json.loads((repository / "runtime-smoke-results/local/result.json").read_text())
+                if name == "valid":
+                    self.assertEqual(result.returncode, 0, result.stderr.decode())
+                    self.assertTrue(browser.exists())
+                    self.assertEqual(recorded["lastStage"], "complete")
+                else:
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertFalse(browser.exists())
+                    self.assertEqual(recorded["lastStage"], "clinical-audit-database")
+                    self.assertNotEqual(recorded["exitCode"], 0)
+
     def test_non_runner_cannot_reach_docker(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
