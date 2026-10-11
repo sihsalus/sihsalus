@@ -231,20 +231,20 @@ firma y promoción nativas. Antes de instalar en QLTY se requieren además el
 [smoke de autenticación](runtime-smoke.md), el
 [checklist de despliegue](deploy-checklist.md) y la aceptación funcional del módulo.
 
-## Propuesta de renovación para DEV y QLTY del 11/10/2026 UTC
+## Renovación para DEV y QLTY del 11/10/2026 UTC
 
 La instalación limpia solicitada para DEV y la actualización de QLTY requieren
 una imagen nueva. Las 50 excepciones existentes vencieron el 09/10 o 10/10,
-por lo que la política bloquea su publicación antes del build. Esta propuesta
-renueva únicamente esos mismos 50 alcances hasta el **12/10/2026 UTC**,
-inclusive; la confirmación del mantenedor está pendiente antes del merge.
+por lo que la política bloqueaba su publicación antes del build. El mantenedor
+confirmó expresamente la renovación de esos mismos 50 alcances hasta el
+**12/10/2026 UTC**, inclusive, para la instalación solicitada en ambos ambientes.
 Responsable: `@Duvet05`; seguimiento [#323](https://github.com/sihsalus/sihsalus/issues/323).
 
 Se conservan IDs, repositorio, plataforma, CVE, paquete, versión, clase,
 ecosistema, severidad, propietario e issue. No se añaden hallazgos ni comodines.
 El nuevo digest todavía requiere escaneo vigente, inventario, comparación con
 OpenMRS, política, firma y promoción. Los informes anteriores no acreditan
-el resultado del candidato nuevo. El ámbito operativo propuesto es DEV y QLTY;
+el resultado del candidato nuevo. El ámbito operativo autorizado es DEV y QLTY;
 no comprende producción y no afirma que se hayan corregido las dependencias.
 
 La corrección pertenece a las releases de Core y sus bibliotecas coordinadas.
