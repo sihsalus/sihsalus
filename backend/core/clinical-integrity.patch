@@ -1,0 +1,348 @@
+diff --git a/api/src/main/java/org/openmrs/api/db/ConditionDAO.java b/api/src/main/java/org/openmrs/api/db/ConditionDAO.java
+index 07f2319..5de5bf4 100644
+--- a/api/src/main/java/org/openmrs/api/db/ConditionDAO.java
++++ b/api/src/main/java/org/openmrs/api/db/ConditionDAO.java
+@@ -47,6 +47,12 @@ public interface ConditionDAO {
+ 	 */
+ 	List<Condition> getActiveConditions(Patient patient);
+ 
++	/** Serialize condition writes for a patient, including an empty history. */
++	void lockPatient(Patient patient);
++
++	/** Read the current active conditions under the patient write lock. */
++	List<Condition> getActiveConditionsForUpdate(Patient patient);
++
+ 	/**
+ 	 * @see org.openmrs.api.ConditionService#getAllConditions(Patient)
+ 	 */
+diff --git a/api/src/main/java/org/openmrs/api/db/hibernate/HibernateConditionDAO.java b/api/src/main/java/org/openmrs/api/db/hibernate/HibernateConditionDAO.java
+index ae81c9c..c593a1c 100644
+--- a/api/src/main/java/org/openmrs/api/db/hibernate/HibernateConditionDAO.java
++++ b/api/src/main/java/org/openmrs/api/db/hibernate/HibernateConditionDAO.java
+@@ -14,6 +14,9 @@ import java.util.Arrays;
+ import java.util.List;
+ 
+ import org.hibernate.SessionFactory;
++import org.hibernate.LockMode;
++import org.hibernate.query.Query;
++import javax.persistence.LockModeType;
+ import org.openmrs.Condition;
+ import org.openmrs.Encounter;
+ import org.openmrs.Patient;
+@@ -88,15 +91,30 @@ public class HibernateConditionDAO implements ConditionDAO {
+ 	 */
+ 	@Override
+ 	public List<Condition> getActiveConditions(Patient patient) {
+-		TypedQuery<Condition> query = sessionFactory.getCurrentSession().createQuery(
+-				 "from Condition c " +
+-					 "where c.patient.patientId = :patientId " +
+-					"and c.clinicalStatus in :activeStatuses " +
+-					"and c.voided = false " +
+-					"order by c.dateCreated desc", Condition.class);
+-		query.setParameter("patientId", patient.getId());
+-		query.setParameter("activeStatuses", Arrays.asList(ACTIVE, RECURRENCE, RELAPSE));
+-		return query.getResultList();
++		return activeConditionsQuery(patient).getResultList();
++	}
++
++	private Query<Condition> activeConditionsQuery(Patient patient) {
++		return sessionFactory.getCurrentSession().createQuery(
++			"from Condition c where c.patient.patientId = :patientId "
++				+ "and c.clinicalStatus in :activeStatuses and c.voided = false order by c.dateCreated desc",
++			Condition.class)
++			.setParameter("patientId", patient.getId())
++			.setParameter("activeStatuses", Arrays.asList(ACTIVE, RECURRENCE, RELAPSE));
++	}
++
++	@Override
++	public void lockPatient(Patient patient) {
++		sessionFactory.getCurrentSession().get(Patient.class, patient.getId(), LockMode.PESSIMISTIC_WRITE);
++	}
++
++	@Override
++	public List<Condition> getActiveConditionsForUpdate(Patient patient) {
++		return activeConditionsQuery(patient)
++			// A locking read sees commits made before acquiring the patient lock,
++			// including under MySQL's REPEATABLE READ isolation.
++			.setLockMode(LockModeType.PESSIMISTIC_WRITE)
++			.getResultList();
+ 	}
+ 
+ 	/**
+diff --git a/api/src/main/java/org/openmrs/api/impl/ConditionServiceImpl.java b/api/src/main/java/org/openmrs/api/impl/ConditionServiceImpl.java
+index 88430d3..dc55b42 100644
+--- a/api/src/main/java/org/openmrs/api/impl/ConditionServiceImpl.java
++++ b/api/src/main/java/org/openmrs/api/impl/ConditionServiceImpl.java
+@@ -12,6 +12,7 @@ package org.openmrs.api.impl;
+ import org.apache.commons.lang3.BooleanUtils;
+ import org.apache.commons.lang3.StringUtils;
+ import org.openmrs.Condition;
++import org.openmrs.ConditionClinicalStatus;
+ import org.openmrs.Encounter;
+ import org.openmrs.Patient;
+ import org.openmrs.User;
+@@ -22,6 +23,11 @@ import org.openmrs.api.db.ConditionDAO;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+ import java.util.List;
++import java.util.Arrays;
++import java.util.Objects;
++import org.openmrs.api.ValidationException;
++import org.springframework.validation.BindException;
++import org.springframework.validation.Errors;
+ 
+ /**
+  * This class implements the {@link ConditionService} interface
+@@ -103,10 +109,12 @@ public class ConditionServiceImpl extends BaseOpenmrsService implements Conditio
+ 	 */
+ 	@Override
+ 	public Condition saveCondition(Condition condition) throws APIException {
++		conditionDAO.lockPatient(condition.getPatient());
+ 		
+ 		// If there is no existing condition, then we are creating a condition
+ 		Integer existingConditionId = condition.getConditionId();
+ 		if (existingConditionId == null) {
++			validateActiveCondition(condition, null);
+ 			return conditionDAO.saveCondition(condition);
+ 		}
+ 		
+@@ -121,6 +129,10 @@ public class ConditionServiceImpl extends BaseOpenmrsService implements Conditio
+ 		boolean voidOriginal = !existingVoided && conditionHasChanged;
+ 		boolean saveNew = !newVoided && conditionHasChanged;
+ 		
++		if (saveNew) {
++			validateActiveCondition(newCondition, existingConditionId);
++		}
++
+ 		// If the intention is to void or change the original Condition, then void the existing and save the new
+ 		if (voidOriginal) {
+ 			User currentUser = Context.getAuthenticatedUser();
+@@ -149,6 +161,7 @@ public class ConditionServiceImpl extends BaseOpenmrsService implements Conditio
+ 	 */
+ 	@Override
+ 	public Condition voidCondition(Condition condition, String voidReason) {
++		conditionDAO.lockPatient(condition.getPatient());
+ 		if (StringUtils.isBlank(voidReason)) {
+ 			throw new IllegalArgumentException("voidReason cannot be null or empty");
+ 		}
+@@ -164,6 +177,8 @@ public class ConditionServiceImpl extends BaseOpenmrsService implements Conditio
+ 	 */
+ 	@Override
+ 	public Condition unvoidCondition(Condition condition) {
++		conditionDAO.lockPatient(condition.getPatient());
++		validateActiveCondition(condition, condition.getId());
+ 		return conditionDAO.saveCondition(condition);
+ 	}
+ 
+@@ -179,4 +194,27 @@ public class ConditionServiceImpl extends BaseOpenmrsService implements Conditio
+ 	public void purgeCondition(Condition condition) {
+ 		conditionDAO.deleteCondition(condition);
+ 	}
++
++	private void validateActiveCondition(Condition condition, Integer originalId) {
++		if (BooleanUtils.isTrue(condition.getVoided()) || condition.getCondition() == null
++		        || condition.getCondition().getCoded() == null
++		        || !Arrays.asList(ConditionClinicalStatus.ACTIVE, ConditionClinicalStatus.RECURRENCE,
++		            ConditionClinicalStatus.RELAPSE).contains(condition.getClinicalStatus())) {
++			return;
++		}
++		boolean duplicate = conditionDAO.getActiveConditionsForUpdate(condition.getPatient()).stream()
++			.anyMatch(existing -> !Objects.equals(existing.getId(), originalId)
++			    && existing.getCondition() != null
++			    && condition.getCondition().getCoded().equals(existing.getCondition().getCoded())
++			    // Supplemental context may distinguish a family antecedent from the patient's condition.
++			    && StringUtils.defaultString(condition.getAdditionalDetail())
++			        .equals(StringUtils.defaultString(existing.getAdditionalDetail())));
++		if (duplicate) {
++			Errors errors = new BindException(condition, "condition");
++			errors.rejectValue("condition", "Condition.activeDuplicate",
++			    "This patient already has an active condition with this concept. Update it or resolve it before recording another episode.");
++			throw new ValidationException(errors);
++		}
++	}
++
+ }
+diff --git a/api/src/main/java/org/openmrs/validator/PatientProgramValidator.java b/api/src/main/java/org/openmrs/validator/PatientProgramValidator.java
+index 5fc811e..5d30702 100644
+--- a/api/src/main/java/org/openmrs/validator/PatientProgramValidator.java
++++ b/api/src/main/java/org/openmrs/validator/PatientProgramValidator.java
+@@ -9,10 +9,12 @@
+  */
+ package org.openmrs.validator;
+ 
++import java.util.Calendar;
+ import java.util.Date;
+ import java.util.HashSet;
+ import java.util.Set;
+ 
++import org.apache.commons.lang3.time.DateUtils;
+ import org.openmrs.PatientProgram;
+ import org.openmrs.PatientState;
+ import org.openmrs.ProgramWorkflow;
+@@ -91,6 +93,12 @@ public class PatientProgramValidator implements Validator {
+ 		
+ 		ValidationUtils.rejectIfEmpty(errors, "dateEnrolled", "error.patientProgram.enrolledDateEmpty");
+ 		
++		Date birthdate = patientProgram.getPatient().getBirthdate();
++		if (patientProgram.getDateEnrolled() != null && birthdate != null
++		        && DateUtils.truncatedCompareTo(patientProgram.getDateEnrolled(), birthdate, Calendar.DATE) < 0) {
++			errors.rejectValue("dateEnrolled", "error.patientProgram.enrolledDateBeforeBirth");
++		}
++
+ 		Date today = new Date();
+ 		if (patientProgram.getDateEnrolled() != null && today.before(patientProgram.getDateEnrolled())) {
+ 			errors.rejectValue("dateEnrolled", "error.patientProgram.enrolledDateDateCannotBeInFuture");
+diff --git a/api/src/main/resources/messages.properties b/api/src/main/resources/messages.properties
+index 0abcedc..4e82ab2 100644
+--- a/api/src/main/resources/messages.properties
++++ b/api/src/main/resources/messages.properties
+@@ -3339,3 +3339,6 @@ Condition.clinicalStatusShouldNotBeNull=Clinical status is required
+ 
+ mail.passwordreset.subject=Password Reset
+ mail.passwordreset.content=Hi {name} \n You recently requested a password reset for your OpenMRS account. To complete the process, click the link below.\n {link} \n  Please disregard this email if you didn't innitiate the password reset process. \n This link will automatically expire after a period of {time} minutes.
++
++error.patientProgram.enrolledDateBeforeBirth=Program enrollment cannot be before the patient birth date.
++Condition.activeDuplicate=This patient already has an active condition with this concept. Update it or resolve it before recording another episode.
+diff --git a/api/src/main/resources/messages_es.properties b/api/src/main/resources/messages_es.properties
+index 7132f30..9b227e7 100644
+--- a/api/src/main/resources/messages_es.properties
++++ b/api/src/main/resources/messages_es.properties
+@@ -2780,3 +2780,6 @@ reporting.whoAreAlive = los que vivimos
+ reporting.patientsInProgram = Los pacientes en el programa
+ reportingcompatibility.CohortBuilder.sqlQuery.note.message2=Please note that your query should only return patient_id(i.e. it should start with something like select o.patient_id from)
+ Role.cannot.inherit.descendant=No se puede heredar un rol descendiente.
++
++error.patientProgram.enrolledDateBeforeBirth=La inscripci\u00f3n al programa no puede ser anterior al nacimiento del paciente.
++Condition.activeDuplicate=El paciente ya tiene esta condici\u00f3n activa. Actualice el registro o resu\u00e9lvalo antes de registrar otro episodio.
+diff --git a/api/src/test/java/org/openmrs/api/impl/ConditionServiceImplTest.java b/api/src/test/java/org/openmrs/api/impl/ConditionServiceImplTest.java
+index 12fa597..bb04361 100644
+--- a/api/src/test/java/org/openmrs/api/impl/ConditionServiceImplTest.java
++++ b/api/src/test/java/org/openmrs/api/impl/ConditionServiceImplTest.java
+@@ -18,6 +18,7 @@ import org.openmrs.ConditionVerificationStatus;
+ import org.openmrs.Encounter;
+ import org.openmrs.Patient;
+ import org.openmrs.api.ConceptService;
++import org.openmrs.api.ValidationException;
+ import org.openmrs.api.ConditionService;
+ import org.openmrs.api.EncounterService;
+ import org.openmrs.api.PatientService;
+@@ -41,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
+ import static org.junit.jupiter.api.Assertions.assertNotNull;
+ import static org.junit.jupiter.api.Assertions.assertNull;
+ import static org.junit.jupiter.api.Assertions.assertTrue;
++import static org.junit.jupiter.api.Assertions.assertThrows;
+ 
+ /**
+  * Unit tests for methods that are specific to the {@link ConditionServiceImpl}. General tests that
+@@ -444,4 +446,82 @@ public class ConditionServiceImplTest extends BaseContextSensitiveTest {
+ 		Condition purgedCondition = conditionService.getCondition(conditionId);
+ 		assertNull(purgedCondition);
+ 	}
++	@Test
++	public void saveCondition_shouldRejectDuplicateActiveConcept() {
++		conditionService.saveCondition(codedCondition(2, ConditionClinicalStatus.ACTIVE));
++		ValidationException error = assertThrows(ValidationException.class,
++		    () -> conditionService.saveCondition(codedCondition(2, ConditionClinicalStatus.RECURRENCE)));
++		assertEquals("Condition.activeDuplicate", error.getErrors().getFieldError("condition").getCode());
++	}
++
++	@Test
++	public void saveCondition_shouldPermitNewEpisodeAfterResolution() {
++		Condition previous = conditionService.saveCondition(codedCondition(2, ConditionClinicalStatus.ACTIVE));
++		previous.setClinicalStatus(ConditionClinicalStatus.RESOLVED);
++		Condition resolved = conditionService.saveCondition(previous);
++		Condition next = conditionService.saveCondition(codedCondition(2, ConditionClinicalStatus.RELAPSE));
++		assertNotEquals(resolved.getId(), next.getId());
++		assertEquals(ConditionClinicalStatus.RESOLVED, resolved.getClinicalStatus());
++	}
++
++	@Test
++	public void saveCondition_shouldPreserveExistingEpisodeWhenEditing() {
++		Condition original = conditionService.saveCondition(codedCondition(2, ConditionClinicalStatus.ACTIVE));
++		Integer originalId = original.getId();
++		original.setAdditionalDetail("Synthetic correction");
++		Condition updated = conditionService.saveCondition(original);
++		assertEquals(originalId, updated.getPreviousVersion().getId());
++		assertEquals("Synthetic correction", updated.getAdditionalDetail());
++	}
++
++	@Test
++	public void saveCondition_shouldPermitSameConceptForAnotherPatient() {
++		conditionService.saveCondition(codedCondition(2, ConditionClinicalStatus.ACTIVE));
++		assertNotNull(conditionService.saveCondition(codedCondition(8, ConditionClinicalStatus.ACTIVE)).getId());
++	}
++
++	@Test
++	public void saveCondition_shouldIgnoreVoidedEpisode() {
++		Condition original = conditionService.saveCondition(codedCondition(2, ConditionClinicalStatus.ACTIVE));
++		conditionService.voidCondition(original, "Synthetic duplicate correction");
++		assertNotNull(conditionService.saveCondition(codedCondition(2, ConditionClinicalStatus.ACTIVE)).getId());
++	}
++
++	@Test
++	public void unvoidCondition_shouldRejectDuplicateActiveConcept() {
++		Condition original = conditionService.saveCondition(codedCondition(2, ConditionClinicalStatus.ACTIVE));
++		conditionService.voidCondition(original, "Synthetic duplicate correction");
++		conditionService.saveCondition(codedCondition(2, ConditionClinicalStatus.ACTIVE));
++		assertThrows(ValidationException.class, () -> conditionService.unvoidCondition(original));
++	}
++
++	@Test
++	public void saveCondition_shouldPreserveDistinctSupplementalContext() {
++		Condition personal = codedCondition(2, ConditionClinicalStatus.ACTIVE);
++		personal.setAdditionalDetail("Synthetic personal context");
++		conditionService.saveCondition(personal);
++		Condition family = codedCondition(2, ConditionClinicalStatus.ACTIVE);
++		family.setAdditionalDetail("Synthetic family context");
++		assertNotNull(conditionService.saveCondition(family).getId());
++	}
++
++	@Test
++	public void saveCondition_shouldRejectDuplicateWithTheSameContext() {
++		Condition original = codedCondition(2, ConditionClinicalStatus.ACTIVE);
++		original.setAdditionalDetail("Synthetic context");
++		conditionService.saveCondition(original);
++		Condition duplicate = codedCondition(2, ConditionClinicalStatus.ACTIVE);
++		duplicate.setAdditionalDetail("Synthetic context");
++		assertThrows(ValidationException.class, () -> conditionService.saveCondition(duplicate));
++	}
++
++	private Condition codedCondition(int patientId, ConditionClinicalStatus status) {
++		Condition condition = new Condition();
++		CodedOrFreeText coded = new CodedOrFreeText();
++		coded.setCoded(conceptService.getConcept(11));
++		condition.setCondition(coded);
++		condition.setPatient(patientService.getPatient(patientId));
++		condition.setClinicalStatus(status);
++		return condition;
++	}
+ }
+diff --git a/api/src/test/java/org/openmrs/validator/PatientProgramValidatorTest.java b/api/src/test/java/org/openmrs/validator/PatientProgramValidatorTest.java
+index 5fabfb2..ed3c50a 100644
+--- a/api/src/test/java/org/openmrs/validator/PatientProgramValidatorTest.java
++++ b/api/src/test/java/org/openmrs/validator/PatientProgramValidatorTest.java
+@@ -404,4 +404,24 @@ public class PatientProgramValidatorTest extends BaseContextSensitiveTest {
+ 		new PatientProgramValidator().validate(pp, errors);
+ 		assertTrue(errors.hasFieldErrors("voidReason"));
+ 	}
++	@Test
++	public void validate_shouldRejectEnrollmentBeforeBirth() throws Exception {
++		PatientProgram program = Context.getProgramWorkflowService().getPatientProgram(1);
++		program.getPatient().setBirthdate(new SimpleDateFormat("yyyy-MM-dd").parse("2000-05-05"));
++		program.setDateEnrolled(new SimpleDateFormat("yyyy-MM-dd").parse("2000-05-04"));
++		BindException errors = new BindException(program, "program");
++		new PatientProgramValidator().validate(program, errors);
++		assertEquals("error.patientProgram.enrolledDateBeforeBirth", errors.getFieldError("dateEnrolled").getCode());
++	}
++
++	@Test
++	public void validate_shouldAllowEnrollmentOnBirthCalendarDay() throws Exception {
++		PatientProgram program = Context.getProgramWorkflowService().getPatientProgram(1);
++		program.getPatient().setBirthdate(new SimpleDateFormat("yyyy-MM-dd HH:mm").parse("2000-05-05 16:00"));
++		program.setDateEnrolled(new SimpleDateFormat("yyyy-MM-dd").parse("2000-05-05"));
++		BindException errors = new BindException(program, "program");
++		new PatientProgramValidator().validate(program, errors);
++		assertFalse(errors.hasFieldErrors("dateEnrolled"));
++	}
++
+ }

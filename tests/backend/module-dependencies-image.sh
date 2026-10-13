@@ -71,6 +71,20 @@ mkdir "$TEMP_DIR/core" "$TEMP_DIR/classes"
   jar xf "$CORE_WAR" "${ENTRIES[@]}"
 )
 CLASSPATH="$TEMP_DIR/core/WEB-INF/lib/*"
+if [[ "$MODE" != self-test ]]; then
+  # Check the packaged WAR, not the build cache: SDK must select the corrected Core.
+  javap -classpath "$CLASSPATH" -private -c \
+    org.openmrs.api.impl.ConditionServiceImpl \
+    org.openmrs.api.db.hibernate.HibernateConditionDAO \
+    org.openmrs.validator.PatientProgramValidator > "$TEMP_DIR/core-validation"
+  for marker in Condition.activeDuplicate getActiveConditionsForUpdate PESSIMISTIC_WRITE \
+    error.patientProgram.enrolledDateBeforeBirth; do
+    grep -Fq "$marker" "$TEMP_DIR/core-validation" || {
+      echo "[FAIL] Packaged Core is missing clinical integrity check: $marker" >&2
+      exit 1
+    }
+  done
+fi
 echo "[INFO] Required-version comparator: ${ENTRIES[0]} from the supplied Core WAR"
 # Compile a test harness only, never module/application source. Its comparator
 # is the exact ModuleUtil bytecode from this image's WAR, not a SemVer substitute.
