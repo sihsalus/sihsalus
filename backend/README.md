@@ -13,11 +13,11 @@ before building the `backend` profile. [pom.xml](pom.xml) owns versions;
 The SDK writes `backend/target/sdk-distro`, packaged by the
 [assembly descriptor](assembly.xml).
 
-Core is built from the official 2.8.9 source with the bounded
+Core is built from the official 2.8.10 source with the bounded
 [clinical integrity correction](core/README.md) for program enrollment and
 duplicate active conditions and the dependency maintenance described in the
-same guide. The distribution version is `2.8.10-sihsalus.2`;
-it is not the official OpenMRS 2.8.10 release. Native Core tests run during the
+same guide. The distribution version is `2.8.10-sihsalus.3`, identifying the
+official 2.8.10 baseline plus SIHSalus patches. Native Core tests run during the
 image build before the WAR enters the SDK distribution.
 
 Initializer metadata comes from the selected content packages. SPA configuration

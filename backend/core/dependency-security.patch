@@ -1,5 +1,5 @@
 diff --git a/api/pom.xml b/api/pom.xml
-index 6dc6301..b8470d3 100644
+index bae27e9..27cd15c 100644
 --- a/api/pom.xml
 +++ b/api/pom.xml
 @@ -56,7 +56,7 @@
@@ -23,10 +23,10 @@ index 6dc6301..b8470d3 100644
  		</dependency>
  		<dependency>
 diff --git a/api/src/main/java/org/openmrs/api/cache/CacheConfig.java b/api/src/main/java/org/openmrs/api/cache/CacheConfig.java
-index a1e889c..b5e35cb 100644
+index bd0f3c5..820d4f4 100644
 --- a/api/src/main/java/org/openmrs/api/cache/CacheConfig.java
 +++ b/api/src/main/java/org/openmrs/api/cache/CacheConfig.java
-@@ -20,7 +20,7 @@ import java.util.List;
+@@ -23,7 +23,7 @@ import java.util.List;
  import java.util.Map;
  import java.util.Set;
  
@@ -62,7 +62,7 @@ index def2aad..2e63a7e 100644
  import org.openmrs.MedicationDispense;
  import org.openmrs.api.APIException;
 diff --git a/api/src/main/java/org/openmrs/api/impl/UserServiceImpl.java b/api/src/main/java/org/openmrs/api/impl/UserServiceImpl.java
-index cd9b157..026a062 100644
+index d424962..10ceb0e 100644
 --- a/api/src/main/java/org/openmrs/api/impl/UserServiceImpl.java
 +++ b/api/src/main/java/org/openmrs/api/impl/UserServiceImpl.java
 @@ -22,7 +22,7 @@ import java.util.Properties;
@@ -171,7 +171,7 @@ index 0d7285a..b85d0d3 100644
  import org.openmrs.api.context.Context;
 diff --git a/api/src/main/java/org/openmrs/util/VelocityConfiguration.java b/api/src/main/java/org/openmrs/util/VelocityConfiguration.java
 new file mode 100644
-index 0000000..b7e69a1
+index 0000000..143d15a
 --- /dev/null
 +++ b/api/src/main/java/org/openmrs/util/VelocityConfiguration.java
 @@ -0,0 +1,33 @@
@@ -190,10 +190,10 @@ index 0000000..b7e69a1
 +
 +/** Keeps existing mail and startup templates compatible with Velocity 2. */
 +public final class VelocityConfiguration {
-+
++	
 +	private VelocityConfiguration() {
 +	}
-+
++	
 +	public static Properties legacyTemplateProperties() {
 +		Properties properties = new Properties();
 +		properties.setProperty("introspector.conversion_handler.class", "none");
@@ -338,7 +338,7 @@ index 0000000..68f5ed8
 +    }
 +}
 diff --git a/liquibase/pom.xml b/liquibase/pom.xml
-index c6496b1..3ac1897 100644
+index 7e4ad92..d937a6f 100644
 --- a/liquibase/pom.xml
 +++ b/liquibase/pom.xml
 @@ -28,8 +28,8 @@
@@ -353,7 +353,7 @@ index c6496b1..3ac1897 100644
  		</dependency>
  		<dependency>
 diff --git a/pom.xml b/pom.xml
-index 118c7ca..c7b2001 100644
+index cc8d03f..0fe03fd 100644
 --- a/pom.xml
 +++ b/pom.xml
 @@ -62,6 +62,46 @@
@@ -437,7 +437,16 @@ index 118c7ca..c7b2001 100644
  				</exclusions>
  			</dependency>
  			<dependency>
-@@ -421,9 +451,9 @@
+@@ -213,7 +243,7 @@
+ 			<dependency>
+ 				<groupId>org.springframework.security</groupId>
+ 				<artifactId>spring-security-crypto</artifactId>
+-				<version>5.8.16</version>
++				<version>6.5.11</version>
+ 			</dependency>
+ 			<dependency>
+ 				<groupId>org.infinispan</groupId>
+@@ -426,9 +456,9 @@
  				<version>1.6.0</version>
  			</dependency>
  			<dependency>
@@ -450,7 +459,7 @@ index 118c7ca..c7b2001 100644
  			</dependency>
  			<dependency>
  				<groupId>org.mariadb.jdbc</groupId>
-@@ -433,7 +463,7 @@
+@@ -438,7 +468,7 @@
  			<dependency>
  				<groupId>org.postgresql</groupId>
  				<artifactId>postgresql</artifactId>
@@ -459,7 +468,7 @@ index 118c7ca..c7b2001 100644
  			</dependency>
  			<dependency>
  				<groupId>org.codehaus.jackson</groupId>
-@@ -445,26 +475,6 @@
+@@ -450,26 +480,6 @@
  				<artifactId>jackson-mapper-asl</artifactId>
  				<version>1.9.14-MULE-002</version>
  			</dependency>
@@ -486,7 +495,7 @@ index 118c7ca..c7b2001 100644
  			<dependency>
  				<groupId>junit</groupId>
  				<artifactId>junit</artifactId>
-@@ -1279,7 +1289,7 @@
+@@ -1294,7 +1304,7 @@
  			 For instance, our version of Lucene is tied to the version of Hibernate Search. Similarly, our
  			 version of Hibernate Search must be compatible with the version of Hibernate and Hibernate must
  			 be compatible with our version of Spring. -->
@@ -495,7 +504,7 @@ index 118c7ca..c7b2001 100644
  		<hibernateVersion>5.6.15.Final</hibernateVersion>
  		<!-- hibernateSearchVersion needs to be adjusted if hibernateVersion changes -->
  		<hibernateSearchVersion>6.2.4.Final</hibernateSearchVersion>
-@@ -1287,7 +1297,7 @@
+@@ -1302,7 +1312,7 @@
  		<!-- ininispanVersion needs to be adjusted if hibernateVersion changes -->
  		<infinispanVersion>13.0.22.Final</infinispanVersion>
  		<aspectjVersion>1.9.24</aspectjVersion>
@@ -505,7 +514,7 @@ index 118c7ca..c7b2001 100644
  		<byteBuddyVersion>1.12.18</byteBuddyVersion>
  		<mockitoVersion>3.12.4</mockitoVersion>
 diff --git a/web/pom.xml b/web/pom.xml
-index 2b0f035..10fda75 100644
+index 8dc1cf8..134060e 100644
 --- a/web/pom.xml
 +++ b/web/pom.xml
 @@ -96,8 +96,8 @@
