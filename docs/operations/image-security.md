@@ -340,3 +340,18 @@ El frontend publica desde `sihsalus-frontend`, con su propio workflow y controle
 Este documento cubre los tres publicadores de imágenes del distro; la promoción
 del conjunto sigue requiriendo revisión, aceptación en QLTY y el
 [checklist de despliegue](deploy-checklist.md).
+
+## Retiro de excepciones vencidas del 15/10/2026 UTC
+
+Se retiran las 50 excepciones que vencieron el 12/10/2026 UTC (3 CRITICAL y
+47 HIGH). El catálogo queda vacío: cualquier hallazgo HIGH/CRITICAL vuelve a
+bloquear la promoción del backend. Esto no resuelve las dependencias Java de
+[#323](https://github.com/sihsalus/sihsalus/issues/323), no renueva su aceptación
+ni modifica imágenes publicadas o instalaciones existentes.
+
+La actualización del runtime incluye `python2-rpm`, `rpm`, `rpm-build-libs` y
+`rpm-libs` para aplicar la corrección de CVE-2026-78367 publicada en
+[ALAS2-2026-3984](https://alas.aws.amazon.com/AL2/ALAS2-2026-3984.html).
+El build y escaneo completos siguen siendo necesarios para comprobar el
+resultado. Los controles de escaneo, inventario, firma y promoción permanecen
+vigentes; un CI de PR correcto no autoriza publicar una imagen rechazada.
