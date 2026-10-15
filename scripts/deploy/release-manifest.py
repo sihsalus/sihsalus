@@ -533,12 +533,13 @@ def apply_release(manifest, previous, root, rollback=False, services=None, state
                 command = ["bash", str(root / "scripts/deploy/redeploy-environment.sh"), source["commit"],
                            source["image"].split("@", 1)[1]]
             else:
+                wait_seconds = 180 if set(services) == {"frontend"} else 1800
                 command = compose_command(manifest, env_file, override) + [
                     "up", "-d", "--no-deps", "--no-build", "--pull", "never", "--wait",
-                    "--wait-timeout", "1800", *sorted(services)]
+                    "--wait-timeout", str(wait_seconds), *sorted(services)]
             # Compose owns health waiting. Component updates never restart databases.
             result = subprocess.run(command, cwd=root, env=environment, check=False,
-                                    timeout=1900 if services is not None else None)
+                                    timeout=wait_seconds + 100 if services is not None else None)
             require(result.returncode == 0, "Redeploy failed; use the retained previous manifest for recovery")
             verify_runtime(manifest, root)
             verify_selected_compose(manifest, root, env_file, state / f"{manifest_digest(manifest)}.json")
