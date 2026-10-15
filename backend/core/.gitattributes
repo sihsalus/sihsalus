@@ -1,0 +1,2 @@
+# Unified-diff context prefixes and upstream whitespace must remain byte-exact.
+*.patch -whitespace
