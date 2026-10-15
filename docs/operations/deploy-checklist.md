@@ -2,31 +2,24 @@
 
 Usar este checklist para cambios en `main`, despliegues de `qlty`, `staging` o producción.
 
-## Frontend automatizado en entornos no productivos
+## Revisión humana y selección del frontend
 
-El release de `sihsalus-frontend` publica un tag de señal
-`frontend-release-<SHA>` mediante una deploy key limitada a este repositorio. El
-workflow `Deploy Frontend` resuelve y verifica la imagen inmutable y despliega
-secuencialmente en DEV y QLTY. DEV funciona como canario: si falla, QLTY no se
-modifica. Un fallo posterior a la actualización restaura el tag y contenedor
-frontend anterior. Un sondeo de `latest` cada cinco minutos conserva una ruta de
-respaldo si la señal inmediata no llega. La señal solo es aceptada cuando su SHA
-y digest siguen correspondiendo a `latest`, por lo que la deploy key no puede
-seleccionar otra versión.
+Seguir [el procedimiento de revisión humana](human-review.md). Preparar la
+selección, la evidencia y la recuperación antes de pedir aprobación de un
+manifiesto/checksum y destino concretos. El merge, CI y la publicación de una
+imagen no autorizan su despliegue.
 
-Cada servidor consume la imagen fuente mediante su digest `sha256`, reconstruye
-el wrapper runtime y recrea únicamente `frontend` con `--no-deps --pull never`.
-El despliegue no descarga, reconstruye ni recrea gateway, backend, bases de
-datos u otros servicios; el único pull permitido es el digest inmutable de la
-imagen fuente del frontend.
-Conserva el checkout instalado: una release que requiera cambiar el wrapper o
-Compose debe pasar primero por el procedimiento coordinado de manifiestos.
+`Deploy Frontend` solo admite `workflow_dispatch` con SHA y digest completos.
+No se activa por tags, cron ni `repository_dispatch`. Verifica las protecciones
+nativas de `development` y `quality`, muestra la selección y espera aprobación
+humana en los jobs de cada environment. Si falta la protección, se detiene antes
+del acceso SSH. DEV sigue siendo canario antes de QLTY en esta ruta individual.
 
-El workflow también acepta `repository_dispatch` de tipo `frontend-published` y
-ejecución manual. La deploy key de señal no contiene credenciales de los
-servidores; esas permanecen exclusivamente en los entornos protegidos del
-distro. Producción queda fuera de esta automatización y conserva el checklist
-con aprobación explícita.
+Esta ruta conserva el checkout y recrea solo `frontend`, con rollback anterior.
+Los hosts administrados por manifiestos rechazan scripts individuales: usar el
+[procedimiento coordinado](release-manifests.md), conservando el marcador de
+selección y la aprobación humana del manifiesto que se aplicará. Producción
+requiere su propia autorización y evidencia.
 
 ## Antes del despliegue
 

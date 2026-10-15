@@ -1,23 +1,15 @@
 name: Deploy Frontend
 
 on:
-  push:
-    tags:
-      - 'frontend-release-*'
-  schedule:
-    # Offset from common five-minute boundaries to reduce scheduler contention.
-    - cron: '3-58/5 * * * *'
-  repository_dispatch:
-    types: [frontend-published]
   workflow_dispatch:
     inputs:
       sha:
-        description: Frontend commit SHA; leave empty to deploy the verified latest image
-        required: false
+        description: Reviewed frontend commit SHA (40 lowercase hexadecimal characters)
+        required: true
         type: string
       digest:
-        description: Optional expected sha256 digest
-        required: false
+        description: Reviewed immutable sha256 digest
+        required: true
         type: string
 
 concurrency:
@@ -25,6 +17,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  actions: read
   contents: read
   packages: read
 
@@ -37,58 +30,29 @@ jobs:
       digest: ${{ steps.release.outputs.digest }}
       tag: ${{ steps.release.outputs.tag }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Require native human approval protections
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/deploy/check-human-review.sh development quality
+
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
 
       - name: Resolve and verify release
         id: release
         env:
-          REQUESTED_SHA: ${{ github.event.client_payload.sha || inputs.sha }}
-          REQUESTED_DIGEST: ${{ github.event.client_payload.digest || inputs.digest }}
-          RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || '' }}
-          REQUIRE_LATEST: ${{ github.event_name == 'push' && 'true' || 'false' }}
+          REQUESTED_SHA: ${{ inputs.sha }}
+          REQUESTED_DIGEST: ${{ inputs.digest }}
         run: |
           set -euo pipefail
 
           image='ghcr.io/sihsalus/sihsalus-frontend'
           requested_sha="${REQUESTED_SHA:-}"
           requested_digest="${REQUESTED_DIGEST:-}"
-          release_tag="${RELEASE_TAG:-}"
-
-          if [[ -n "${release_tag}" ]]; then
-            if [[ ! "${release_tag}" =~ ^frontend-release-([0-9a-f]{40})$ ]]; then
-              echo "::error::The frontend release tag is invalid."
-              exit 2
-            fi
-            requested_sha="${BASH_REMATCH[1]}"
-          fi
-
-          if [[ -n "${requested_sha}" && ! "${requested_sha}" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::The requested frontend SHA is invalid."
+          if [[ ! "${requested_sha}" =~ ^[0-9a-f]{40}$ || ! "${requested_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::An explicitly reviewed SHA and digest are required."
             exit 2
-          fi
-
-          if [[ -n "${requested_digest}" && ! "${requested_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-            echo "::error::The requested frontend digest is invalid."
-            exit 2
-          fi
-
-          if [[ -z "${requested_sha}" ]]; then
-            latest_json="$(docker buildx imagetools inspect "${image}:latest" --format '{{json .}}')"
-            latest_sha="$(jq -r '.image.config.Labels["org.opencontainers.image.revision"] // empty' <<<"${latest_json}")"
-            latest_digest="$(jq -r '.manifest.digest // empty' <<<"${latest_json}")"
-
-            if [[ -n "${requested_digest}" && "${requested_digest}" != "${latest_digest}" ]]; then
-              echo "::error::The requested digest is not the currently promoted latest image."
-              exit 1
-            fi
-
-            requested_sha="${latest_sha}"
-            requested_digest="${latest_digest}"
-          fi
-
-          if [[ ! "${requested_sha}" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::The published image does not contain a valid source revision."
-            exit 1
           fi
 
           tag="sha-${requested_sha}"
@@ -101,19 +65,8 @@ jobs:
             exit 1
           fi
 
-          if [[ "${REQUIRE_LATEST}" == "true" ]]; then
-            latest_json="$(docker buildx imagetools inspect "${image}:latest" --format '{{json .}}')"
-            latest_sha="$(jq -r '.image.config.Labels["org.opencontainers.image.revision"] // empty' <<<"${latest_json}")"
-            latest_digest="$(jq -r '.manifest.digest // empty' <<<"${latest_json}")"
-
-            if [[ "${latest_sha}" != "${requested_sha}" || "${latest_digest}" != "${immutable_digest}" ]]; then
-              echo "::error::The release signal is not the currently promoted latest image."
-              exit 1
-            fi
-          fi
-
-          if [[ -n "${requested_digest}" && "${immutable_digest}" != "${requested_digest}" ]]; then
-            echo "::error::The immutable image digest does not match the promoted release."
+          if [[ "${immutable_digest}" != "${requested_digest}" ]]; then
+            echo "::error::The immutable image digest does not match the reviewed selection."
             exit 1
           fi
 
@@ -124,6 +77,13 @@ jobs:
           } >>"${GITHUB_OUTPUT}"
 
           echo "Resolved ${tag} at ${immutable_digest}"
+          {
+            echo '## Selection awaiting human deployment approval'
+            echo "Operational checkout: ${GITHUB_SHA}"
+            echo "Frontend commit: ${requested_sha}"
+            echo "Immutable source: ${image}@${immutable_digest}"
+            echo 'Targets: DEV (development), then QLTY (quality); approve each environment job separately.'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   deploy-dev:
     name: Deploy DEV
