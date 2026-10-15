@@ -261,6 +261,96 @@ A rollback must account for the new task definitions and use a verified,
 consistent database/application-data recovery point when necessary. No runtime,
 migration, shared configuration or clinical data was changed in this review.
 
+### Gradual adoption of official OMODs, phase 1
+
+The distribution now selects published Maven artifacts for two more modules,
+instead of compiling upstream snapshots under private version numbers:
+
+| Module | Previous pin | Official candidate | Functional difference to review |
+| --- | --- | --- | --- |
+| [Billing](https://github.com/openmrs/openmrs-module-billing/releases/tag/2.5.0) | 2.5.0-sihsalus.1 | 2.5.0 | Changes `getBillableServiceId` from `int` to `Integer` and removes `setBillableServiceId` / `addServicePrice`. Check Java consumers and billing workflows. |
+| [Reporting REST](https://github.com/openmrs/openmrs-module-reportingrest/releases/tag/2.0.0) | 2.1.0-sihsalus.1 | 2.0.0 | Removes the unreleased immediate `POST reportingrest/runReport/...` endpoints. Existing queued report APIs remain. |
+
+Reporting REST is an intentional **version downgrade**, not a renamed 2.1 release.
+No `runReport/` caller was found in frontend commit
+`c122fa48965ce973cb38900bbcd464fe28d0c977`; external clients remain to be checked.
+Do not delete module-version records or migration history to force a downgrade.
+The selected Billing binary has a byte-identical `liquibase.xml` file to the
+previous candidate; neither Reporting REST binary includes one.
+This is static evidence, not a restored-database migration test.
+
+These selections remove two source-lock entries and their source-test matrix
+jobs. The existing image checks, version-review rules and security gates remain.
+The PR records source commits, downloaded binary checksums, native test results
+and the exact local validation-harness adaptations. The distribution consumes
+the unmodified official binaries, never the harness-built OMODs.
+
+FHIR2 4.3.0 was evaluated but **not selected**: its default reactor passed
+5,297 tests with three skipped after local fixture/locale preparation, but the
+explicit `integration-test` profile exposed medication-update persistence errors
+involving `Drug.ingredients` / duplicate `DrugIngredient` identities. Its `lastn`
+integration cases also depend on Core's changed encounter-6 fixture. Retain the
+existing FHIR2 pin and source build while diagnosing these separately; this does
+not establish that the previous snapshot is free of the same problems. Prefer
+an upstream resolution and a green integration suite to another private patch.
+
+The Core compatibility/security blockers described above still apply. Before
+promotion, require the full image checks, actual startup on restored synthetic
+data, authenticated FHIR reads/writes and denied access, billing create/pay/refund
+and invoice checks, and queued report generation/download. No DEV/QLTY or
+production runtime was changed while preparing this phase.
+
+### Remaining exceptions and removal conditions
+
+Keep each exception until its replacement passes the affected functional and
+authorization tests. Technical maintenance owner: `@Duvet05`; clinical acceptance
+requires a designated CRED/Gestantes reviewer. Track the phased transition in its
+PR and existing owning-module PRs rather than introducing another version registry.
+
+| Module | What would be lost by removing the current variant | Condition for an official replacement |
+| --- | --- | --- |
+| REST | CLOB UTF-8, plain-text and `nosniff` protection | A compatible Core 2.8 release containing the fix; its presence on upstream master alone is insufficient. |
+| O3 Forms | Null-locale translation guard | Demonstrate safe form translation with the official release and actual locale configuration. |
+| EMR API | Atomic failure of automatic visit closure and maternal lookup without admission metadata | Prove batch rollback and mother/child queries; keep automatic closure paused pending clinical acceptance. |
+| Initializer | Retirement reason when creating an already-retired AMPATH form | Official release containing upstream PR #334; test fresh creation and replacement without modifying historical data. |
+| OAuth2Login | Native route registration and authentication-scheme selection | Verify official login, callback, session and logout, or separately approve local OpenMRS authentication. |
+| Bed Management | Clinical visit closure, scoped metadata access, extra bed states and tag mappings | Complete the visit/permission review below and assess existing bed data before replacing the module. |
+| Stock Management | Operation-location input/fallback and the variant's DAO wiring | Compare official 3.0.0 with our 3.1.1 variant, then test receipts, transfers and billing. A higher private number does not establish an official release. |
+
+FUA, Imaging, Notifications and Audit are local products, not redundant upstream
+rebuilds. Their replacement needs an explicit functional decision; this phase
+does not remove them.
+
+### Next phase: decouple clinical visit closure from Bed Management
+
+The frontend revision above has three production callers of
+`POST /ws/rest/v1/clinicalvisitclosure`: visit finalization, appointment closure
+and the deceased-patient workflow. The native REST visit update accepts
+`stopDatetime`, but calls `VisitService.saveVisit`, whereas our endpoint calls
+`endVisit`, returns an already-closed visit without changing its date, and
+temporarily supplies two metadata privileges. The Bed Management variant also
+changes service wiring in visit/encounter hooks. A URL replacement alone does
+not establish equivalent authorization or behavior.
+
+Prepare an isolated official-module comparison before changing these callers:
+
+- Exercise allowed and denied requests with actual CRED/Gestantes role metadata,
+  including bed hooks. Do not grant bed administration or broad metadata access
+  to compensate for missing module behavior.
+- Preserve SIS summary validation, closing before FUA generation, and safe retry
+  when FUA generation or the close response fails. Repeated closure must preserve
+  the original stop date.
+- Preserve queue draining, fresh visit readback, timestamp bounds and recovery
+  after a lost response in the deceased-patient workflow. Test appointments too.
+- Inventory persisted `CLEANING`, `MAINTENANCE`, `ISOLATION` states and tag mappings
+  read-only before deciding how the official model can represent them. Do not
+  delete or remap clinical/bed data as part of an artifact replacement.
+
+Acceptance needs real Core + REST + Bed Management + Queue integration and a
+human clinical/permission review. If the official stack cannot provide the
+required behavior, retain the bounded exception and propose the responsible
+upstream fix; do not move backend authorization into the frontend.
+
 ## Source-built modules
 
 [omod-sources.lock](omod-sources.lock) pins the remaining upstream source revisions,
