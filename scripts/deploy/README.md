@@ -40,6 +40,9 @@ acredita acceso desde fuera del host.
    anterior y conserva la evidencia del fallo. El comando devuelve error incluso
    si recuperó correctamente.
 
+Después de una recuperación por fallo, `rollback` no vuelve a instalar el
+candidato fallido. Para reintentarlo se elige su versión explícitamente.
+
 Dos actualizaciones no pueden ejecutarse simultáneamente. Interrumpir un proceso
 con SIGKILL o perder energía puede dejar una operación pendiente: consultar
 `status` e `history` y ejecutar `rollback` si corresponde. Nunca borrar el estado

@@ -127,9 +127,14 @@ def history(root):
 
 
 def previous_release(current, root):
-    for path in history(root):
-        result = releases.read_json(path)
+    attempts = [(path, releases.read_json(path)) for path in history(root)]
+    for path, result in attempts:
         if result["target"] == releases.manifest_digest(current):
+            if result["operation"] == "rollback" and any(
+                other["target"] == result["previous"] and other["status"] != "verified"
+                for _, other in attempts
+            ):
+                raise releases.ManifestError("The failed update was already recovered; select a published version explicitly")
             return releases.validate_manifest(releases.read_json(path.parent / "previous.json"))
     raise releases.ManifestError("No previous version is retained for this installation")
 

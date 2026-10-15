@@ -84,6 +84,8 @@ class ComponentUpdate(unittest.TestCase):
             if name != "frontend":
                 self.assertEqual(self.engine.runtime["services"][name], self.current["services"][name])
         self.assertIn("SECRET=keep-private", (self.root / ".env").read_text())
+        self.assertEqual(deploy.env_value(self.root, "FRONTEND_RUNTIME_IMAGE"), "sihsalus-release-retained")
+        self.assertEqual(deploy.env_value(self.root, "FRONTEND_RUNTIME_TAG"), release.manifest_digest(self.target)[:48] + "-frontend")
         self.assertEqual(deploy.current_release(self.root), self.target)
         self.assertEqual(deploy.previous_release(self.target, self.root), self.current)
 
@@ -136,6 +138,8 @@ class ComponentUpdate(unittest.TestCase):
 
         results = [release.read_json(path) for path in deploy.history(self.root)]
         self.assertEqual([item["status"] for item in results if item["operation"] == "deploy"], ["failed-or-interrupted"])
+        with self.assertRaisesRegex(release.ManifestError, "already recovered"):
+            deploy.previous_release(deploy.current_release(self.root), self.root)
 
     def test_preparation_failure_does_not_trigger_a_restart(self):
         del self.engine.images[self.target["services"]["frontend"]["image"]]

@@ -519,7 +519,9 @@ def apply_release(manifest, previous, root, rollback=False, services=None, state
                      "BACKEND_TAG": manifest["sources"]["backend"]["image"].split(":sha-", 1)[1]}
         selection["BACKEND_TAG"] = "sha-" + selection["BACKEND_TAG"]
         selection.update(FRONTEND_SOURCE_IMAGE=manifest["sources"]["frontend"]["image"],
-                         FRONTEND_SOURCE_TAG="sha-" + manifest["sources"]["frontend"]["commit"])
+                         FRONTEND_SOURCE_TAG="sha-" + manifest["sources"]["frontend"]["commit"],
+                         FRONTEND_RUNTIME_IMAGE="sihsalus-release-retained",
+                         FRONTEND_RUNTIME_TAG=manifest_digest(manifest)[:48] + "-frontend")
         try:
             # Persist the attempted selection before recreation. On any failure
             # leave it and the journal in place: silently restoring only .env
