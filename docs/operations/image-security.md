@@ -52,10 +52,10 @@ ambiente correspondiente.
 
 El comportamiento por defecto es bloquear cada hallazgo HIGH o CRITICAL,
 incluidos los que todavía no tienen corrección. No se agrega una excepción
-automática por estar presente en una imagen base. Los controles existentes del
-backend siguen siendo adicionales: una excepción no desactiva el rechazo de
-vulnerabilidades corregibles del sistema operativo ni el de hallazgos nuevos
-frente a la base OpenMRS.
+automática por estar presente en una imagen base. El control comparativo del backend reutiliza el mismo catálogo para aceptar
+solo hallazgos Java con coincidencia exacta y vigente. Las vulnerabilidades
+corregibles del sistema operativo nunca reciben excepción en ese control;
+los hallazgos nuevos no registrados siguen bloqueando.
 
 `scripts/security/image-exceptions.json` registra las aceptaciones temporales. Una excepción requiere PR
 revisado, responsable identificable y un issue de seguimiento. Su alcance
@@ -355,3 +355,29 @@ La actualización del runtime incluye `python2-rpm`, `rpm`, `rpm-build-libs` y
 El build y escaneo completos siguen siendo necesarios para comprobar el
 resultado. Los controles de escaneo, inventario, firma y promoción permanecen
 vigentes; un CI de PR correcto no autoriza publicar una imagen rechazada.
+
+## Aceptación temporal para DEV/QLTY, 15/10/2026
+
+El usuario autorizó agregar la excepción temporal, integrar #384/#386 y desplegar
+DEV/QLTY. Confirmó por separado ampliar los ocho hallazgos del CI a
+CVE-2026-41849 (Spring sin corrección publicada) y CVE-2025-48924, restaurando
+Commons Lang 2.6 para conservar los OMODs oficiales. Responsable: @Duvet05;
+seguimiento: [#323](https://github.com/sihsalus/sihsalus/issues/323).
+
+El catálogo contiene diez alcances de `ghcr.io/sihsalus/sihsalus-backend`,
+`linux/amd64`, ecosistema `jar`: nueve en Spring Framework 5.3.39 y uno en
+Commons Lang 2.6. Vigencia: 15/10 a 22/10/2026 UTC inclusive; desde el día 23
+bloquea sin renovación automática. No se declara que estén corregidos ni que
+sean falsos positivos. Los informes mantienen cada hallazgo y su decisión.
+
+CI y publicación usan la misma validación de alcance y vencimiento. Una nueva
+versión, paquete, CVE, severidad, arquitectura o ecosistema no queda cubierto.
+El control del sistema operativo sigue siendo incondicional; no se omiten
+pruebas, SBOM, firmas, restauración ni aceptación del runtime. La autorización
+no incluye producción. El catálogo permite evaluar/publicar el artefacto, pero
+no sustituye la autorización del ambiente.
+
+La siguiente acción es retirar la aceptación cuando una plataforma/mantenimiento
+compatible resuelva los hallazgos y los OMODs oficiales dejen de requerir Lang 2.
+Antes del vencimiento, resolverlos o revisar expresamente el riesgo; no extender
+las fechas automáticamente.

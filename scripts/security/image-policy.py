@@ -267,11 +267,70 @@ def write_evidence(path, value):
         output.write("\n")
 
 
+def backend_ratchet(candidate, baseline, policy, today=None):
+    """Keep the OS gate unconditional; reuse reviewed exact Java exceptions."""
+    validate_policy(policy, today)
+    config = candidate.get("Metadata", {}).get("ImageConfig", {})
+    platform = f"{config.get('os')}/{config.get('architecture')}"
+    require(platform in PLATFORMS, "Backend scan must identify its executable platform")
+    repository = "ghcr.io/sihsalus/sihsalus-backend"
+
+    def findings(report):
+        require(isinstance(report, dict) and isinstance(report.get("Results"), list), "Invalid backend scan results")
+        rows = []
+        for result in report["Results"]:
+            require(isinstance(result, dict), "Invalid backend scan result")
+            vulnerabilities = result.get("Vulnerabilities") or []
+            require(isinstance(vulnerabilities, list), "Invalid backend vulnerability list")
+            for item in vulnerabilities:
+                require(isinstance(item, dict) and item.get("Severity") in ("HIGH", "CRITICAL"),
+                        "Backend comparison requires HIGH/CRITICAL findings")
+                row = {"repository": repository, "platform": platform,
+                       "vulnerabilityId": item.get("VulnerabilityID"), "packageName": item.get("PkgName"),
+                       "installedVersion": item.get("InstalledVersion"), "severity": item["Severity"],
+                       "class": result.get("Class"), "type": result.get("Type")}
+                require(matches(row["vulnerabilityId"], r"[A-Za-z0-9][A-Za-z0-9._-]{2,127}")
+                        and safe_package(row["packageName"]) and safe_package(row["installedVersion"])
+                        and row["class"] in ("os-pkgs", "lang-pkgs")
+                        and matches(row["type"], r"[a-z][a-z0-9-]{0,63}"), "Invalid backend finding scope")
+                rows.append(tuple(row[field] for field in MATCH_FIELDS))
+        return rows
+
+    current, upstream = findings(candidate), findings(baseline)
+    unexpected = set(current) - set(upstream)
+    exceptions = {tuple(entry[field] for field in MATCH_FIELDS): entry for entry in policy["exceptions"]
+                  if entry["class"] == "lang-pkgs"}
+    accepted = unexpected & exceptions.keys()
+    blocked = unexpected - accepted
+    os_count = sum(row[MATCH_FIELDS.index("class")] == "os-pkgs" for row in current)
+    summary = ("### Backend vulnerability ratchet\n"
+               f"- Candidate HIGH/CRITICAL findings: {len(current)}\n"
+               f"- Upstream OpenMRS baseline findings: {len(upstream)}\n"
+               f"- Candidate OS findings with fixes: {os_count}\n"
+               f"- Findings added beyond upstream: {len(unexpected)}\n"
+               f"- Temporarily accepted findings: {len(accepted)}\n"
+               f"- Unaccepted findings: {len(blocked)}\n")
+    for row in sorted(accepted):
+        entry = exceptions[row]
+        summary += (f"- Accepted {entry['vulnerabilityId']} {entry['packageName']} {entry['installedVersion']}; "
+                    f"owner {entry['owner']}; expires {entry['expiresOn']}; {entry['issue']}\n")
+    for row in sorted(blocked):
+        summary += "- Blocked " + "|".join(row[2:5]) + "\n"
+    if os_count:
+        summary += "::error::Fixable HIGH/CRITICAL operating-system findings cannot be excepted.\n"
+    if blocked:
+        summary += "::error::Unaccepted HIGH/CRITICAL findings beyond the pinned OpenMRS base.\n"
+    return summary, bool(os_count or blocked)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     policy_command = commands.add_parser("check-policy")
     policy_command.add_argument("policy", type=Path)
+    backend = commands.add_parser("backend-ratchet")
+    for name in ("candidate", "baseline", "policy"):
+        backend.add_argument(name, type=Path)
     platforms_command = commands.add_parser("platforms")
     platforms_command.add_argument("image")
     platforms_command.add_argument("index", type=Path)
@@ -281,6 +340,13 @@ def main():
     for name in ("index", "sbom", "reports", "policy", "output"):
         check.add_argument("--" + name, required=True, type=Path)
     args = parser.parse_args()
+    if args.command == "backend-ratchet":
+        summary, blocked = backend_ratchet(read_json(args.candidate), read_json(args.baseline), read_json(args.policy))
+        print(summary, end="")
+        if os.environ.get("GITHUB_STEP_SUMMARY"):
+            with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as output:
+                output.write(summary)
+        return int(blocked)
     if args.command == "check-policy":
         policy = validate_policy(read_json(args.policy))
         print(f"Validated {len(policy['exceptions'])} current, explicitly scoped exceptions")

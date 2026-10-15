@@ -52,7 +52,7 @@ fi
 CORE_WAR="$(cd "$(dirname "$CORE_WAR")" && pwd)/$(basename "$CORE_WAR")"
 jar tf "$CORE_WAR" > "$TEMP_DIR/war-entries"
 ENTRIES=()
-for artifact in openmrs-api slf4j-api commons-lang3; do
+for artifact in openmrs-api slf4j-api commons-lang3 commons-lang; do
   matches=()
   while IFS= read -r entry; do
     if [[ "$entry" =~ ^WEB-INF/lib/${artifact}-[^/]+\.jar$ ]]; then
@@ -71,6 +71,10 @@ mkdir "$TEMP_DIR/core" "$TEMP_DIR/classes"
   jar xf "$CORE_WAR" "${ENTRIES[@]}"
 )
 CLASSPATH="$TEMP_DIR/core/WEB-INF/lib/*"
+# Official Queue/OCL/REST still link this legacy namespace. A descriptor-only
+# version check cannot detect its accidental removal from the Core runtime.
+javap -classpath "$CLASSPATH" org.apache.commons.lang.StringUtils \
+  org.apache.commons.lang.RandomStringUtils org.apache.commons.lang.LocaleUtils >/dev/null
 if [[ "$MODE" != self-test ]]; then
   # Check the packaged WAR, not the build cache: SDK must select the corrected Core.
   javap -classpath "$CLASSPATH" -private -c \
