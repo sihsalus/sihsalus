@@ -52,7 +52,7 @@ def retained_releases(manifests, current, days, count, now):
 
 def image_inventory(release, root, identifiers=None):
     if identifiers is None:
-        identifiers = sorted(set(release.run(["docker", "image", "ls", "--quiet", "--no-trunc"], root=root).splitlines()))
+        identifiers = sorted(set(release.run(["docker", "image", "ls", "--all", "--quiet", "--no-trunc"], root=root).splitlines()))
     images = {}
     template = ('{"id":{{json .Id}},"tags":{{json .RepoTags}},'
                 '"digests":{{json .RepoDigests}},"created":{{json .Created}}}')
@@ -92,7 +92,7 @@ def plan_images(images, manifests, keep, prepared, used, cutoff):
         image = images[key]
         refs = sorted(set((image["tags"] or []) + (image["digests"] or [])))
         # Unknown owners and explicitly staged candidates are never garbage.
-        if not refs or any(not ref.startswith(("sihsalus-", "local/sihsalus-", "ghcr.io/sihsalus/"))
+        if any(not ref.startswith(("sihsalus-", "local/sihsalus-", "ghcr.io/sihsalus/"))
                            or "-prepared:" in ref or ":candidate-" in ref for ref in refs):
             continue
         if timestamp(image["created"]) >= cutoff:
@@ -161,8 +161,15 @@ def clean(release, root, days, count, apply):
                 release.require(refs == item["references"], "Candidate references changed; cleanup stopped")
                 # Removing the final tag also removes digest references. Passing
                 # those digests again would turn a successful deletion into an error.
-                remove = sorted(fresh[item["id"]]["tags"] or []) or refs
+                remove = sorted(fresh[item["id"]]["tags"] or []) or refs or [item["id"]]
                 release.run(["docker", "image", "rm", "--no-prune", *remove], root=root)
+                # The classic image store can leave an untagged intermediate
+                # image behind. Include intermediates and remove this exact ID,
+                # never globally prune or force removal of dependent images.
+                remaining_ids = release.run(["docker", "image", "ls", "--all", "--quiet", "--no-trunc"], root=root).splitlines()
+                if item["id"] in remaining_ids:
+                    release.require(item["id"] not in used_images(release, root), "An untagged image became used; cleanup stopped")
+                    release.run(["docker", "image", "rm", "--no-prune", item["id"]], root=root)
                 report["removed_images"].append(item["id"])
                 release.replace_private(journal, release.canonical_bytes(report))
             remaining = image_inventory(release, root)

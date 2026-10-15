@@ -55,6 +55,10 @@ class RetentionTests(unittest.TestCase):
     def test_old_unused_image_is_eligible(self):
         self.assertEqual([item["id"] for item in self.plan()], [self.image_id])
 
+    def test_untagged_image_referenced_by_expired_manifest_is_eligible(self):
+        self.images[self.image_id]["tags"] = []
+        self.assertEqual([item["id"] for item in self.plan()], [self.image_id])
+
     def test_any_container_including_stopped_protects_its_image(self):
         self.assertEqual(self.plan(used={self.image_id}), [])
 
@@ -126,14 +130,25 @@ class CleanupExecutionTests(unittest.TestCase):
         self.stack.enter_context(patch.object(cleanup, "image_inventory", side_effect=lambda *_: deepcopy(self.images)))
         self.used = self.stack.enter_context(patch.object(cleanup, "used_images", return_value=set()))
         self.commands = []
+        self.leave_untagged = False
 
         def remove(command, **_):
+            if command[:3] == ["docker", "image", "ls"]:
+                self.assertIn("--all", command)
+                return "\n".join(self.images)
             self.commands.append(command)
             self.assertEqual(command[:4], ["docker", "image", "rm", "--no-prune"])
             self.assertNotIn("--force", command)
             for key, image in list(self.images.items()):
-                if set(command[4:]) == set(image["tags"]):
+                if command[4:] == [key]:
                     del self.images[key]
+                    return ""
+                if set(command[4:]) == set(image["tags"]):
+                    if self.leave_untagged:
+                        image["tags"] = []
+                        image["digests"] = []
+                    else:
+                        del self.images[key]
                     return ""
             raise AssertionError("Unexpected deletion")
 
@@ -161,6 +176,13 @@ class CleanupExecutionTests(unittest.TestCase):
         with self.assertRaisesRegex(self.release.ManifestError, "became used"):
             self.clean(apply=True)
         self.assertFalse(self.commands)
+
+    def test_classic_store_untagged_intermediates_are_removed_by_exact_id(self):
+        self.leave_untagged = True
+        report = self.clean(apply=True)
+        self.assertTrue(report["removed_images"])
+        self.assertFalse(set(report["removed_images"]) & set(self.images))
+        self.assertEqual(len(self.commands), 2 * len(report["removed_images"]))
 
     def test_missing_protected_image_blocks_cleanup(self):
         del self.images[self.current["services"]["frontend"]["imageId"]]
