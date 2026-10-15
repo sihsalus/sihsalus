@@ -108,13 +108,15 @@ longer needs a distribution-specific version, source build or source-test
 matrix entry. The existing packaged-image and required-module gates remain.
 Preserve forced-password-change and OAuth2 configuration contracts.
 
-The September/October upstream review also considered the following releases:
+The 2026-10-02 review on Core 2.8.9 recorded the following decisions. The
+2026-10-15 review below supersedes Address Hierarchy and Reporting for the
+Core 2.8.10 candidate:
 
-- Address Hierarchy 3.0.0 remains pending. Native tests on Core 2.8.9 failed
+- Address Hierarchy 3.0.0 was deferred. Native tests on Core 2.8.9 failed
   repeated CSV import and an i18n address-update case with privilege errors.
   Core requirements alone do not establish acceptance. ExtI18n 1.1.0 is optional;
   introducing it is not required for the current address hierarchy integration.
-- Reporting 2.2.0 remains pending as a packaging simplification. Its PDF and
+- Reporting 2.2.0 was deferred as a packaging simplification. Its PDF and
   service-privilege changes are already in our source pin. Native Core 2.8.9
   tests encounter an obsolete DrugOrder fixture and a confirmed H2 role-cache
   deadlock: the test creates uncommitted roles while Core resolves privileges in
@@ -176,6 +178,88 @@ Native module tests, packaged checks and synthetic DEV acceptance are separate
 requirements. Retain a verified database backup and previous immutable image
 before testing startup, attachment saves and login/session behavior. Image
 rollback does not restore a database.
+
+### Review validation, 2026-10-15
+
+This candidate adopts the official Maven OMODs below. Queue, Patient Documents
+and Reporting no longer need distribution-specific versions, source builds or
+source-test matrix entries. The remaining source matrix follows
+`omod-sources.lock`. Existing packaged-image and security checks remain required.
+
+| Module | Previous pin | Candidate | Native tests on official Core 2.8.10 / Java 21 |
+| --- | --- | --- | --- |
+| [Queue](https://github.com/openmrs/openmrs-module-queue/releases/tag/3.1.0) | 3.1.0-sihsalus.1 | 3.1.0 | 292 tests, zero skipped |
+| [OpenConceptLab](https://github.com/openmrs/openmrs-module-openconceptlab/releases/tag/4.0.0) | 3.2.0 | 4.0.0 | 196 tests, eight skipped |
+| [Patient Documents](https://github.com/openmrs/openmrs-module-patientdocuments/releases/tag/1.2.0) | 1.2.0-sihsalus.1 | 1.2.0 | 309 tests, zero skipped; test fixtures adapted |
+| [Address Hierarchy](https://github.com/openmrs/openmrs-module-addresshierarchy/releases/tag/3.0.0) | 2.21.0 | 3.0.0 | 105 tests, two skipped |
+| [Reporting](https://github.com/openmrs/openmrs-module-reporting/releases/tag/2.2.0) | 2.2.0-sihsalus.1 | 2.2.0 | 821 tests, 14 skipped; test fixture adapted |
+
+All five full reactors completed with zero failures/errors. These are isolated
+H2/source tests, not startup or clinical acceptance of the packaged system.
+Queue, OCL and Address Hierarchy used unmodified release sources. The earlier
+Address Hierarchy privilege failures did not recur with official Core 2.8.10.
+
+Patient Documents was tested with Reporting 2.2.0, matching this candidate;
+its default Reporting 1.28 dependency could not initialize on this baseline.
+Its H2 fixtures needed the Core 2.8 `obs_id` shared primary key and persistence
+of a typed location attribute through `LocationService` before auto-flush.
+Reporting's date-filter test needed a valid encounter without cascading the
+obsolete DrugOrders attached to the shared fixture. Assertions and clinical
+validation were preserved; only isolated test data changed. The unadapted tags
+failed these tests. Exact test-only patches and commands accompany the PR;
+production sources and the selected official Maven binaries are unchanged.
+The earlier Reporting role-cache deadlock did not recur with Core 2.8.10.
+
+Queue is adopted **as published**, including upstream annulment of queue entries
+when a patient is voided and both scheduled tasks registered/started on module
+startup. The visit task closes queue entries for visits that have already ended;
+it does not end visits. The time-based task has no effect while
+`queue.autoCloseQueueEntriesAtTime` is empty (the default). No new closure time
+or EMR API visit-closure setting is configured here. Before activation, inspect
+the environment's persisted properties and task definitions; defaults do not
+prove their current values. Clinical acceptance must cover ended visits,
+patient voiding and any existing configured closure schedule.
+
+OCL 4.0.0 introduces asynchronous index work during imports and requires Core
+2.8.0 or later. Validate import completion, search results and startup ordering
+with Initializer before promotion. Patient Documents adds paper-size-aware
+PDF layout; verify the actual CRED/Gestantes documents. Reporting's functional
+PDF/privilege changes were already in our old source pin; switching to its
+release simplifies packaging. Address Hierarchy needs import/update acceptance;
+optional ExtI18n remains outside this change.
+
+REST 3.6.0 is prepared in its owning fork, retaining only the required CLOB
+UTF-8/plain-text/`nosniff` runtime protection and exact release descriptor.
+Its full reactor passed on official Core 2.8.7 and 2.8.10 (1,924 tests each,
+14 skipped). A test-only activation-token fixture uses the dedicated DAO method
+instead of the general credential update now guarded by Core 2.8.10; production
+password controls remain intact. Core 2.8.9 is also required by its CI matrix.
+The distribution still consumes the previously published, checksum-pinned REST
+release until the new owning-repository release is reviewed and published.
+
+**Integration remains blocked.** The prepared `2.8.10-sihsalus.3` Core removes
+Commons Lang 2; official Queue 3.1.0, OCL 4.0.0 and REST 3.6.0 still import
+`org.apache.commons.lang` and fail compilation against that candidate. Passing
+tests against official Core 2.8.10 does not validate our modified Core. Reevaluate
+that Core dependency patch with its security impact before merging this stack;
+do not silently restore a vulnerable library or bypass the scanner. The parent
+Core PR also fails the image security gate on new fixable Spring findings.
+
+The repository test suite and Compose/Bake validation passed. A local assembly
+of 34 module binaries, replacing only the five selected OMODs, also passed the
+existing identity/required-version check and its 33 comparator fixtures against
+the candidate WAR. Input modules were copied read-only from DEV and matched the
+previous inventory byte for byte. This static gate does not resolve Java class
+linkage and therefore does not clear the Commons Lang blocker above.
+
+Before a separately approved DEV/QLTY rollout, require full packaged-image CI,
+security clearance, startup/migration validation on restored synthetic data,
+and the functional checks above. Back up both database and application data and
+retain the prior immutable image. Queue can create persisted scheduler records
+and change queue rows; reverting only the image does not reverse those writes.
+A rollback must account for the new task definitions and use a verified,
+consistent database/application-data recovery point when necessary. No runtime,
+migration, shared configuration or clinical data was changed in this review.
 
 ## Source-built modules
 
