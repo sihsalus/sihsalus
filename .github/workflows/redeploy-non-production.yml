@@ -22,11 +22,36 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
+  review-policy:
+    name: Verify native human approval protections
+    if: inputs.confirm_full_redeploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ inputs.backend_sha }}
+          TARGET_DIGEST: ${{ inputs.backend_digest }}
+        run: |
+          set -euo pipefail
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$TARGET_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          bash scripts/deploy/check-human-review.sh development quality
+          {
+            echo '## Full redeploy awaiting human approval'
+            echo "Operational checkout: $GITHUB_SHA"
+            echo "Backend commit: $TARGET_SHA"
+            echo "Backend digest: $TARGET_DIGEST"
+            echo 'Targets: DEV and QLTY. Every active service will be recreated; review the full configuration and recovery plan.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   deploy-dev:
     name: Clean redeploy DEV
+    needs: review-policy
     if: inputs.confirm_full_redeploy
     runs-on: ubuntu-latest
     timeout-minutes: 60
