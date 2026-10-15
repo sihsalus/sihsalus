@@ -37,7 +37,7 @@
     <authentication.version>2.4.0</authentication.version>
     <oauth2login.version>1.5.1-sihsalus.1</oauth2login.version>
     <reporting.version>2.2.0</reporting.version>
-    <reportingrest.version>2.1.0-sihsalus.1</reportingrest.version>
+    <reportingrest.version>2.0.0</reportingrest.version>
     <!-- the next three are required for reporting -->
     <calculation.version>2.0.0</calculation.version>
     <htmlwidgets.version>2.0.1</htmlwidgets.version>
@@ -50,7 +50,7 @@
     <bedmanagement.version>7.3.0-sihsalus.2</bedmanagement.version>
     <!-- Stock Management and Billing -->
     <stockmanagement.version>3.1.1</stockmanagement.version>
-    <billing.version>2.5.0-sihsalus.1</billing.version>
+    <billing.version>2.5.0</billing.version>
     <tasks.version>2.1.0</tasks.version>
     <fua.version>1.0.90</fua.version>
     <imaging.version>1.2.8</imaging.version>
