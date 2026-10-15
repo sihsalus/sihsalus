@@ -42,7 +42,7 @@ logic. The archived SIHSalus Core fork is not a build dependency.
 The exception is limited to these Core fixes, the dependency maintenance below,
 and native tests; it introduces no
 patch loader, runtime repair, schema change or new module. Review the patches
-against every Core upgrade. Replace this source build and both patches with an
+against every Core upgrade. Replace this source build and its patches with an
 official artifact containing equivalent fixes after native tests, module
 compatibility and synthetic DEV/QLTY acceptance pass. Do not grow this directory
 into a general distribution patch system.
@@ -95,6 +95,16 @@ zero failures/errors and 54 upstream skips. This includes the existing clinical
 integrity tests, H2 persistence/cache tests, actual startup template rendering
 and synthetic mail compatibility tests. The local WAR SHA-256 is
 `141a0a663d00129cb2c73a0d55510cbde25895019873752602fb1b5e7f38e09e`.
+
+A local diagnostic used Syft 1.54.1 to inventory both WARs and Trivy 0.74.0
+with the same 2026-10-15 vulnerability database. It reports 47 HIGH/CRITICAL
+findings for the previous patched WAR and 9 for this candidate (2 CRITICAL,
+7 HIGH), all in Spring; 38 CVE/package pairs disappear and none are added.
+The candidate inventory contains 200 components. This is a WAR-only diagnostic,
+not the required scan of the complete container. Syft identifies the old MySQL
+connector under different Maven coordinates from the image scanner, so these
+counts must not be presented as a direct reduction of the earlier 48 image
+findings. The release scan must independently verify every affected package.
 
 The complete container, OMOD integration, fresh local/Keycloak authentication,
 MariaDB behavior and DEV/QLTY clinical acceptance require separate checks.
