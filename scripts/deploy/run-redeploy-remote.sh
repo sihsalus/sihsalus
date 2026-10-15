@@ -200,6 +200,9 @@ upload_remote_file() {
 upload_remote_scripts() {
   upload_remote_file "$CLEAN_CHECKOUT_HELPER_PATH" "$REMOTE_CLEAN_CHECKOUT_HELPER" || return "$?"
   upload_remote_file "$ENV_HELPER_PATH" "$REMOTE_RUN_DIRECTORY/env.sh" || return "$?"
+  for helper in deploy.py release-manifest.py verify-external-frontend.sh; do
+    upload_remote_file "$ROOT/$helper" "$REMOTE_RUN_DIRECTORY/$helper" || return "$?"
+  done
   upload_remote_file "$REDEPLOY_SCRIPT_PATH" "$REMOTE_SCRIPT"
 }
 

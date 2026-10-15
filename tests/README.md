@@ -29,10 +29,11 @@ compara contexto, Dockerfile y argumentos del frontend entre Compose y Bake
 (automático, explícito y HCL aislado), incluida `.env.template` y la precedencia
 de overrides sobre los valores de respaldo del HCL.
 CI ejecuta ambos comandos en cada PR y los contratos sintéticos de selección
-persistente. El workflow `Release manifests` también permite validar un archivo
-adjunto a una release inmutable mediante el input `release_tag`. La misma
-comprobación del commit fuente y su Compose puede ejecutarse con
-`python3 -B tests/deploy/release-manifest-compose.py --manifest /ruta/release-manifest.json`.
+persistente. `Deployment checks` comprueba además la identidad y lectura de
+imágenes reales. Las pruebas de `test_deploy.py` verifican actualización parcial,
+recuperación ante fallo interno o HTTP, exclusión mutua y conservación de bases
+de datos, secretos y configuración. La compatibilidad de registros históricos
+se sigue probando para recuperar instalaciones anteriores.
 
 ## Comprobaciones de imágenes
 

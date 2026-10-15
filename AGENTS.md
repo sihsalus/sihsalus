@@ -12,8 +12,9 @@ so a maintainer can understand and challenge the result.
 
 Merges, release publication, deployments, shared infrastructure changes,
 privilege grants, credential resets, and destructive operations require explicit
-human approval of the concrete result. Identify the exact PR head, manifest
-checksum/image digest and environment, or account and role change. A broad
+human approval of the concrete result. Identify the PR/version and environment, or account and role change.
+Deployment tooling resolves and records immutable digests and recovery history;
+operators do not author or publish per-host deployment artifacts. A broad
 “yolo”, a plan approval, green CI, or a previous deployment is insufficient.
 Material changes invalidate approval for the changed scope.
 

@@ -80,9 +80,9 @@ jobs:
           fi
           echo "grafana_oidc=$grafana_oidc" >> "$GITHUB_OUTPUT"
 
-  release-manifests:
-    name: Release manifests
-    uses: ./.github/workflows/release-manifests.yml
+  deployment-checks:
+    name: Deployment checks
+    uses: ./.github/workflows/deployment-checks.yml
 
   compose:
     name: Validate Compose
@@ -318,14 +318,14 @@ jobs:
   gate:
     name: PR Gate
     if: always()
-    needs: [changes, compose, release-manifests, web, monitoring, grafana-oidc, source-omods, backend]
+    needs: [changes, compose, deployment-checks, web, monitoring, grafana-oidc, source-omods, backend]
     runs-on: ubuntu-latest
     steps:
       - name: Require successful validations
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
           COMPOSE_RESULT: ${{ needs.compose.result }}
-          MANIFEST_RESULT: ${{ needs.release-manifests.result }}
+          MANIFEST_RESULT: ${{ needs.deployment-checks.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
           OMOD_RESULT: ${{ needs.source-omods.result }}
           WEB_RESULT: ${{ needs.web.result }}

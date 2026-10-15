@@ -2,7 +2,7 @@
 """Validate, capture and consume immutable, node-specific SIHSalus releases."""
 
 import argparse
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime
 import fcntl
 import hashlib
@@ -169,11 +169,11 @@ def validate_effective_compose(manifest, model, active_services):
         require(set(configured.get("depends_on", {})) <= set(active_services), "Dependency is absent from the manifest")
 
 
-def run(command, *, root, environment=None, binary=False):
+def run(command, *, root, environment=None, binary=False, timeout=60):
     """Capture operational output: Compose configuration can contain secrets."""
     try:
         result = subprocess.run(command, cwd=root, env=environment, capture_output=True,
-                                text=not binary, check=False, timeout=60)
+                                text=not binary, check=False, timeout=timeout)
     except (OSError, subprocess.TimeoutExpired):
         raise ManifestError("Required operational command is unavailable") from None
     require(result.returncode == 0, "Operational command failed; no raw configuration or error output is displayed")
@@ -203,9 +203,14 @@ def compose_environment(manifest):
     return environment
 
 
-def verify_checkout(manifest, root):
+def verify_checkout(manifest, root, compatible=False):
     current = run(["git", "rev-parse", "HEAD"], root=root).strip()
-    require(current == manifest["sources"]["distroCommit"], "Checkout does not match the manifest distribution commit")
+    if current != manifest["sources"]["distroCommit"]:
+        require(compatible, "Checkout does not match the manifest distribution commit")
+        # Updating operational tools is safe only when installed runtime inputs
+        # remain byte-identical. Configuration migrations use the coordinated path.
+        run(["git", "diff", "--quiet", manifest["sources"]["distroCommit"], current, "--",
+             "docker-compose.yml", "compose", "frontend", "gateway", "oauth", "scripts/database"], root=root)
     require(not run(["git", "status", "--porcelain=v1", "--untracked-files=no"], root=root).strip(), "Checkout contains tracked changes")
     for name in manifest["compose"]["files"]:
         path = root / name
@@ -228,9 +233,9 @@ def verify_compose(manifest, root, env_file):
         validate_effective_compose(manifest, model, active)
 
 
-def verify_selected_compose(manifest, root, env_file, manifest_path):
+def verify_selected_compose(manifest, root, env_file, manifest_path, compatible_checkout=False):
     """Audit the selection actually used by ordinary Docker Compose commands."""
-    verify_checkout(manifest, root)
+    verify_checkout(manifest, root, compatible=compatible_checkout)
     verify_environment(manifest, env_file)
     command = ["docker", "compose", "--env-file", str(env_file)]
     rendered_environment = run(command + ["config", "--environment"], root=root)
@@ -448,11 +453,16 @@ def release_lock(root):
         yield directory
 
 
-def apply_release(manifest, previous, root, rollback=False):
+def apply_release(manifest, previous, root, rollback=False, services=None, state=None, verify=None):
     """Deploy and rollback share the same pinned execution and verification path."""
     validate_manifest(manifest)
     validate_manifest(previous)
     verify_transition(manifest, previous)
+    if services is not None:
+        changed = {name for name in manifest["services"]
+                   if manifest["services"][name] != previous["services"][name]}
+        require(bool(services) and set(services) <= {"frontend", "backend"} and changed <= set(services),
+                "Component update would change unrelated services")
     verify_checkout(manifest, root)
     env_file = root / ".env"
     require(env_file.is_file() and not env_file.is_symlink(), "A regular local .env is required")
@@ -460,7 +470,7 @@ def apply_release(manifest, previous, root, rollback=False):
     require(not run(["git", "ls-files", "--", ".env"], root=root).strip(), "Environment file must not be tracked")
     verify_environment(manifest, env_file)
     run(["git", "check-ignore", "--quiet", ".env.release-state/"], root=root)
-    with release_lock(root) as state:
+    with (release_lock(root) if state is None else nullcontext(state)) as state:
         verify_compose(manifest, root, env_file)
         runtime_inventory(manifest, root, allow_missing=rollback)
         if not rollback:
@@ -508,6 +518,8 @@ def apply_release(manifest, previous, root, rollback=False):
                      "SIHSALUS_RELEASE_MANIFEST": str(state / f"{manifest_digest(manifest)}.json"),
                      "BACKEND_TAG": manifest["sources"]["backend"]["image"].split(":sha-", 1)[1]}
         selection["BACKEND_TAG"] = "sha-" + selection["BACKEND_TAG"]
+        selection.update(FRONTEND_SOURCE_IMAGE=manifest["sources"]["frontend"]["image"],
+                         FRONTEND_SOURCE_TAG="sha-" + manifest["sources"]["frontend"]["commit"])
         try:
             # Persist the attempted selection before recreation. On any failure
             # leave it and the journal in place: silently restoring only .env
@@ -516,15 +528,22 @@ def apply_release(manifest, previous, root, rollback=False):
             environment.update(selection)
             environment.update(REDEPLOY_OFFLINE="true", SIHSALUS_MANIFEST_APPLY="true",
                                COMPOSE_ENV_FILES=str(env_file), COMPOSE_DISABLE_ENV_FILE="false")
-            source = manifest["sources"]["backend"]
-            command = ["bash", str(Path(__file__).with_name("redeploy-environment.sh")), source["commit"],
-                       source["image"].split("@", 1)[1]]
-            # Reuse existing authenticated FUA preflight and all health checks.
-            # Stream its bounded progress instead of collecting secret-bearing config.
-            result = subprocess.run(command, cwd=root, env=environment, check=False)
+            if services is None:
+                source = manifest["sources"]["backend"]
+                command = ["bash", str(root / "scripts/deploy/redeploy-environment.sh"), source["commit"],
+                           source["image"].split("@", 1)[1]]
+            else:
+                command = compose_command(manifest, env_file, override) + [
+                    "up", "-d", "--no-deps", "--no-build", "--pull", "never", "--wait",
+                    "--wait-timeout", "1800", *sorted(services)]
+            # Compose owns health waiting. Component updates never restart databases.
+            result = subprocess.run(command, cwd=root, env=environment, check=False,
+                                    timeout=1900 if services is not None else None)
             require(result.returncode == 0, "Redeploy failed; use the retained previous manifest for recovery")
             verify_runtime(manifest, root)
             verify_selected_compose(manifest, root, env_file, state / f"{manifest_digest(manifest)}.json")
+            if verify is not None:
+                verify()
             status["status"] = "verified"
         except BaseException:
             status["status"] = "failed-or-interrupted"

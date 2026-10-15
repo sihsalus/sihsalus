@@ -13,7 +13,7 @@ LOG_PREFIX="$1"
 # replace one component or prune images behind that retained release contract.
 if [ -f .env ] && grep -Eq '^[[:space:]]*(export[[:space:]]+)?SIHSALUS_RELEASE_MANIFEST[[:space:]]*=' .env &&
   [ "${SIHSALUS_MANIFEST_APPLY:-false}" != true ]; then
-  echo "[${LOG_PREFIX}] host is managed by a release manifest; use release-manifest.py deploy or rollback" >&2
+  echo "[${LOG_PREFIX}] host is managed by a release manifest; use python3 scripts/deploy/deploy.py update or rollback" >&2
   exit 1
 fi
 

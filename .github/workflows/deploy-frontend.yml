@@ -3,13 +3,10 @@ name: Deploy Frontend
 on:
   workflow_dispatch:
     inputs:
-      sha:
-        description: Reviewed frontend commit SHA (40 lowercase hexadecimal characters)
+      version:
+        description: Published frontend version (latest or complete commit SHA)
         required: true
-        type: string
-      digest:
-        description: Reviewed immutable sha256 digest
-        required: true
+        default: latest
         type: string
 
 concurrency:
@@ -42,31 +39,32 @@ jobs:
       - name: Resolve and verify release
         id: release
         env:
-          REQUESTED_SHA: ${{ inputs.sha }}
-          REQUESTED_DIGEST: ${{ inputs.digest }}
+          REQUESTED_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
 
           image='ghcr.io/sihsalus/sihsalus-frontend'
-          requested_sha="${REQUESTED_SHA:-}"
-          requested_digest="${REQUESTED_DIGEST:-}"
-          if [[ ! "${requested_sha}" =~ ^[0-9a-f]{40}$ || ! "${requested_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-            echo "::error::An explicitly reviewed SHA and digest are required."
+          version="${REQUESTED_VERSION}"
+          if [[ "$version" == latest ]]; then
+            tag=latest
+          elif [[ "$version" =~ ^[0-9a-f]{40}$ ]]; then
+            tag="sha-$version"
+          else
+            echo "::error::Choose latest or a complete published commit SHA."
             exit 2
           fi
-
-          tag="sha-${requested_sha}"
           immutable_json="$(docker buildx imagetools inspect "${image}:${tag}" --format '{{json .}}')"
-          immutable_sha="$(jq -r '.image.config.Labels["org.opencontainers.image.revision"] // empty' <<<"${immutable_json}")"
+          requested_sha="$(jq -r '.image.config.Labels["org.opencontainers.image.revision"] // empty' <<<"${immutable_json}")"
           immutable_digest="$(jq -r '.manifest.digest // empty' <<<"${immutable_json}")"
-
-          if [[ "${immutable_sha}" != "${requested_sha}" ]]; then
-            echo "::error::The immutable image revision does not match its tag."
+          if [[ ! "$requested_sha" =~ ^[0-9a-f]{40}$ || ! "$immutable_digest" =~ ^sha256:[0-9a-f]{64}$ ]] ||
+             { [[ "$version" != latest ]] && [[ "$requested_sha" != "$version" ]]; }; then
+            echo "::error::Published image has invalid or mismatched release metadata."
             exit 1
           fi
-
-          if [[ "${immutable_digest}" != "${requested_digest}" ]]; then
-            echo "::error::The immutable image digest does not match the reviewed selection."
+          tag="sha-$requested_sha"
+          published_digest="$(docker buildx imagetools inspect "${image}:${tag}" --format '{{.Manifest.Digest}}')"
+          if [[ "$published_digest" != "$immutable_digest" ]]; then
+            echo "::error::Published version changed during selection; retry."
             exit 1
           fi
 

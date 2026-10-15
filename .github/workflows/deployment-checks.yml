@@ -1,0 +1,26 @@
+name: Deployment checks
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deployment-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Deployment identity and recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Verify Compose coverage and persistent release selection
+        run: python3 -B tests/deploy/release-manifest-compose.py --audit
+      - name: Verify metadata from unlabeled and labeled runtime images
+        run: python3 -B tests/deploy/release-manifest-images.py
