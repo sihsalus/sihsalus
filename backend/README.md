@@ -15,8 +15,9 @@ The SDK writes `backend/target/sdk-distro`, packaged by the
 
 Core is built from the official 2.8.9 source with the bounded
 [clinical integrity correction](core/README.md) for program enrollment and
-duplicate active conditions. The distribution version is `2.8.10-sihsalus.1`;
-it is not an official OpenMRS 2.8.10 release. Native Core tests run during the
+duplicate active conditions and the dependency maintenance described in the
+same guide. The distribution version is `2.8.10-sihsalus.2`;
+it is not the official OpenMRS 2.8.10 release. Native Core tests run during the
 image build before the WAR enters the SDK distribution.
 
 Initializer metadata comes from the selected content packages. SPA configuration

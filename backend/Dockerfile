@@ -42,7 +42,7 @@ ADD --checksum=sha256:428cddc778eb382f91eafa2156117b090fc75b11202919376bb615ff3d
 COPY backend ./backend/
 
 # Core owns Condition persistence and PatientProgram validation. Keep this bounded
-# correction on the official 2.8.9 source used by the distribution (see core/README.md).
+# corrections on the official 2.8.9 source used by the distribution (see core/README.md).
 ARG OPENMRS_SOURCE_SHA=4dda0f50a60991a5af9a4b36508e69bb3561c8a6
 ADD --checksum=sha256:1ac87ad358b578b3e13c27bde5be8489f1f007885ff2125432f629f158a3b3b3 \
     https://github.com/openmrs/openmrs-core/archive/${OPENMRS_SOURCE_SHA}.tar.gz \
@@ -56,6 +56,7 @@ RUN --mount=type=cache,target=/root/.m2/repository \
     tar -xzf /tmp/openmrs-source.tar.gz -C /tmp/openmrs-source --strip-components=1 && \
     git -C /tmp/openmrs-source apply /openmrs_distro/backend/core/clinical-integrity.patch && \
     git -C /tmp/openmrs-source apply /openmrs_distro/backend/core/distribution-version.patch && \
+    git -C /tmp/openmrs-source apply /openmrs_distro/backend/core/dependency-security.patch && \
     mvn --batch-mode --no-transfer-progress --file /tmp/openmrs-source/pom.xml install && \
     tar -xzf /tmp/bedmanagement-source.tar.gz -C /tmp/bedmanagement-source --strip-components=1 && \
     mvn --batch-mode --show-version --no-transfer-progress \
