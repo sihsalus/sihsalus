@@ -22,7 +22,7 @@ the resulting WAR in the same build-only cache as the SDK distribution.
   response. Historical duplicates are not deleted or rewritten.
 
 `distribution-version.patch` changes only the reactor POM versions to
-`2.8.10-sihsalus.3`, matching `backend/pom.xml`. This is a SIHSalus build of
+`2.8.10-sihsalus.4`, matching `backend/pom.xml`. This is a SIHSalus build of
 **official 2.8.10 plus these patches**. The suffix distinguishes the patched
 artifact from upstream and the previous SIHSalus candidates. Never install these
 bytes as the official 2.8.10 artifact or change applied Liquibase identities.
@@ -70,7 +70,12 @@ The native reactor tests remain mandatory during the image build.
 Core only uses generic Velocity tools. Selecting their dedicated artifact
 removes the obsolete Struts integration transitively included by Tools 2.
 Core's remaining Commons Lang imports use the already declared Lang 3 dependency;
-they no longer depend on Lang 2 arriving implicitly through Velocity.
+they no longer depend on Lang 2 arriving implicitly through Velocity. Official
+OMODs still use its legacy namespace, so the API now explicitly provides
+`commons-lang:commons-lang:2.6`. The suffix `.4` distinguishes these bytes from
+the incompatible `.3` candidate. Its CVE-2025-48924 is temporarily accepted
+alongside nine exact Spring findings through 2026-10-22 UTC, with user approval
+for DEV/QLTY. Removing it requires upstream module compatibility first.
 Regression tests render actual startup templates and synthetic mail, checking
 localization, legacy truthiness, hyphenated identifiers and exception handling.
 
@@ -105,14 +110,16 @@ the UUID-generating Java change class did change upstream. This is not evidence
 of a successful upgrade against an installed MariaDB database. Content and
 module migrations still need their own restore-based validation before deployment.
 
-This change does not authorize an exception or establish release eligibility.
+The dependency upgrade alone does not establish release eligibility.
 Spring 5.3 remains affected by findings whose fixes require a different runtime
 or licensed maintenance. In particular, CVE-2016-1000027 remains associated with
 Spring Web versions before 6.0, and the OSS fix for CVE-2026-47884 is Spring 7.0.9.
 Moving to Spring 6+ also requires Jakarta-compatible Core, OMODs and Tomcat;
 changing a Maven version alone is insufficient. Track that migration separately.
-The empty exception policy, HIGH/CRITICAL gate, SBOM and signing requirements
-remain unchanged. Do not deploy a rejected candidate.
+The 2026-10-15 user-approved ten-entry exception catalog applies to this
+candidate through 2026-10-22 UTC. It is shared by CI and image promotion;
+new findings, OS findings, expired acceptance, failed tests, missing SBOM or
+signatures still block. Production is outside the approved deployment scope.
 
 ### Native validation, 2026-10-15
 
@@ -137,8 +144,8 @@ source in Dockerfile order; no local Liquibase changelog was changed.
 
 The complete container, OMOD integration, fresh local/Keycloak authentication,
 MariaDB behavior and DEV/QLTY clinical acceptance require separate checks.
-Native success does not remove the Spring publication block or establish that
-this candidate can be deployed. No migration was run on an existing environment.
+The prior native success does not validate the `.4` change or authorize
+deployment before the complete candidate passes its checks. No migration was run on an existing environment.
 
 ## Core 3 outlook
 

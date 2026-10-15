@@ -16,7 +16,7 @@ The SDK writes `backend/target/sdk-distro`, packaged by the
 Core is built from the official 2.8.10 source with the bounded
 [clinical integrity correction](core/README.md) for program enrollment and
 duplicate active conditions and the dependency maintenance described in the
-same guide. The distribution version is `2.8.10-sihsalus.3`, identifying the
+same guide. The distribution version is `2.8.10-sihsalus.4`, identifying the
 official 2.8.10 baseline plus SIHSalus patches. Native Core tests run during the
 image build before the WAR enters the SDK distribution.
 
@@ -237,20 +237,20 @@ password controls remain intact. Core 2.8.9 is also required by its CI matrix.
 The distribution still consumes the previously published, checksum-pinned REST
 release until the new owning-repository release is reviewed and published.
 
-**Integration remains blocked.** The prepared `2.8.10-sihsalus.3` Core removes
-Commons Lang 2; official Queue 3.1.0, OCL 4.0.0 and REST 3.6.0 still import
-`org.apache.commons.lang` and fail compilation against that candidate. Passing
-tests against official Core 2.8.10 does not validate our modified Core. Reevaluate
-that Core dependency patch with its security impact before merging this stack;
-do not silently restore a vulnerable library or bypass the scanner. The parent
-Core PR also fails the image security gate on new fixable Spring findings.
+**Compatibility recovery, 2026-10-15.** Core `2.8.10-sihsalus.4` explicitly
+restores upstream Commons Lang 2.6 for the official modules that still import
+`org.apache.commons.lang`. The user approved the associated CVE-2025-48924 and
+nine exact Spring 5.3.39 findings through 2026-10-22 UTC for DEV/QLTY. The shared
+image exception catalog records the ten exact scopes; other findings still
+block. Native Core/module tests, packaged-image CI and runtime acceptance must
+pass before deployment. This acceptance does not cover production.
 
 The repository test suite and Compose/Bake validation passed. A local assembly
 of 34 module binaries, replacing only the five selected OMODs, also passed the
 existing identity/required-version check and its 33 comparator fixtures against
 the candidate WAR. Input modules were copied read-only from DEV and matched the
 previous inventory byte for byte. This static gate does not resolve Java class
-linkage and therefore does not clear the Commons Lang blocker above.
+linkage; the restored dependency must also pass native and runtime checks.
 
 Before a separately approved DEV/QLTY rollout, require full packaged-image CI,
 security clearance, startup/migration validation on restored synthetic data,
