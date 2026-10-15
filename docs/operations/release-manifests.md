@@ -121,6 +121,40 @@ No podar esas imágenes mientras siga vigente la ventana de recuperación. Para
 recuperación ante pérdida del disco también se necesitan los backups y archivos
 de imágenes locales; un ID local no puede descargarse de un registry.
 
+### Retención de imágenes en DEV y QLTY
+
+`scripts/deploy/cleanup-release-images.py` conserva como mínimo las dos releases
+más recientes y todas las releases de los últimos tres días. Conserva además
+la release activa, el predecesor del último despliegue verificado, las imágenes
+de cualquier contenedor (también detenido) y las candidatas preparadas en
+`~/.sihsalus-release-prep/*/candidate.json` o con tags `*-prepared:*`.
+Los candidatos preparados deben retirarse explícitamente cuando dejen de ser
+necesarios; no caducan automáticamente.
+
+La limpieza solo considera imágenes de manifiestos históricos fuera de esa
+ventana y con referencias de SIHSalus. No usa `prune` global ni `--force`, ni
+borra contenedores, volúmenes, backups, manifiestos o archivos del checkout.
+Usa el mismo bloqueo que deploy/rollback. Se detiene ante selección inconsistente,
+un despliegue pendiente de recuperación o imágenes ausentes de una release protegida.
+Retirar imágenes implica que las releases históricas afectadas dejan de tener
+recuperación local completa; sus manifiestos se conservan como evidencia.
+
+```bash
+# Vista previa; no elimina imágenes.
+python3 -B scripts/deploy/cleanup-release-images.py --root /srv/sihsalus
+# Aplicar la política revisada.
+python3 -B scripts/deploy/cleanup-release-images.py --root /srv/sihsalus --apply
+```
+
+Para cron, instalar una copia versionada del script fuera del checkout instalado
+y ejecutar con el usuario de despliegue, sin cambiar el commit de la aplicación.
+Con el servidor en `America/Lima`, programar DEV a las 04:20 y QLTY a las 04:35.
+Usar rutas absolutas y un `PATH` explícito; preservar todas las tareas existentes.
+El último resultado queda en `.env.release-state/image-cleanup-latest.json`.
+Revisar primero la vista previa en cada nodo y comprobar su política con
+`--keep-releases 2 --keep-days 3`. La salida de cron puede guardarse en un archivo
+privado sobrescrito en cada ejecución para no acumular logs.
+
 La selección completa queda persistida en `.env`: archivos/perfiles Compose,
 proyecto, plataforma, nodo y manifiesto. El helper de los scripts individuales
 rechaza esos hosts para impedir que una actualización frontend o backend altere
