@@ -1,0 +1,684 @@
+diff --git a/api/pom.xml b/api/pom.xml
+index bae27e9..27cd15c 100644
+--- a/api/pom.xml
++++ b/api/pom.xml
+@@ -43,6 +43,11 @@
+ 			<artifactId>commons-lang3</artifactId>
+ 		</dependency>
+ 		<dependency>
++			<groupId>commons-lang</groupId>
++			<artifactId>commons-lang</artifactId>
++			<version>2.6</version>
++		</dependency>
++		<dependency>
+ 			<groupId>commons-beanutils</groupId>
+ 			<artifactId>commons-beanutils</artifactId>
+ 		</dependency>
+@@ -56,7 +61,7 @@
+ 		</dependency>
+ 		<dependency>
+ 			<groupId>org.apache.velocity</groupId>
+-			<artifactId>velocity</artifactId>
++			<artifactId>velocity-engine-core</artifactId>
+ 		</dependency>
+ 		<dependency>
+ 			<groupId>org.springframework</groupId>
+@@ -209,8 +214,8 @@
+ 			<artifactId>hibernate-validator</artifactId>
+ 		</dependency>
+ 		<dependency>
+-			<groupId>mysql</groupId>
+-			<artifactId>mysql-connector-java</artifactId>
++			<groupId>com.mysql</groupId>
++			<artifactId>mysql-connector-j</artifactId>
+ 			<scope>runtime</scope>
+ 		</dependency>
+ 		<dependency>
+diff --git a/api/src/main/java/org/openmrs/api/cache/CacheConfig.java b/api/src/main/java/org/openmrs/api/cache/CacheConfig.java
+index bd0f3c5..820d4f4 100644
+--- a/api/src/main/java/org/openmrs/api/cache/CacheConfig.java
++++ b/api/src/main/java/org/openmrs/api/cache/CacheConfig.java
+@@ -23,7 +23,7 @@ import java.util.List;
+ import java.util.Map;
+ import java.util.Set;
+ 
+-import org.apache.commons.lang.StringUtils;
++import org.apache.commons.lang3.StringUtils;
+ import org.apache.commons.text.CaseUtils;
+ import org.infinispan.commons.dataconversion.MediaType;
+ import org.infinispan.configuration.parsing.ConfigurationBuilderHolder;
+diff --git a/api/src/main/java/org/openmrs/api/db/hibernate/search/bridge/LocaleValueBridge.java b/api/src/main/java/org/openmrs/api/db/hibernate/search/bridge/LocaleValueBridge.java
+index b2d80c9..7141ce9 100644
+--- a/api/src/main/java/org/openmrs/api/db/hibernate/search/bridge/LocaleValueBridge.java
++++ b/api/src/main/java/org/openmrs/api/db/hibernate/search/bridge/LocaleValueBridge.java
+@@ -11,7 +11,7 @@ package org.openmrs.api.db.hibernate.search.bridge;
+ 
+ import java.util.Locale;
+ 
+-import org.apache.commons.lang.LocaleUtils;
++import org.apache.commons.lang3.LocaleUtils;
+ import org.hibernate.search.mapper.pojo.bridge.ValueBridge;
+ import org.hibernate.search.mapper.pojo.bridge.runtime.ValueBridgeFromIndexedValueContext;
+ import org.hibernate.search.mapper.pojo.bridge.runtime.ValueBridgeToIndexedValueContext;
+diff --git a/api/src/main/java/org/openmrs/api/impl/MedicationDispenseServiceImpl.java b/api/src/main/java/org/openmrs/api/impl/MedicationDispenseServiceImpl.java
+index def2aad..2e63a7e 100644
+--- a/api/src/main/java/org/openmrs/api/impl/MedicationDispenseServiceImpl.java
++++ b/api/src/main/java/org/openmrs/api/impl/MedicationDispenseServiceImpl.java
+@@ -9,7 +9,7 @@
+  */
+ package org.openmrs.api.impl;
+ 
+-import org.apache.commons.lang.BooleanUtils;
++import org.apache.commons.lang3.BooleanUtils;
+ import org.apache.commons.lang3.StringUtils;
+ import org.openmrs.MedicationDispense;
+ import org.openmrs.api.APIException;
+diff --git a/api/src/main/java/org/openmrs/api/impl/UserServiceImpl.java b/api/src/main/java/org/openmrs/api/impl/UserServiceImpl.java
+index d424962..10ceb0e 100644
+--- a/api/src/main/java/org/openmrs/api/impl/UserServiceImpl.java
++++ b/api/src/main/java/org/openmrs/api/impl/UserServiceImpl.java
+@@ -22,7 +22,7 @@ import java.util.Properties;
+ import java.util.Set;
+ import java.util.stream.Collectors;
+ 
+-import org.apache.commons.lang.RandomStringUtils;
++import org.apache.commons.lang3.RandomStringUtils;
+ import org.apache.commons.lang3.StringUtils;
+ import org.openmrs.Person;
+ import org.openmrs.Privilege;
+diff --git a/api/src/main/java/org/openmrs/api/storage/LocalStorageService.java b/api/src/main/java/org/openmrs/api/storage/LocalStorageService.java
+index 32515df..360f50d 100644
+--- a/api/src/main/java/org/openmrs/api/storage/LocalStorageService.java
++++ b/api/src/main/java/org/openmrs/api/storage/LocalStorageService.java
+@@ -20,7 +20,7 @@ import java.nio.file.attribute.BasicFileAttributes;
+ import java.util.ArrayList;
+ import java.util.List;
+ import java.util.stream.Stream;
+-import org.apache.commons.lang.StringUtils;
++import org.apache.commons.lang3.StringUtils;
+ import org.apache.commons.lang3.tuple.Pair;
+ import org.openmrs.api.StorageService;
+ import org.openmrs.api.stream.StreamDataService;
+diff --git a/api/src/main/java/org/openmrs/api/storage/S3StorageService.java b/api/src/main/java/org/openmrs/api/storage/S3StorageService.java
+index f0e3d97..16ba6ce 100644
+--- a/api/src/main/java/org/openmrs/api/storage/S3StorageService.java
++++ b/api/src/main/java/org/openmrs/api/storage/S3StorageService.java
+@@ -20,7 +20,7 @@ import java.util.concurrent.CompletableFuture;
+ import java.util.concurrent.ExecutionException;
+ import java.util.stream.Stream;
+ 
+-import org.apache.commons.lang.StringUtils;
++import org.apache.commons.lang3.StringUtils;
+ import org.openmrs.api.StorageService;
+ import org.openmrs.api.stream.StreamDataService;
+ import org.slf4j.Logger;
+diff --git a/api/src/main/java/org/openmrs/layout/address/AddressSupport.java b/api/src/main/java/org/openmrs/layout/address/AddressSupport.java
+index 6e17765..f7bbdbd 100644
+--- a/api/src/main/java/org/openmrs/layout/address/AddressSupport.java
++++ b/api/src/main/java/org/openmrs/layout/address/AddressSupport.java
+@@ -12,7 +12,7 @@ package org.openmrs.layout.address;
+ import java.util.ArrayList;
+ import java.util.List;
+ 
+-import org.apache.commons.lang.StringEscapeUtils;
++import org.apache.commons.lang3.StringEscapeUtils;
+ import org.apache.commons.lang3.StringUtils;
+ import org.openmrs.GlobalProperty;
+ import org.openmrs.api.GlobalPropertyListener;
+diff --git a/api/src/main/java/org/openmrs/layout/name/NameSupport.java b/api/src/main/java/org/openmrs/layout/name/NameSupport.java
+index d8cb4c9..3e6adb3 100644
+--- a/api/src/main/java/org/openmrs/layout/name/NameSupport.java
++++ b/api/src/main/java/org/openmrs/layout/name/NameSupport.java
+@@ -9,7 +9,7 @@
+  */
+ package org.openmrs.layout.name;
+ 
+-import org.apache.commons.lang.StringEscapeUtils;
++import org.apache.commons.lang3.StringEscapeUtils;
+ import org.apache.commons.lang3.StringUtils;
+ 
+ import java.util.ArrayList;
+diff --git a/api/src/main/java/org/openmrs/notification/mail/velocity/VelocityMessagePreparator.java b/api/src/main/java/org/openmrs/notification/mail/velocity/VelocityMessagePreparator.java
+index 588341b..dc9b205 100644
+--- a/api/src/main/java/org/openmrs/notification/mail/velocity/VelocityMessagePreparator.java
++++ b/api/src/main/java/org/openmrs/notification/mail/velocity/VelocityMessagePreparator.java
+@@ -14,11 +14,11 @@ import java.util.Properties;
+ 
+ import org.apache.velocity.VelocityContext;
+ import org.apache.velocity.app.VelocityEngine;
+-import org.apache.velocity.runtime.log.Log4JLogChute;
+ import org.openmrs.notification.Message;
+ import org.openmrs.notification.MessageException;
+ import org.openmrs.notification.MessagePreparator;
+ import org.openmrs.notification.Template;
++import org.openmrs.util.VelocityConfiguration;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+ 
+@@ -42,10 +42,8 @@ public class VelocityMessagePreparator implements MessagePreparator {
+ 	public VelocityMessagePreparator() throws MessageException {
+ 		try {
+ 			engine = new VelocityEngine();
+-			Properties props = new Properties();
+-			props.put("runtime.log.logsystem.class", Log4JLogChute.class.getName());
+-			props.put("runtime.log.logsystem.log4j.category", "velocity");
+-			props.put("runtime.log.logsystem.log4j.logger", "velocity");
++			Properties props = VelocityConfiguration.legacyTemplateProperties();
++			props.setProperty("runtime.log.name", "velocity");
+ 			engine.init(props);
+ 		}
+ 		catch (Exception e) {
+diff --git a/api/src/main/java/org/openmrs/scheduler/tasks/AutoRetireUsersTask.java b/api/src/main/java/org/openmrs/scheduler/tasks/AutoRetireUsersTask.java
+index 0d7285a..b85d0d3 100644
+--- a/api/src/main/java/org/openmrs/scheduler/tasks/AutoRetireUsersTask.java
++++ b/api/src/main/java/org/openmrs/scheduler/tasks/AutoRetireUsersTask.java
+@@ -9,7 +9,7 @@
+  */
+ package org.openmrs.scheduler.tasks;
+ 
+-import org.apache.commons.lang.StringUtils;
++import org.apache.commons.lang3.StringUtils;
+ import org.openmrs.User;
+ import org.openmrs.api.UserService;
+ import org.openmrs.api.context.Context;
+diff --git a/api/src/main/java/org/openmrs/util/VelocityConfiguration.java b/api/src/main/java/org/openmrs/util/VelocityConfiguration.java
+new file mode 100644
+index 0000000..143d15a
+--- /dev/null
++++ b/api/src/main/java/org/openmrs/util/VelocityConfiguration.java
+@@ -0,0 +1,33 @@
++/**
++ * This Source Code Form is subject to the terms of the Mozilla Public License,
++ * v. 2.0. If a copy of the MPL was not distributed with this file, You can
++ * obtain one at http://mozilla.org/MPL/2.0/. OpenMRS is also distributed under
++ * the terms of the Healthcare Disclaimer located at http://openmrs.org/license.
++ *
++ * Copyright (C) OpenMRS Inc. OpenMRS is a registered trademark and the OpenMRS
++ * graphic logo is a trademark of OpenMRS Inc.
++ */
++package org.openmrs.util;
++
++import java.util.Properties;
++
++/** Keeps existing mail and startup templates compatible with Velocity 2. */
++public final class VelocityConfiguration {
++	
++	private VelocityConfiguration() {
++	}
++	
++	public static Properties legacyTemplateProperties() {
++		Properties properties = new Properties();
++		properties.setProperty("introspector.conversion_handler.class", "none");
++		properties.setProperty("parser.space_gobbling", "bc");
++		properties.setProperty("directive.if.empty_check", "false");
++		properties.setProperty("parser.allow_hyphen_in_identifiers", "true");
++		properties.setProperty("velocimacro.enable_bc_mode", "true");
++		properties.setProperty("event_handler.invalid_references.quiet", "true");
++		properties.setProperty("event_handler.invalid_references.null", "true");
++		properties.setProperty("event_handler.invalid_references.tested", "true");
++		properties.setProperty("runtime.immutable_ranges", "false");
++		return properties;
++	}
++}
+diff --git a/api/src/main/java/org/openmrs/util/VelocityExceptionHandler.java b/api/src/main/java/org/openmrs/util/VelocityExceptionHandler.java
+index eed684f..08dd57b 100644
+--- a/api/src/main/java/org/openmrs/util/VelocityExceptionHandler.java
++++ b/api/src/main/java/org/openmrs/util/VelocityExceptionHandler.java
+@@ -10,6 +10,9 @@
+ package org.openmrs.util;
+ 
+ import org.apache.velocity.app.event.MethodExceptionEventHandler;
++import org.apache.velocity.context.Context;
++import org.apache.velocity.exception.MethodInvocationException;
++import org.apache.velocity.util.introspection.Info;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+ 
+@@ -26,10 +29,8 @@ public class VelocityExceptionHandler implements MethodExceptionEventHandler {
+ 	 * Object to be used as the return value of the method call, or throw the passed-in or new
+ 	 * Exception, which will be wrapped and propagated to the user as a MethodInvocationException
+ 	 *
+-	 * @see org.apache.velocity.app.event.MethodExceptionEventHandler#methodException(java.lang.Class,
+-	 *      java.lang.String, java.lang.Exception)
++	 * Retained for callers of the original Core helper.
+ 	 */
+-	@Override
+ 	public Object methodException(Class claz, String method, Exception e) throws Exception {
+ 		
+ 		log.debug("Claz: " + claz.getName() + " method: " + method, e);
+@@ -42,5 +43,19 @@ public class VelocityExceptionHandler implements MethodExceptionEventHandler {
+ 		// keep the default behavior
+ 		throw e;
+ 	}
++
++	@Override
++	public Object methodException(Context context, Class<?> claz, String method, Exception e, Info info) {
++		try {
++			return methodException(claz, method, e);
++		}
++		catch (RuntimeException failure) {
++			throw failure;
++		}
++		catch (Exception failure) {
++			throw new MethodInvocationException("Template method failed", failure, method,
++			    info.getTemplateName(), info.getLine(), info.getColumn());
++		}
++	}
+ 	
+ }
+diff --git a/api/src/test/java/org/openmrs/CohortTest.java b/api/src/test/java/org/openmrs/CohortTest.java
+index 5a89d6f..a717d06 100644
+--- a/api/src/test/java/org/openmrs/CohortTest.java
++++ b/api/src/test/java/org/openmrs/CohortTest.java
+@@ -24,7 +24,7 @@ import java.util.HashSet;
+ import java.util.List;
+ import java.util.Set;
+ 
+-import org.apache.commons.lang.ArrayUtils;
++import org.apache.commons.lang3.ArrayUtils;
+ import org.apache.commons.lang3.StringUtils;
+ import org.junit.jupiter.api.Test;
+ 
+diff --git a/api/src/test/java/org/openmrs/notification/mail/velocity/VelocityMessagePreparatorTest.java b/api/src/test/java/org/openmrs/notification/mail/velocity/VelocityMessagePreparatorTest.java
+new file mode 100644
+index 0000000..68f5ed8
+--- /dev/null
++++ b/api/src/test/java/org/openmrs/notification/mail/velocity/VelocityMessagePreparatorTest.java
+@@ -0,0 +1,64 @@
++/**
++ * This Source Code Form is subject to the terms of the Mozilla Public License,
++ * v. 2.0. If a copy of the MPL was not distributed with this file, You can
++ * obtain one at http://mozilla.org/MPL/2.0/. OpenMRS is also distributed under
++ * the terms of the Healthcare Disclaimer located at http://openmrs.org/license.
++ *
++ * Copyright (C) OpenMRS Inc. OpenMRS is a registered trademark and the OpenMRS
++ * graphic logo is a trademark of OpenMRS Inc.
++ */
++package org.openmrs.notification.mail.velocity;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertNull;
++import static org.junit.jupiter.api.Assertions.assertSame;
++import static org.junit.jupiter.api.Assertions.assertThrows;
++
++import java.util.HashMap;
++import java.util.Map;
++
++import org.apache.velocity.VelocityContext;
++import org.apache.velocity.exception.MethodInvocationException;
++import org.apache.velocity.util.introspection.Info;
++import org.junit.jupiter.api.Test;
++import org.openmrs.notification.Message;
++import org.openmrs.notification.Template;
++import org.openmrs.util.VelocityExceptionHandler;
++
++public class VelocityMessagePreparatorTest {
++
++    @Test
++    public void prepare_shouldPreserveLegacyTemplatesAndMessageHeaders() throws Exception {
++        Template template = new Template();
++        template.setTemplate("Hola $patient-name: #if($count)$count#end|#if($empty)present#end|$!missing");
++        template.setSubject("Recordatorio sintético");
++        template.setSender("test@example.invalid");
++        template.setRecipients("recipient@example.invalid");
++        Map<String, Object> data = new HashMap<>();
++        data.put("patient-name", "José");
++        data.put("count", 0);
++        data.put("empty", "");
++        template.setData(data);
++        Message message = new VelocityMessagePreparator().prepare(template);
++        assertEquals("Hola José: 0|present|", message.getContent());
++        assertEquals(template.getSubject(), message.getSubject());
++        assertEquals(template.getSender(), message.getSender());
++        assertEquals(template.getRecipients(), message.getRecipients());
++    }
++
++    @Test
++    public void methodException_shouldPreserveDateFallbackAndPropagateOtherFailures() throws Exception {
++        VelocityExceptionHandler handler = new VelocityExceptionHandler();
++        IllegalArgumentException failure = new IllegalArgumentException("synthetic invalid date");
++        VelocityContext context = new VelocityContext();
++        Info info = new Info("synthetic", 1, 1);
++        assertNull(handler.methodException(context, String.class, "format", failure, info));
++        assertSame(failure, assertThrows(IllegalArgumentException.class,
++            () -> handler.methodException(context, String.class, "other", failure, info)));
++        Exception checkedFailure = new Exception("synthetic checked failure");
++        MethodInvocationException wrapped = assertThrows(MethodInvocationException.class,
++            () -> handler.methodException(context, String.class, "other", checkedFailure, info));
++        assertSame(checkedFailure, wrapped.getCause());
++        assertEquals("synthetic", wrapped.getTemplateName());
++    }
++}
+diff --git a/liquibase/pom.xml b/liquibase/pom.xml
+index 7e4ad92..d937a6f 100644
+--- a/liquibase/pom.xml
++++ b/liquibase/pom.xml
+@@ -28,8 +28,8 @@
+ 			<artifactId>jaxen</artifactId>
+ 		</dependency>
+ 		<dependency>
+-			<groupId>mysql</groupId>
+-			<artifactId>mysql-connector-java</artifactId>
++			<groupId>com.mysql</groupId>
++			<artifactId>mysql-connector-j</artifactId>
+ 			<scope>runtime</scope>
+ 		</dependency>
+ 		<dependency>
+diff --git a/pom.xml b/pom.xml
+index cc8d03f..0fe03fd 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -62,6 +62,46 @@
+ 
+ 	<dependencyManagement>
+ 		<dependencies>
++			<!-- Keep transitive protocol and JSON libraries aligned across Core. -->
++			<dependency>
++				<groupId>io.netty</groupId>
++				<artifactId>netty-bom</artifactId>
++				<version>4.1.139.Final</version>
++				<type>pom</type>
++				<scope>import</scope>
++			</dependency>
++			<dependency>
++				<groupId>com.fasterxml.jackson</groupId>
++				<artifactId>jackson-bom</artifactId>
++				<version>${jacksonVersion}</version>
++				<type>pom</type>
++				<scope>import</scope>
++			</dependency>
++			<dependency>
++				<groupId>com.google.protobuf</groupId>
++				<artifactId>protobuf-java</artifactId>
++				<version>3.25.9</version>
++			</dependency>
++			<dependency>
++				<groupId>com.mchange</groupId>
++				<artifactId>c3p0</artifactId>
++				<version>0.14.2</version>
++			</dependency>
++			<dependency>
++				<groupId>com.mchange</groupId>
++				<artifactId>mchange-commons-java</artifactId>
++				<version>0.6.1</version>
++			</dependency>
++			<dependency>
++				<groupId>org.infinispan.protostream</groupId>
++				<artifactId>protostream</artifactId>
++				<version>4.6.5.Final</version>
++			</dependency>
++			<dependency>
++				<groupId>org.infinispan.protostream</groupId>
++				<artifactId>protostream-types</artifactId>
++				<version>4.6.5.Final</version>
++			</dependency>
+ 			<!-- OpenMRS Dependencies -->
+ 			<dependency>
+ 				<groupId>org.openmrs.tools</groupId>
+@@ -134,28 +174,18 @@
+ 			</dependency>
+ 			<dependency>
+ 				<groupId>org.apache.velocity</groupId>
+-				<artifactId>velocity</artifactId>
+-				<version>1.7</version>
+-				<exclusions>
+-					<exclusion>
+-						<groupId>oro</groupId>
+-						<artifactId>oro</artifactId>
+-					</exclusion>
+-				</exclusions>
++				<artifactId>velocity-engine-core</artifactId>
++				<version>2.4.1</version>
+ 			</dependency>
+ 			<dependency>
+-				<groupId>org.apache.velocity</groupId>
+-				<artifactId>velocity-tools</artifactId>
+-				<version>2.0.1-atlassian-2</version>
++				<groupId>org.apache.velocity.tools</groupId>
++				<artifactId>velocity-tools-generic</artifactId>
++				<version>3.1</version>
+ 				<exclusions>
+ 					<exclusion>
+ 						<groupId>commons-logging</groupId>
+ 						<artifactId>commons-logging</artifactId>
+ 					</exclusion>
+-					<exclusion>
+-						<groupId>org.apache.struts</groupId>
+-						<artifactId>struts-core</artifactId>
+-					</exclusion>
+ 				</exclusions>
+ 			</dependency>
+ 			<dependency>
+@@ -213,7 +243,7 @@
+ 			<dependency>
+ 				<groupId>org.springframework.security</groupId>
+ 				<artifactId>spring-security-crypto</artifactId>
+-				<version>5.8.16</version>
++				<version>6.5.11</version>
+ 			</dependency>
+ 			<dependency>
+ 				<groupId>org.infinispan</groupId>
+@@ -426,9 +456,9 @@
+ 				<version>1.6.0</version>
+ 			</dependency>
+ 			<dependency>
+-				<groupId>mysql</groupId>
+-				<artifactId>mysql-connector-java</artifactId>
+-				<version>8.0.30</version>
++				<groupId>com.mysql</groupId>
++				<artifactId>mysql-connector-j</artifactId>
++				<version>8.4.0</version>
+ 			</dependency>
+ 			<dependency>
+ 				<groupId>org.mariadb.jdbc</groupId>
+@@ -438,7 +468,7 @@
+ 			<dependency>
+ 				<groupId>org.postgresql</groupId>
+ 				<artifactId>postgresql</artifactId>
+-				<version>42.7.7</version>
++				<version>42.7.14</version>
+ 			</dependency>
+ 			<dependency>
+ 				<groupId>org.codehaus.jackson</groupId>
+@@ -450,26 +480,6 @@
+ 				<artifactId>jackson-mapper-asl</artifactId>
+ 				<version>1.9.14-MULE-002</version>
+ 			</dependency>
+-			<dependency>
+-				<groupId>com.fasterxml.jackson.core</groupId>
+-				<artifactId>jackson-core</artifactId>
+-				<version>${jacksonVersion}</version>
+-			</dependency>
+-			<dependency>
+-				<groupId>com.fasterxml.jackson.core</groupId>
+-				<artifactId>jackson-annotations</artifactId>
+-				<version>${jacksonVersion}</version>
+-			</dependency>
+-			<dependency>
+-				<groupId>com.fasterxml.jackson.core</groupId>
+-				<artifactId>jackson-databind</artifactId>
+-				<version>${jacksonVersion}</version>
+-			</dependency>
+-			<dependency>
+-				<groupId>com.fasterxml.jackson.datatype</groupId>
+-				<artifactId>jackson-datatype-jsr310</artifactId>
+-				<version>${jacksonVersion}</version>
+-			</dependency>
+ 			<dependency>
+ 				<groupId>junit</groupId>
+ 				<artifactId>junit</artifactId>
+@@ -1294,7 +1304,7 @@
+ 			 For instance, our version of Lucene is tied to the version of Hibernate Search. Similarly, our
+ 			 version of Hibernate Search must be compatible with the version of Hibernate and Hibernate must
+ 			 be compatible with our version of Spring. -->
+-		<springVersion>5.3.30</springVersion>
++		<springVersion>5.3.39</springVersion>
+ 		<hibernateVersion>5.6.15.Final</hibernateVersion>
+ 		<!-- hibernateSearchVersion needs to be adjusted if hibernateVersion changes -->
+ 		<hibernateSearchVersion>6.2.4.Final</hibernateSearchVersion>
+@@ -1302,7 +1312,7 @@
+ 		<!-- ininispanVersion needs to be adjusted if hibernateVersion changes -->
+ 		<infinispanVersion>13.0.22.Final</infinispanVersion>
+ 		<aspectjVersion>1.9.24</aspectjVersion>
+-		<jacksonVersion>2.19.1</jacksonVersion>
++		<jacksonVersion>2.21.7</jacksonVersion>
+ 		<junitVersion>5.11.4</junitVersion>
+ 		<byteBuddyVersion>1.12.18</byteBuddyVersion>
+ 		<mockitoVersion>3.12.4</mockitoVersion>
+diff --git a/web/pom.xml b/web/pom.xml
+index 8dc1cf8..134060e 100644
+--- a/web/pom.xml
++++ b/web/pom.xml
+@@ -96,8 +96,8 @@
+          <artifactId>jcl-over-slf4j</artifactId>
+       </dependency>
+       <dependency>
+-		 <groupId>org.apache.velocity</groupId>
+-		 <artifactId>velocity-tools</artifactId>
++		 <groupId>org.apache.velocity.tools</groupId>
++		 <artifactId>velocity-tools-generic</artifactId>
+ 		 <exclusions>
+ 		 	<exclusion>
+ 		 		<groupId>dom4j</groupId>
+diff --git a/web/src/main/java/org/openmrs/web/filter/StartupFilter.java b/web/src/main/java/org/openmrs/web/filter/StartupFilter.java
+index 675b2b9..e286b6e 100644
+--- a/web/src/main/java/org/openmrs/web/filter/StartupFilter.java
++++ b/web/src/main/java/org/openmrs/web/filter/StartupFilter.java
+@@ -41,7 +41,6 @@ import org.apache.commons.lang3.ArrayUtils;
+ import org.apache.velocity.VelocityContext;
+ import org.apache.velocity.app.VelocityEngine;
+ import org.apache.velocity.runtime.RuntimeConstants;
+-import org.apache.velocity.runtime.log.CommonsLogLogChute;
+ import org.apache.velocity.tools.Scope;
+ import org.apache.velocity.tools.ToolContext;
+ import org.apache.velocity.tools.ToolManager;
+@@ -49,6 +48,7 @@ import org.apache.velocity.tools.config.DefaultKey;
+ import org.apache.velocity.tools.config.FactoryConfiguration;
+ import org.apache.velocity.tools.config.ToolConfiguration;
+ import org.apache.velocity.tools.config.ToolboxConfiguration;
++import org.openmrs.util.VelocityConfiguration;
+ import org.openmrs.OpenmrsCharacterEscapes;
+ import org.openmrs.api.APIException;
+ import org.openmrs.api.context.Context;
+@@ -202,17 +202,13 @@ public abstract class StartupFilter implements Filter {
+ 		if (velocityEngine == null) {
+ 			velocityEngine = new VelocityEngine();
+ 			
+-			Properties props = new Properties();
+-			props.setProperty(RuntimeConstants.RUNTIME_LOG, "startup_wizard_vel.log");
+-			// Linux requires setting logging properties to initialize Velocity Context.
+-			props.setProperty(RuntimeConstants.RUNTIME_LOG_LOGSYSTEM_CLASS,
+-			    "org.apache.velocity.runtime.log.CommonsLogLogChute");
+-			props.setProperty(CommonsLogLogChute.LOGCHUTE_COMMONS_LOG_NAME, "initial_wizard_velocity");
++			Properties props = VelocityConfiguration.legacyTemplateProperties();
++			props.setProperty("runtime.log.name", "initial_wizard_velocity");
+ 			
+ 			// so the vm pages can import the header/footer
+-			props.setProperty(RuntimeConstants.RESOURCE_LOADER, "class");
+-			props.setProperty("class.resource.loader.description", "Velocity Classpath Resource Loader");
+-			props.setProperty("class.resource.loader.class",
++			props.setProperty(RuntimeConstants.RESOURCE_LOADERS, "class");
++			props.setProperty("resource.loader.class.description", "Velocity Classpath Resource Loader");
++			props.setProperty("resource.loader.class.class",
+ 			    "org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader");
+ 			
+ 			try {
+diff --git a/web/src/test/java/org/openmrs/web/filter/StartupVelocityTest.java b/web/src/test/java/org/openmrs/web/filter/StartupVelocityTest.java
+new file mode 100644
+index 0000000..aefd2e4
+--- /dev/null
++++ b/web/src/test/java/org/openmrs/web/filter/StartupVelocityTest.java
+@@ -0,0 +1,83 @@
++/**
++ * This Source Code Form is subject to the terms of the Mozilla Public License,
++ * v. 2.0. If a copy of the MPL was not distributed with this file, You can
++ * obtain one at http://mozilla.org/MPL/2.0/. OpenMRS is also distributed under
++ * the terms of the Healthcare Disclaimer located at http://openmrs.org/license.
++ *
++ * Copyright (C) OpenMRS Inc. OpenMRS is a registered trademark and the OpenMRS
++ * graphic logo is a trademark of OpenMRS Inc.
++ */
++package org.openmrs.web.filter;
++
++import static org.junit.jupiter.api.Assertions.assertFalse;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++import java.io.IOException;
++import java.util.Collections;
++import java.util.HashMap;
++import java.util.Map;
++
++import javax.servlet.http.HttpServletRequest;
++import javax.servlet.http.HttpServletResponse;
++
++import org.junit.jupiter.api.Test;
++import org.springframework.mock.web.MockFilterConfig;
++import org.springframework.mock.web.MockHttpServletResponse;
++
++public class StartupVelocityTest {
++
++    @Test
++    public void render_shouldLoadStartupTemplatesAndLocalizeWithoutDatabase() throws Exception {
++        TestFilter filter = new TestFilter();
++        filter.init(new MockFilterConfig());
++        try {
++            Map<String, Object> model = new HashMap<>();
++            model.put("locale", "es");
++            model.put("HEADER_TEMPLATE", "org/openmrs/web/filter/initialization/header.vm");
++            model.put("FOOTER_TEMPLATE", "org/openmrs/web/filter/footer.vm");
++            model.put("OPENMRS_VERSION", "synthetic-test");
++            model.put("workLog", Collections.emptyList());
++            MockHttpServletResponse response = new MockHttpServletResponse();
++            filter.renderTemplate("initialization/chooselang.vm", model, response);
++            String html = response.getContentAsString();
++            assertTrue(html.contains("Español"));
++            assertTrue(html.contains("Continuar"));
++            assertTrue(html.contains("synthetic-test"));
++            assertFalse(html.contains("$l10n"));
++            assertFalse(html.contains("#parse"));
++
++            model.put("locale", "en");
++            model.put("HEADER_TEMPLATE", "org/openmrs/web/filter/update/header.vm");
++            model.put("superuserrole", "System Developer");
++            response = new MockHttpServletResponse();
++            filter.renderTemplate("update/maintenance.vm", model, response);
++            html = response.getContentAsString();
++            assertTrue(html.contains("name=\"username\""));
++            assertTrue(html.contains("name=\"password\""));
++            assertTrue(html.contains("Continue"));
++            assertFalse(html.contains("$l10n"));
++        } finally {
++            filter.destroy();
++        }
++    }
++
++    private static class TestFilter extends StartupFilter {
++        @Override
++        protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
++        }
++
++        @Override
++        protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
++        }
++
++        @Override
++        protected Object getUpdateFilterModel() {
++            return new Object();
++        }
++
++        @Override
++        public boolean skipFilter(HttpServletRequest request) {
++            return false;
++        }
++    }
++}
+diff --git a/webapp/src/main/resources/velocity.properties b/webapp/src/main/resources/velocity.properties
+index a15a013..fd5f139 100644
+--- a/webapp/src/main/resources/velocity.properties
++++ b/webapp/src/main/resources/velocity.properties
+@@ -1,3 +1,2 @@
+-# Prevent velocity.log from getting written to current directory
+-runtime.log.logsystem.class=org.apache.velocity.runtime.log.SimpleLog4JLogSystem
+-runtime.log.logsystem.log4j.category=org.apache.velocity
++# Velocity 2 routes logging through the application's SLF4J binding.
++runtime.log.name=org.apache.velocity

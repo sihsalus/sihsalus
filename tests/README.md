@@ -46,7 +46,7 @@ módulos, dependencias, hooks de arranque y permisos. Los workflows de publicaci
 comprueban el backend, las rutas HTTP/HTTPS del gateway y los certificados de
 Certbot antes de promover sus imágenes; conservan escaneo, SBOM y firma.
 
-La matriz de pruebas de los diez módulos compilados desde fuente se ejecuta
+La matriz de pruebas de los módulos de `backend/omod-sources.lock` se ejecuta
 manualmente con la opción `source_omods` del workflow CI. El build normal sigue
 compilando sus revisiones fijadas y comprobando la imagen resultante.
 

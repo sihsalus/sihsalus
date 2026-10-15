@@ -13,10 +13,11 @@ before building the `backend` profile. [pom.xml](pom.xml) owns versions;
 The SDK writes `backend/target/sdk-distro`, packaged by the
 [assembly descriptor](assembly.xml).
 
-Core is built from the official 2.8.9 source with the bounded
+Core is built from the official 2.8.10 source with the bounded
 [clinical integrity correction](core/README.md) for program enrollment and
-duplicate active conditions. The distribution version is `2.8.10-sihsalus.1`;
-it is not an official OpenMRS 2.8.10 release. Native Core tests run during the
+duplicate active conditions and the dependency maintenance described in the
+same guide. The distribution version is `2.8.10-sihsalus.4`, identifying the
+official 2.8.10 baseline plus SIHSalus patches. Native Core tests run during the
 image build before the WAR enters the SDK distribution.
 
 Initializer metadata comes from the selected content packages. SPA configuration
@@ -107,13 +108,15 @@ longer needs a distribution-specific version, source build or source-test
 matrix entry. The existing packaged-image and required-module gates remain.
 Preserve forced-password-change and OAuth2 configuration contracts.
 
-The September/October upstream review also considered the following releases:
+The 2026-10-02 review on Core 2.8.9 recorded the following decisions. The
+2026-10-15 review below supersedes Address Hierarchy and Reporting for the
+Core 2.8.10 candidate:
 
-- Address Hierarchy 3.0.0 remains pending. Native tests on Core 2.8.9 failed
+- Address Hierarchy 3.0.0 was deferred. Native tests on Core 2.8.9 failed
   repeated CSV import and an i18n address-update case with privilege errors.
   Core requirements alone do not establish acceptance. ExtI18n 1.1.0 is optional;
   introducing it is not required for the current address hierarchy integration.
-- Reporting 2.2.0 remains pending as a packaging simplification. Its PDF and
+- Reporting 2.2.0 was deferred as a packaging simplification. Its PDF and
   service-privilege changes are already in our source pin. Native Core 2.8.9
   tests encounter an obsolete DrugOrder fixture and a confirmed H2 role-cache
   deadlock: the test creates uncommitted roles while Core resolves privileges in
@@ -175,6 +178,178 @@ Native module tests, packaged checks and synthetic DEV acceptance are separate
 requirements. Retain a verified database backup and previous immutable image
 before testing startup, attachment saves and login/session behavior. Image
 rollback does not restore a database.
+
+### Review validation, 2026-10-15
+
+This candidate adopts the official Maven OMODs below. Queue, Patient Documents
+and Reporting no longer need distribution-specific versions, source builds or
+source-test matrix entries. The remaining source matrix follows
+`omod-sources.lock`. Existing packaged-image and security checks remain required.
+
+| Module | Previous pin | Candidate | Native tests on official Core 2.8.10 / Java 21 |
+| --- | --- | --- | --- |
+| [Queue](https://github.com/openmrs/openmrs-module-queue/releases/tag/3.1.0) | 3.1.0-sihsalus.1 | 3.1.0 | 292 tests, zero skipped |
+| [OpenConceptLab](https://github.com/openmrs/openmrs-module-openconceptlab/releases/tag/4.0.0) | 3.2.0 | 4.0.0 | 196 tests, eight skipped |
+| [Patient Documents](https://github.com/openmrs/openmrs-module-patientdocuments/releases/tag/1.2.0) | 1.2.0-sihsalus.1 | 1.2.0 | 309 tests, zero skipped; test fixtures adapted |
+| [Address Hierarchy](https://github.com/openmrs/openmrs-module-addresshierarchy/releases/tag/3.0.0) | 2.21.0 | 3.0.0 | 105 tests, two skipped |
+| [Reporting](https://github.com/openmrs/openmrs-module-reporting/releases/tag/2.2.0) | 2.2.0-sihsalus.1 | 2.2.0 | 821 tests, 14 skipped; test fixture adapted |
+
+All five full reactors completed with zero failures/errors. These are isolated
+H2/source tests, not startup or clinical acceptance of the packaged system.
+Queue, OCL and Address Hierarchy used unmodified release sources. The earlier
+Address Hierarchy privilege failures did not recur with official Core 2.8.10.
+
+Patient Documents was tested with Reporting 2.2.0, matching this candidate;
+its default Reporting 1.28 dependency could not initialize on this baseline.
+Its H2 fixtures needed the Core 2.8 `obs_id` shared primary key and persistence
+of a typed location attribute through `LocationService` before auto-flush.
+Reporting's date-filter test needed a valid encounter without cascading the
+obsolete DrugOrders attached to the shared fixture. Assertions and clinical
+validation were preserved; only isolated test data changed. The unadapted tags
+failed these tests. Exact test-only patches and commands accompany the PR;
+production sources and the selected official Maven binaries are unchanged.
+The earlier Reporting role-cache deadlock did not recur with Core 2.8.10.
+
+Queue is adopted **as published**, including upstream annulment of queue entries
+when a patient is voided and both scheduled tasks registered/started on module
+startup. The visit task closes queue entries for visits that have already ended;
+it does not end visits. The time-based task has no effect while
+`queue.autoCloseQueueEntriesAtTime` is empty (the default). No new closure time
+or EMR API visit-closure setting is configured here. Before activation, inspect
+the environment's persisted properties and task definitions; defaults do not
+prove their current values. Clinical acceptance must cover ended visits,
+patient voiding and any existing configured closure schedule.
+
+OCL 4.0.0 introduces asynchronous index work during imports and requires Core
+2.8.0 or later. Validate import completion, search results and startup ordering
+with Initializer before promotion. Patient Documents adds paper-size-aware
+PDF layout; verify the actual CRED/Gestantes documents. Reporting's functional
+PDF/privilege changes were already in our old source pin; switching to its
+release simplifies packaging. Address Hierarchy needs import/update acceptance;
+optional ExtI18n remains outside this change.
+
+REST 3.6.0 is prepared in its owning fork, retaining only the required CLOB
+UTF-8/plain-text/`nosniff` runtime protection and exact release descriptor.
+Its full reactor passed on official Core 2.8.7 and 2.8.10 (1,924 tests each,
+14 skipped). A test-only activation-token fixture uses the dedicated DAO method
+instead of the general credential update now guarded by Core 2.8.10; production
+password controls remain intact. Core 2.8.9 is also required by its CI matrix.
+The distribution still consumes the previously published, checksum-pinned REST
+release until the new owning-repository release is reviewed and published.
+
+**Compatibility recovery, 2026-10-15.** Core `2.8.10-sihsalus.4` explicitly
+restores upstream Commons Lang 2.6 for the official modules that still import
+`org.apache.commons.lang`. The user approved the associated CVE-2025-48924 and
+nine exact Spring 5.3.39 findings through 2026-10-22 UTC for DEV/QLTY. The shared
+image exception catalog records the ten exact scopes; other findings still
+block. Native Core/module tests, packaged-image CI and runtime acceptance must
+pass before deployment. This acceptance does not cover production.
+
+The repository test suite and Compose/Bake validation passed. A local assembly
+of 34 module binaries, replacing only the five selected OMODs, also passed the
+existing identity/required-version check and its 33 comparator fixtures against
+the candidate WAR. Input modules were copied read-only from DEV and matched the
+previous inventory byte for byte. This static gate does not resolve Java class
+linkage; the restored dependency must also pass native and runtime checks.
+
+Before a separately approved DEV/QLTY rollout, require full packaged-image CI,
+security clearance, startup/migration validation on restored synthetic data,
+and the functional checks above. Back up both database and application data and
+retain the prior immutable image. Queue can create persisted scheduler records
+and change queue rows; reverting only the image does not reverse those writes.
+A rollback must account for the new task definitions and use a verified,
+consistent database/application-data recovery point when necessary. No runtime,
+migration, shared configuration or clinical data was changed in this review.
+
+### Gradual adoption of official OMODs, phase 1
+
+The distribution now selects published Maven artifacts for two more modules,
+instead of compiling upstream snapshots under private version numbers:
+
+| Module | Previous pin | Official candidate | Functional difference to review |
+| --- | --- | --- | --- |
+| [Billing](https://github.com/openmrs/openmrs-module-billing/releases/tag/2.5.0) | 2.5.0-sihsalus.1 | 2.5.0 | Changes `getBillableServiceId` from `int` to `Integer` and removes `setBillableServiceId` / `addServicePrice`. Check Java consumers and billing workflows. |
+| [Reporting REST](https://github.com/openmrs/openmrs-module-reportingrest/releases/tag/2.0.0) | 2.1.0-sihsalus.1 | 2.0.0 | Removes the unreleased immediate `POST reportingrest/runReport/...` endpoints. Existing queued report APIs remain. |
+
+Reporting REST is an intentional **version downgrade**, not a renamed 2.1 release.
+No `runReport/` caller was found in frontend commit
+`c122fa48965ce973cb38900bbcd464fe28d0c977`; external clients remain to be checked.
+Do not delete module-version records or migration history to force a downgrade.
+The selected Billing binary has a byte-identical `liquibase.xml` file to the
+previous candidate; neither Reporting REST binary includes one.
+This is static evidence, not a restored-database migration test.
+
+These selections remove two source-lock entries and their source-test matrix
+jobs. The existing image checks, version-review rules and security gates remain.
+The PR records source commits, downloaded binary checksums, native test results
+and the exact local validation-harness adaptations. The distribution consumes
+the unmodified official binaries, never the harness-built OMODs.
+
+FHIR2 4.3.0 was evaluated but **not selected**: its default reactor passed
+5,297 tests with three skipped after local fixture/locale preparation, but the
+explicit `integration-test` profile exposed medication-update persistence errors
+involving `Drug.ingredients` / duplicate `DrugIngredient` identities. Its `lastn`
+integration cases also depend on Core's changed encounter-6 fixture. Retain the
+existing FHIR2 pin and source build while diagnosing these separately; this does
+not establish that the previous snapshot is free of the same problems. Prefer
+an upstream resolution and a green integration suite to another private patch.
+
+The Core compatibility/security blockers described above still apply. Before
+promotion, require the full image checks, actual startup on restored synthetic
+data, authenticated FHIR reads/writes and denied access, billing create/pay/refund
+and invoice checks, and queued report generation/download. No DEV/QLTY or
+production runtime was changed while preparing this phase.
+
+### Remaining exceptions and removal conditions
+
+Keep each exception until its replacement passes the affected functional and
+authorization tests. Technical maintenance owner: `@Duvet05`; clinical acceptance
+requires a designated CRED/Gestantes reviewer. Track the phased transition in its
+PR and existing owning-module PRs rather than introducing another version registry.
+
+| Module | What would be lost by removing the current variant | Condition for an official replacement |
+| --- | --- | --- |
+| REST | CLOB UTF-8, plain-text and `nosniff` protection | A compatible Core 2.8 release containing the fix; its presence on upstream master alone is insufficient. |
+| O3 Forms | Null-locale translation guard | Demonstrate safe form translation with the official release and actual locale configuration. |
+| EMR API | Atomic failure of automatic visit closure and maternal lookup without admission metadata | Prove batch rollback and mother/child queries; keep automatic closure paused pending clinical acceptance. |
+| Initializer | Retirement reason when creating an already-retired AMPATH form | Official release containing upstream PR #334; test fresh creation and replacement without modifying historical data. |
+| OAuth2Login | Native route registration and authentication-scheme selection | Verify official login, callback, session and logout, or separately approve local OpenMRS authentication. |
+| Bed Management | Clinical visit closure, scoped metadata access, extra bed states and tag mappings | Complete the visit/permission review below and assess existing bed data before replacing the module. |
+| Stock Management | Operation-location input/fallback and the variant's DAO wiring | Compare official 3.0.0 with our 3.1.1 variant, then test receipts, transfers and billing. A higher private number does not establish an official release. |
+
+FUA, Imaging, Notifications and Audit are local products, not redundant upstream
+rebuilds. Their replacement needs an explicit functional decision; this phase
+does not remove them.
+
+### Next phase: decouple clinical visit closure from Bed Management
+
+The frontend revision above has three production callers of
+`POST /ws/rest/v1/clinicalvisitclosure`: visit finalization, appointment closure
+and the deceased-patient workflow. The native REST visit update accepts
+`stopDatetime`, but calls `VisitService.saveVisit`, whereas our endpoint calls
+`endVisit`, returns an already-closed visit without changing its date, and
+temporarily supplies two metadata privileges. The Bed Management variant also
+changes service wiring in visit/encounter hooks. A URL replacement alone does
+not establish equivalent authorization or behavior.
+
+Prepare an isolated official-module comparison before changing these callers:
+
+- Exercise allowed and denied requests with actual CRED/Gestantes role metadata,
+  including bed hooks. Do not grant bed administration or broad metadata access
+  to compensate for missing module behavior.
+- Preserve SIS summary validation, closing before FUA generation, and safe retry
+  when FUA generation or the close response fails. Repeated closure must preserve
+  the original stop date.
+- Preserve queue draining, fresh visit readback, timestamp bounds and recovery
+  after a lost response in the deceased-patient workflow. Test appointments too.
+- Inventory persisted `CLEANING`, `MAINTENANCE`, `ISOLATION` states and tag mappings
+  read-only before deciding how the official model can represent them. Do not
+  delete or remap clinical/bed data as part of an artifact replacement.
+
+Acceptance needs real Core + REST + Bed Management + Queue integration and a
+human clinical/permission review. If the official stack cannot provide the
+required behavior, retain the bounded exception and propose the responsible
+upstream fix; do not move backend authorization into the frontend.
 
 ## Source-built modules
 

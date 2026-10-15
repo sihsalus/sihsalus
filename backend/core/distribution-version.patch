@@ -1,130 +1,130 @@
 diff --git a/api/pom.xml b/api/pom.xml
-index 74f3ce9..39f4ee4 100644
+index 60b5ec6..bae27e9 100644
 --- a/api/pom.xml
 +++ b/api/pom.xml
 @@ -14,7 +14,7 @@
  	<parent>
  		<groupId>org.openmrs</groupId>
  		<artifactId>openmrs</artifactId>
--		<version>2.8.9</version>
-+		<version>2.8.10-sihsalus.1</version>
+-		<version>2.8.10</version>
++		<version>2.8.10-sihsalus.4</version>
  		<relativePath>../pom.xml</relativePath>
  	</parent>
  	<modelVersion>4.0.0</modelVersion>
 diff --git a/liquibase/pom.xml b/liquibase/pom.xml
-index 1e7fa10..41e0083 100644
+index ca263a6..7e4ad92 100644
 --- a/liquibase/pom.xml
 +++ b/liquibase/pom.xml
 @@ -13,7 +13,7 @@
  	<parent>
  		<groupId>org.openmrs</groupId>
  		<artifactId>openmrs</artifactId>
--		<version>2.8.9</version>
-+		<version>2.8.10-sihsalus.1</version>
+-		<version>2.8.10</version>
++		<version>2.8.10-sihsalus.4</version>
  	</parent>
  	<modelVersion>4.0.0</modelVersion>
  	<groupId>org.openmrs.liquibase</groupId>
 diff --git a/pom.xml b/pom.xml
-index 7f87117..73a6cee 100644
+index ef0945d..cc8d03f 100644
 --- a/pom.xml
 +++ b/pom.xml
 @@ -15,7 +15,7 @@
  	<modelVersion>4.0.0</modelVersion>
  	<groupId>org.openmrs</groupId>
  	<artifactId>openmrs</artifactId>
--	<version>2.8.9</version>
-+	<version>2.8.10-sihsalus.1</version>
+-	<version>2.8.10</version>
++	<version>2.8.10-sihsalus.4</version>
  	<packaging>pom</packaging>
  	<name>OpenMRS</name>
  	<description>Master project for the modules of OpenMRS</description>
 diff --git a/test-module/api/pom.xml b/test-module/api/pom.xml
-index 7ee9408..a34e953 100644
+index d89d2d9..496da62 100644
 --- a/test-module/api/pom.xml
 +++ b/test-module/api/pom.xml
 @@ -15,7 +15,7 @@
  	<parent>
  		<groupId>org.openmrs.module</groupId>
  		<artifactId>openmrs-test-module</artifactId>
--		<version>2.8.9</version>
-+		<version>2.8.10-sihsalus.1</version>
+-		<version>2.8.10</version>
++		<version>2.8.10-sihsalus.4</version>
  	</parent>
  
  	<artifactId>openmrs-test-module-api</artifactId>
 diff --git a/test-module/omod/pom.xml b/test-module/omod/pom.xml
-index 723c607..7c8113f 100644
+index 99a6d1e..6778ac0 100644
 --- a/test-module/omod/pom.xml
 +++ b/test-module/omod/pom.xml
 @@ -15,7 +15,7 @@
  	<parent>
  		<groupId>org.openmrs.module</groupId>
  		<artifactId>openmrs-test-module</artifactId>
--		<version>2.8.9</version>
-+		<version>2.8.10-sihsalus.1</version>
+-		<version>2.8.10</version>
++		<version>2.8.10-sihsalus.4</version>
  	</parent>
  
  	<artifactId>openmrs-test-module-omod</artifactId>
 diff --git a/test-module/pom.xml b/test-module/pom.xml
-index ed15844..3ca21d7 100644
+index 29f3e77..025fd1e 100644
 --- a/test-module/pom.xml
 +++ b/test-module/pom.xml
 @@ -16,7 +16,7 @@
  	<parent>
  		<groupId>org.openmrs</groupId>
  		<artifactId>openmrs</artifactId>
--		<version>2.8.9</version>
-+		<version>2.8.10-sihsalus.1</version>
+-		<version>2.8.10</version>
++		<version>2.8.10-sihsalus.4</version>
  	</parent>
  
  	<groupId>org.openmrs.module</groupId>
 diff --git a/test/pom.xml b/test/pom.xml
-index d59ae2a..e75fa72 100644
+index 3f5ecda..2893e95 100644
 --- a/test/pom.xml
 +++ b/test/pom.xml
 @@ -13,7 +13,7 @@
     <parent>
        <groupId>org.openmrs</groupId>
        <artifactId>openmrs</artifactId>
--      <version>2.8.9</version>
-+      <version>2.8.10-sihsalus.1</version>
+-      <version>2.8.10</version>
++      <version>2.8.10-sihsalus.4</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.openmrs.test</groupId>
 diff --git a/tools/pom.xml b/tools/pom.xml
-index cc72b5a..56ce08a 100644
+index 63e2f28..1576021 100644
 --- a/tools/pom.xml
 +++ b/tools/pom.xml
 @@ -13,7 +13,7 @@
      <parent>
          <groupId>org.openmrs</groupId>
          <artifactId>openmrs</artifactId>
--        <version>2.8.9</version>
-+        <version>2.8.10-sihsalus.1</version>
+-        <version>2.8.10</version>
++        <version>2.8.10-sihsalus.4</version>
      </parent>
      <modelVersion>4.0.0</modelVersion>
      <groupId>org.openmrs.tools</groupId>
 diff --git a/web/pom.xml b/web/pom.xml
-index 24083f1..ffc576b 100644
+index f941176..8dc1cf8 100644
 --- a/web/pom.xml
 +++ b/web/pom.xml
 @@ -13,7 +13,7 @@
     <parent>
        <groupId>org.openmrs</groupId>
        <artifactId>openmrs</artifactId>
--      <version>2.8.9</version>
-+      <version>2.8.10-sihsalus.1</version>
+-      <version>2.8.10</version>
++      <version>2.8.10-sihsalus.4</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.openmrs.web</groupId>
 diff --git a/webapp/pom.xml b/webapp/pom.xml
-index 57ff3e1..cf969dd 100644
+index a435739..e35ad9b 100644
 --- a/webapp/pom.xml
 +++ b/webapp/pom.xml
 @@ -13,7 +13,7 @@
     <parent>
        <groupId>org.openmrs</groupId>
        <artifactId>openmrs</artifactId>
--      <version>2.8.9</version>
-+      <version>2.8.10-sihsalus.1</version>
+-      <version>2.8.10</version>
++      <version>2.8.10-sihsalus.4</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.openmrs.web</groupId>
