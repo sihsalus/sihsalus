@@ -59,13 +59,14 @@ script completa el no-op y la limpieza acotada de imágenes frontend aunque el
 host esté por debajo del umbral; nunca reconstruye ni recrea el servicio en ese
 caso.
 
-La automatización normal vive en `.github/workflows/deploy-frontend.yml`. Una
-release verificada de `sihsalus-frontend` publica el tag de señal
-`frontend-release-<SHA>` en este repositorio mediante una deploy key limitada al
-distro. El workflow exige que ese SHA y su digest correspondan a la imagen
-`latest` promovida y los valida contra la imagen inmutable antes de desplegar.
-El sondeo programado de `latest` permanece como respaldo si falla la señal
-inmediata.
+El workflow `.github/workflows/deploy-frontend.yml` se inicia manualmente con
+SHA y digest completos. Verifica los revisores humanos y la ausencia de bypass
+administrativo de `development` y `quality` antes de los jobs protegidos. La
+selección se muestra en el resumen del run para la aprobación de cada entorno.
+Publicar una imagen, crear tags o mover `latest` no inicia un despliegue. Seguir
+[el procedimiento de revisión humana](../../docs/operations/human-review.md).
+Los hosts seleccionados por manifiestos siguen usando su procedimiento
+coordinado; esta ruta individual no permite eludir ese control.
 
 Después de cada despliegue, `verify-external-frontend.sh` abre por defecto 12
 conexiones HTTP/1.1 independientes durante 55 segundos. En cada muestra valida

@@ -5,6 +5,9 @@ mantiene las imágenes, Docker Compose y las herramientas de operación. La
 metadata clínica vive en `sihsalus-content` y los microfrontends en
 `sihsalus-frontend`.
 
+Antes de contribuir, seguir [AGENTS.md](AGENTS.md). Los merges y las operaciones
+compartidas siguen el [procedimiento de revisión humana](docs/operations/human-review.md).
+
 ## Inicio rápido
 
 Requiere Docker con Compose v2; Buildx permite usar los targets de Bake.
