@@ -22,7 +22,7 @@ permite encontrarlo sin duplicar comandos ni versiones.
 | --- | --- |
 | Preparar y aceptar un despliegue | [Checklist](operations/deploy-checklist.md) |
 | Actualizar un servicio o un ambiente completo | [Scripts de despliegue](../scripts/deploy/README.md) |
-| Aplicar o revertir una release coordinada | [Manifiestos](operations/release-manifests.md) |
+| Consultar, actualizar o revertir versiones | [Despliegue](../scripts/deploy/README.md) |
 | Verificar firmas, imágenes y vulnerabilidades | [Política de imágenes](operations/image-security.md) |
 | Respaldar y restaurar MariaDB | [Backups](../scripts/backup/README.md) |
 | Preparar semillas cifradas | [Semillas](../scripts/seed/README.md) |

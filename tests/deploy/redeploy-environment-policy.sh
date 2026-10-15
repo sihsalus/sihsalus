@@ -27,7 +27,7 @@ fi
 
 grep -Fq 'git merge --ff-only origin/main' "$SCRIPT"
 grep -Fq 'bash "$CLEAN_CHECKOUT_HELPER" redeploy-environment' "$SCRIPT"
-grep -Fq 'bash "$CLEAN_CHECKOUT_HELPER" deploy-frontend' "$FRONTEND_SCRIPT"
+grep -Fq '/deploy.py" "${arguments[@]}"' "$FRONTEND_SCRIPT"
 grep -Fq 'Usage: $0 <40-character backend git SHA> <sha256 image digest>' "$SCRIPT"
 grep -Fq 'export BACKEND_TAG="$TARGET_BACKEND_REFERENCE"' "$SCRIPT"
 grep -Fq 'docker compose pull backend' "$SCRIPT"

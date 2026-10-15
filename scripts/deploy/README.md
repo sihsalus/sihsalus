@@ -1,215 +1,105 @@
-# Despliegue y recuperación
+# Despliegue y versiones
 
-Ejecutar desde la raíz del checkout instalado, con su `.env` y selección
-Compose. Completar el [checklist](../../docs/operations/deploy-checklist.md).
-
-| Cambio | Procedimiento |
-| --- | --- |
-| Release coordinada, imágenes y configuración del distro | [Manifiestos](../../docs/operations/release-manifests.md) |
-| Solo imagen frontend, compatible con el wrapper instalado | [Frontend únicamente](#frontend-únicamente) |
-| Solo imagen backend, compatible con Compose y el esquema existentes | [Backend únicamente](#backend-únicamente) |
-| Reconstrucción integral de DEV/QLTY sin manifiestos | [Redeploy integral](#redeploy-integral-no-destructivo) |
-
-Para una release coordinada de todos los servicios, usar el
-[procedimiento de manifiestos inmutables](../../docs/operations/release-manifests.md).
-Los hosts que adoptan ese flujo consumen el mismo manifiesto al desplegar y
-revertir; sus actualizaciones individuales quedan deshabilitadas.
-
-Los scripts individuales conservan el checkout: no ejecutan `git fetch` ni
-`git merge`. Así, ante un fallo, la imagen anterior se recrea con el mismo
-Compose usado al iniciar el intento. No actualizar Git en paralelo. Si el
-candidato necesita otro wrapper o configuración, preparar una release coordinada
-con su commit y el procedimiento de recuperación correspondiente.
-
-`env.sh` comparte la lectura de referencias/nodos y su escritura atómica en
-`.env`, conserva permisos y elimina asignaciones duplicadas de la clave
-gestionada. No ejecuta el contenido del archivo como shell. El runner remoto
-envía este helper junto al script y la comprobación de checkout limpio.
-
-## Frontend únicamente
-
-`deploy-frontend.sh` actualiza exclusivamente el frontend desde una imagen
-inmutable que ya fue publicada y analizada en `sihsalus-frontend`.
-
-El script:
-
-1. valida el SHA y digest solicitados;
-2. comprueba que el checkout instalado esté limpio y conserva su configuración;
-3. fija `FRONTEND_SOURCE_IMAGE` al digest inmutable y conserva el tag SHA como
-   metadato operativo; el runtime local recibe un tag derivado del mismo digest
-   para que un rebuild del mismo commit no destruya la ruta de rollback;
-4. reconstruye el wrapper runtime y recrea solo `frontend`;
-5. verifica salud, imagen y `build-info.json`;
-6. restaura la configuración y el contenedor anterior si falla;
-7. solo después de verificar el frontend, elimina imágenes antiguas de los dos
-   repositorios exclusivos del frontend y conserva las imágenes fuente y
-   runtime activas.
-
-No ejecuta `docker compose pull`, `up`, `restart` ni `build` sobre el stack
-completo. El único pull explícito es la imagen fuente del frontend por digest;
-el build y la recreación están dirigidos exclusivamente al servicio `frontend`
-con `--no-deps`. La limpieza tampoco usa `docker image prune`: enumera
-únicamente `ghcr.io/sihsalus/sihsalus-frontend` y el repositorio runtime
-configurado en `FRONTEND_RUNTIME_IMAGE`, por lo que no elimina imágenes de
-OpenMRS, base de datos, gateway ni otros servicios.
-
-El umbral de espacio libre se aplica antes de cualquier actualización real. Si
-el SHA, digest, imagen runtime, identidad del nodo y salud ya coinciden, el
-script completa el no-op y la limpieza acotada de imágenes frontend aunque el
-host esté por debajo del umbral; nunca reconstruye ni recrea el servicio en ese
-caso.
-
-El workflow `.github/workflows/deploy-frontend.yml` se inicia manualmente con
-SHA y digest completos. Verifica los revisores humanos y la ausencia de bypass
-administrativo de `development` y `quality` antes de los jobs protegidos. La
-selección se muestra en el resumen del run para la aprobación de cada entorno.
-Publicar una imagen, crear tags o mover `latest` no inicia un despliegue. Seguir
-[el procedimiento de revisión humana](../../docs/operations/human-review.md).
-Los hosts seleccionados por manifiestos siguen usando su procedimiento
-coordinado; esta ruta individual no permite eludir ese control.
-
-Después de cada despliegue, `verify-external-frontend.sh` abre por defecto 12
-conexiones HTTP/1.1 independientes durante 55 segundos. En cada muestra valida
-`/health`, `/ready`, `/openmrs/health/started` y `build-info.json`, omite cachés
-y exige que todas las revisiones observadas coincidan con el SHA desplegado.
-También exige una única dirección remota y que `X-SIHSALUS-Node-ID` coincida
-exactamente con el UUID estable configurado para el ambiente. El runner solo
-entrega ese UUID al host cuya MAC fue validada y el wrapper frontend lo hornea
-en la imagen local. Esto hace fallar la promoción
-a QLTY si DEV alterna entre nodos o revisiones durante la ventana, en vez de
-aceptar la primera respuesta saludable. El conteo, intervalo y timeout pueden
-ajustarse con `EXTERNAL_VERIFY_SAMPLE_COUNT`,
-`EXTERNAL_VERIFY_SAMPLE_INTERVAL_SECONDS` y
-`EXTERNAL_VERIFY_CURL_TIMEOUT_SECONDS`; producción siempre debe conservar al
-menos dos muestras.
-
-Antes de subir, iniciar, monitorear o cancelar un despliegue remoto,
-`run-redeploy-remote.sh` exige y valida la MAC física esperada. Los workflows
-fijan la pareja MAC/UUID de DEV y QLTY; una VM clonada que comparta IP y claves
-SSH no puede recibir el script ni ejecutar Docker, y tampoco puede aprobar la
-verificación HTTP con otra identidad. La MAC se comprueba dentro de cada
-conexión SSH porque un preflight separado no protege la siguiente conexión.
-
-La identidad física de DEV es `00:0c:29:86:a3:3b`, confirmada por el responsable
-de infraestructura el 6 de octubre de 2026 y comprobada por SSH el 7 de octubre.
-La MAC anterior `00:0c:29:ad:be:90` corresponde al host retirado. El UUID lógico
-de DEV instalado y comprobado por `.env`, etiqueta OCI y cabecera HTTP es `700e430a-1c32-5241-b7cf-78ccea17f8c1`; el despliegue lo
-entrega únicamente después de verificar la MAC vigente. La incidencia
-[#243](https://github.com/sihsalus/sihsalus/issues/243) conserva el antecedente
-de alternancia. Si vuelve a responder el host antiguo, el control debe rechazarlo.
-
-El sondeo es una defensa probabilística: una réplica que no reciba ninguna de
-las conexiones dentro de la ventana todavía puede escapar. La corrección
-definitiva de direcciones duplicadas y VMs clonadas sigue correspondiendo a la
-infraestructura o al hipervisor.
-
-Para una ejecución manual:
+Ejecutar desde el checkout instalado, con su `.env`. La selección de servicios,
+imágenes inmutables e historial la mantiene la herramienta en el propio servidor.
+No se crean releases de GitHub por ambiente ni se editan manifiestos a mano.
 
 ```bash
-./scripts/deploy/deploy-frontend.sh \
-  0123456789abcdef0123456789abcdef01234567 \
-  sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+python3 scripts/deploy/deploy.py status
+python3 scripts/deploy/deploy.py update --frontend latest
+python3 scripts/deploy/deploy.py history
+python3 scripts/deploy/deploy.py rollback
 ```
 
-El comando debe ejecutarse desde la raíz del repositorio. Durante una
-actualización, la imagen anterior permanece disponible hasta que terminan la
-verificación y la posibilidad de rollback automático. Una reversión posterior
-a un despliegue exitoso vuelve a descargar por digest y reconstruir el frontend
-anterior.
+`latest` significa la última imagen **publicada**, no un candidato de CI. También
+se acepta el SHA completo de una versión publicada. El digest se resuelve una
+sola vez y se conserva internamente. `--digest` permite fijarlo adicionalmente en
+automatizaciones. `--prepare` prepara y verifica sin recrear servicios.
 
-Antes de consultar o modificar contenedores, el script rechaza cambios locales
-en archivos versionados y muestra únicamente su estado y ruta. La salida no
-muestra el contenido del archivo. Un ajuste operativo que deba persistir se
-incorpora mediante un pull request; no se mantiene como parche en el checkout
-del servidor.
+Configurar `SIHSALUS_PUBLIC_URL=https://servidor` en `.env` una vez, o pasar `--url`.
+Esto incorpora las comprobaciones HTTP externas al resultado de la operación.
+Sin URL, se verifican las imágenes, identidad y salud internas; el resultado no
+acredita acceso desde fuera del host.
 
-## Backend únicamente
+## Qué ocurre al actualizar
 
-Cuando solo cambia un OMOD o la imagen clásica de OpenMRS, usa
-`deploy-backend.sh` para no recrear frontend, gateway, bases de datos ni perfiles
-opcionales:
+1. Comprueba checkout limpio, selección real de Compose, ambiente, UUID y versión
+   instalada. Un cambio de herramientas operativas es compatible si los archivos
+   que definen el runtime siguen idénticos. Un cambio de Compose exige una
+   intervención coordinada, no una actualización individual.
+2. Verifica las imágenes de recuperación y la salud del componente actual.
+3. Resuelve la versión publicada por digest. Para frontend construye únicamente
+   su wrapper con la configuración y UUID del servidor, sin modificar `.env` aún.
+4. Guarda automáticamente las versiones anterior y candidata y un registro
+   privado del intento. Conserva las imágenes anteriores.
+5. Usa Docker Compose `up --no-deps --no-build --pull never --wait` exclusivamente
+   sobre el componente elegido. Actualizar frontend no reinicia OpenMRS, MariaDB,
+   PostgreSQL, gateway ni servicios opcionales.
+6. Comprueba imágenes reales, selección persistida, salud y, con URL configurada,
+   acceso externo. Si falla el frontend después de empezar, recupera su imagen
+   anterior y conserva la evidencia del fallo. El comando devuelve error incluso
+   si recuperó correctamente.
+
+Después de una recuperación por fallo, `rollback` no vuelve a instalar el
+candidato fallido. Para reintentarlo se elige su versión explícitamente.
+
+Dos actualizaciones no pueden ejecutarse simultáneamente. Interrumpir un proceso
+con SIGKILL o perder energía puede dejar una operación pendiente: consultar
+`status` e `history` y ejecutar `rollback` si corresponde. Nunca borrar el estado
+privado para forzar una actualización.
+
+La limpieza queda fuera del despliegue. El cron local conserva al menos dos
+versiones y tres días, además de imágenes en uso, candidatas y recuperación.
+No se ejecuta `docker image prune`, no se eliminan volúmenes y no se necesitan
+commits ni PR por cada tarea de mantenimiento local.
+
+## Backend y content
 
 ```bash
-./scripts/deploy/deploy-backend.sh \
-  0123456789abcdef0123456789abcdef01234567 \
-  sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+python3 scripts/deploy/deploy.py update --backend VERSION
 ```
 
-El script exige que el backend actual esté saludable, valida SHA y digest OCI,
-conserva su referencia e imagen local para rollback, recrea exclusivamente el
-servicio `backend`, espera `/openmrs/health/started` y solo entonces persiste
-`BACKEND_TAG`. Si falla, restaura `.env` y vuelve a levantar la imagen anterior
-sin tocar los demás servicios.
+Actualiza solo backend; content viaja dentro de esa imagen y su versión se lee
+del artefacto. Antes, confirmar respaldo comprobado, compatibilidad de esquema
+y aceptación del cambio. Si falla, conserva la evidencia y no revierte
+automáticamente: una imagen anterior no deshace migraciones ya confirmadas.
+`rollback` automático/manual está limitado al frontend. La recuperación de
+backend y base de datos usa el [procedimiento de backups](../backup/README.md)
+y una versión compatible elegida expresamente.
 
-El rollback individual no revierte migraciones SQL ni recupera un cambio previo
-del checkout. La versión candidata debe ser compatible con la configuración
-instalada; el backup y la ruta de recuperación de la base se preparan antes.
+## GitHub Actions y conexión remota
 
-## Redeploy integral no destructivo
+**Deploy Frontend** pide una versión y resuelve su SHA/digest antes de acceder a
+los hosts. Mantiene los environments `development` y `quality`, revisión humana
+nativa, DEV como canario y QLTY solo después de sus comprobaciones.
+La aprobación describe versión y ambiente; hashes y registros son evidencia
+producida por la automatización, no archivos que el operador deba preparar.
 
-`redeploy-environment.sh` se usa para reconstruir y recrear un ambiente
-completo cuando una actualización exclusiva del frontend no es suficiente.
-Recibe el commit y digest ya publicados del backend para que un `BACKEND_TAG`
-antiguo en el servidor no pueda degradar el despliegue:
+`run-redeploy-remote.sh` conserva la ejecución desconectable, exclusión mutua,
+registro de resultados y comprobación MAC en **cada** conexión SSH. Mantener las
+identidades vigentes: DEV `00:0c:29:86:a3:3b` / UUID
+`700e430a-1c32-5241-b7cf-78ccea17f8c1`; QLTY `00:0c:29:1c:f7:78` / UUID
+`0cefb0c8-c860-48c5-856f-408594775cbb`. El antecedente de VMs clonadas es #243.
+`verify-external-frontend.sh` comprueba 12 conexiones independientes, versión,
+UUID, dirección remota y salud; una muestra HTTP no prueba aceptación clínica.
 
-```bash
-./scripts/deploy/redeploy-environment.sh \
-  0123456789abcdef0123456789abcdef01234567 \
-  sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-```
+Los scripts `deploy-frontend.sh` y `deploy-backend.sh` permanecen como entradas
+compatibles y delegan en la misma implementación. No mantienen flujos separados.
 
-Opera sobre los archivos y perfiles definidos por el `.env` del servidor:
+## Instalaciones existentes y cambios coordinados
 
-1. rechaza cambios locales en archivos versionados y el perfil destructivo
-   `seed`; si existe drift, muestra únicamente el estado y la ruta de cada
-   archivo para poder localizarlo sin volcar configuración ni secretos;
-2. actualiza `main` únicamente mediante fast-forward;
-3. descarga por digest la imagen solicitada del backend clásico
-   `ghcr.io/sihsalus/sihsalus-backend`, construido desde `backend/pom.xml`, y
-   valida que su revisión OCI coincida con el commit solicitado;
-4. descarga las imágenes de registry de todos los perfiles activos;
-5. si FUA ya está activo, prueba mediante una conexión autenticada que la
-   identidad configurada todavía corresponde al rol almacenado en el volumen;
-6. reconstruye sin caché y de forma secuencial los runtimes locales activos
-   (`frontend`, `gateway`, `certbot` y/o `keycloak`) para limitar el consumo de
-   CPU, memoria y red del host;
-7. recrea todos los servicios activos, pero conserva volúmenes y datos;
-8. espera MariaDB, frontend, OpenMRS y gateway, y verifica el estado de todos
-   los servicios antes de declarar el ambiente usable;
-9. solo entonces persiste en `.env` la referencia inmutable
-   `sha-<commit>@sha256:<digest>` usada por el backend.
+La herramienta reconoce el estado local anterior directamente. Para una
+instalación Compose sin historial, captura las imágenes reales, sus revisiones,
+content, perfiles y nodo antes de la primera actualización. No cambia datos,
+perfiles ni nombres de proyecto. La adopción se detiene ante información
+incompleta o imágenes fuente que no se puedan verificar.
 
-No ejecuta `docker compose down`, no usa `-v` y no elimina volúmenes. El
-workflow manual `Redeploy Non-Production` solicita el SHA y digest del backend,
-ejecuta primero DEV y solo promueve a QLTY si DEV y sus verificaciones HTTP
-terminan correctamente. La conexión usa keepalive con tolerancia de diez
-minutos y la espera de OpenMRS emite progreso periódico para tolerar arranques
-largos.
+El [motor de recuperación](../../docs/operations/release-manifests.md) mantiene
+compatibilidad con registros históricos y operaciones coordinadas de Compose.
+Es una interfaz interna para recuperación avanzada, no un paso de la operación
+cotidiana. Una migración de perfiles, volúmenes o configuración tiene su propia
+revisión, respaldo y pruebas; `redeploy-environment.sh` no es el camino normal
+para actualizar versiones.
 
-El preflight FUA es deliberadamente de solo lectura: ejecuta `SELECT 1` con la
-configuración renderizada y no crea usuarios, no ejecuta `ALTER ROLE` y no
-modifica el volumen. `POSTGRES_PASSWORD` solo inicializa un volumen PostgreSQL
-vacío; cambiar `SIHSALUS_FUA_GEN_DB_PASSWORD` en `.env` no rota el rol que ya
-existe. Si ambas credenciales divergen, el despliegue se detiene antes de
-recrear servicios y remite al procedimiento de recuperación del checklist de
-operaciones. La conexión y la consulta tienen límites de tiempo y solo los
-errores PostgreSQL de autenticación o identidad se diagnostican como drift de
-credenciales; un error transitorio también detiene el redeploy antes de recrear
-servicios y exige verificar conectividad y salud autenticada.
-Si la sonda aislada no puede arrancar, el despliegue también se detiene cuando
-ya existe un volumen FUA; no se recrean servicios sobre una verificación
-inconclusa.
-En una primera instalación sin volumen ni contenedor FUA, la sonda aislada se
-omite y la autenticación queda a cargo del healthcheck durante el arranque. Si
-el volumen ya existe pero el contenedor está ausente o detenido, el redeploy
-falla cerrado para no convertir un estado de recuperación en una recreación
-general del ambiente.
-
-Si un establecimiento está temporalmente sin DNS o salida a Internet, se puede
-usar `REDEPLOY_OFFLINE=true` únicamente después de transferir y verificar el
-checkout y todas las imágenes runtime deseadas. Ese modo omite `git fetch`, los
-pulls y los builds; recrea los servicios exclusivamente con las imágenes
-prevalidadas que ya estén presentes. También exige el SHA y digest del backend;
-la referencia por digest debe haberse descargado explícitamente o transferido
-con sus metadatos de `RepoDigest`. La referencia solo se persiste después de
-completar las verificaciones.
+Producción no se actualiza junto con DEV/QLTY. Su adopción y actualización requieren
+la ventana y autorización correspondientes.

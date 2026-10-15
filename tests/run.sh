@@ -23,9 +23,7 @@ for check in \
   tests/backend/o3forms-release-config.sh \
   tests/backend/tomcat-config-config.sh \
   tests/backend/vulnerability-ratchet-config.sh \
-  tests/deploy/deploy-backend-test.sh \
   tests/deploy/redeploy-environment-policy.sh \
-  tests/frontend/deploy-frontend.sh \
   tests/utils/safe-poweroff-policy.sh; do
   echo "[CHECK] $check"
   bash "$check"

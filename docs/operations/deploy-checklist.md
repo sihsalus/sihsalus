@@ -2,24 +2,17 @@
 
 Usar este checklist para cambios en `main`, despliegues de `qlty`, `staging` o producción.
 
-## Revisión humana y selección del frontend
+## Revisión humana y selección
 
-Seguir [el procedimiento de revisión humana](human-review.md). Preparar la
-selección, la evidencia y la recuperación antes de pedir aprobación de un
-manifiesto/checksum y destino concretos. El merge, CI y la publicación de una
-imagen no autorizan su despliegue.
+Seguir [el procedimiento de revisión humana](human-review.md). El mantenedor
+elige la versión y ambientes; `deploy.py` registra automáticamente las imágenes
+exactas y la recuperación. No preparar ni publicar archivos por servidor.
 
-`Deploy Frontend` solo admite `workflow_dispatch` con SHA y digest completos.
-No se activa por tags, cron ni `repository_dispatch`. Verifica las protecciones
-nativas de `development` y `quality`, muestra la selección y espera aprobación
-humana en los jobs de cada environment. Si falta la protección, se detiene antes
-del acceso SSH. DEV sigue siendo canario antes de QLTY en esta ruta individual.
-
-Esta ruta conserva el checkout y recrea solo `frontend`, con rollback anterior.
-Los hosts administrados por manifiestos rechazan scripts individuales: usar el
-[procedimiento coordinado](release-manifests.md), conservando el marcador de
-selección y la aprobación humana del manifiesto que se aplicará. Producción
-requiere su propia autorización y evidencia.
+En Actions, **Deploy Frontend** admite una versión publicada y conserva las
+aprobaciones nativas de `development` y `quality`. DEV sigue siendo el canario.
+Por SSH se usa la misma herramienta sobre el checkout instalado. Actualizar
+frontend recrea solo frontend y conserva backend, bases de datos y perfiles.
+Producción tiene su propia ventana y autorización.
 
 ## Antes del despliegue
 
@@ -43,9 +36,9 @@ requiere su propia autorización y evidencia.
 - Distinguir recuperación de imágenes y de base de datos. Volver a una imagen
   anterior no deshace migraciones SQL ya confirmadas; una consolidación de roles
   requiere el procedimiento coordinado de restauración del respaldo.
-- Para releases coordinadas, manifiestos anterior y candidato revisados,
-  imágenes conservadas y [procedimiento de aplicación/reversión](release-manifests.md)
-  probado en QLTY; registrar sus IDs y checksums junto a la evidencia.
+- Versiones anterior y candidata identificadas por la herramienta, imágenes de
+  recuperación conservadas y procedimiento de rollback probado. Para cambios de
+  Compose, revisar además el [procedimiento coordinado](release-manifests.md).
 - Variables y secretos requeridos confirmados sin exponer valores.
 - `COMPOSE_FILE` y `COMPOSE_PROFILES` reflejan el stack real del servidor.
 - Si el entorno usa HTTPS, `COMPOSE_FILE` incluye `compose/ssl.yml` y `COMPOSE_PROFILES` incluye `ssl`.
@@ -127,7 +120,7 @@ Registrar:
 
 ## Smoke test posterior
 
-Antes de activar el frontend nuevo, verificar en el intento actual de arranque
+Cuando cambie el backend o content, verificar en el intento actual de arranque
 que Initializer terminó sin errores ni cargas abortadas. Comparar el historial
 de migraciones y la política final del rol canónico con el artefacto elegido,
 incluidas las asignaciones y referencias conservadas. Para llegadas no SIS,

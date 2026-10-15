@@ -10,7 +10,7 @@ deben poder revisarse sin reconstruir una conversación con el agente.
 - **Merge:** PR y SHA exacto, diff completo, pruebas ejecutadas y pendientes,
   revisión clínica/de seguridad cuando corresponda, y efectos automáticos de
   publicación. Un nuevo cambio sustancial requiere nueva revisión.
-- **Despliegue o rollback:** entorno/nodo, manifiesto y checksum o SHA/digest,
+- **Despliegue o rollback:** versión publicada y entorno/nodo; la herramienta registra SHA/digest,
   versión anterior, respaldo comprobado, interrupción prevista y recuperación.
   Validar un asset o aprobar un merge no aprueba su aplicación.
 - **Administración:** instalación, cuenta, permisos actuales y propuestos, y
@@ -71,17 +71,20 @@ la regla. Si cambian los nombres del CI, revisar también los checks requeridos.
 
 ## Aplicación y evidencia
 
-`Deploy Frontend` solo admite ejecución manual con SHA y digest completos;
-publicar imágenes, mover `latest` o crear tags no inicia un despliegue. El run
-publica la selección resuelta para que el revisor compruebe lo que autoriza.
-La aprobación de DEV y QLTY se realiza en el job de cada environment.
+El mantenedor autoriza el cambio y sus ambientes. **Deploy Frontend** solicita
+la versión, resuelve su SHA/digest y muestra el resultado en el run. GitHub aplica
+la revisión humana de cada environment; el agente no aprueba en nombre del usuario.
 
-Los hosts con `SIHSALUS_RELEASE_MANIFEST` siguen usando el
-[procedimiento de manifiestos](release-manifests.md); no quitar el marcador
-para usar scripts individuales. Antes de una aplicación por SSH, el agente
-debe presentar el manifiesto preparado y esperar la aprobación humana de ese
-checksum y destino. La protección de Actions no controla una sesión SSH local.
+Por SSH, usar `deploy.py`: prepara el candidato, conserva automáticamente la
+versión anterior y registra las identidades exactas. No pedir al operador que
+redacte, publique o apruebe JSON por nodo. La autorización explícita del usuario
+para una actualización concreta se conserva durante su preparación y ejecución;
+no solicitarla de nuevo por cada archivo interno generado. Una ampliación de
+ambientes, componentes o efectos sí requiere una nueva decisión.
 
-Después, registrar por separado imágenes/identidad, salud, autenticación,
-aceptación clínica y recuperación. Un login correcto o doce respuestas HTTP
-correctas no demuestran que las decisiones clínicas sean válidas.
+El estado de instalaciones anteriores se adopta sin eliminar sus protecciones.
+Conservar los registros y las imágenes de recuperación; no quitar marcadores
+para usar un camino que ignore el estado instalado.
+
+Registrar por separado imágenes/identidad, salud, autenticación, aceptación
+clínica y recuperación. Un login correcto no demuestra corrección clínica.

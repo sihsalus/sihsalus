@@ -81,18 +81,30 @@ bash scripts/validate-compose.sh
 con imágenes, autenticación y restauración real. Un resultado local correcto no
 sustituye la aceptación del runtime.
 
-## Actualización en producción
+## Actualizar y consultar versiones
 
-Usar el [checklist](docs/operations/deploy-checklist.md) y elegir el procedimiento
-en la [guía de despliegue](scripts/deploy/README.md):
+Desde el checkout instalado:
 
-- **Release coordinada o cambio de Compose:** manifiestos con imágenes y commit
-  del distro fijados, incluida la versión anterior para recuperación.
-- **Solo frontend o backend:** scripts de actualización individual sobre el
-  checkout limpio ya instalado. No actualizan Git durante el despliegue.
+```bash
+python3 scripts/deploy/deploy.py status
+python3 scripts/deploy/deploy.py update --frontend latest
+python3 scripts/deploy/deploy.py history
+python3 scripts/deploy/deploy.py rollback
+```
 
-El rollback de imágenes no revierte migraciones de base de datos. La guía
-especifica las verificaciones y los límites de recuperación de cada flujo.
+La herramienta resuelve la versión publicada, conserva la recuperación y
+actualiza solo el servicio elegido. El historial se guarda automáticamente en
+el servidor; no hay archivos de despliegue que redactar o publicar. También
+acepta un commit publicado en lugar de `latest`. Configurar `SIHSALUS_PUBLIC_URL`
+una vez para incluir la comprobación HTTP externa en la actualización.
+
+`update --backend VERSION` actualiza OpenMRS y su paquete content: exige preparar
+el respaldo y revisar migraciones; nunca actualiza el backend implícitamente al
+actualizar frontend. Los cambios de Compose se coordinan aparte.
+
+En GitHub Actions, **Deploy Frontend** pide solamente la versión; resuelve sus
+imágenes una vez y despliega DEV antes de QLTY con las aprobaciones nativas.
+Producción es una operación separada. Ver [operación y recuperación](scripts/deploy/README.md).
 
 ## Backup y restore
 
