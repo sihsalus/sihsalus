@@ -39,6 +39,7 @@ permite encontrarlo sin duplicar comandos ni versiones.
 | Configurar apagado seguro | [Runbook UPS](operations/safe-poweroff.md) |
 | Atender alertas de secretos | [Detección de secretos](operations/secret-scanning.md) |
 | Construir y probar componentes | [Backend](../backend/README.md), [frontend](../frontend/README.md), [gateway](../gateway/README.md), [pruebas](../tests/README.md) |
+| Preparar la acreditación de Hospital Santa Clotilde | [Brechas y aceptación](accreditation/README.md), [contrato IPS Perú](accreditation/ips-peru-contract.md), [opciones de firma](accreditation/digital-signature-options.md) |
 
 El [contrato de enrutamiento clínico 1.23.0](operations/canonical-care-routing-1.23.0.md)
 conserva el contexto de esa versión; no reemplaza las instrucciones vigentes de despliegue.

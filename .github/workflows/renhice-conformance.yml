@@ -1,0 +1,56 @@
+name: RENHICE synthetic conformance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tests/interop/**'
+      - '.github/workflows/renhice-conformance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conformance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Check document identity and validation failure handling
+        run: python3 -B -m unittest discover -s tests/interop -p 'test_*.py' -v
+      - name: Validate synthetic documents against the unchanged MINSA draft
+        run: python3 -B tests/interop/run_conformance.py --cache "$RUNNER_TEMP/renhice-validation"
+      - name: Record the scope and result
+        if: always()
+        run: |
+          {
+            echo '## RENHICE synthetic conformance'
+            echo 'FHIR R4 / CorePE draft 0.1; official package and HL7 validator are checksum verified.'
+            echo 'Only repository-owned synthetic documents; no clinical data, credentials, Docker, or environment access.'
+            echo 'This does not prove OpenMRS export, RENIPRESS identity, signature, authorization, transport, or accreditation.'
+            echo 'Terminology warnings remain visible for review; the test does not disable terminology checks.'
+            if [ -f target/interop-conformance/summary.json ]; then
+              echo '```json'
+              cat target/interop-conformance/summary.json
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain synthetic validation evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.0
+        with:
+          name: renhice-conformance-${{ github.sha }}
+          path: target/interop-conformance/
+          if-no-files-found: warn
+          retention-days: 14
