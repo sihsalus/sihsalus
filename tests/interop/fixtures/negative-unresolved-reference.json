@@ -1,0 +1,387 @@
+{
+  "resourceType": "Bundle",
+  "id": "20000000-0000-4000-8000-000000000001",
+  "meta": {
+    "profile": [
+      "https://www.gob.pe/minsa/RENHICE/fhir/StructureDefinition/BundlePe"
+    ],
+    "lastUpdated": "2026-10-16T12:00:00-05:00"
+  },
+  "identifier": {
+    "system": "urn:example:sihsalus:synthetic-documents",
+    "value": "20000000-0000-4000-8000-000000000001"
+  },
+  "type": "document",
+  "timestamp": "2026-10-16T12:00:00-05:00",
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:10000000-0000-4000-8000-000000000001",
+      "resource": {
+        "resourceType": "Composition",
+        "id": "10000000-0000-4000-8000-000000000001",
+        "meta": {
+          "profile": [
+            "https://www.gob.pe/minsa/RENHICE/fhir/StructureDefinition/CompositionPe"
+          ]
+        },
+        "text": {
+          "status": "generated",
+          "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>SYNTHETIC TEST ONLY. Synthetic conformance document. Unsigned. No clinical, accreditation or identity claim.</p></div>"
+        },
+        "status": "final",
+        "type": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "60591-5"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:99999999-0000-4000-8000-000000000099"
+        },
+        "date": "2026-10-16T12:00:00-05:00",
+        "author": [
+          {
+            "reference": "urn:uuid:10000000-0000-4000-8000-000000000003"
+          }
+        ],
+        "title": "SYNTHETIC COREPE STRUCTURE TEST - NOT A CLINICAL RECORD",
+        "custodian": {
+          "reference": "urn:uuid:10000000-0000-4000-8000-000000000004"
+        },
+        "section": [
+          {
+            "title": "Synthetic Problems",
+            "code": {
+              "coding": [
+                {
+                  "system": "http://loinc.org",
+                  "code": "11450-4"
+                }
+              ]
+            },
+            "text": {
+              "status": "generated",
+              "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>SYNTHETIC TEST ONLY. Fictitious problems.</p></div>"
+            },
+            "entry": [
+              {
+                "reference": "urn:uuid:10000000-0000-4000-8000-000000000005"
+              }
+            ]
+          },
+          {
+            "title": "Synthetic Medication",
+            "code": {
+              "coding": [
+                {
+                  "system": "http://loinc.org",
+                  "code": "10160-0"
+                }
+              ]
+            },
+            "text": {
+              "status": "generated",
+              "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>SYNTHETIC TEST ONLY. Fictitious medication.</p></div>"
+            },
+            "entry": [
+              {
+                "reference": "urn:uuid:10000000-0000-4000-8000-000000000007"
+              }
+            ]
+          },
+          {
+            "title": "Synthetic Allergies",
+            "code": {
+              "coding": [
+                {
+                  "system": "http://loinc.org",
+                  "code": "48765-2"
+                }
+              ]
+            },
+            "text": {
+              "status": "generated",
+              "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>SYNTHETIC TEST ONLY. Fictitious allergies.</p></div>"
+            },
+            "entry": [
+              {
+                "reference": "urn:uuid:10000000-0000-4000-8000-000000000006"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:10000000-0000-4000-8000-000000000002",
+      "resource": {
+        "resourceType": "Patient",
+        "id": "10000000-0000-4000-8000-000000000002",
+        "meta": {
+          "profile": [
+            "https://www.gob.pe/minsa/RENHICE/fhir/StructureDefinition/PacientePe"
+          ]
+        },
+        "text": {
+          "status": "generated",
+          "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>SYNTHETIC TEST ONLY. Fictitious patient. This identity is not verified by any civil registry.</p></div>"
+        },
+        "identifier": [
+          {
+            "system": "urn:example:sihsalus:synthetic-identity",
+            "type": {
+              "extension": [
+                {
+                  "url": "https://www.gob.pe/minsa/RENHICE/fhir/StructureDefinition/pe-pais",
+                  "valueCodeableConcept": {
+                    "coding": [
+                      {
+                        "system": "https://www.gob.pe/minsa/RENHICE/fhir/CodeSystem/PaisesCS",
+                        "code": "PER"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "coding": [
+                {
+                  "system": "https://www.gob.pe/minsa/RENHICE/fhir/CodeSystem/IdspersonaPeru",
+                  "code": "3"
+                }
+              ]
+            },
+            "value": "SYNTHETIC-NOT-A-REAL-PASSPORT-001"
+          }
+        ],
+        "name": [
+          {
+            "family": "SYNTHETIC TEST PATIENT",
+            "given": [
+              "NOT FOR CLINICAL USE"
+            ]
+          }
+        ],
+        "gender": "female",
+        "birthDate": "2000-01-01"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:10000000-0000-4000-8000-000000000003",
+      "resource": {
+        "resourceType": "Practitioner",
+        "id": "10000000-0000-4000-8000-000000000003",
+        "meta": {
+          "profile": [
+            "https://www.gob.pe/minsa/RENHICE/fhir/StructureDefinition/PractitionerPe"
+          ]
+        },
+        "text": {
+          "status": "generated",
+          "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>SYNTHETIC TEST ONLY. Fictitious professional; no license or certificate is claimed.</p></div>"
+        },
+        "identifier": [
+          {
+            "system": "urn:example:sihsalus:synthetic-identity",
+            "type": {
+              "extension": [
+                {
+                  "url": "https://www.gob.pe/minsa/RENHICE/fhir/StructureDefinition/pe-pais",
+                  "valueCodeableConcept": {
+                    "coding": [
+                      {
+                        "system": "https://www.gob.pe/minsa/RENHICE/fhir/CodeSystem/PaisesCS",
+                        "code": "PER"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "coding": [
+                {
+                  "system": "https://www.gob.pe/minsa/RENHICE/fhir/CodeSystem/IdspersonaPeru",
+                  "code": "3"
+                }
+              ]
+            },
+            "value": "SYNTHETIC-NOT-A-REAL-PASSPORT-002"
+          }
+        ],
+        "name": [
+          {
+            "family": "SYNTHETIC TEST PROFESSIONAL",
+            "given": [
+              "NOT FOR CLINICAL USE"
+            ]
+          }
+        ],
+        "qualification": [
+          {
+            "identifier": [
+              {
+                "system": "urn:example:sihsalus:synthetic-professional-registration",
+                "value": "NOT-A-PROFESSIONAL-LICENSE"
+              }
+            ],
+            "code": {
+              "coding": [
+                {
+                  "system": "https://www.gob.pe/minsa/RENHICE/fhir/CodeSystem/ColegiosProfesionalesSaludCS",
+                  "code": "01"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:10000000-0000-4000-8000-000000000004",
+      "resource": {
+        "resourceType": "Organization",
+        "id": "10000000-0000-4000-8000-000000000004",
+        "meta": {
+          "profile": [
+            "https://www.gob.pe/minsa/RENHICE/fhir/StructureDefinition/OrganizacionPe"
+          ]
+        },
+        "text": {
+          "status": "generated",
+          "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>SYNTHETIC TEST ONLY. Fictitious organization. This is not Hospital Santa Clotilde and does not assert RENIPRESS registration.</p></div>"
+        },
+        "identifier": [
+          {
+            "system": "urn:example:sihsalus:synthetic-ipress",
+            "value": "NOT-A-RENIPRESS-CODE"
+          }
+        ],
+        "active": true,
+        "name": "SYNTHETIC TEST ORGANIZATION - NOT A REAL IPRESS"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:10000000-0000-4000-8000-000000000005",
+      "resource": {
+        "resourceType": "Condition",
+        "id": "10000000-0000-4000-8000-000000000005",
+        "meta": {
+          "profile": [
+            "https://www.gob.pe/minsa/RENHICE/fhir/StructureDefinition/ConditionPe"
+          ]
+        },
+        "text": {
+          "status": "generated",
+          "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>SYNTHETIC TEST ONLY. Fictitious condition used only to validate a coded resource; never an actual diagnosis.</p></div>"
+        },
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+              "code": "active"
+            }
+          ]
+        },
+        "verificationStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-ver-status",
+              "code": "unconfirmed"
+            }
+          ]
+        },
+        "code": {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/sid/icd-10",
+              "code": "J00",
+              "display": "Acute nasopharyngitis [common cold]"
+            }
+          ],
+          "text": "SYNTHETIC CONDITION FOR STRUCTURAL TEST ONLY"
+        },
+        "subject": {
+          "reference": "urn:uuid:10000000-0000-4000-8000-000000000002"
+        },
+        "onsetPeriod": {
+          "start": "2026-10-16"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:10000000-0000-4000-8000-000000000006",
+      "resource": {
+        "resourceType": "AllergyIntolerance",
+        "id": "10000000-0000-4000-8000-000000000006",
+        "meta": {
+          "profile": [
+            "https://www.gob.pe/minsa/RENHICE/fhir/StructureDefinition/AlergiaPe"
+          ]
+        },
+        "text": {
+          "status": "generated",
+          "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>SYNTHETIC TEST ONLY. Fictitious allergy test data; no real substance or clinical assertion.</p></div>"
+        },
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical",
+              "code": "active"
+            }
+          ]
+        },
+        "verificationStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/allergyintolerance-verification",
+              "code": "unconfirmed"
+            }
+          ]
+        },
+        "type": "allergy",
+        "category": [
+          "medication"
+        ],
+        "criticality": "unable-to-assess",
+        "code": {
+          "text": "SYNTHETIC TEST SUBSTANCE - NOT FOR CLINICAL USE"
+        },
+        "patient": {
+          "reference": "urn:uuid:10000000-0000-4000-8000-000000000002"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:10000000-0000-4000-8000-000000000007",
+      "resource": {
+        "resourceType": "MedicationStatement",
+        "id": "10000000-0000-4000-8000-000000000007",
+        "meta": {
+          "profile": [
+            "https://www.gob.pe/minsa/RENHICE/fhir/StructureDefinition/MedicationStatementPe"
+          ]
+        },
+        "text": {
+          "status": "generated",
+          "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>SYNTHETIC TEST ONLY. Fictitious medication statement; not a prescription or dispensing instruction.</p></div>"
+        },
+        "status": "unknown",
+        "medicationCodeableConcept": {
+          "text": "SYNTHETIC TEST PRODUCT - NOT FOR DISPENSING"
+        },
+        "subject": {
+          "reference": "urn:uuid:10000000-0000-4000-8000-000000000002"
+        },
+        "effectiveDateTime": "2026-10-16",
+        "dosage": [
+          {
+            "text": "SYNTHETIC TEST ONLY - DO NOT ADMINISTER",
+            "route": {
+              "text": "SYNTHETIC TEST ROUTE"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
