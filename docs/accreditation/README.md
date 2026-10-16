@@ -107,9 +107,16 @@ El ensayo histórico de actualización que había agotado el tiempo fue completa
 correctamente en el [run del head `07c334c0`](https://github.com/sihsalus/sihsalus-content/actions/runs/38963094605),
 junto con instalación nueva y operación. La actualización OCL del mismo run
 siguió fallando por el orden del catálogo. El head posterior `9a8df60d` añade
-extracción de metadata de la línea base sintética para preparar una corrección
-revisable; sus pruebas nativas siguen pendientes. No se amplió el límite ni se
-omitió el control de preservación.
+extracción de metadata de la línea base sintética. El
+[artefacto verificado](https://github.com/sihsalus/sihsalus-content/actions/runs/38976229948/artifacts/12079867361)
+contiene las 17.404 relaciones y sus pesos; la actualización reprodujo el
+bloqueo y limpió sus recursos. Se preparó una propuesta offline de **2.924
+propiedades `sort_weight` en siete fuentes**, iguales a los pesos publicados:
+2.922 respuestas y dos conjuntos (10/60). No cambia UUID, extremos ni extras;
+la API OCL y el OMOD soportan esa propiedad de forma nativa. Requiere aprobación
+antes de escribir borradores; publicar, integrar y desplegar son decisiones
+posteriores. Los controles históricos del head nuevo siguen pendientes.
+No se amplió el límite ni se omitió el control de preservación.
 
 ## Seguimiento de los reportes y evidencia pendiente
 
@@ -149,9 +156,10 @@ No se consultaron historias, pacientes ni observaciones; estos resultados
 Entre los UUID compartidos, 14.436 pesos coinciden y 2.773 difieren:
 QLTY tiene **2.771 opciones de respuesta sin peso de orden** (320 de
 laboratorio y 2.451 de sihsalus), más dos pesos numéricos distintos en
-conjuntos sihsalus. El orden de DEV todavía debe contrastarse con la línea
-base sintética verificada; ninguna de estas lecturas es una lista autorizada
-de cambios. Antes de promover la transición OCL hay que explicar estas
+conjuntos sihsalus. La comparación posterior con el artefacto nativo confirmó
+que **DEV coincide exactamente con la línea base publicada en las 17.404
+identidades, extremos y pesos**; ninguna de estas lecturas es una lista
+autorizada de cambios. Antes de promover la transición OCL hay que explicar estas
 diferencias, preparar una reconciliación revisable y demostrar preservación
 de identidades, opciones y orden. No borrar checksums ni reparar SQL para
 forzar una coincidencia.
