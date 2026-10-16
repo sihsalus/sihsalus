@@ -136,6 +136,32 @@ con MAC y UUID de los hosts verificados, encontró **QLTY `c122fa48` y DEV
 La salud del contenedor y los resultados de CI no acreditan su despliegue ni
 aceptación clínica. Esta revisión no reinició ni modificó servicios.
 
+Una comprobación posterior de **solo lectura, 16/10/2026 17:45 Lima**, comparó
+las relaciones del catálogo con los UUID y extremos de las 17.404 relaciones
+activas declaradas por content publicado `1.25.34` (`b9e93638`). DEV contiene
+las 17.404, con pesos numéricos. QLTY contiene 17.209 con los UUID esperados:
+de las otras 195, **192 relaciones no aparecen y tres tienen otro UUID**.
+Las diferencias de identidad corresponden a laboratorio (147 miembros de
+conjuntos y 38 respuestas) y barrios de Santa Clotilde (10 miembros).
+No se consultaron historias, pacientes ni observaciones; estos resultados
+**no prueban pérdida de datos clínicos ni establecen su causa**.
+
+Entre los UUID compartidos, 14.436 pesos coinciden y 2.773 difieren:
+QLTY tiene **2.771 opciones de respuesta sin peso de orden** (320 de
+laboratorio y 2.451 de sihsalus), más dos pesos numéricos distintos en
+conjuntos sihsalus. El orden de DEV todavía debe contrastarse con la línea
+base sintética verificada; ninguna de estas lecturas es una lista autorizada
+de cambios. Antes de promover la transición OCL hay que explicar estas
+diferencias, preparar una reconciliación revisable y demostrar preservación
+de identidades, opciones y orden. No borrar checksums ni reparar SQL para
+forzar una coincidencia.
+
+La extracción usó exclusivamente metadatos de conceptos/relaciones, con
+verificación de MAC por conexión. Evidencia privada conservada por el operador:
+SHA-256 DEV `eb0104be8c1bf5113ec56b7bd5fb31a0e0749b0ddc76cc06c48a468d3fcf5e0a`;
+QLTY `973fd5732119a7ad4cdbf38d3e8cffe3df1b917da753eb0f639318fd6edc1023`.
+Los valores identificadores y el detalle no se publican en este documento.
+
 El PR #270 prepara `1.25.35` conservando los catálogos y la suscripción actuales.
 Si se integra/publica primero, #269 deberá rebasarse y adoptar una versión
 posterior. No presentar los dos candidatos como un mismo artefacto. Aplicar
