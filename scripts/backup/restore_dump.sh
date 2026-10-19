@@ -22,7 +22,6 @@ TEMP_DIR=""
 ASSUME_YES="${RESTORE_ASSUME_YES:-false}"
 MANAGE_BACKEND="${RESTORE_MANAGE_BACKEND:-true}"
 
-# Parseo de argumentos
 while [[ $# -gt 0 ]]; do
     case $1 in
         --container) CONTAINER_NAME="$2"; shift 2;;
@@ -49,8 +48,6 @@ cleanup() {
     if [ -n "$TEMP_DIR" ]; then rm -rf "$TEMP_DIR"; fi
 }
 trap cleanup EXIT
-
-# --- Seleccion de backup ---
 
 if [ -n "$BACKUP_FILE" ]; then
     if [ ! -f "$BACKUP_FILE" ]; then
@@ -90,8 +87,6 @@ else
 fi
 
 echo -e "[INFO] Dump seleccionado: ${GREEN}$(basename "$selected_file")${NC}"
-
-# --- Confirmacion ---
 
 echo ""
 echo -e "${YELLOW}ATENCION: Esto reemplazara la base de datos '$DB_NAME'.${NC}"
@@ -153,24 +148,18 @@ else
     echo "[INFO] Control del backend deshabilitado por --no-app-control"
 fi
 
-# --- Restaurar en caliente ---
-
 echo "[INFO] Restaurando dump en la base de datos (en caliente)..."
 echo "[INFO] Esto puede tomar varios minutos segun el tamano..."
 
-# Drop y recrear la DB, luego importar
 docker exec -i -e MYSQL_PWD="$DB_PASSWORD" "$CONTAINER_NAME" mariadb \
     --user="$DB_USER" \
     -e "DROP DATABASE IF EXISTS ${DB_NAME}; CREATE DATABASE ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;"
 
-# Importar el dump
 docker exec -i -e MYSQL_PWD="$DB_PASSWORD" "$CONTAINER_NAME" mariadb \
     --user="$DB_USER" \
     "$DB_NAME" <"$validated_sql"
 
 echo -e "${GREEN}[OK] Dump restaurado exitosamente${NC}"
-
-# --- Reiniciar backend ---
 
 if [ "$MANAGE_BACKEND" = "true" ]; then
     echo "[INFO] Reiniciando backend..."

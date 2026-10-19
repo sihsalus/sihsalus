@@ -49,9 +49,8 @@ Consultar la [configuración oficial de environments](https://docs.github.com/en
 y la [revisión de despliegues](https://docs.github.com/en/actions/how-tos/managing-workflow-runs-and-deployments/managing-deployments/reviewing-deployments).
 
 Un administrador debe configurar estas protecciones en GitHub: editar YAML no
-las crea. En la revisión del 13/10/2026, ambos environments carecían de revisores;
-por tanto, los workflows modificados quedarán bloqueados hasta configurarlos.
-Mantener la comprobación; no eliminarla para recuperar la automatización.
+las crea. Sin revisores configurados, los workflows de despliegue se detienen;
+mantener la comprobación y no eliminarla para recuperar la automatización.
 
 Para `main`, mantener reglas nativas de PR obligatorio, revisión humana,
 desestimación de aprobaciones obsoletas, conversaciones resueltas, CI requerido
@@ -71,9 +70,10 @@ la regla. Si cambian los nombres del CI, revisar también los checks requeridos.
 
 ## Aplicación y evidencia
 
-El mantenedor autoriza el cambio y sus ambientes. **Deploy Frontend** solicita
-la versión, resuelve su SHA/digest y muestra el resultado en el run. GitHub aplica
-la revisión humana de cada environment; el agente no aprueba en nombre del usuario.
+El mantenedor autoriza el cambio y sus ambientes; el flujo de **Deploy Frontend**
+está en [scripts/deploy/README.md](../../scripts/deploy/README.md#github-actions-y-conexión-remota).
+GitHub aplica la revisión humana de cada environment; el agente no aprueba en
+nombre del usuario.
 
 Por SSH, usar `deploy.py`: prepara el candidato, conserva automáticamente la
 versión anterior y registra las identidades exactas. No pedir al operador que

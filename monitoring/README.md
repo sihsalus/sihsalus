@@ -400,11 +400,6 @@ docker volume rm sihsalus_prometheus-data
    docker compose --profile monitoring logs prometheus | grep -i error
    ```
 
-3. Verifica conectividad:
-   ```bash
-   curl http://localhost:9090/api/v1/targets
-   ```
-
 ### "No logs in Loki"
 
 1. Revisa que Alloy esté habilitado y recolectando:
@@ -441,45 +436,28 @@ docker volume rm sihsalus_prometheus-data
 
 ### Bajo rendimiento / memoria alta
 
-1. Reduce retención Prometheus:
-   ```yaml
-   prometheus:
-     command:
-       - '--storage.tsdb.retention.time=7d'  # En lugar de 30d
-   ```
+Reduce la retención de Prometheus:
 
-2. Reduce verbosidad de logs en Alloy
-
-3. Optimiza queries (evitar demasiadas métricas)
+```yaml
+prometheus:
+  command:
+    - '--storage.tsdb.retention.time=7d'  # En lugar de 30d
+```
 
 ---
 
 ## Configuración Avanzada
 
-### Agregar métricas personalizadas
+### Métricas adicionales
 
-1. **OpenMRS JMX**: Descomentar en [prometheus.yml](prometheus/prometheus.yml)
-   ```yaml
-   - job_name: 'openmrs-backend'
-     metrics_path: '/openmrs/metrics'
-     static_configs:
-       - targets: ['backend:8080']
-   ```
+[prometheus.yml](prometheus/prometheus.yml) conserva comentados los jobs
+`openmrs-backend`, `mariadb-master` y `keycloak`. Activarlos requiere que el
+servicio exponga métricas (y, para MariaDB, un exporter definido en Compose con
+credenciales desde el entorno); no hay scrape de esos servicios por defecto.
 
-2. **MariaDB**: Agregar exporter
-   ```bash
-   docker run -d \
-     --network sihsalus_default \
-     --name mariadb-exporter \
-     -e DATA_SOURCE_NAME="openmrs:password@(db:3306)/" \
-     prom/mysqld-exporter
-   ```
+### HTTPS para Grafana
 
-3. **Keycloak**: Descomentar en [prometheus.yml](prometheus/prometheus.yml)
-
-### SSL/HTTPS para Grafana
-
-Ver [compose/ssl.yml](../compose/ssl.yml)
+Ver [compose/ssl.yml](../compose/ssl.yml).
 
 ### Backup de dashboards
 
@@ -498,23 +476,8 @@ persistentes desde la interfaz.
 
 ## Integración con OpenMRS
 
-### Logs en OpenMRS
-
-Los logs del backend se recolectan automáticamente via Alloy y están disponibles en Loki.
-
-Búsqueda en Grafana:
-```
-Explore → Loki → {job="docker", service_name="backend"}
-```
-
-### Métricas personalizadas
-
-OpenMRS 3.x expone métricas en `/openmrs/metrics` (vía Micrometer).
-
-Para activar:
-1. Descomentar `openmrs-backend` job en prometheus.yml
-2. Reiniciar Prometheus
-3. Buscar en Grafana: `openmrs_*`
+Los logs del backend se recolectan con Alloy y se consultan en Loki:
+`Explore → Loki → {job="docker", service_name="backend"}`.
 
 ---
 
@@ -529,20 +492,10 @@ Para activar:
 
 ---
 
-## SLA/Health checks
-
-### Verificar stack operacional
+## Salud del stack
 
 ```bash
-# Health check de todos los servicios
 docker compose --profile monitoring exec grafana curl -f http://grafana:3000/api/health
 docker compose --profile monitoring exec prometheus curl -f http://localhost:9090/-/healthy
 curl -f http://localhost:3100/ready
 ```
-
-### Dashboard de salud
-
-Crear dashboard personalizado con:
-- `probe_success{job="blackbox-http-prod"}` - Disponibilidad real de endpoints
-- `probe_duration_seconds{job="blackbox-http-prod"}` - Latencia por endpoint
-- Count de eventos de alertas últimas 24h

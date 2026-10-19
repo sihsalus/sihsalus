@@ -91,172 +91,26 @@ explícitamente revisada; no sustituir el umbral por `exit-code: 0`, modificar e
 informe ni deshabilitar el control. Los valores del catálogo son decisiones de
 seguridad que los mantenedores deben revisar antes de incorporarlos.
 
-## Aceptación temporal del backend del 23/09/2026
+## Aceptación vigente
 
-El mantenedor autorizó habilitar la publicación del backend para continuar la
-actualización de QLTY. Se registran 43 excepciones exactas del escaneo
-[35887356865](https://github.com/sihsalus/sihsalus/actions/runs/35887356865):
-2 CRITICAL y 41 HIGH, todas bibliotecas Java de `linux/amd64`. Responsable:
-`@Duvet05`; seguimiento [#323](https://github.com/sihsalus/sihsalus/issues/323);
-vencimiento inclusivo: **30/09/2026 UTC**.
+`scripts/security/image-exceptions.json` contiene diez alcances de
+`ghcr.io/sihsalus/sihsalus-backend`, `linux/amd64`, clase `lang-pkgs`,
+ecosistema `jar`: nueve hallazgos en Spring Framework 5.3.39 (`spring-core`,
+`spring-expression`, `spring-web` y `spring-webmvc`; dos CRITICAL y siete HIGH)
+y CVE-2025-48924 en `commons-lang:commons-lang` 2.6, que Core `2.8.10-sihsalus.4`
+restaura para los OMODs oficiales. Responsable: `@Duvet05`; seguimiento:
+[#323](https://github.com/sihsalus/sihsalus/issues/323). Vigencia: del 15/10 al
+22/10/2026 UTC inclusive; desde el 23/10 la publicación vuelve a bloquearse salvo
+nueva decisión explícita del mantenedor. Gateway, Certbot y frontend no tienen
+excepciones.
 
-La aceptación permite publicar una imagen que conserve esos hallazgos; no
-los corrige ni demuestra que sean inexplotables. El catálogo se aplica a la
-publicación del repositorio backend, no implementa una restricción por entorno.
-La intervención autorizada continúa en QLTY; esta decisión no constituye una
-aprobación de despliegue de ese backend en producción.
-
-Se reutiliza el mecanismo de excepciones existente, sin cambiar el evaluador,
-Trivy, SBOM, firma, comparación con OpenMRS ni rechazo de fallos operativos.
-Una CVE, paquete, versión, severidad, ecosistema o plataforma fuera del alcance
-registrado sigue bloqueando. Gateway, Certbot y frontend no reciben excepciones.
-
-Retirar cada entrada al publicar y verificar la corrección en el componente
-propietario. Si vence sin corrección, la publicación vuelve a bloquearse;
-renovar exige una nueva decisión explícita. Retirar las entradas revoca futuras
-promociones, pero no modifica imágenes ya publicadas ni revierte despliegues.
-
-## Revisión y renovación propuesta del 02/10/2026
-
-El mantenedor pidió actualizar los paquetes de la imagen y revisar el catálogo
-vencido en [PR #345](https://github.com/sihsalus/sihsalus/pull/345). La revisión
-propone renovar únicamente las 43 entradas anteriores, conservando IDs,
-responsable, issue y todos sus campos de alcance. La nueva vigencia empieza el
-**02/10/2026** y termina el **09/10/2026 UTC**, inclusive; no es una renovación
-automática ni una ampliación a paquetes o hallazgos nuevos.
-
-La comparación aislada de DEV usó el backend existente de main, los OMOD
-oficiales Attachments 4.1.0 y Authentication 2.4.0, y el bloque de actualización
-de paquetes del Dockerfile revisado. Trivy 0.74.0 descargó bases nuevas y terminó
-el escaneo el **02/10/2026 a las 23:07 UTC**, incluyendo HIGH/CRITICAL sin
-corrección disponible. La imagen local de comparación fue
-`sha256:59468213bcf725bd18f67bacbecb1e78f689e19215ba053491e4849a4ac022d8`.
-La evidencia depurada confirmó:
-
-- Cero hallazgos HIGH/CRITICAL del sistema operativo; `curl` y `libcurl` quedaron
-  en `8.3.0-1.amzn2.0.13`.
-- Las 43 entradas anteriores todavía coinciden exactamente: dos CRITICAL y
-  41 HIGH Java. No hubo entradas obsoletas que retirar.
-- Cinco alcances HIGH Java adicionales quedan fuera del catálogo y siguen
-  bloqueando la publicación. Esta revisión no los acepta ni los oculta.
-
-La línea oficial de Core mantiene 2.8.9 como último tag 2.8 disponible en esta
-revisión. Las correcciones Java requieren una release validada en el componente
-propietario; se conserva [#323](https://github.com/sihsalus/sihsalus/issues/323)
-como seguimiento. La renovación temporal no corrige esas dependencias ni
-demuestra que sean inexplotables. Su incorporación requiere revisión del PR.
-
-Esta comparación local no tiene índice de release, SBOM adjunto ni firma y no
-sirve como evidencia de promoción. El CI del PR debe construir el Dockerfile
-completo y pasar el control de vulnerabilidades corregibles y la comparación
-con OpenMRS. La publicación sigue exigiendo su propio escaneo del digest
-inmutable, SBOM, política completa y firma. No se autorizan merge, despliegue
-ni ampliación de aceptación por este cambio.
-
-## Aceptación adicional para DEV y QLTY del 03/10/2026 UTC
-
-Después del merge de PR #345, el mantenedor aceptó expresamente los cinco
-hallazgos HIGH adicionales de Jackson/Core, únicamente para continuar los
-despliegues de DEV y QLTY. Se agregan cinco entradas exactas al catálogo;
-las 43 entradas anteriores permanecen intactas. Responsable: `@Duvet05`;
-seguimiento [#323](https://github.com/sihsalus/sihsalus/issues/323). La aceptación
-empieza el **03/10/2026 UTC** y vence el **09/10/2026 UTC**, inclusive.
-
-La evidencia del [Build Backend 37078656482](https://github.com/sihsalus/sihsalus/actions/runs/37078656482)
-corresponde al Dockerfile completo del commit
-`e0645a6e4cc7e1325d49c812d1b7c2f523e71dd3` y al índice inmutable
-`sha256:dfa4649ba5cd586fdd6f45240d4430dc0848b3fa19699a19bad3d3016dec6b15`.
-Trivy 0.74.0 terminó el escaneo el **03/10/2026 a las 00:06:59 UTC**;
-el inventario SPDX contiene 432 paquetes. Encontró 48 alcances Java:
-dos CRITICAL y 46 HIGH, sin hallazgos HIGH/CRITICAL del sistema operativo.
-El control bloqueó cinco alcances que no tenían excepción; esas son exactamente
-las entradas adicionales aceptadas. No se amplía ningún otro alcance.
-
-El catálogo gobierna la publicación del repositorio de imagen y no restringe
-técnicamente el entorno. Esta decisión **no autoriza despliegues en producción**.
-Mantiene la plataforma `linux/amd64`, los paquetes y versiones exactos, la
-comparación con OpenMRS y todos los controles de SBOM, escaneo vigente, firma y
-promoción por digest. El candidato rechazado no se despliega como release.
-
-Antes de intervenir DEV o QLTY se requiere una imagen que haya superado los
-controles de publicación y el smoke de autenticación local y Keycloak del digest
-correspondiente, además del [checklist de despliegue](deploy-checklist.md).
-La aceptación es temporal: no corrige Core ni demuestra que los hallazgos sean
-inexplotables. Retirar cada entrada cuando una release probada del componente
-propietario resuelva su alcance; el día posterior al vencimiento se vuelve a
-bloquear la publicación y cualquier renovación exige otra decisión explícita.
-
-## Aceptación adicional para QLTY del 09/10/2026 UTC
-
-El mantenedor aceptó expresamente dos hallazgos adicionales para continuar la
-instalación de EmrApi `3.5.1-sihsalus.2` en **QLTY únicamente**. Se agregan dos
-entradas exactas; las 48 anteriores conservan todos sus valores y su vencimiento
-**09/10/2026 UTC**. Responsable: `@Duvet05`; seguimiento
-[#323](https://github.com/sihsalus/sihsalus/issues/323).
-
-La evidencia del [Build Backend 37992692656, intento 2](https://github.com/sihsalus/sihsalus/actions/runs/37992692656/attempts/2)
-corresponde al commit `23cd14b02d75e2d5186061894785693b7015077a`.
-Trivy 0.74.0 terminó el escaneo el **09/10/2026 a las 21:44:24 UTC**;
-el SPDX 2.3 contiene 432 paquetes y sitúa ambos componentes en el WAR de Core.
-Los dos alcances son `linux/amd64`, `lang-pkgs` / `jar`:
-
-| Hallazgo | Paquete y versión | Severidad del escáner |
-| --- | --- | --- |
-| CVE-2026-47884 | `org.springframework:spring-webmvc` 5.3.30 | CRITICAL |
-| CVE-2026-68494 | `com.fasterxml.jackson.core:jackson-core` 2.19.1 | HIGH |
-
-Core 2.8.9 es el componente propietario. Para Spring, la corrección compatible
-5.3.50 requiere [acceso Enterprise](https://spring.io/security/cve-2026-47884/);
-la alternativa OSS 7.0.9 cambia de `javax` a `jakarta` y exige una migración del
-stack actual de Core y Tomcat 9, según la
-[matriz oficial de Spring](https://github.com/spring-projects/spring-framework/wiki/Spring-Framework-Versions).
-Para Jackson, el escáner informa 2.18.8 y 2.21.4 como versiones corregidas;
-actualizar a 2.21.4 requiere una release probada de Core y sus dependencias
-Jackson coordinadas. No se sustituye un JAR anidado desde infraestructura.
-
-Las dos entradas se crean el **09/10/2026** y vencen el **10/10/2026 UTC**,
-inclusive, la fecha mínima válida del contrato existente. Esto **no renueva las
-48 entradas anteriores**: el catálogo completo sólo permite publicación mientras
-todas estén vigentes, y vuelve a fallar el 10/10 por las 48 vencidas.
-
-El catálogo gobierna la publicación global de la imagen; no impone restricciones
-por entorno. QLTY es el alcance operativo autorizado para esta aceptación;
-no se amplía a DEV ni producción. La aceptación no corrige las dependencias,
-no declara falsos positivos ni demuestra que sean inexplotables.
-Retirar cada entrada cuando una release verificada de Core elimine su hallazgo
-y pase compatibilidad, runtime y seguridad; cualquier renovación necesita otra
-decisión explícita del mantenedor.
-
-El intento 2 también falló al obtener un token de Docker Hub durante el escaneo
-de la baseline OpenMRS (HTTP 504). Ese fallo operativo sigue bloqueando: esta
-aceptación no lo ignora ni convierte el candidato en una release. Se conservan
-la comparación con OpenMRS, SBOM, escaneo vigente del digest exacto, política,
-firma y promoción nativas. Antes de instalar en QLTY se requieren además el
-[smoke de autenticación](runtime-smoke.md), el
-[checklist de despliegue](deploy-checklist.md) y la aceptación funcional del módulo.
-
-## Renovación para DEV y QLTY del 11/10/2026 UTC
-
-La instalación limpia solicitada para DEV y la actualización de QLTY requieren
-una imagen nueva. Las 50 excepciones existentes vencieron el 09/10 o 10/10,
-por lo que la política bloqueaba su publicación antes del build. El mantenedor
-confirmó expresamente la renovación de esos mismos 50 alcances hasta el
-**12/10/2026 UTC**, inclusive, para la instalación solicitada en ambos ambientes.
-Responsable: `@Duvet05`; seguimiento [#323](https://github.com/sihsalus/sihsalus/issues/323).
-
-Se conservan IDs, repositorio, plataforma, CVE, paquete, versión, clase,
-ecosistema, severidad, propietario e issue. No se añaden hallazgos ni comodines.
-El nuevo digest todavía requiere escaneo vigente, inventario, comparación con
-OpenMRS, política, firma y promoción. Los informes anteriores no acreditan
-el resultado del candidato nuevo. El ámbito operativo autorizado es DEV y QLTY;
-no comprende producción y no afirma que se hayan corregido las dependencias.
-
-La corrección pertenece a las releases de Core y sus bibliotecas coordinadas.
-Se conserva la alternativa documentada de actualizar el componente propietario
-y verificar compatibilidad; no se sustituyen JARs anidados desde infraestructura.
-Retirar cada alcance cuando una release verificada elimine su hallazgo. El día
-posterior al vencimiento la política vuelve a bloquear; renovar requiere la
-decisión explícita documentada arriba.
+El alcance operativo autorizado es DEV y QLTY; no incluye producción. La
+aceptación no corrige las dependencias ni declara falsos positivos: la
+corrección pertenece a las releases de Core y sus bibliotecas coordinadas
+(Spring 5.3.50 requiere [acceso Enterprise](https://spring.io/security/cve-2026-47884/);
+la alternativa OSS 7.0.9 exige migrar de `javax` a `jakarta`). No se sustituyen
+JARs anidados desde infraestructura. Retirar cada entrada cuando una release
+verificada elimine su hallazgo y pase compatibilidad, runtime y seguridad.
 
 ## Evidencia sin credenciales
 
@@ -340,44 +194,3 @@ El frontend publica desde `sihsalus-frontend`, con su propio workflow y controle
 Este documento cubre los tres publicadores de imágenes del distro; la promoción
 del conjunto sigue requiriendo revisión, aceptación en QLTY y el
 [checklist de despliegue](deploy-checklist.md).
-
-## Retiro de excepciones vencidas del 15/10/2026 UTC
-
-Se retiran las 50 excepciones que vencieron el 12/10/2026 UTC (3 CRITICAL y
-47 HIGH). El catálogo queda vacío: cualquier hallazgo HIGH/CRITICAL vuelve a
-bloquear la promoción del backend. Esto no resuelve las dependencias Java de
-[#323](https://github.com/sihsalus/sihsalus/issues/323), no renueva su aceptación
-ni modifica imágenes publicadas o instalaciones existentes.
-
-La actualización del runtime incluye `python2-rpm`, `rpm`, `rpm-build-libs` y
-`rpm-libs` para aplicar la corrección de CVE-2026-78367 publicada en
-[ALAS2-2026-3984](https://alas.aws.amazon.com/AL2/ALAS2-2026-3984.html).
-El build y escaneo completos siguen siendo necesarios para comprobar el
-resultado. Los controles de escaneo, inventario, firma y promoción permanecen
-vigentes; un CI de PR correcto no autoriza publicar una imagen rechazada.
-
-## Aceptación temporal para DEV/QLTY, 15/10/2026
-
-El usuario autorizó agregar la excepción temporal, integrar #384/#386 y desplegar
-DEV/QLTY. Confirmó por separado ampliar los ocho hallazgos del CI a
-CVE-2026-41849 (Spring sin corrección publicada) y CVE-2025-48924, restaurando
-Commons Lang 2.6 para conservar los OMODs oficiales. Responsable: @Duvet05;
-seguimiento: [#323](https://github.com/sihsalus/sihsalus/issues/323).
-
-El catálogo contiene diez alcances de `ghcr.io/sihsalus/sihsalus-backend`,
-`linux/amd64`, ecosistema `jar`: nueve en Spring Framework 5.3.39 y uno en
-Commons Lang 2.6. Vigencia: 15/10 a 22/10/2026 UTC inclusive; desde el día 23
-bloquea sin renovación automática. No se declara que estén corregidos ni que
-sean falsos positivos. Los informes mantienen cada hallazgo y su decisión.
-
-CI y publicación usan la misma validación de alcance y vencimiento. Una nueva
-versión, paquete, CVE, severidad, arquitectura o ecosistema no queda cubierto.
-El control del sistema operativo sigue siendo incondicional; no se omiten
-pruebas, SBOM, firmas, restauración ni aceptación del runtime. La autorización
-no incluye producción. El catálogo permite evaluar/publicar el artefacto, pero
-no sustituye la autorización del ambiente.
-
-La siguiente acción es retirar la aceptación cuando una plataforma/mantenimiento
-compatible resuelva los hallazgos y los OMODs oficiales dejen de requerir Lang 2.
-Antes del vencimiento, resolverlos o revisar expresamente el riesgo; no extender
-las fechas automáticamente.

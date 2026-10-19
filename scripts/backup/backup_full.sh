@@ -3,14 +3,10 @@
 # Script: backup_full.sh
 # Descripción: Realiza un backup completo de la base de datos MariaDB del contenedor especificado.
 # Uso: ./backup_full.sh [--container NOMBRE] [--dir DIRECTORIO] [--max N]
-# Autor: Equipo SIHSALUS
-# Fecha: 2025-10-20
 # ------------------------------------------------------------------------------
 
 set -euo pipefail
 
-
-# Configuración por defecto (pueden ser sobreescritas por argumentos o variables de entorno)
 CONTAINER_NAME="${CONTAINER_NAME:-sihsalus-db-master}"
 FULL_BACKUP_DIR="${FULL_BACKUP_DIR:-/home/${USER}/sihsalus-fullBackups}"
 MAX_BACKUPS="${MAX_BACKUPS:-10}"
@@ -28,7 +24,6 @@ else
     DB_BACKUP_PASSWORD="${MYSQL_ROOT_PASSWORD:-}"
 fi
 
-# Parseo de argumentos
 while [[ $# -gt 0 ]]; do
     case $1 in
         --container)
@@ -53,7 +48,6 @@ if [ -z "$DB_BACKUP_PASSWORD" ]; then
 fi
 umask 077
 
-# Logging
 # Rotación de logs: mantener solo los últimos 5 logs
 LOG_FILE="$FULL_BACKUP_DIR/fullBackup_log.txt"
 mkdir -p "$FULL_BACKUP_DIR"
@@ -61,7 +55,6 @@ mapfile -t LOG_FILES < <(find "$FULL_BACKUP_DIR" -maxdepth 1 -type f -name 'full
 if [ "${#LOG_FILES[@]}" -gt 5 ]; then
     printf '%s\0' "${LOG_FILES[@]:5}" | xargs -0 rm -f
 fi
-# Renombrar log anterior si existe
 if [ -f "$LOG_FILE" ]; then
     mv "$LOG_FILE" "$LOG_FILE.$(date +%Y%m%d%H%M%S)"
 fi
@@ -69,30 +62,24 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "[INFO] Iniciando backup completo $TIMESTAMP para contenedor $CONTAINER_NAME"
 
-# Verificar existencia del contenedor
 if ! docker ps -a --format '{{.Names}}' | grep -q "^$CONTAINER_NAME$"; then
     echo "[ERROR] Contenedor '$CONTAINER_NAME' no encontrado."; exit 1
 fi
 
-# Verificar directorio de backups
 if [ ! -d "$FULL_BACKUP_DIR" ]; then
     echo "[ERROR] Directorio '$FULL_BACKUP_DIR' no existe."; exit 1
 fi
 
-# Crear backup dentro del contenedor
 docker exec --user root "$CONTAINER_NAME" rm -rf "$TEMP_FULL_BACKUP_PATH"
 docker exec --user root -e MYSQL_PWD="$DB_BACKUP_PASSWORD" "$CONTAINER_NAME" \
     mariadb-backup --user="$DB_BACKUP_USER" --backup --target-dir="$TEMP_FULL_BACKUP_PATH"
 
-# Copiar backup al host
 mkdir -m 700 "$FULL_BACKUP_DIR/$BACKUP_NAME"
 docker cp "$CONTAINER_NAME:$TEMP_FULL_BACKUP_PATH/." "$FULL_BACKUP_DIR/$BACKUP_NAME"
 
-# Comprimir backup
 tar -czf "$FULL_BACKUP_DIR/$BACKUP_NAME.tar.gz" -C "$FULL_BACKUP_DIR" "$BACKUP_NAME"
 rm -rf "$FULL_BACKUP_DIR/$BACKUP_NAME"
 
-# Cifrar backup con openssl (AES-256)
 openssl enc -aes-256-cbc -salt -pbkdf2 -pass env:BACKUP_ENCRYPTION_PASSWORD \
     -in "$FULL_BACKUP_DIR/$BACKUP_NAME.tar.gz" \
     -out "$FULL_BACKUP_DIR/$BACKUP_NAME.tar.gz.enc"
@@ -104,7 +91,6 @@ else
     exit 3
 fi
 
-# Rotar backups antiguos
 BACKUP_COUNT=$(ls -1 "$FULL_BACKUP_DIR"/*.tar.gz.enc 2>/dev/null | wc -l)
 if [ "$BACKUP_COUNT" -gt "$MAX_BACKUPS" ]; then
     ls -1t "$FULL_BACKUP_DIR"/*.tar.gz.enc | tail -n +$((MAX_BACKUPS+1)) | xargs rm -f

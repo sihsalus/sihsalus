@@ -1,5 +1,4 @@
 # module repository revision archive_sha256 upstream_version version
 initializer sihsalus/openmrs-module-initializer 806aec0a11fbb6b582629ecb2c89992e2e46107e a2d4deca889dbb1826360fd67e53b24edddacccea4f9acaea087794bcb1beb30 2.13.0-SNAPSHOT 2.13.0-sihsalus.2
-fhir2 openmrs/openmrs-module-fhir2 069deb714818428540719182472ea13711628526 15fe6277c775a746899fa0f0f339eaae983a97624decad4a4f5adad0b4eca4b3 4.3.0-SNAPSHOT 4.3.0-sihsalus.1
 oauth2login sihsalus/openmrs-module-oauth2login 8c0c807e0aa70608bfade37ca948f9fcc223f9c6 8d4127789d61edd014232736e8ee429bc74fb70b381eb89c245b0574109811fa 1.5.1-sihsalus.1 1.5.1-sihsalus.1
 sihsalusaudit sihsalus/openmrs-module-sihsalus-audit 13712f1f08839047a360e452d988ee361d2181a0 0aa86044fc86c080604c0d0770f3c9c0f03df24f7a38ece47f8b8162fd714a51 1.0.0 1.0.0

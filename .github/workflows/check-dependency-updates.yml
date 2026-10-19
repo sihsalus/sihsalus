@@ -65,8 +65,21 @@ jobs:
 
           Modules built from pinned source revisions remain controlled by backend/omod-sources.lock. Required CI verifies the packaged modules before integration. DEV/QLTY validation is required before deployment.
           BODY
-            gh pr create --base main --head "$branch" \
-              --title "chore(backend): update published OMOD releases" --body-file "$body"
+            gh_error="${RUNNER_TEMP}/omod-release-pr.err"
+            if ! gh pr create --base main --head "$branch" \
+              --title "chore(backend): update published OMOD releases" --body-file "$body" 2>"$gh_error"; then
+              # Repository policy may forbid GITHUB_TOKEN from creating pull requests.
+              # Print the error first so non-policy failures stay visible in the log;
+              # the branch is already pushed, so leave the compare link for a maintainer.
+              echo "gh pr create failed:" >&2
+              cat "$gh_error" >&2
+              {
+                echo "## OMOD release updates pushed to \`$branch\`"
+                echo
+                echo "Pull request creation was refused for GITHUB_TOKEN. Open it manually:"
+                echo "https://github.com/${GITHUB_REPOSITORY}/compare/main...${branch}?expand=1"
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
           fi
           # GITHUB_TOKEN-created pushes/PRs do not trigger CI automatically.
           gh workflow run ci.yml --ref "$branch"

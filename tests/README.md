@@ -110,51 +110,28 @@ no se recuperan su proveedor sintético ni el registry de prueba.
 
 ## Conformidad RENHICE con datos sintéticos
 
-Esta suite prepara evidencia de desarrollo para el [contrato IPS Perú](../docs/accreditation/ips-peru-contract.md).
-No ejecuta un exportador de OpenMRS, no consulta pacientes ni prueba acreditación,
-firma, transporte, autorización institucional o aceptación clínica.
-
-Los controles locales de identidad y manejo de fallos no requieren red:
+Evidencia de desarrollo para el [contrato IPS Perú](../docs/accreditation/ips-peru-contract.md);
+no ejecuta un exportador de OpenMRS ni consulta pacientes.
 
 ```bash
 python3 -B -m unittest discover -s tests/interop -p 'test_*.py' -v
-```
-
-La validación completa requiere Python 3.11+, Java 21 y acceso a GitHub, al
-paquete MINSA, al registro de paquetes FHIR y a `https://tx.fhir.org/r4`:
-
-```bash
 python3 -B tests/interop/run_conformance.py --cache "$TMPDIR/sihsalus-renhice-validation"
 ```
 
-En Linux, usar una ruta temporal o de caché propia si `TMPDIR` no está definido.
-El script descarga el validador oficial HL7 **7.0.2** y CorePE **0.1** con SHA-256
-fijados. Un cambio de bytes del borrador oficial bloquea la ejecución hasta
-revisión humana del nuevo artefacto; no actualiza el pin automáticamente.
-Las dependencias FHIR transitivas las resuelve el validador en su caché habitual
-`~/.fhir/packages`; sus versiones y carga quedan en los logs. No se afirma
-reproducibilidad binaria completa de esas dependencias ni del servicio de
-terminología. Usar un runner efímero de CI para obtener una ejecución nueva.
+La primera línea no requiere red. La validación completa requiere Python 3.11+,
+Java 21 y acceso a GitHub, al paquete MINSA, al registro de paquetes FHIR y a
+`https://tx.fhir.org/r4`; en Linux, indicar una ruta de caché si `TMPDIR` no
+está definido. El script descarga el validador HL7 **7.0.2** y CorePE **0.1**
+con SHA-256 fijados; un cambio de bytes bloquea la ejecución hasta revisar el
+pin. Las dependencias FHIR transitivas se resuelven en `~/.fhir/packages`.
 
-Se conserva `target/interop-conformance/summary.json`, logs y OperationOutcome.
-La suite comprueba documento válido, referencia ausente, recurso incompatible
-y mezcla de pacientes. El último caso separa aceptación del perfil de rechazo
-por identidad documental. Los errores negativos deben ser los esperados; un
-fallo de red o del proceso no cuenta como prueba aprobada. Las advertencias
-conocidas del borrador quedan visibles y se contrastan por ID, ubicación y
-cantidad. Una advertencia nueva, ausente o cambiada bloquea la referencia de
-prueba hasta revisar la causa; no se desactiva terminología ni se rebaja la
-severidad de los diagnósticos.
-
-El documento positivo produce tres advertencias: dos por los tipos de identidad
-peruanos frente al binding extensible de R4 y una porque el paquete MINSA
-referencia `CIE10VS` sin incluirlo. La prueba de mezcla de pacientes añade otra
-del mismo tipo de identidad para el paciente contenido. Son limitaciones
-explícitas del borrador: **no demuestran validación terminológica completa ni
-autorizan uso clínico**. Los errores/advertencias de las referencias rotas se
-comprueban exclusivamente en su caso negativo.
-
-El workflow `renhice-conformance.yml` ejecuta la suite en PR que cambian sus
-pruebas y permite ejecución manual. Conserva evidencia sintética durante 14
-días. No usa Docker, secretos, credenciales de entornos ni modifica servicios.
-El script no admite archivos clínicos arbitrarios: solo fixtures del repositorio.
+Fixtures, solo del repositorio: documento válido, referencia ausente, recurso
+incompatible y mezcla de pacientes. Las advertencias conocidas del borrador
+(tipos de identidad peruanos y `CIE10VS` ausente) se contrastan por ID,
+ubicación y cantidad; una advertencia nueva, ausente o cambiada bloquea la
+referencia. No desactivar terminología ni rebajar la severidad de los
+diagnósticos; un fallo de red o del proceso no cuenta como prueba aprobada.
+Resultados en `target/interop-conformance/summary.json`, logs y
+OperationOutcome. El workflow `renhice-conformance.yml` ejecuta la suite en PR
+que cambian sus pruebas, admite ejecución manual y conserva evidencia 14 días.
+Límites: [contrato IPS Perú](../docs/accreditation/ips-peru-contract.md).

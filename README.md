@@ -102,9 +102,7 @@ una vez para incluir la comprobación HTTP externa en la actualización.
 el respaldo y revisar migraciones; nunca actualiza el backend implícitamente al
 actualizar frontend. Los cambios de Compose se coordinan aparte.
 
-En GitHub Actions, **Deploy Frontend** pide solamente la versión; resuelve sus
-imágenes una vez y despliega DEV antes de QLTY con las aprobaciones nativas.
-Producción es una operación separada. Ver [operación y recuperación](scripts/deploy/README.md).
+El flujo de **Deploy Frontend** en GitHub Actions está en [operación y recuperación](scripts/deploy/README.md#github-actions-y-conexión-remota).
 
 ## Backup y restore
 

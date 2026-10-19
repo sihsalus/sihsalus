@@ -10,6 +10,7 @@ FRONTEND_SCRIPT="$ROOT/scripts/deploy/deploy-frontend.sh"
 REMOTE_RUNNER="$ROOT/scripts/deploy/run-redeploy-remote.sh"
 REMOTE_RUNNER_TEST="$ROOT/tests/deploy/run-redeploy-remote-test.sh"
 EXTERNAL_VERIFIER="$ROOT/scripts/deploy/verify-external-frontend.sh"
+EXTERNAL_VERIFIER_TEST="$ROOT/tests/deploy/verify-external-frontend-test.sh"
 WORKFLOW="$ROOT/.github/workflows/redeploy-non-production.yml"
 
 bash -n "$SCRIPT"
@@ -19,6 +20,7 @@ bash -n "$FRONTEND_SCRIPT"
 bash -n "$REMOTE_RUNNER"
 bash -n "$REMOTE_RUNNER_TEST"
 bash -n "$EXTERNAL_VERIFIER"
+bash -n "$EXTERNAL_VERIFIER_TEST"
 
 if grep -Eq 'docker compose down|docker (volume|system) (rm|prune)|docker image prune|docker compose .* (--volumes|-v)( |$)' "$SCRIPT"; then
   echo "[FAIL] full redeploy script contains a data-destructive Docker operation" >&2
@@ -251,5 +253,8 @@ grep -Fq 'process.exit(IDENTITY_ERROR_CODES.has(error?.code) ? 78 : 75)' "$SCRIP
 
 bash "$CLEAN_CHECKOUT_HELPER_TEST"
 bash "$REMOTE_RUNNER_TEST"
+# The external verifier test sets EXTERNAL_VERIFY_*_SECONDS=0 itself, so it
+# runs in a few seconds without network access.
+bash "$EXTERNAL_VERIFIER_TEST"
 
 echo "[OK] full environment redeploy policy"

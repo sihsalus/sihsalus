@@ -56,8 +56,7 @@ de recrear servicios. La sintaxis de `geo` no se valida con `compose config`.
 En una ventana autorizada, la reconciliación afecta únicamente gateway y
 Grafana para aplicar sus nuevas redes; no recrees backend, bases ni el stack
 completo. Usa `--no-deps`, conserva los volúmenes y registra las referencias
-de las imágenes/configuración anteriores. Fusionar este PR no constituye una
-orden de ejecutar esos pasos en un servidor.
+de las imágenes/configuración anteriores.
 
 ## Verificación en DEV/QLTY
 
@@ -89,8 +88,7 @@ Conserva el acceso SSH autorizado. El puerto loopback no cambia, pero una
 sesión web mediante túnel depende de `GRAFANA_ROOT_URL`, las cookies, el esquema
 y el navegador. No asumas que una cookie `Secure` funcionará por HTTP en todos
 los navegadores: valida previamente el túnel HTTPS o el procedimiento
-administrativo aprobado del entorno. Este PR no reduce la seguridad de cookies
-ni cambia contraseñas para facilitar una recuperación.
+administrativo aprobado del entorno.
 
 Para cerrar inmediatamente la ruta en una ventana autorizada, vacía la lista
 y recrea solo el gateway con la misma composición. Para volver al estado

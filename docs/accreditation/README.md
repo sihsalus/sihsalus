@@ -8,11 +8,9 @@ La institución debe confirmar qué perfiles funcionales corresponden a sus
 UPSS, categoría y servicios declarados.
 
 **Todavía no hay evidencia suficiente para afirmar cumplimiento de la
-acreditación.** Se encontraron funcionalidades y pruebas reutilizables, pero
-faltan evidencias documentales, aceptación clínica y contratos externos.
-No se modificó la hoja de evaluación ni se marcaron requisitos como aprobados.
-Esta preparación no cambia el backend, dependencias, roles, datos o ambientes;
-no autoriza merge, publicación ni despliegue.
+acreditación**: existen funcionalidades y pruebas reutilizables, pero faltan
+evidencias documentales, aceptación clínica y contratos externos. Este documento
+no marca requisitos como aprobados ni autoriza cambios, merge o despliegue.
 
 ## Base de la evaluación
 
@@ -76,7 +74,6 @@ Referencias de código: `esm-atencion-ambulatoria-app/README.md` (firma manual),
 (verificación DNI del flujo de registro), `esm-salud-materna-app/README.md`
 (alcance HCMP), `esm-audit-logger/README.md` (cobertura pendiente) y
 `esm-patient-immunizations-app/README.md` (aceptación pendiente).
-La evidencia documental de código no sustituye comprobar la versión desplegada.
 
 ## Entregables técnicos de esta preparación
 
@@ -90,98 +87,60 @@ La evidencia documental de código no sustituye comprobar la versión desplegada
    [el análisis técnico](ips-peru-contract.md).
 3. **Pruebas de desarrollo:** [suite de conformidad](../../tests/README.md#conformidad-renhice-con-datos-sintéticos)
    con validador HL7 y paquete MINSA verificados por SHA-256. Documento válido,
-   referencia rota, vacuna incompatible y mezcla de pacientes. Sin pacientes
-   reales, consultas clínicas, certificados ni modificación de ambientes.
+   referencia rota, vacuna incompatible y mezcla de pacientes, sin pacientes
+   reales.
 4. **Decisión de firma:** tres opciones, condiciones y criterios de aceptación
-   en [firma digital](digital-signature-options.md). No se contrató proveedor ni
-   se instalaron componentes/certificados.
+   en [firma digital](digital-signature-options.md).
 
 El PR de frontend CRED [1229](https://github.com/sihsalus/sihsalus-frontend/pull/1229)
 y el PR de content [269](https://github.com/sihsalus/sihsalus-content/pull/269)
-siguen separados. La transición OCL de este último conserva cantidades y
-UUID, pero la prueba de actualización encontró **2922 pesos de respuestas
-convertidos a NULL y dos pesos de conjuntos modificados**. El caso de talla
-decimal pasó; eso no autoriza ignorar el resto de la regresión. No se afirma
-que esos cambios estén desplegados ni que los issues clínicos estén cerrados.
-El ensayo histórico de actualización que había agotado el tiempo fue completado
-correctamente en el [run del head `07c334c0`](https://github.com/sihsalus/sihsalus-content/actions/runs/38963094605),
-junto con instalación nueva y operación. La actualización OCL del mismo run
-siguió fallando por el orden del catálogo. El head posterior `9a8df60d` añade
-extracción de metadata de la línea base sintética. El
-[artefacto verificado](https://github.com/sihsalus/sihsalus-content/actions/runs/38976229948/artifacts/12079867361)
-contiene las 17.404 relaciones y sus pesos; la actualización reprodujo el
-bloqueo y limpió sus recursos. Se preparó una propuesta offline de **2.924
-propiedades `sort_weight` en siete fuentes**, iguales a los pesos publicados:
-2.922 respuestas y dos conjuntos (10/60). No cambia UUID, extremos ni extras;
-la API OCL y el OMOD soportan esa propiedad de forma nativa. Requiere aprobación
-antes de escribir borradores; publicar, integrar y desplegar son decisiones
-posteriores. Los controles históricos del head nuevo siguen pendientes.
-No se amplió el límite ni se omitió el control de preservación.
+siguen separados. La transición OCL de #269 conserva cantidades y UUID, pero su
+prueba de actualización convierte **2.922 pesos de respuestas a NULL y modifica
+dos pesos de conjuntos**. Hay una propuesta offline de 2.924 propiedades
+`sort_weight` en siete fuentes, iguales a los pesos publicados, que no cambia
+UUID, extremos ni extras; requiere aprobación antes de escribir borradores.
+[Content #270](https://github.com/sihsalus/sihsalus-content/pull/270) prepara
+`1.25.35` conservando catálogos y suscripción; si se integra primero, #269 debe
+rebasarse y adoptar una versión posterior. Content viaja en la imagen de
+backend, por lo que aplicarlo requiere coordinación operativa separada.
 
-## Seguimiento de los reportes y evidencia pendiente
+## Seguimiento
 
-Corte de ingeniería: **16/10/2026, 17:38 Lima**. Este seguimiento identifica
-trabajo y comprobaciones pendientes; no asigna «cumple» a ningún requisito de
-la hoja institucional. Las asociaciones siguientes son áreas funcionales de
-la matriz; el responsable de acreditación debe completar el identificador
-oficial aplicable y su evidencia de aceptación.
+Las áreas siguientes corresponden a la matriz funcional; el responsable de
+acreditación completa el identificador oficial y la evidencia de aceptación.
 
-| Reporte                                          | Área funcional                              | Resultado técnico y siguiente condición de aceptación                                                                                                                                                                                                                                                                  |
-| ------------------------------------------------ | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| #387 — inscripciones CRED                        | Acceso y programas                          | Frontend #1229 integrado; falta la asignación administrativa del rol existente a CRED, con aprobación específica. Probar registrar, editar y anular con CRED, además de denegar a un perfil de consulta. Publicar content no asigna ese rol.                                                                           |
-| #388 — antecedente antes del nacimiento          | CRED e integridad de historia               | Corrección en #1229. En QLTY sintético, rechazar el día anterior, aceptar el día del nacimiento, conservar excepción de antecedentes familiares y bloquear identidad no verificada.                                                                                                                                    |
-| #389/#390 — alta y hospitalización               | CRED y datos del nacimiento                 | [Content #270](https://github.com/sihsalus/sihsalus-content/pull/270) separa los formularios del bloqueo OCL. Validar alta anterior/igual al nacimiento y futura; duración con Sí → No debe conservarse y bloquear la contradicción, incluido cero, hasta su corrección explícita. Verificar guardar y recargar.       |
-| #391 — talla decimal                             | Terminología y CRED                         | #269 sigue bloqueado. Preparar los pesos exactos desde 1.25.34 y aprobar la propuesta OCL antes de actualizar fuentes. Tras pasar instalación/actualización/reinicio, comprobar que 30.1 cm se guarda y relee exactamente con el mismo concepto.                                                                       |
-| #392 — tabla de reacciones adversas              | CRED e inmunizaciones                       | Corrección en #1229. Verificar reacción guardada una sola vez, actualización inmediata y aviso de guardado confirmado si falla únicamente la recarga; usar dos pacientes sintéticos para descartar contaminación de contexto.                                                                                          |
-| #393 — dosis mostrada                            | Inmunizaciones                              | [Frontend #1232](https://github.com/sihsalus/sihsalus-frontend/pull/1232) corrige empates de fecha/hora usando el número registrado. Comparar resumen, detalle y respuesta persistida. No inferir dosis contando registros ni interpretar el fixture como una pauta clínica.                                           |
-| #376/#377 — lectura y guardado de inmunizaciones | Inmunizaciones, autoría e interoperabilidad | La evidencia disponible confirma registros existentes y errores FHIR 422 por ausencia de proveedor compatible. No ocultar el historial fallido ni reintentar a ciegas. Requiere revisión clínica de autoría y una propuesta específica de intervención en datos/backend antes de aceptar lectura y guardado completos. |
-
-El frontend #1229 fue integrado externamente en `2ab15da9` el 16/10 a las
-17:19 Lima. La lectura posterior de `build-info.json` dentro de los contenedores,
-con MAC y UUID de los hosts verificados, encontró **QLTY `c122fa48` y DEV
-`04202915`**. Ninguno contenía ese merge en el momento de la comprobación.
-La salud del contenedor y los resultados de CI no acreditan su despliegue ni
-aceptación clínica. Esta revisión no reinició ni modificó servicios.
-
-Una comprobación posterior de **solo lectura, 16/10/2026 17:45 Lima**, comparó
-las relaciones del catálogo con los UUID y extremos de las 17.404 relaciones
-activas declaradas por content publicado `1.25.34` (`b9e93638`). DEV contiene
-las 17.404, con pesos numéricos. QLTY contiene 17.209 con los UUID esperados:
-de las otras 195, **192 relaciones no aparecen y tres tienen otro UUID**.
-Las diferencias de identidad corresponden a laboratorio (147 miembros de
-conjuntos y 38 respuestas) y barrios de Santa Clotilde (10 miembros).
-No se consultaron historias, pacientes ni observaciones; estos resultados
-**no prueban pérdida de datos clínicos ni establecen su causa**.
-
-Entre los UUID compartidos, 14.436 pesos coinciden y 2.773 difieren:
-QLTY tiene **2.771 opciones de respuesta sin peso de orden** (320 de
-laboratorio y 2.451 de sihsalus), más dos pesos numéricos distintos en
-conjuntos sihsalus. La comparación posterior con el artefacto nativo confirmó
-que **DEV coincide exactamente con la línea base publicada en las 17.404
-identidades, extremos y pesos**; ninguna de estas lecturas es una lista
-autorizada de cambios. Antes de promover la transición OCL hay que explicar estas
-diferencias, preparar una reconciliación revisable y demostrar preservación
-de identidades, opciones y orden. No borrar checksums ni reparar SQL para
-forzar una coincidencia.
-
-La extracción usó exclusivamente metadatos de conceptos/relaciones, con
-verificación de MAC por conexión. Evidencia privada conservada por el operador:
-SHA-256 DEV `eb0104be8c1bf5113ec56b7bd5fb31a0e0749b0ddc76cc06c48a468d3fcf5e0a`;
-QLTY `973fd5732119a7ad4cdbf38d3e8cffe3df1b917da753eb0f639318fd6edc1023`.
-Los valores identificadores y el detalle no se publican en este documento.
-
-El PR #270 prepara `1.25.35` conservando los catálogos y la suscripción actuales.
-Si se integra/publica primero, #269 deberá rebasarse y adoptar una versión
-posterior. No presentar los dos candidatos como un mismo artefacto. Aplicar
-content requiere coordinación operativa separada porque viaja en la imagen de
-backend; preparar metadata no autoriza reconstruir o reiniciar ese servicio.
-
-Para #376/#377, el profesional responsable debe confirmar la autoría original
-antes de proponer cualquier reparación. La evidencia de ausencia de proveedor
-no permite atribuir la atención al usuario que la consulta, al creador del
-registro ni al profesional de la sesión actual. El frontend mantiene el bloqueo
-ante historial ilegible; su resolución no se acredita solo con una interfaz
-sin errores visibles.
+- [#387](https://github.com/sihsalus/sihsalus/issues/387) inscripciones CRED:
+  frontend #1229 integrado; falta asignar el rol existente a CRED con aprobación
+  específica y probar registrar, editar y anular, además de denegar a un perfil
+  de consulta.
+- [#388](https://github.com/sihsalus/sihsalus/issues/388) antecedente antes del
+  nacimiento: corrección en #1229; en QLTY sintético rechazar el día anterior,
+  aceptar el día del nacimiento y conservar la excepción de antecedentes familiares.
+- [#389](https://github.com/sihsalus/sihsalus/issues/389) y
+  [#390](https://github.com/sihsalus/sihsalus/issues/390) alta y hospitalización:
+  content #270; validar alta anterior/igual al nacimiento y futura, y la
+  contradicción de duración con Sí → No, incluido cero.
+- [#391](https://github.com/sihsalus/sihsalus/issues/391) talla decimal: content
+  #269 bloqueado por el orden del catálogo; tras instalación, actualización y
+  reinicio, comprobar que 30.1 cm se guarda y relee con el mismo concepto.
+- [#392](https://github.com/sihsalus/sihsalus/issues/392) reacciones adversas:
+  corrección en #1229; verificar guardado único, actualización inmediata y aviso
+  si falla solo la recarga, con dos pacientes sintéticos.
+- [#393](https://github.com/sihsalus/sihsalus/issues/393) dosis mostrada:
+  [frontend #1232](https://github.com/sihsalus/sihsalus-frontend/pull/1232)
+  resuelve empates de fecha/hora con el número registrado; comparar resumen,
+  detalle y respuesta persistida.
+- [#376](https://github.com/sihsalus/sihsalus/issues/376) y
+  [#377](https://github.com/sihsalus/sihsalus/issues/377) lectura y guardado de
+  inmunizaciones: errores FHIR 422 por ausencia de proveedor compatible. El
+  profesional responsable confirma la autoría original antes de cualquier
+  reparación; no atribuir la atención al usuario que consulta, al creador del
+  registro ni al profesional de la sesión.
+- Catálogos: frente a content `1.25.34`, DEV coincide en las 17.404 relaciones
+  activas; QLTY omite 192, tiene tres UUID distintos y 2.771 opciones de
+  respuesta sin peso de orden (laboratorio y sihsalus). Explicar y reconciliar
+  antes de promover la transición OCL; no borrar checksums ni reparar SQL para
+  forzar una coincidencia.
 
 ## Secuencia de aceptación
 

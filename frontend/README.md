@@ -90,11 +90,6 @@ respaldo. Para rollback, quitar el JSON adicional de `SPA_CONFIG_URLS` y aplicar
 el wrapper/manifiesto anterior; no hay migración clínica. No borrar imágenes
 ni artefactos privados de recuperación antes de verificar la reversión.
 
-La suite `clinical-recovery` del frontend sigue en cuarentena: sus fixtures y
-su limpieza requieren revisión independiente. Estas instrucciones no habilitan
-ni eluden esa suite; distinguen la comprobación manual de transportes del smoke
-clínico pendiente y no autorizan datos reales ni producción.
-
 ## Caché y rutas
 
 La política canónica está en [nginx.conf](nginx.conf):
