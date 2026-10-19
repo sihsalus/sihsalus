@@ -17,7 +17,6 @@ DB_PASSWORD="${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD no definido}"
 TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
 DUMP_FILE="dump_${TIMESTAMP}.sql.gz"
 
-# Parseo de argumentos
 while [[ $# -gt 0 ]]; do
     case $1 in
         --container) CONTAINER_NAME="$2"; shift 2;;
@@ -49,7 +48,6 @@ docker exec -e MYSQL_PWD="$DB_PASSWORD" "$CONTAINER_NAME" \
 DUMP_SIZE=$(du -h "$BACKUP_DIR/$DUMP_FILE" | cut -f1)
 echo "[OK] Dump creado: $BACKUP_DIR/$DUMP_FILE ($DUMP_SIZE)"
 
-# Cifrar si hay clave disponible
 if [ -n "${BACKUP_ENCRYPTION_PASSWORD:-}" ]; then
     openssl enc -aes-256-cbc -salt -pbkdf2 \
         -pass env:BACKUP_ENCRYPTION_PASSWORD \
@@ -60,7 +58,6 @@ if [ -n "${BACKUP_ENCRYPTION_PASSWORD:-}" ]; then
     DUMP_FILE="$DUMP_FILE.enc"
 fi
 
-# Rotar backups antiguos
 BACKUP_COUNT=$(ls -1 "$BACKUP_DIR"/dump_*.sql.gz* 2>/dev/null | wc -l)
 if [ "$BACKUP_COUNT" -gt "$MAX_BACKUPS" ]; then
     ls -1t "$BACKUP_DIR"/dump_*.sql.gz* | tail -n +$((MAX_BACKUPS+1)) | xargs rm -f

@@ -4,13 +4,11 @@
 
 set -e
 
-# Colores
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Configuración
 SERVER="${1:-${SIHSALUS_SERVER}}"
 
 if [ -z "$SERVER" ]; then
@@ -42,7 +40,6 @@ echo ""
 echo -e "Presiona ${YELLOW}Ctrl+C${NC} para cerrar todos los túneles"
 echo ""
 
-# Verificar que los puertos locales estén libres
 check_port() {
     local port=$1
     if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1 ; then
@@ -56,7 +53,6 @@ check_port 9000
 check_port 3001
 check_port 8081
 
-# Crear múltiples túneles SSH
 ssh -L 9000:localhost:9000 \
     -L 3001:localhost:3001 \
     -L 8081:localhost:8081 \

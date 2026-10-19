@@ -216,11 +216,6 @@ Referencia: [backup de Orthanc](https://orthanc.uclouvain.be/book/users/backup.h
 | Recuperación | Carga parcialmente aceptada, desconexión, expiración de sesión, reinicio de Orthanc/proxy/Redis y restore aislado |
 | Modalidad | C-ECHO/C-STORE y, una vez integrado el puente, C-FIND y finalización con identidad verificada |
 
-Los tests antiguos `e2e/patient-imaging` permanecen en cuarentena. Su limpieza no
-puede sincronizar y borrar candidatos de un Orthanc compartido. Un futuro harness
-debe registrar los recursos propios, comprobar su identidad sintética antes de
-borrarlos y conservar el journal si una limpieza falla.
-
 CI y aceptación del entorno deben registrar comando, estado, SHA,
 versiones, rol sintético y resultado de limpieza. No adjuntar DICOM, tokens ni logs
 con datos de pacientes a artefactos públicos.

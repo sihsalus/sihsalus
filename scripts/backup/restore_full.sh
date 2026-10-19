@@ -3,18 +3,15 @@
 # Script: restore_full.sh
 # Descripcion: Restaura la base de datos MariaDB desde un backup completo.
 # Uso: ./restore_full.sh [--container NOMBRE] [--dir DIRECTORIO] [--file ARCHIVO]
-# Autor: Equipo SIHSALUS
 # ------------------------------------------------------------------------------
 
 set -euo pipefail
 
-# Colores
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Configuracion por defecto
 CONTAINER_NAME="${CONTAINER_NAME:-sihsalus-db-master}"
 BACKUP_DIR="${BACKUP_DIR:-/home/${USER}/sihsalus-fullBackups}"
 BACKUP_FILE=""
@@ -22,7 +19,6 @@ DB_VOLUME="${DB_VOLUME:-}"
 MARIADB_IMAGE="mariadb:10.11.7"
 TEMP_DIR="/tmp/sihsalus-restore-$$"
 
-# Parseo de argumentos
 while [[ $# -gt 0 ]]; do
     case $1 in
         --container)
@@ -44,7 +40,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Funciones
 cleanup() {
     echo -e "\n[INFO] Limpiando archivos temporales..."
     rm -rf "$TEMP_DIR"
@@ -57,16 +52,12 @@ confirm() {
     [[ "$resp" =~ ^[sS]$ ]] || { echo "Cancelado."; exit 0; }
 }
 
-# --- Seleccion de backup ---
-
 if [ -n "$BACKUP_FILE" ]; then
-    # Archivo especificado por argumento
     if [ ! -f "$BACKUP_FILE" ]; then
         echo -e "${RED}[ERROR] Archivo no encontrado: $BACKUP_FILE${NC}"; exit 1
     fi
     selected_file="$BACKUP_FILE"
 else
-    # Seleccion interactiva
     if [ ! -d "$BACKUP_DIR" ]; then
         echo -e "${RED}[ERROR] Directorio de backups no encontrado: $BACKUP_DIR${NC}"; exit 1
     fi
@@ -101,8 +92,6 @@ fi
 echo ""
 echo -e "[INFO] Backup seleccionado: ${GREEN}$(basename "$selected_file")${NC}"
 
-# --- Verificaciones previas ---
-
 # Resolver el volumen real desde el mount del contenedor para no depender del
 # nombre del proyecto Compose ni de un prefijo historico.
 if [ -z "$DB_VOLUME" ]; then
@@ -115,7 +104,6 @@ if [ -z "$DB_VOLUME" ]; then
     exit 1
 fi
 
-# Verificar que el volumen de datos existe
 if ! docker volume inspect "$DB_VOLUME" &>/dev/null; then
     echo -e "${RED}[ERROR] Volumen '$DB_VOLUME' no encontrado.${NC}"
     echo "[INFO] Volumenes disponibles:"
@@ -124,8 +112,6 @@ if ! docker volume inspect "$DB_VOLUME" &>/dev/null; then
 fi
 
 confirm "ATENCION: Esto reemplazara TODA la base de datos actual. Los datos actuales se perderan."
-
-# --- Descifrar si es necesario ---
 
 mkdir -p "$TEMP_DIR"
 archive_file="$selected_file"
@@ -152,8 +138,6 @@ if [[ "$selected_file" == *.enc ]]; then
     archive_file="$decrypted_file"
 fi
 
-# --- Descomprimir ---
-
 echo "[INFO] Descomprimiendo backup..."
 restore_dir="$TEMP_DIR/restore"
 mkdir -p "$restore_dir"
@@ -167,8 +151,6 @@ fi
 backup_data_dir=$(dirname "$backup_content")
 echo -e "${GREEN}[OK] Backup descomprimido: $backup_data_dir${NC}"
 
-# --- Preparar backup ---
-
 echo "[INFO] Preparando backup (mariadb-backup --prepare)..."
 docker run --rm \
     -v "$backup_data_dir:/backup/full" \
@@ -178,23 +160,18 @@ docker run --rm \
 
 echo -e "${GREEN}[OK] Backup preparado${NC}"
 
-# --- Detener servicios ---
-
 echo "[INFO] Deteniendo servicios de base de datos..."
 docker compose stop db 2>/dev/null || docker stop "$CONTAINER_NAME" 2>/dev/null || true
 
 # Esperar a que el contenedor se detenga
 sleep 2
 
-# --- Snapshot del volumen actual (safety net) ---
-
+# Snapshot del volumen actual: permite volver atras si copy-back falla.
 SNAPSHOT_VOLUME="${DB_VOLUME}-pre-restore"
 echo "[INFO] Creando snapshot del volumen actual en '$SNAPSHOT_VOLUME'..."
 
-# Eliminar snapshot anterior si existe
 docker volume rm "$SNAPSHOT_VOLUME" 2>/dev/null || true
 
-# Copiar volumen actual a snapshot
 docker volume create "$SNAPSHOT_VOLUME" >/dev/null
 docker run --rm \
     -v "$DB_VOLUME:/source:ro" \
@@ -204,16 +181,12 @@ docker run --rm \
 echo -e "${GREEN}[OK] Snapshot creado. En caso de fallo, restaurar con:${NC}"
 echo -e "  docker run --rm -v $SNAPSHOT_VOLUME:/source:ro -v $DB_VOLUME:/dest busybox sh -c 'rm -rf /dest/* /dest/.* 2>/dev/null; cp -a /source/. /dest/'"
 
-# --- Limpiar volumen de datos ---
-
 echo "[INFO] Limpiando volumen de datos actual..."
 docker run --rm \
     -v "$DB_VOLUME:/var/lib/mysql" \
     busybox sh -c "rm -rf /var/lib/mysql/* /var/lib/mysql/.*" 2>/dev/null || true
 
 echo -e "${GREEN}[OK] Volumen limpiado${NC}"
-
-# --- Restaurar ---
 
 echo "[INFO] Restaurando backup (mariadb-backup --copy-back)..."
 if ! docker run --rm \
@@ -239,12 +212,9 @@ fi
 
 echo -e "${GREEN}[OK] Datos restaurados${NC}"
 
-# --- Reiniciar servicios ---
-
 echo "[INFO] Reiniciando servicios..."
 docker compose up -d db backend
 
-# Limpiar snapshot despues de exito
 echo "[INFO] Eliminando snapshot (restore exitoso)..."
 docker volume rm "$SNAPSHOT_VOLUME" 2>/dev/null || true
 

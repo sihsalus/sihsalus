@@ -8,11 +8,7 @@ Seguir [el procedimiento de revisión humana](human-review.md). El mantenedor
 elige la versión y ambientes; `deploy.py` registra automáticamente las imágenes
 exactas y la recuperación. No preparar ni publicar archivos por servidor.
 
-En Actions, **Deploy Frontend** admite una versión publicada y conserva las
-aprobaciones nativas de `development` y `quality`. DEV sigue siendo el canario.
-Por SSH se usa la misma herramienta sobre el checkout instalado. Actualizar
-frontend recrea solo frontend y conserva backend, bases de datos y perfiles.
-Producción tiene su propia ventana y autorización.
+El flujo de **Deploy Frontend** en Actions está en [scripts/deploy/README.md](../../scripts/deploy/README.md#github-actions-y-conexión-remota).
 
 ## Antes del despliegue
 
