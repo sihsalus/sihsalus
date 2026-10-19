@@ -11,12 +11,34 @@ Antes de habilitarlo se necesitan un destino DEV/QLTY autorizado, imágenes
 construidas por CI, el módulo `imaging` iniciado y una conexión Orthanc registrada
 en OpenMRS. La aceptación usa exclusivamente estudios y pacientes sintéticos.
 
-El frontend actualizado acepta DICOM individuales. ZIP permanece deshabilitado:
-el contrato de carga de `imaging` 1.2.8 interpreta una respuesta por estudio, mientras
-que Orthanc devuelve una lista al recibir un archivo ZIP. La versión 1.2.9 preparada
-en `sihsalus/openmrs-module-imaging` requiere su propio CI, revisión y publicación;
-no es todavía el artefacto fijado en `backend/pom.xml`. La distribución conserva
-1.2.8 hasta que exista un reemplazo publicado y verificable.
+El frontend acepta DICOM individuales. ZIP permanece deshabilitado: `imaging`
+1.2.9 rechaza archivos comprimidos en el servidor (415) y responde un estudio por
+carga. La distribución fija 1.2.9, publicado en Maven Central desde
+`sihsalus/openmrs-module-imaging` PR #17. El frontend debe incluir la corrección
+de `scheduledPerformingPhysician` y del estado `in progress`
+(sihsalus-frontend `fix/clinical-feedback-20261019`); con 1.2.9 la creación de
+pasos de lista de trabajo devuelve 400 sin ella.
+
+### Prechequeo antes de desplegar 1.2.9
+
+Los changesets 418 a 420 añaden restricciones de unicidad por configuración
+Orthanc, columnas de versión optimista en la lista de trabajo y amplían el
+detalle de comparación. El changeset 418 **detiene la migración** si existen
+duplicados; no borra filas. Con un backup coordinado de MariaDB y `orthanc-data`,
+ejecutar en solo lectura y exigir cero filas:
+
+```sql
+SELECT orthancConfigurationId, studyInstanceUID, COUNT(*) AS c
+  FROM imaging_DicomStudy
+ GROUP BY orthancConfigurationId, studyInstanceUID HAVING c > 1;
+SELECT orthancConfigurationId, orthancStudyUID, COUNT(*) AS c
+  FROM imaging_DicomStudy
+ GROUP BY orthancConfigurationId, orthancStudyUID HAVING c > 1;
+```
+
+Un duplicado requiere conciliación revisada antes de actualizar. Tras el cambio,
+`GET /imaging/studies` falla mientras alguna conexión Orthanc registrada esté
+caída, en lugar de mostrar la lista en caché.
 
 La lista de trabajo de modalidades y su notificación de finalización requieren
 además un puente Orthanc–OpenMRS. Este profile **no instala ese puente**. No habilitar
