@@ -39,11 +39,6 @@
         <ignoreVersion type="regex">.*</ignoreVersion>
       </ignoreVersions>
     </rule>
-    <rule groupId="org.openmrs.module" artifactId="queue-omod">
-      <ignoreVersions>
-        <ignoreVersion type="regex">.*</ignoreVersion>
-      </ignoreVersions>
-    </rule>
     <rule groupId="org.openmrs.module" artifactId="reporting-omod">
       <ignoreVersions>
         <ignoreVersion type="regex">.*</ignoreVersion>
@@ -65,11 +60,6 @@
       </ignoreVersions>
     </rule>
     <rule groupId="org.openmrs.module" artifactId="emrapi-omod">
-      <ignoreVersions>
-        <ignoreVersion type="regex">.*</ignoreVersion>
-      </ignoreVersions>
-    </rule>
-    <rule groupId="org.openmrs.module" artifactId="fhir2-omod">
       <ignoreVersions>
         <ignoreVersion type="regex">.*</ignoreVersion>
       </ignoreVersions>
