@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
-# This test mounts the Docker socket and uses the stack's fixed container name.
+# This test mounts the Docker socket into a container of the local daemon.
 # Only run against the local daemon of a disposable GitHub-hosted runner.
 if [[ "${GITHUB_ACTIONS:-}" != "true" || "${RUNNER_ENVIRONMENT:-}" != "github-hosted" ]]; then
   echo "[FAIL] Docker proxy test requires ephemeral GitHub-hosted CI" >&2
@@ -22,8 +22,15 @@ trap cleanup EXIT
 
 "${COMPOSE[@]}" up -d docker-socket-proxy
 
+# Containers have no fixed names: resolve the proxy through its Compose service.
+PROXY_CONTAINER="$("${COMPOSE[@]}" ps --all --quiet docker-socket-proxy | head -n 1)"
+if [ -z "$PROXY_CONTAINER" ]; then
+  echo "[FAIL] Docker proxy container was not created by Compose" >&2
+  exit 1
+fi
+
 PING="$("${DOCKER[@]}" run --rm \
-  --network container:sihsalus-docker-socket-proxy \
+  --network "container:$PROXY_CONTAINER" \
   curlimages/curl:8.12.1 \
   -fsS --retry 10 --retry-connrefused --retry-delay 1 --max-time 5 \
   http://localhost:2375/_ping)"
@@ -34,7 +41,7 @@ if [ "$PING" != "OK" ]; then
 fi
 
 STATUS="$("${DOCKER[@]}" run --rm \
-  --network container:sihsalus-docker-socket-proxy \
+  --network "container:$PROXY_CONTAINER" \
   curlimages/curl:8.12.1 \
   -sS -o /dev/null -w '%{http_code}' --max-time 5 \
   -X POST http://localhost:2375/containers/create)"

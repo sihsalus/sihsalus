@@ -3,7 +3,6 @@
 
 services:
   grafana:
-    container_name: sihsalus-grafana
     image: grafana/grafana:12.3
     restart: "unless-stopped"
     profiles: [ monitoring ]
@@ -64,7 +63,6 @@ services:
       - monitoring-edge
 
   prometheus:
-    container_name: sihsalus-prometheus
     image: prom/prometheus:v3.2.1
     restart: "unless-stopped"
     profiles: [ monitoring ]
@@ -91,7 +89,6 @@ services:
       - default
 
   alertmanager:
-    container_name: sihsalus-alertmanager
     image: prom/alertmanager:v0.33.1
     restart: "unless-stopped"
     profiles: [ monitoring ]
@@ -114,7 +111,6 @@ services:
       - monitoring-network
 
   node-exporter:
-    container_name: sihsalus-node-exporter
     image: prom/node-exporter:v1.11.1
     restart: "unless-stopped"
     profiles: [ monitoring ]
@@ -138,7 +134,6 @@ services:
       - monitoring-network
 
   operations-collector:
-    container_name: sihsalus-operations-collector
     image: alpine:3.23
     restart: "unless-stopped"
     profiles: [ monitoring ]
@@ -163,7 +158,6 @@ services:
       start_period: 15s
 
   viewpower-exporter:
-    container_name: sihsalus-viewpower-exporter
     image: python:3.13-alpine@sha256:7415fbc3c9e4979cc717d92377ab2bc7b2b4a2af1ac03cc52b5f3f88efedaf3a
     restart: "unless-stopped"
     profiles: [ monitoring ]
@@ -197,7 +191,6 @@ services:
       - monitoring-network
 
   cadvisor:
-    container_name: sihsalus-cadvisor
     image: ghcr.io/google/cadvisor:v0.60.5
     restart: "unless-stopped"
     profiles: [ monitoring ]
@@ -219,7 +212,6 @@ services:
       - monitoring-network
 
   blackbox:
-    container_name: sihsalus-blackbox
     image: prom/blackbox-exporter:v0.27.0
     restart: "unless-stopped"
     profiles: [ monitoring ]
@@ -238,7 +230,6 @@ services:
       - default
 
   loki-init:
-    container_name: sihsalus-loki-init
     image: alpine:3.23
     profiles: [ monitoring ]
     restart: "no"
@@ -250,7 +241,6 @@ services:
       - monitoring-network
 
   loki:
-    container_name: sihsalus-loki
     image: grafana/loki:3.6
     restart: "unless-stopped"
     profiles: [ monitoring ]
@@ -267,7 +257,6 @@ services:
       - monitoring-network
 
   alloy:
-    container_name: sihsalus-alloy
     image: grafana/alloy:v1.13.1
     restart: "unless-stopped"
     profiles: [ logs ]
@@ -298,7 +287,6 @@ services:
       - monitoring-network
 
   docker-socket-proxy:
-    container_name: sihsalus-docker-socket-proxy
     image: tecnativa/docker-socket-proxy:v0.4.2
     restart: "unless-stopped"
     profiles: [ logs ]

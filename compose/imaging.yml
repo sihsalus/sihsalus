@@ -3,7 +3,6 @@
 
 services:
   ohif:
-    container_name: sihsalus-ohif
     # Compile PUBLIC_URL into OHIF; the upstream root build cannot be moved
     # under /imaging/ by changing only its React router configuration.
     build:
@@ -26,7 +25,6 @@ services:
       - default
 
   orthanc:
-    container_name: sihsalus-orthanc
     image: orthancteam/orthanc:25.8.2
     restart: "unless-stopped"
     profiles: [ imaging ]
@@ -93,7 +91,6 @@ services:
       - default
 
   orthanc-proxy:
-    container_name: sihsalus-orthanc-proxy
     image: nginx:1.28-alpine
     restart: "unless-stopped"
     profiles: [ imaging ]

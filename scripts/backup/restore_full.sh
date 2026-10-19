@@ -2,17 +2,24 @@
 # ------------------------------------------------------------------------------
 # Script: restore_full.sh
 # Descripcion: Restaura la base de datos MariaDB desde un backup completo.
-# Uso: ./restore_full.sh [--container NOMBRE] [--dir DIRECTORIO] [--file ARCHIVO]
+# Uso: ./restore_full.sh [--container NOMBRE|ID] [--service SERVICIO] [--dir DIRECTORIO] [--file ARCHIVO]
 # ------------------------------------------------------------------------------
 
 set -euo pipefail
+# The checkout that owns this script selects the Compose project (.env,
+# COMPOSE_FILE, COMPOSE_PROFILES), so the script works from any directory;
+# backup paths stay relative to the directory it was started from.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$REPO_ROOT/scripts/lib/compose-container.sh"
+compose() { (cd "$REPO_ROOT" && docker compose "$@"); }
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-CONTAINER_NAME="${CONTAINER_NAME:-sihsalus-db-master}"
+DB_SERVICE="${DB_SERVICE:-db}"
+CONTAINER_NAME="${CONTAINER_NAME:-}"
 BACKUP_DIR="${BACKUP_DIR:-/home/${USER}/sihsalus-fullBackups}"
 BACKUP_FILE=""
 DB_VOLUME="${DB_VOLUME:-}"
@@ -23,15 +30,18 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --container)
             CONTAINER_NAME="$2"; shift 2;;
+        --service)
+            DB_SERVICE="$2"; shift 2;;
         --dir)
             BACKUP_DIR="$2"; shift 2;;
         --file)
             BACKUP_FILE="$2"; shift 2;;
         --help|-h)
-            echo "Uso: $0 [--container NOMBRE] [--dir DIRECTORIO] [--file ARCHIVO]"
+            echo "Uso: $0 [--container NOMBRE|ID] [--service SERVICIO] [--dir DIRECTORIO] [--file ARCHIVO]"
             echo ""
             echo "Opciones:"
-            echo "  --container  Nombre del contenedor DB (default: sihsalus-db-master)"
+            echo "  --container  Nombre o id del contenedor DB (default: el del servicio Compose)"
+            echo "  --service    Servicio Compose de la base (default: db)"
             echo "  --dir        Directorio de backups (default: ~/sihsalus-fullBackups)"
             echo "  --file       Archivo de backup especifico (omitir para seleccion interactiva)"
             exit 0;;
@@ -92,14 +102,20 @@ fi
 echo ""
 echo -e "[INFO] Backup seleccionado: ${GREEN}$(basename "$selected_file")${NC}"
 
+# Sin --container, el contenedor es el del servicio Compose del checkout;
+# puede no existir todavia si DB_VOLUME se indica explicitamente.
+if [ -z "$CONTAINER_NAME" ]; then
+    CONTAINER_NAME="$(compose_container "$DB_SERVICE" "$REPO_ROOT" 2>/dev/null || true)"
+fi
+
 # Resolver el volumen real desde el mount del contenedor para no depender del
 # nombre del proyecto Compose ni de un prefijo historico.
-if [ -z "$DB_VOLUME" ]; then
+if [ -z "$DB_VOLUME" ] && [ -n "$CONTAINER_NAME" ]; then
     DB_VOLUME="$(docker inspect "$CONTAINER_NAME" --format '{{range .Mounts}}{{if eq .Destination "/var/lib/mysql"}}{{.Name}}{{end}}{{end}}' 2>/dev/null || true)"
 fi
 
 if [ -z "$DB_VOLUME" ]; then
-    echo -e "${RED}[ERROR] No se pudo resolver el volumen /var/lib/mysql de '$CONTAINER_NAME'.${NC}"
+    echo -e "${RED}[ERROR] No se pudo resolver el volumen /var/lib/mysql del servicio '$DB_SERVICE'${CONTAINER_NAME:+ (contenedor $CONTAINER_NAME)}.${NC}"
     echo "[INFO] Define DB_VOLUME explicitamente si el contenedor no existe."
     exit 1
 fi
@@ -161,7 +177,7 @@ docker run --rm \
 echo -e "${GREEN}[OK] Backup preparado${NC}"
 
 echo "[INFO] Deteniendo servicios de base de datos..."
-docker compose stop db 2>/dev/null || docker stop "$CONTAINER_NAME" 2>/dev/null || true
+compose stop "$DB_SERVICE" 2>/dev/null || { [ -n "$CONTAINER_NAME" ] && docker stop "$CONTAINER_NAME" 2>/dev/null; } || true
 
 # Esperar a que el contenedor se detenga
 sleep 2
@@ -206,14 +222,14 @@ if ! docker run --rm \
         -v "$DB_VOLUME:/dest" \
         busybox sh -c "cp -a /source/. /dest/"
     echo -e "${YELLOW}[INFO] Snapshot restaurado. Reiniciando con datos anteriores...${NC}"
-    docker compose up -d db backend
+    compose up -d "$DB_SERVICE" backend
     exit 1
 fi
 
 echo -e "${GREEN}[OK] Datos restaurados${NC}"
 
 echo "[INFO] Reiniciando servicios..."
-docker compose up -d db backend
+compose up -d "$DB_SERVICE" backend
 
 echo "[INFO] Eliminando snapshot (restore exitoso)..."
 docker volume rm "$SNAPSHOT_VOLUME" 2>/dev/null || true

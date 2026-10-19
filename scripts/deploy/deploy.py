@@ -49,7 +49,10 @@ def current_release(root):
 
     # Adopt an existing Compose installation directly; operators never author metadata.
     model = json.loads(releases.run(["docker", "compose", "config", "--format", "json"], root=root))
-    backend_id = releases.run(["docker", "inspect", "sihsalus-backend", "--format", "{{.Image}}"], root=root).strip()
+    # Containers have no fixed names; the backend is the one Compose runs for its service.
+    containers = releases.run(["docker", "compose", "ps", "--all", "--quiet", "backend"], root=root).split()
+    releases.require(len(containers) == 1, "Cannot identify the installed backend container")
+    backend_id = releases.run(["docker", "inspect", containers[0], "--format", "{{.Image}}"], root=root).strip()
     backend = source_image("backend", backend_id, root)
     frontend = source_image("frontend", model["services"]["frontend"]["build"]["args"]["FRONTEND_SOURCE_IMAGE"], root)
     properties = releases.image_file(backend_id, "/openmrs/distribution/openmrs-distro.properties", root)
@@ -141,7 +144,12 @@ def previous_release(current, root):
 
 def health(current, root, components):
     for name in components:
-        value = releases.run(["docker", "inspect", f"sihsalus-{name}", "--format",
+        # Containers have no fixed names: locate the service through its Compose labels.
+        containers = releases.run(["docker", "ps", "--all", "--quiet", "--no-trunc",
+                                   "--filter", f"label=com.docker.compose.project={current['compose']['project']}",
+                                   "--filter", f"label=com.docker.compose.service={name}"], root=root).split()
+        releases.require(len(containers) == 1, f"Current {name} has no single container; inspect it before updating")
+        value = releases.run(["docker", "inspect", containers[0], "--format",
                               "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}"], root=root).strip()
         releases.require(value == "healthy", f"Current {name} is not healthy; inspect it before updating")
 

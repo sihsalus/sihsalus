@@ -6,7 +6,6 @@
 
 services:
   reportes-sql:
-    container_name: sihsalus-reportes-sql
     image: ${REPORTES_SQL_IMAGE:-ghcr.io/sihsalus/reportes-sql}:${REPORTES_SQL_TAG:-latest}
     restart: "unless-stopped"
     profiles: [ indicadores ]
@@ -32,7 +31,6 @@ services:
       - services-network
 
   reportes-sql-db:
-    container_name: sihsalus-reportes-sql-db
     image: postgres:17
     restart: "unless-stopped"
     profiles: [ indicadores ]

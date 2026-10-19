@@ -16,6 +16,11 @@ EXPECTED_BACKEND_IMAGE="${BACKEND_REPOSITORY}:${TARGET_BACKEND_REFERENCE}"
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLEAN_CHECKOUT_HELPER="$SCRIPT_DIRECTORY/check-clean-checkout.sh"
 source "$SCRIPT_DIRECTORY/env.sh"
+# Containers are resolved by service: the remote runner uploads the helper next
+# to this script; a checkout keeps it in scripts/lib.
+COMPOSE_CONTAINER_HELPER="$SCRIPT_DIRECTORY/compose-container.sh"
+[ -r "$COMPOSE_CONTAINER_HELPER" ] || COMPOSE_CONTAINER_HELPER="$SCRIPT_DIRECTORY/../lib/compose-container.sh"
+source "$COMPOSE_CONTAINER_HELPER"
 
 if [[ ! "$TARGET_BACKEND_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   echo "[redeploy-environment] invalid backend SHA" >&2
@@ -90,28 +95,32 @@ service_allows_successful_exit() {
   esac
 }
 
-container_health() {
-  local container="$1"
-  docker inspect "$container" \
+service_health() {
+  local service="$1"
+  local container_id
+
+  container_id="$(compose_container "$service" 2>/dev/null)" || container_id=""
+  [ -n "$container_id" ] || return 0
+  docker inspect "$container_id" \
     --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
     2>/dev/null || true
 }
 
-wait_for_container_health() {
-  local container="$1"
+wait_for_service_health() {
+  local service="$1"
   local timeout_seconds="$2"
   local elapsed=0
   local health
 
   while [ "$elapsed" -lt "$timeout_seconds" ]; do
-    health="$(container_health "$container")"
+    health="$(service_health "$service")"
     case "$health" in
       healthy | running)
-        echo "[redeploy-environment] ${container} is ${health}"
+        echo "[redeploy-environment] ${service} is ${health}"
         return 0
         ;;
       unhealthy | exited | dead)
-        echo "[redeploy-environment] ${container} entered state: ${health}" >&2
+        echo "[redeploy-environment] ${service} entered state: ${health}" >&2
         return 1
         ;;
     esac
@@ -119,24 +128,53 @@ wait_for_container_health() {
     elapsed=$((elapsed + 5))
   done
 
-  echo "[redeploy-environment] ${container} did not become healthy within ${timeout_seconds}s" >&2
+  echo "[redeploy-environment] ${service} did not become healthy within ${timeout_seconds}s" >&2
   return 1
 }
 
+# Named volumes follow ${COMPOSE_PROJECT_NAME:-sihsalus}-<key> and the others
+# <project>_<key>. Under another project name Compose would start services on
+# new, empty volumes while the historical sihsalus ones still hold the data.
+preflight_named_volumes() {
+  local pending key name legacy
+  # The rendered model can contain secrets: parse it in a pipe, print only volume names.
+  pending="$(
+    docker compose config --format json | python3 -c '
+import json, sys
+model = json.load(sys.stdin)
+for key, volume in sorted((model.get("volumes") or {}).items()):
+    name = (volume or {}).get("name") or ""
+    if name not in ("sihsalus-" + key, "sihsalus_" + key):
+        print(key, name)
+'
+  )"
+  [ -n "$pending" ] || return 0
+  while read -r key name; do
+    for legacy in "sihsalus-${key}" "sihsalus_${key}"; do
+      if docker volume inspect "$legacy" >/dev/null 2>&1 && ! docker volume inspect "$name" >/dev/null 2>&1; then
+        echo "[redeploy-environment] volume ${key} would start empty as ${name} while ${legacy} still holds its data" >&2
+        echo "[redeploy-environment] pin COMPOSE_PROJECT_NAME=sihsalus in .env or run the project rename migration in scripts/deploy/README.md#nombres-de-contenedores-y-volúmenes first" >&2
+        return 1
+      fi
+    done
+  done <<<"$pending"
+}
+
 wait_for_openmrs() {
+
   local timeout_seconds="$1"
   local elapsed=0
   local health
 
   while [ "$elapsed" -lt "$timeout_seconds" ]; do
-    if docker exec sihsalus-backend \
+    if docker compose exec --no-TTY backend \
       curl --fail --silent --show-error --max-time 10 \
       http://127.0.0.1:8080/openmrs/health/started >/dev/null 2>&1; then
       echo "[redeploy-environment] OpenMRS reports started"
       return 0
     fi
 
-    health="$(container_health sihsalus-backend)"
+    health="$(service_health backend)"
     case "$health" in
       unhealthy | exited | dead)
         echo "[redeploy-environment] OpenMRS entered state: ${health}" >&2
@@ -424,6 +462,8 @@ else
   echo "[redeploy-environment] offline mode: using prevalidated local runtime images without rebuilding"
 fi
 
+preflight_named_volumes
+
 echo "[redeploy-environment] recreating every active service without deleting volumes"
 docker compose up \
   --detach \
@@ -432,21 +472,24 @@ docker compose up \
   --no-build \
   --pull never
 
-wait_for_container_health sihsalus-db-master 300
-wait_for_container_health sihsalus-frontend 600
+wait_for_service_health db 300
+wait_for_service_health frontend 600
 wait_for_openmrs 2400
-wait_for_container_health sihsalus-backend 120
-wait_for_container_health sihsalus-gateway 600
+wait_for_service_health backend 120
+wait_for_service_health gateway 600
 
 wait_for_active_services 600
 
-BACKEND_IMAGE="$(docker inspect sihsalus-backend --format '{{.Config.Image}}')"
+BACKEND_CONTAINER="$(require_compose_container backend)"
+FRONTEND_CONTAINER="$(require_compose_container frontend)"
+
+BACKEND_IMAGE="$(docker inspect "$BACKEND_CONTAINER" --format '{{.Config.Image}}')"
 if [ "$BACKEND_IMAGE" != "$EXPECTED_BACKEND_IMAGE" ]; then
   echo "[redeploy-environment] backend image is not the requested immutable release: ${BACKEND_IMAGE}" >&2
   false
 fi
 
-BACKEND_IMAGE_ID="$(docker inspect sihsalus-backend --format '{{.Image}}')"
+BACKEND_IMAGE_ID="$(docker inspect "$BACKEND_CONTAINER" --format '{{.Image}}')"
 BACKEND_REVISION="$(
   docker image inspect "$BACKEND_IMAGE_ID" \
     --format '{{index .Config.Labels "org.opencontainers.image.revision"}}'
@@ -457,7 +500,7 @@ if [ "$BACKEND_REVISION" != "$TARGET_BACKEND_SHA" ]; then
 fi
 
 FRONTEND_SHA="$(
-  docker exec sihsalus-frontend wget -qO- http://127.0.0.1/build-info.json |
+  docker exec "$FRONTEND_CONTAINER" wget -qO- http://127.0.0.1/build-info.json |
     awk -F'"' '/"gitSha"[[:space:]]*:/ { print $4; exit }'
 )"
 if [[ ! "$FRONTEND_SHA" =~ ^[0-9a-f]{40}$ ]]; then
@@ -465,7 +508,7 @@ if [[ ! "$FRONTEND_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   false
 fi
 
-FRONTEND_NODE_ID="$(docker inspect sihsalus-frontend --format '{{index .Config.Labels "org.sihsalus.node-id"}}')"
+FRONTEND_NODE_ID="$(docker inspect "$FRONTEND_CONTAINER" --format '{{index .Config.Labels "org.sihsalus.node-id"}}')"
 if [ "$FRONTEND_NODE_ID" != "$NODE_ID" ]; then
   echo "[redeploy-environment] frontend wrapper does not contain the expected node identity" >&2
   false

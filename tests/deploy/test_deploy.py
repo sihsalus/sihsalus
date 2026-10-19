@@ -199,7 +199,44 @@ class ComponentUpdate(unittest.TestCase):
         self.assertFalse(self.up_commands())
         self.assertEqual((self.root / ".env").read_bytes(), self.before)
 
+    def test_health_locates_each_component_through_its_compose_service(self):
+        deploy.health(self.current, self.root, ["frontend", "backend"])
+        lookups = [c for c in self.engine.calls if c[:2] == ["docker", "ps"]]
+        self.assertEqual(len(lookups), 2)
+        for command, name in zip(lookups, ("frontend", "backend")):
+            self.assertIn(f"label=com.docker.compose.project={self.current['compose']['project']}", command)
+            self.assertIn(f"label=com.docker.compose.service={name}", command)
+        self.assertFalse(any("sihsalus-frontend" in c for c in self.engine.calls))
+        self.engine.health["frontend"] = "unhealthy"
+        with self.assertRaisesRegex(release.ManifestError, "frontend is not healthy"):
+            deploy.health(self.current, self.root, ["frontend"])
+        deploy.health(self.current, self.root, ["backend"])
+        self.engine.replicas["backend"] = 2
+        with self.assertRaisesRegex(release.ManifestError, "backend has no single container"):
+            deploy.health(self.current, self.root, ["backend"])
+        del self.engine.runtime["services"]["frontend"]
+        with self.assertRaisesRegex(release.ManifestError, "frontend has no single container"):
+            deploy.health(self.current, self.root, ["frontend"])
+
+    def test_adoption_identifies_the_installed_backend_through_its_compose_service(self):
+        (self.root / ".env").write_text("SECRET=keep-private\nDEPLOYMENT_ENV=qlty\nCOMPOSE_FILE=docker-compose.yml\n"
+                                        f"COMPOSE_PROFILES=\nSIHSALUS_NODE_ID={self.current['target']['nodeId']}\n")
+        adopted = deploy.current_release(self.root)
+        self.assertEqual(adopted["services"], self.current["services"])
+        self.assertEqual(adopted["sources"], self.current["sources"])
+        self.assertEqual(adopted["compose"], self.current["compose"])
+        self.assertIn(["docker", "compose", "ps", "--all", "--quiet", "backend"], self.engine.calls)
+        self.assertFalse(any("sihsalus-backend" in c for c in self.engine.calls))
+        self.assertFalse(self.up_commands())
+        self.engine.replicas["backend"] = 2
+        with self.assertRaisesRegex(release.ManifestError, "identify the installed backend"):
+            deploy.current_release(self.root)
+        self.engine.replicas["backend"] = 0
+        with self.assertRaisesRegex(release.ManifestError, "identify the installed backend"):
+            deploy.current_release(self.root)
+
     def test_backend_failure_does_not_silently_downgrade_a_migrated_database(self):
+
         self.fail_once = True
         # Fail at the mutation boundary, preserving a failed journal for recovery.
         with patch.object(release, "apply_release", side_effect=release.ManifestError("backend failed")) as apply:

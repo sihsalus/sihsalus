@@ -58,20 +58,20 @@ volumes:
   hapi_pgdata:
   # Imaging (profile: imaging)
   orthanc-data:
-    name: sihsalus-orthanc-data
+    name: ${COMPOSE_PROJECT_NAME:-sihsalus}-orthanc-data
   # Monitoring (profile: monitoring)
   prometheus-data:
-    name: sihsalus-prometheus-data
+    name: ${COMPOSE_PROJECT_NAME:-sihsalus}-prometheus-data
   alertmanager-data:
-    name: sihsalus-alertmanager-data
+    name: ${COMPOSE_PROJECT_NAME:-sihsalus}-alertmanager-data
   operations-metrics:
-    name: sihsalus-operations-metrics
+    name: ${COMPOSE_PROJECT_NAME:-sihsalus}-operations-metrics
   loki-data:
-    name: sihsalus-loki-data
+    name: ${COMPOSE_PROJECT_NAME:-sihsalus}-loki-data
   alloy-data:
-    name: sihsalus-alloy-data
+    name: ${COMPOSE_PROJECT_NAME:-sihsalus}-alloy-data
   grafana-data:
-    name: sihsalus-grafana-data
+    name: ${COMPOSE_PROJECT_NAME:-sihsalus}-grafana-data
 
 networks:
   # Red principal - servicios core

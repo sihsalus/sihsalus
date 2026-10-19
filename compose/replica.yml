@@ -3,7 +3,6 @@
 
 services:
   db-replic:
-    container_name: sihsalus-db-replic
     image: mariadb:10.11.7
     restart: "unless-stopped"
     profiles: [ replica ]

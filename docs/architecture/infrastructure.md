@@ -72,5 +72,5 @@ CI, que también considera cambios en sus propias pruebas y workflows.
 ## Decisiones pendientes
 
 - Las imágenes con tag `latest` siguen siendo adecuadas para desarrollo, pero producción debe fijar tags inmutables.
-- `container_name` facilita scripts operativos existentes, aunque impide ejecutar dos proyectos SIH Salus en el mismo host. Su eliminación requiere actualizar primero esos scripts.
+- Decidido (#172): no se fijan `container_name`; los contenedores se llaman `<proyecto>-<servicio>-1` y los scripts resuelven cada servicio con `docker compose ps -q <servicio>` (`scripts/lib/compose-container.sh`). Los volúmenes con nombre usan `${COMPOSE_PROJECT_NAME:-sihsalus}-<clave>`; cambiar el nombre del proyecto en un host existente sigue el [runbook de migración](../../scripts/deploy/README.md#nombres-de-contenedores-y-volúmenes).
 - El socket Docker solo se monta en `docker-socket-proxy` al activar `logs`; Alloy recibe una API limitada con operaciones de escritura deshabilitadas.

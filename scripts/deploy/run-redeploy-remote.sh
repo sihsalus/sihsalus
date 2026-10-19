@@ -6,6 +6,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REDEPLOY_SCRIPT_PATH="${REDEPLOY_SCRIPT_PATH:-$ROOT/redeploy-environment.sh}"
 CLEAN_CHECKOUT_HELPER_PATH="${CLEAN_CHECKOUT_HELPER_PATH:-$ROOT/check-clean-checkout.sh}"
 ENV_HELPER_PATH="$ROOT/env.sh"
+COMPOSE_CONTAINER_HELPER_PATH="$ROOT/../lib/compose-container.sh"
 SSH_BIN="${SSH_BIN:-ssh}"
 POLL_INTERVAL_SECONDS="${REDEPLOY_POLL_INTERVAL_SECONDS:-10}"
 TIMEOUT_SECONDS="${REDEPLOY_TIMEOUT_SECONDS:-3300}"
@@ -200,6 +201,7 @@ upload_remote_file() {
 upload_remote_scripts() {
   upload_remote_file "$CLEAN_CHECKOUT_HELPER_PATH" "$REMOTE_CLEAN_CHECKOUT_HELPER" || return "$?"
   upload_remote_file "$ENV_HELPER_PATH" "$REMOTE_RUN_DIRECTORY/env.sh" || return "$?"
+  upload_remote_file "$COMPOSE_CONTAINER_HELPER_PATH" "$REMOTE_RUN_DIRECTORY/compose-container.sh" || return "$?"
   for helper in deploy.py release-manifest.py verify-external-frontend.sh; do
     upload_remote_file "$ROOT/$helper" "$REMOTE_RUN_DIRECTORY/$helper" || return "$?"
   done

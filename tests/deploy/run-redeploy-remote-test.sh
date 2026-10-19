@@ -218,6 +218,8 @@ cmp "$ROOT/scripts/deploy/check-clean-checkout.sh" \
   "$REMOTE_REPOSITORY/.redeploy-runs/success-run/check-clean-checkout.sh"
 cmp "$ROOT/scripts/deploy/env.sh" \
   "$REMOTE_REPOSITORY/.redeploy-runs/success-run/env.sh"
+cmp "$ROOT/scripts/lib/compose-container.sh" \
+  "$REMOTE_REPOSITORY/.redeploy-runs/success-run/compose-container.sh"
 
 FAILURE_OUTPUT="$TEMP_ROOT/failure-output.log"
 set +e

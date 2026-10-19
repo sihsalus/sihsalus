@@ -103,3 +103,101 @@ para actualizar versiones.
 
 Producción no se actualiza junto con DEV/QLTY. Su adopción y actualización requieren
 la ventana y autorización correspondientes.
+
+## Nombres de contenedores y volúmenes
+
+Los archivos Compose no fijan `container_name`. Cada contenedor se llama
+`<proyecto>-<servicio>-1` y el DNS interno sigue siendo el nombre del servicio.
+Para operar uno, resolverlo por servicio desde el checkout con su `.env`:
+
+```bash
+docker compose ps -q backend
+```
+
+`scripts/lib/compose-container.sh` ofrece `compose_container <servicio> [directorio]`
+y `require_compose_container <servicio> [directorio]` para scripts. Los cron y
+comandos manuales que usaban `docker exec sihsalus-db-master` deben pasar a esta
+resolución; los scripts de backup la hacen solos desde su propio checkout,
+también cuando cron los inicia desde otro directorio.
+
+Los volúmenes con nombre siguen `${COMPOSE_PROJECT_NAME:-sihsalus}-<clave>` y los
+demás `<proyecto>_<clave>`. Compose interpola `COMPOSE_PROJECT_NAME` con el nombre
+efectivo del proyecto (`-p`, variable de entorno, `.env` o, en su defecto, el
+directorio del checkout), así que el valor que importa es
+`docker compose config --format json | jq -r .name`. Con `sihsalus` los nombres
+son idénticos a los históricos y no hay nada que migrar. `.env.template` fija
+`COMPOSE_PROJECT_NAME=sihsalus` para que el nombre no dependa del directorio.
+
+### Primer despliegue sin `container_name`
+
+Antes de desplegar este cambio en cualquier host:
+
+1. Confirmar que `docker compose config --format json | jq -r .name` imprime
+   `sihsalus`. Si no, añadir `COMPOSE_PROJECT_NAME=sihsalus` a `.env` (conserva
+   los nombres históricos) o completar primero la migración de abajo.
+   `redeploy-environment.sh` lo comprueba antes de `docker compose up`
+   (`preflight_named_volumes`) y aborta si algún volumen histórico quedaría
+   huérfano; `sihsalus-compose.service` no tiene esa comprobación.
+2. Auditar las tareas programadas: `sudo crontab -l; grep -R 'sihsalus-' /etc/cron*`.
+   Las entradas con `docker exec sihsalus-db-master` u otro nombre fijo deben
+   resolver el servicio con `docker compose ps -q <servicio>` desde el checkout;
+   las que invocan `scripts/backup/*.sh` no necesitan cambios ni `cd`.
+3. Planificar una ventana de reinicio completo: al desaparecer `container_name`
+   cambia la configuración de todos los servicios, así que el primer
+   `docker compose up` (arranque de `sihsalus-compose.service` o
+   `redeploy-environment.sh`) recrea todos los contenedores a la vez, incluidos
+   `db`, `keycloak-db` y la monitorización, no solo los que cambiaron de imagen.
+   Los datos en volúmenes se conservan y `docker compose ps` muestra después los
+   nombres `sihsalus-<servicio>-1`.
+
+### Migrar un host a otro nombre de proyecto
+
+Omitir la copia crea volúmenes vacíos en silencio: la base de Keycloak, los
+certificados de Let's Encrypt y el historial de Grafana/Prometheus/Loki
+aparecerían en blanco. Los volúmenes sin `name` (`db-data`, `openmrs-data`,
+`db-fua-generator`, etc.) también cambian de `sihsalus_<clave>` a
+`<proyecto>_<clave>` y requieren el mismo tratamiento.
+
+1. Backup verificado (dump y backup físico restaurados en un ambiente aislado).
+2. `docker compose down` sin `-v`, con la selección real de `COMPOSE_FILE` y
+   `COMPOSE_PROFILES`.
+3. Definir `COMPOSE_PROJECT_NAME=<proyecto>` en `.env` y renderizar
+   `docker compose config --format json | jq '.volumes[].name'` para obtener
+   los nombres nuevos. En un host gestionado por manifiestos
+   (`SIHSALUS_RELEASE_MANIFEST` en `.env`) este paso no basta: `deploy.py`
+   reescribe `COMPOSE_PROJECT_NAME` desde el manifiesto en cada despliegue y
+   rechaza el cambio de proyecto por diseño (`verify_transition`,
+   "Compose project differs from manifest"). Renombrar uno de esos hosts exige
+   volver a adoptar la instalación con un procedimiento revisado aparte; este
+   runbook cubre solo hosts sin manifiesto retenido.
+4. Para cada volumen con nombre (misma clave, cambia el prefijo):
+
+   | Clave | Anterior | Nuevo |
+   | --- | --- | --- |
+   | `orthanc-data` | `sihsalus-orthanc-data` | `<proyecto>-orthanc-data` |
+   | `prometheus-data` | `sihsalus-prometheus-data` | `<proyecto>-prometheus-data` |
+   | `alertmanager-data` | `sihsalus-alertmanager-data` | `<proyecto>-alertmanager-data` |
+   | `operations-metrics` | `sihsalus-operations-metrics` | `<proyecto>-operations-metrics` |
+   | `loki-data` | `sihsalus-loki-data` | `<proyecto>-loki-data` |
+   | `alloy-data` | `sihsalus-alloy-data` | `<proyecto>-alloy-data` |
+   | `grafana-data` | `sihsalus-grafana-data` | `<proyecto>-grafana-data` |
+   | `keycloak-data` | `sihsalus-keycloak-data` | `<proyecto>-keycloak-data` |
+   | `letsencrypt-data` | `sihsalus-letsencrypt-data` | `<proyecto>-letsencrypt-data` |
+   | `certbot-data` | `sihsalus-certbot-data` | `<proyecto>-certbot-data` |
+   | `gatus-data` | `sihsalus-gatus-data` | `<proyecto>-gatus-data` |
+
+   ```bash
+   docker volume create \
+     --label com.docker.compose.project=<proyecto> \
+     --label com.docker.compose.volume=<clave> NEW
+   docker run --rm -v OLD:/src:ro -v NEW:/dst alpine cp -a /src/. /dst/
+   docker run --rm -v OLD:/src:ro -v NEW:/dst:ro alpine sh -c 'du -s /src /dst'
+   ```
+
+   Las etiquetas hacen que Compose reconozca el volumen como propio; sin ellas
+   cada `docker compose up` avisa `volume "NEW" already exists but was not
+   created by Docker Compose`, un aviso inofensivo que no impide reutilizarlo.
+
+5. `docker compose up -d` y aceptación funcional (login, Keycloak, HTTPS,
+   Grafana con historial).
+6. Eliminar los volúmenes `OLD` solo después de la aceptación.

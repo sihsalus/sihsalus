@@ -63,6 +63,10 @@ COMPOSE_FILE=docker-compose.yml:compose/keycloak.yml:compose/ssl.yml
 COMPOSE_PROFILES=keycloak,ssl
 ```
 
+`COMPOSE_PROJECT_NAME=sihsalus` (fijado en `.env.template`) nombra contenedores y
+volúmenes; sin él Compose usa el nombre del directorio del checkout. Cambiarlo en
+un host existente sigue el [runbook de migración](../scripts/deploy/README.md#nombres-de-contenedores-y-volúmenes).
+
 Después, los comandos operativos son uniformes y no degradan HTTPS accidentalmente:
 
 ```bash

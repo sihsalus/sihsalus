@@ -76,13 +76,20 @@ o modificar respaldos y logs. Los archivos nuevos se crean con permisos privados
 ./scripts/backup/restore_full.sh --file /ruta/backups/backup_FECHA.tar.gz.enc
 ```
 
-Para ejecutar el backup físico sobre la réplica:
+Sin `--container` (o `CONTAINER_NAME`), los cuatro scripts resuelven el
+contenedor del servicio Compose `db` del checkout al que pertenecen (su `.env`,
+`COMPOSE_FILE` y `COMPOSE_PROFILES`), sin importar el directorio desde el que se
+invocan; una entrada de cron como `/opt/sihsalus/scripts/backup/backup_dump.sh`
+no necesita `cd`. Las rutas de `--dir` y `--file` siguen siendo relativas al
+directorio actual. `--service` elige otro servicio y `--container` acepta un
+nombre o id concreto. Para ejecutar el backup físico sobre la réplica (servicio
+`db-replic` de `compose/replica.yml`):
 
 ```bash
-./scripts/backup/backup_full.sh --container sihsalus-db-replic --dir /ruta/backups
+./scripts/backup/backup_full.sh --service db-replic --dir /ruta/backups
 ```
 
-`restore_full.sh` detecta el volumen real montado en `/var/lib/mysql`, crea un snapshot temporal, restaura y levanta solo `db` y `backend`. Puede recibir `DB_VOLUME` explícitamente si el contenedor de base de datos no existe.
+`restore_full.sh` detecta el volumen real montado en `/var/lib/mysql`, crea un snapshot temporal, restaura y levanta solo el servicio de base (`db` por defecto) y `backend`. Puede recibir `DB_VOLUME` explícitamente si el contenedor de base de datos no existe.
 
 ## Verificación de restauración
 

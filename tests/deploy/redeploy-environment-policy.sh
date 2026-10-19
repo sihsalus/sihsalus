@@ -8,6 +8,7 @@ CLEAN_CHECKOUT_HELPER="$ROOT/scripts/deploy/check-clean-checkout.sh"
 CLEAN_CHECKOUT_HELPER_TEST="$ROOT/tests/deploy/check-clean-checkout-test.sh"
 FRONTEND_SCRIPT="$ROOT/scripts/deploy/deploy-frontend.sh"
 REMOTE_RUNNER="$ROOT/scripts/deploy/run-redeploy-remote.sh"
+COMPOSE_CONTAINER_HELPER="$ROOT/scripts/lib/compose-container.sh"
 REMOTE_RUNNER_TEST="$ROOT/tests/deploy/run-redeploy-remote-test.sh"
 EXTERNAL_VERIFIER="$ROOT/scripts/deploy/verify-external-frontend.sh"
 EXTERNAL_VERIFIER_TEST="$ROOT/tests/deploy/verify-external-frontend-test.sh"
@@ -18,6 +19,8 @@ bash -n "$CLEAN_CHECKOUT_HELPER"
 bash -n "$CLEAN_CHECKOUT_HELPER_TEST"
 bash -n "$FRONTEND_SCRIPT"
 bash -n "$REMOTE_RUNNER"
+bash -n "$COMPOSE_CONTAINER_HELPER"
+sh -n "$COMPOSE_CONTAINER_HELPER"
 bash -n "$REMOTE_RUNNER_TEST"
 bash -n "$EXTERNAL_VERIFIER"
 bash -n "$EXTERNAL_VERIFIER_TEST"
@@ -42,6 +45,25 @@ grep -Fq -- '--remove-orphans' "$SCRIPT"
 grep -Fq -- '--no-build' "$SCRIPT"
 grep -Fq -- '--pull never' "$SCRIPT"
 grep -Fq 'wait_for_openmrs 2400' "$SCRIPT"
+# Containers have no fixed names: every lookup goes through the Compose service.
+if grep -Eq '(^|[^/])sihsalus-(db-master|backend|frontend|gateway|fua-generator)' "$SCRIPT"; then
+  echo "[FAIL] full redeploy script references a fixed container name" >&2
+  exit 1
+fi
+grep -Fq 'source "$COMPOSE_CONTAINER_HELPER"' "$SCRIPT"
+grep -Fq 'wait_for_service_health db 300' "$SCRIPT"
+grep -Fq 'wait_for_service_health gateway 600' "$SCRIPT"
+# A project name other than sihsalus must not start services on empty volumes
+# while the historical ones still hold the data.
+grep -Fq 'preflight_named_volumes() {' "$SCRIPT"
+grep -Fxq 'preflight_named_volumes' "$SCRIPT"
+if ! awk '/^preflight_named_volumes$/ { seen = 1 } /^docker compose up/ && !seen { exit 1 }' "$SCRIPT"; then
+  echo "[FAIL] named volume guard must run before docker compose up" >&2
+  exit 1
+fi
+grep -Fq 'BACKEND_CONTAINER="$(require_compose_container backend)"' "$SCRIPT"
+grep -Fq 'FRONTEND_CONTAINER="$(require_compose_container frontend)"' "$SCRIPT"
+grep -Fq 'upload_remote_file "$COMPOSE_CONTAINER_HELPER_PATH" "$REMOTE_RUN_DIRECTORY/compose-container.sh"' "$REMOTE_RUNNER"
 grep -Fq 'wait_for_active_services 600' "$SCRIPT"
 grep -Fq 'backend-oauth2-config | certbot | loki-init)' "$SCRIPT"
 grep -Fq 'EXPECTED_BACKEND_IMAGE="${BACKEND_REPOSITORY}:${TARGET_BACKEND_REFERENCE}"' "$SCRIPT"

@@ -4,7 +4,6 @@
 
 services:
   gatus:
-    container_name: sihsalus-gatus
     image: twinproduction/gatus:v5.20.0
     restart: "unless-stopped"
     profiles: [ status ]
@@ -28,4 +27,4 @@ services:
 
 volumes:
   gatus-data:
-    name: sihsalus-gatus-data
+    name: ${COMPOSE_PROJECT_NAME:-sihsalus}-gatus-data

@@ -40,8 +40,20 @@ esac
   exit 1
 }
 
+# Containers are resolved by Compose service with the host's .env selection.
+. "$(dirname "$0")/../lib/compose-container.sh"
+BACKEND_CONTAINER="$(require_compose_container backend)"
+DB_CONTAINER="$(require_compose_container db)"
+GATEWAY_CONTAINER="$(compose_container gateway 2>/dev/null || true)"
+FUA_CONTAINER=""
+FUA_DB_CONTAINER=""
+if [ "$INCLUDE_FUA" = "true" ]; then
+  FUA_CONTAINER="$(compose_container fua-generator 2>/dev/null || true)"
+  FUA_DB_CONTAINER="$(compose_container fua-generator-db 2>/dev/null || true)"
+fi
+
 gh auth status --hostname github.com >/dev/null
-docker exec sihsalus-backend curl -fsS \
+docker exec "$BACKEND_CONTAINER" curl -fsS \
   http://localhost:8080/openmrs/health/started >/dev/null
 
 GIT_SHA="$(git rev-parse HEAD)"
@@ -57,32 +69,33 @@ CHECKSUM_NAME="$ARTIFACT_NAME.sha256"
 mkdir -p "$WORK_DIR"
 chmod 700 "$OUT" "$WORK_DIR"
 
-DB_VOL="$(docker inspect sihsalus-db-master --format '{{range .Mounts}}{{if eq .Destination "/var/lib/mysql"}}{{.Name}}{{end}}{{end}}')"
-OMRS_VOL="$(docker inspect sihsalus-backend --format '{{range .Mounts}}{{if eq .Destination "/openmrs/data"}}{{.Name}}{{end}}{{end}}')"
+DB_VOL="$(docker inspect "$DB_CONTAINER" --format '{{range .Mounts}}{{if eq .Destination "/var/lib/mysql"}}{{.Name}}{{end}}{{end}}')"
+OMRS_VOL="$(docker inspect "$BACKEND_CONTAINER" --format '{{range .Mounts}}{{if eq .Destination "/openmrs/data"}}{{.Name}}{{end}}{{end}}')"
 FUA_VOL=""
-if [ "$INCLUDE_FUA" = "true" ]; then
-  FUA_VOL="$(docker inspect sihsalus-fua-generator-db --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Name}}{{end}}{{end}}' 2>/dev/null || true)"
+if [ -n "$FUA_DB_CONTAINER" ]; then
+  FUA_VOL="$(docker inspect "$FUA_DB_CONTAINER" --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Name}}{{end}}{{end}}' 2>/dev/null || true)"
 fi
 
 [ -n "$DB_VOL" ] || { echo "[seed] db volume not found" >&2; exit 1; }
 [ -n "$OMRS_VOL" ] || { echo "[seed] openmrs volume not found" >&2; exit 1; }
 
 is_running() {
-  [ "$(docker inspect --format '{{.State.Running}}' "$1" 2>/dev/null || true)" = "true" ]
+  [ -n "$1" ] && [ "$(docker inspect --format '{{.State.Running}}' "$1" 2>/dev/null || true)" = "true" ]
 }
 
 BACKEND_WAS_RUNNING=false
 DB_WAS_RUNNING=false
 FUA_WAS_RUNNING=false
 FUA_DB_WAS_RUNNING=false
-is_running sihsalus-backend && BACKEND_WAS_RUNNING=true
-is_running sihsalus-db-master && DB_WAS_RUNNING=true
-is_running sihsalus-fua-generator && FUA_WAS_RUNNING=true
-is_running sihsalus-fua-generator-db && FUA_DB_WAS_RUNNING=true
+is_running "$BACKEND_CONTAINER" && BACKEND_WAS_RUNNING=true
+is_running "$DB_CONTAINER" && DB_WAS_RUNNING=true
+is_running "$FUA_CONTAINER" && FUA_WAS_RUNNING=true
+is_running "$FUA_DB_CONTAINER" && FUA_DB_WAS_RUNNING=true
 
 wait_healthy() {
-  container="$1"
-  max_attempts="$2"
+  service="$1"
+  container="$2"
+  max_attempts="$3"
   attempts=0
   while [ "$attempts" -lt "$max_attempts" ]; do
     state="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container" 2>/dev/null || true)"
@@ -93,27 +106,27 @@ wait_healthy() {
     attempts=$((attempts + 1))
     sleep 2
   done
-  echo "[seed] $container did not become healthy" >&2
+  echo "[seed] $service did not become healthy" >&2
   return 1
 }
 
 restart_captured_containers() {
   restart_failed=false
 
-  [ "$DB_WAS_RUNNING" = "false" ] || docker start sihsalus-db-master >/dev/null || restart_failed=true
-  [ "$FUA_DB_WAS_RUNNING" = "false" ] || docker start sihsalus-fua-generator-db >/dev/null || restart_failed=true
+  [ "$DB_WAS_RUNNING" = "false" ] || docker start "$DB_CONTAINER" >/dev/null || restart_failed=true
+  [ "$FUA_DB_WAS_RUNNING" = "false" ] || docker start "$FUA_DB_CONTAINER" >/dev/null || restart_failed=true
 
-  [ "$DB_WAS_RUNNING" = "false" ] || wait_healthy sihsalus-db-master 60 || restart_failed=true
-  [ "$FUA_DB_WAS_RUNNING" = "false" ] || wait_healthy sihsalus-fua-generator-db 60 || restart_failed=true
+  [ "$DB_WAS_RUNNING" = "false" ] || wait_healthy db "$DB_CONTAINER" 60 || restart_failed=true
+  [ "$FUA_DB_WAS_RUNNING" = "false" ] || wait_healthy fua-generator-db "$FUA_DB_CONTAINER" 60 || restart_failed=true
 
-  [ "$BACKEND_WAS_RUNNING" = "false" ] || docker start sihsalus-backend >/dev/null || restart_failed=true
-  [ "$FUA_WAS_RUNNING" = "false" ] || docker start sihsalus-fua-generator >/dev/null || restart_failed=true
+  [ "$BACKEND_WAS_RUNNING" = "false" ] || docker start "$BACKEND_CONTAINER" >/dev/null || restart_failed=true
+  [ "$FUA_WAS_RUNNING" = "false" ] || docker start "$FUA_CONTAINER" >/dev/null || restart_failed=true
 
-  [ "$BACKEND_WAS_RUNNING" = "false" ] || wait_healthy sihsalus-backend 450 || restart_failed=true
-  [ "$FUA_WAS_RUNNING" = "false" ] || wait_healthy sihsalus-fua-generator 120 || restart_failed=true
+  [ "$BACKEND_WAS_RUNNING" = "false" ] || wait_healthy backend "$BACKEND_CONTAINER" 450 || restart_failed=true
+  [ "$FUA_WAS_RUNNING" = "false" ] || wait_healthy fua-generator "$FUA_CONTAINER" 120 || restart_failed=true
 
-  if is_running sihsalus-gateway; then
-    docker exec sihsalus-gateway nginx -s reload >/dev/null || restart_failed=true
+  if is_running "$GATEWAY_CONTAINER"; then
+    docker exec "$GATEWAY_CONTAINER" nginx -s reload >/dev/null || restart_failed=true
   fi
 
   [ "$restart_failed" = "false" ]
@@ -136,11 +149,11 @@ trap 'exit 143' TERM
 
 RESTART_NEEDED=true
 echo "[seed] stopping application writers"
-[ "$BACKEND_WAS_RUNNING" = "false" ] || docker stop sihsalus-backend >/dev/null
-[ "$FUA_WAS_RUNNING" = "false" ] || docker stop sihsalus-fua-generator >/dev/null
+[ "$BACKEND_WAS_RUNNING" = "false" ] || docker stop "$BACKEND_CONTAINER" >/dev/null
+[ "$FUA_WAS_RUNNING" = "false" ] || docker stop "$FUA_CONTAINER" >/dev/null
 
 echo "[seed] checking that the snapshot contains no clinical records or OCL errors"
-SAFETY_COUNTS="$(docker exec sihsalus-db-master sh -ec '
+SAFETY_COUNTS="$(docker exec "$DB_CONTAINER" sh -ec '
   MYSQL_PWD="$MYSQL_PASSWORD" mariadb \
     --user="$MYSQL_USER" \
     --database="$MYSQL_DATABASE" \
@@ -168,19 +181,19 @@ if [ "$PATIENT_COUNT" -ne 0 ] || [ "$OBS_COUNT" -ne 0 ] || \
 fi
 
 echo "[seed] stopping databases"
-[ "$DB_WAS_RUNNING" = "false" ] || docker stop sihsalus-db-master >/dev/null
-[ "$FUA_DB_WAS_RUNNING" = "false" ] || docker stop sihsalus-fua-generator-db >/dev/null
+[ "$DB_WAS_RUNNING" = "false" ] || docker stop "$DB_CONTAINER" >/dev/null
+[ "$FUA_DB_WAS_RUNNING" = "false" ] || docker stop "$FUA_DB_CONTAINER" >/dev/null
 
-DB_IMAGE="$(docker inspect --format '{{.Config.Image}}' sihsalus-db-master)"
-BACKEND_IMAGE="$(docker inspect --format '{{.Config.Image}}' sihsalus-backend)"
-DB_IMAGE_ID="$(docker inspect --format '{{.Image}}' sihsalus-db-master)"
-BACKEND_IMAGE_ID="$(docker inspect --format '{{.Image}}' sihsalus-backend)"
+DB_IMAGE="$(docker inspect --format '{{.Config.Image}}' "$DB_CONTAINER")"
+BACKEND_IMAGE="$(docker inspect --format '{{.Config.Image}}' "$BACKEND_CONTAINER")"
+DB_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$DB_CONTAINER")"
+BACKEND_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$BACKEND_CONTAINER")"
 BACKEND_REVISION="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$BACKEND_IMAGE_ID" 2>/dev/null || true)"
 FUA_DB_IMAGE=""
 FUA_DB_IMAGE_ID=""
 if [ -n "$FUA_VOL" ]; then
-  FUA_DB_IMAGE="$(docker inspect --format '{{.Config.Image}}' sihsalus-fua-generator-db)"
-  FUA_DB_IMAGE_ID="$(docker inspect --format '{{.Image}}' sihsalus-fua-generator-db)"
+  FUA_DB_IMAGE="$(docker inspect --format '{{.Config.Image}}' "$FUA_DB_CONTAINER")"
+  FUA_DB_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$FUA_DB_CONTAINER")"
 fi
 
 cat > "$WORK_DIR/manifest.txt" <<EOF

@@ -9,6 +9,7 @@ Este directorio contiene las herramientas ejecutables del stack. La documentaci�
 | `backup/` | Dump, backup binario, restore y rotación | [backup/README.md](backup/README.md) |
 | `database/` | Inicialización de usuarios y réplica MariaDB | [database/README.md](database/README.md) |
 | `deploy/` | Despliegue inmutable y rollback de frontend y backend | [deploy/README.md](deploy/README.md) |
+| `lib/` | `compose-container.sh`: resolver el contenedor de un servicio Compose | [deploy/README.md](deploy/README.md#nombres-de-contenedores-y-volúmenes) |
 | `security/` | Generación y auditoría de archivos de entorno | [security/README.md](security/README.md) |
 | `seed/` | Crear y aplicar releases cifrados de datos seed | [seed/README.md](seed/README.md) |
 | `utils/` | Servicios systemd, UPS y apagado seguro | [utils/README.md](utils/README.md) |

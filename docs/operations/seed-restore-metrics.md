@@ -22,7 +22,7 @@ Medicion tomada el 2026-07-03 en `gidis-dev` y comparada con arranques recientes
 | Descargar artifact seed desde GitHub Releases | 22 s | `curl` dentro de `sihsalus-seed-1` |
 | Restore completo de volumenes seed | 1 min 02 s | `StartedAt=2026-07-03T15:23:45Z`, `FinishedAt=2026-07-03T15:24:47Z` |
 | Build backend local con cache Maven fria/parcial | aprox. 11-12 min | `dependency:resolve` 7m12s, `mvn install` 2m59s, export/capas aprox. 1m |
-| Recreate backend despues del build | 10-15 s | Compose recreo `sihsalus-backend` y arranco contenedor |
+| Recreate backend despues del build | 10-15 s | Compose recreo el contenedor del servicio `backend` y lo arranco |
 | Startup backend/OpenMRS hasta Tomcat listo | 11 min 34 s | `StartedAt=2026-07-03T15:48:36Z`, `Server startup=2026-07-03T16:00:10Z` |
 | `Refreshing Context` de OpenMRS | 7 min 59 s | `15:50:03Z` a `15:58:02Z` |
 | Validacion final backend | 200 | `GET /openmrs/health/started` |
@@ -47,9 +47,12 @@ Arranques recientes con contenido cargado:
 
 ## Comandos rapidos
 
+Los contenedores se nombran `<proyecto>-<servicio>-1`; usar siempre el servicio
+Compose desde el checkout con su `.env`.
+
 ```bash
-docker ps --format "table {{.Names}}\t{{.Status}}"
-docker logs --tail 120 sihsalus-backend
-docker exec sihsalus-backend curl --max-time 10 -sS -o /dev/null -w "BACKEND=%{http_code}\n" http://localhost:8080/openmrs/health/started
-docker exec sihsalus-db-master sh -lc 'mariadb --user="$MYSQL_USER" --password="$MYSQL_PASSWORD" openmrs -N -e "SELECT COUNT(*) FROM concept; SELECT COUNT(*) FROM openconceptlab_item WHERE type=CHAR(77,65,80,80,73,78,71); SELECT COUNT(*) FROM openconceptlab_item WHERE error_message IS NOT NULL AND LENGTH(error_message)>0; SELECT COUNT(*) FROM patient; SELECT COUNT(*) FROM obs; SELECT COUNT(*) FROM encounter;"'
+docker compose ps
+docker compose logs --tail 120 backend
+docker compose exec backend curl --max-time 10 -sS -o /dev/null -w "BACKEND=%{http_code}\n" http://localhost:8080/openmrs/health/started
+docker compose exec db sh -lc 'mariadb --user="$MYSQL_USER" --password="$MYSQL_PASSWORD" openmrs -N -e "SELECT COUNT(*) FROM concept; SELECT COUNT(*) FROM openconceptlab_item WHERE type=CHAR(77,65,80,80,73,78,71); SELECT COUNT(*) FROM openconceptlab_item WHERE error_message IS NOT NULL AND LENGTH(error_message)>0; SELECT COUNT(*) FROM patient; SELECT COUNT(*) FROM obs; SELECT COUNT(*) FROM encounter;"'
 ```

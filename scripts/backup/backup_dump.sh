@@ -3,12 +3,17 @@
 # Script: backup_dump.sh
 # Descripcion: Backup SQL logico en caliente (sin detener la DB).
 #              Genera un .sql.gz que se puede restaurar con restore_dump.sh
-# Uso: ./backup_dump.sh [--container NOMBRE] [--dir DIRECTORIO] [--max N]
+# Uso: ./backup_dump.sh [--container NOMBRE|ID] [--service SERVICIO] [--dir DIRECTORIO] [--max N]
 # ------------------------------------------------------------------------------
 
 set -euo pipefail
+# The checkout that owns this script selects the Compose project (.env,
+# COMPOSE_FILE, COMPOSE_PROFILES), so cron may start it from any directory.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$REPO_ROOT/scripts/lib/compose-container.sh"
 
-CONTAINER_NAME="${CONTAINER_NAME:-sihsalus-db-master}"
+DB_SERVICE="${DB_SERVICE:-db}"
+CONTAINER_NAME="${CONTAINER_NAME:-}"
 BACKUP_DIR="${BACKUP_DIR:-/home/${USER}/sihsalus-dumps}"
 MAX_BACKUPS="${MAX_BACKUPS:-10}"
 DB_NAME="openmrs"
@@ -20,14 +25,22 @@ DUMP_FILE="dump_${TIMESTAMP}.sql.gz"
 while [[ $# -gt 0 ]]; do
     case $1 in
         --container) CONTAINER_NAME="$2"; shift 2;;
+        --service) DB_SERVICE="$2"; shift 2;;
         --dir) BACKUP_DIR="$2"; shift 2;;
         --max) MAX_BACKUPS="$2"; shift 2;;
         --help|-h)
-            echo "Uso: $0 [--container NOMBRE] [--dir DIRECTORIO] [--max N]"
+            echo "Uso: $0 [--container NOMBRE|ID] [--service SERVICIO] [--dir DIRECTORIO] [--max N]"
             exit 0;;
         *) echo "Opcion desconocida: $1"; exit 1;;
     esac
 done
+
+# Sin --container ni CONTAINER_NAME, el contenedor se resuelve desde el
+# servicio Compose del checkout (su .env, COMPOSE_FILE y COMPOSE_PROFILES),
+# sin depender del directorio desde el que se invoca el script.
+if [ -z "$CONTAINER_NAME" ]; then
+    CONTAINER_NAME="$(require_compose_container "$DB_SERVICE" "$REPO_ROOT")"
+fi
 
 mkdir -p "$BACKUP_DIR"
 

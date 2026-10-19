@@ -5,7 +5,6 @@
 
 services:
   fua-generator:
-    container_name: sihsalus-fua-generator
     image: ${FUA_GENERATOR_IMAGE:-ghcr.io/sihsalus/generador-de-fua}:${FUA_GENERATOR_TAG:-sha-8deb5ba}
     restart: "unless-stopped"
     profiles: [ fua ]
@@ -33,7 +32,6 @@ services:
       - services-network
 
   fua-generator-db:
-    container_name: sihsalus-fua-generator-db
     image: postgres:17
     restart: "unless-stopped"
     profiles: [ fua ]

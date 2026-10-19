@@ -3,17 +3,24 @@
 # Script: restore_dump.sh
 # Descripcion: Restaura la DB desde un dump SQL en caliente (sin detener la DB).
 #              Compatible con backups de backup_dump.sh
-# Uso: ./restore_dump.sh [--container NOMBRE] [--dir DIRECTORIO] [--file ARCHIVO] [--yes] [--no-app-control]
+# Uso: ./restore_dump.sh [--container NOMBRE|ID] [--service SERVICIO] [--dir DIRECTORIO] [--file ARCHIVO] [--yes] [--no-app-control]
 # ------------------------------------------------------------------------------
 
 set -euo pipefail
+# The checkout that owns this script selects the Compose project (.env,
+# COMPOSE_FILE, COMPOSE_PROFILES), so the script works from any directory;
+# backup paths stay relative to the directory it was started from.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$REPO_ROOT/scripts/lib/compose-container.sh"
+compose() { (cd "$REPO_ROOT" && docker compose "$@"); }
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-CONTAINER_NAME="${CONTAINER_NAME:-sihsalus-db-master}"
+DB_SERVICE="${DB_SERVICE:-db}"
+CONTAINER_NAME="${CONTAINER_NAME:-}"
 BACKUP_DIR="${BACKUP_DIR:-/home/${USER}/sihsalus-dumps}"
 BACKUP_FILE=""
 DB_NAME="openmrs"
@@ -25,12 +32,13 @@ MANAGE_BACKEND="${RESTORE_MANAGE_BACKEND:-true}"
 while [[ $# -gt 0 ]]; do
     case $1 in
         --container) CONTAINER_NAME="$2"; shift 2;;
+        --service) DB_SERVICE="$2"; shift 2;;
         --dir) BACKUP_DIR="$2"; shift 2;;
         --file) BACKUP_FILE="$2"; shift 2;;
         --yes) ASSUME_YES=true; shift;;
         --no-app-control) MANAGE_BACKEND=false; shift;;
         --help|-h)
-            echo "Uso: $0 [--container NOMBRE] [--dir DIRECTORIO] [--file ARCHIVO] [--yes] [--no-app-control]"
+            echo "Uso: $0 [--container NOMBRE|ID] [--service SERVICIO] [--dir DIRECTORIO] [--file ARCHIVO] [--yes] [--no-app-control]"
             echo ""
             echo "  --yes             No solicita confirmacion interactiva."
             echo "  --no-app-control  No detiene ni inicia el backend (CI o control externo)."
@@ -127,19 +135,28 @@ if ! gzip -dc "$sql_source" >"$validated_sql" || [ ! -s "$validated_sql" ]; then
     exit 1
 fi
 
+# La base se resuelve despues de validar el dump y antes de detener el backend:
+# sin contenedor de base no hay nada que restaurar.
+if [ -z "$CONTAINER_NAME" ]; then
+    if ! CONTAINER_NAME="$(require_compose_container "$DB_SERVICE" "$REPO_ROOT")"; then
+        echo "[ERROR] No existe un contenedor para el servicio '$DB_SERVICE' en este proyecto Compose; restauracion cancelada" >&2
+        exit 1
+    fi
+fi
+
 if [ "$MANAGE_BACKEND" = "true" ]; then
-    backend_containers="$(docker compose ps --all --quiet backend)"
+    backend_containers="$(compose ps --all --quiet backend)"
     if [ -z "$backend_containers" ]; then
         echo "[ERROR] No existe un contenedor backend en este proyecto Compose; restauracion cancelada antes de modificar la base" >&2
         echo "[INFO] Para recuperacion con control externo de la aplicacion, usar --no-app-control y preparar su arranque por separado" >&2
         exit 1
     fi
     echo "[INFO] Deteniendo backend para evitar escrituras..."
-    if ! docker compose stop backend; then
+    if ! compose stop backend; then
         echo "[ERROR] No se pudo detener el backend; restauracion cancelada" >&2
         exit 1
     fi
-    running_backend="$(docker compose ps --status running --quiet backend)"
+    running_backend="$(compose ps --status running --quiet backend)"
     if [ -n "$running_backend" ]; then
         echo "[ERROR] El backend sigue ejecutandose; restauracion cancelada" >&2
         exit 1
@@ -164,7 +181,7 @@ echo -e "${GREEN}[OK] Dump restaurado exitosamente${NC}"
 if [ "$MANAGE_BACKEND" = "true" ]; then
     echo "[INFO] Reiniciando backend..."
     # Resume the existing container with its original image and configuration.
-    docker compose start backend
+    compose start backend
 fi
 
 echo ""

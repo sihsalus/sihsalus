@@ -181,7 +181,7 @@ groups:
           team: infrastructure
         annotations:
           summary: "El colector operativo dejó de actualizar métricas"
-          description: "Las métricas de backups llevan más de 5 minutos sin actualizarse. Revise sihsalus-operations-collector."
+          description: "Las métricas de backups llevan más de 5 minutos sin actualizarse. Revise el servicio operations-collector (docker compose logs operations-collector)."
           dashboard: "/d/sihsalus-resilience"
 
       - alert: BackupArtifactMissing

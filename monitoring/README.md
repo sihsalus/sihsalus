@@ -237,7 +237,8 @@ Muestra:
 ### Equipos conectados (LAN)
 
 Una fila por dirección IP de la LAN que hizo peticiones al gateway, a partir
-del log de acceso de nginx en Loki (`container_name="sihsalus-gateway"`):
+del log de acceso de nginx en Loki (`service_name="gateway"`, la etiqueta que
+Alloy toma del servicio Compose; el nombre del contenedor depende del proyecto):
 - Equipos activos (últimos 5 min y en el rango) y peticiones totales
 - Actividad por equipo en el tiempo
 - Tabla por IP: peticiones, navegador y si registró `service-worker.js`
@@ -380,8 +381,9 @@ sum(rate({job="docker"}[5m]))
 # retention_enabled: true
 # retention_period: 720h
 
-# Manual: eliminar volumen
-docker volume rm sihsalus_prometheus-data
+# Manual: eliminar volumen. El nombre es ${COMPOSE_PROJECT_NAME:-sihsalus}-prometheus-data;
+# confirmarlo con: docker compose config --format json | jq -r '.volumes["prometheus-data"].name'
+docker volume rm sihsalus-prometheus-data
 ```
 
 ---

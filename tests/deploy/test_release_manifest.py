@@ -61,6 +61,8 @@ class Engine:
         self.target = target
         self.fail = False
         self.drift = False
+        self.health = {}
+        self.replicas = {}
         for manifest in (previous, target):
             for service, artifact in manifest["services"].items():
                 image = {"id": artifact["imageId"], "os": "linux", "arch": "amd64", "digests": [], "revision": "", "node": ""}
@@ -76,7 +78,8 @@ class Engine:
                 self.images[artifact["image"]] = image
                 self.images[artifact["imageId"]] = image
             source = manifest["sources"]["frontend"]
-            self.images[source["image"]] = {"id": digest(source["image"]), "revision": source["commit"]}
+            self.images[source["image"]] = {"id": digest(source["image"]), "revision": source["commit"],
+                                            "digests": [source["image"].split(":sha-", 1)[0] + "@" + source["image"].split("@", 1)[1]]}
 
     def run(self, command, **kwargs):
         if command[0] != "docker":
@@ -108,14 +111,27 @@ class Engine:
             del self.temporary[command[-1]]
             return ""
         if command[1] == "ps":
-            return "\n".join(digest(service)[7:] for service in self.runtime["services"])
+            services = list(self.runtime["services"])
+            for index, value in enumerate(command):
+                if value == "--filter" and command[index + 1].startswith("label=com.docker.compose.service="):
+                    services = [s for s in services if s == command[index + 1].split("=", 2)[2]]
+            return "\n".join(digest(service)[7:] for service in services for _ in range(self.replicas.get(service, 1)))
         if command[1] == "inspect":
             service = next(service for service in self.runtime["services"] if digest(service)[7:] == command[2])
+            template = command[command.index("--format") + 1]
+            if ".State.Health" in template:
+                return self.health.get(service, "healthy")
+            if template == "{{.Image}}":
+                return self.runtime["services"][service]["imageId"]
             return json.dumps({"service": service, "oneoff": "False",
                                "imageId": self.runtime["services"][service]["imageId"],
                                "node": self.runtime["target"]["nodeId"] if service == "frontend" else ""})
+        if command[1:4] == ["compose", "ps", "--all"]:
+            service = command[-1]
+            present = self.replicas.get(service, 1 if service in self.runtime["services"] else 0)
+            return "\n".join(digest(service)[7:] for _ in range(present))
         if command[1] == "compose":
-            env_file = Path(command[command.index("--env-file") + 1])
+            env_file = Path(command[command.index("--env-file") + 1]) if "--env-file" in command else kwargs["root"] / ".env"
             selected = dict(line.split("=", 1) for line in env_file.read_text().splitlines() if "=" in line)
             if command[-1] == "--environment":
                 return "\n".join(f"{key}={value}" for key, value in selected.items())
@@ -124,7 +140,13 @@ class Engine:
             files = [command[index + 1] for index, value in enumerate(command) if value == "--file"]
             if not files:
                 files = selected["COMPOSE_FILE"].split(":")
-            override = json.loads(Path(files[-1]).read_text())
+            if files[-1].endswith(".json"):
+                override = json.loads(Path(files[-1]).read_text())
+            else:
+                # No retained image override: an installation that adoption still has to capture.
+                override = {"services": {
+                    "backend": {"platform": self.runtime["compose"]["platform"]},
+                    "frontend": {"build": {"args": {"FRONTEND_SOURCE_IMAGE": self.runtime["sources"]["frontend"]["image"]}}}}}
             return json.dumps({"name": self.target["compose"]["project"], **override})
         raise AssertionError(f"Unexpected Docker operation: {command[:3]}")
 

@@ -24,11 +24,18 @@ class RestoreDump(unittest.TestCase):
         docker.write_text('''#!/usr/bin/env python3
 import os, sys
 from pathlib import Path
+state = Path(os.environ['RESTORE_STATE'])
 args = sys.argv[1:]
+# Compose selects the project from the checkout that owns the script, not from
+# the directory the operator or cron started it in.
+if args[0] == 'compose' and Path.cwd() != Path(os.environ['RESTORE_CHECKOUT']):
+    raise SystemExit('Compose command outside the checkout')
 if args[:2] == ['compose', 'stop']:
     event = 'stop'
 elif args == ['compose', 'ps', '--all', '--quiet', 'backend']:
     event = 'locate'
+elif args == ['compose', 'ps', '--all', '--quiet', 'db']:
+    event = 'resolve'
 elif args[:2] == ['compose', 'ps']:
     event = 'inspect'
 elif args[:2] == ['compose', 'start']:
@@ -37,25 +44,29 @@ elif any('DROP DATABASE' in arg for arg in args):
     event = 'drop'
 elif args[0] == 'exec':
     event = 'import'
-    Path('imported.sql').write_bytes(sys.stdin.buffer.read())
+    (state / 'imported.sql').write_bytes(sys.stdin.buffer.read())
 else:
     raise SystemExit('Unexpected Docker command')
-with Path('events').open('a') as f:
+with (state / 'events').open('a') as f:
     f.write(event + '\\n')
 if os.environ.get('RESTORE_FAIL') == event:
     sys.exit(23)
 if event == 'locate' and os.environ.get('RESTORE_MISSING') != 'true':
     print('synthetic-existing-backend')
+if event == 'resolve' and os.environ.get('RESTORE_MISSING_DB') != 'true':
+    print('synthetic-database')
 if event == 'inspect' and os.environ.get('RESTORE_RUNNING') == 'true':
     print('synthetic-running-backend')
 ''')
         docker.chmod(0o755)
         self.env = dict(os.environ, PATH=f"{self.bin}:{os.environ['PATH']}",
                         MYSQL_ROOT_PASSWORD="synthetic-only", TMPDIR=str(self.root),
-                        RESTORE_ASSUME_YES="true", RESTORE_MANAGE_BACKEND="true")
+                        RESTORE_ASSUME_YES="true", RESTORE_MANAGE_BACKEND="true",
+                        RESTORE_STATE=str(self.root), RESTORE_CHECKOUT=str(ROOT))
         self.env.pop("RESTORE_FAIL", None)
         self.env.pop("RESTORE_RUNNING", None)
         self.env.pop("RESTORE_MISSING", None)
+        self.env.pop("RESTORE_MISSING_DB", None)
 
     def restore(self, *args, **environment):
         return subprocess.run(["bash", str(ROOT / "scripts/backup/restore_dump.sh"),
@@ -75,7 +86,7 @@ if event == 'inspect' and os.environ.get('RESTORE_RUNNING') == 'true':
                 self.assertEqual(list(self.root.glob("sihsalus-restore-dump.*")), [])
 
     def test_stop_and_inspection_failures_prevent_database_changes(self):
-        for operation in ("locate", "stop", "inspect"):
+        for operation in ("resolve", "locate", "stop", "inspect"):
             with self.subTest(operation=operation):
                 self.log.unlink(missing_ok=True)
                 self.assertNotEqual(self.restore(RESTORE_FAIL=operation).returncode, 0)
@@ -86,12 +97,24 @@ if event == 'inspect' and os.environ.get('RESTORE_RUNNING') == 'true':
         result = self.restore(RESTORE_MISSING="true")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("No existe un contenedor backend", result.stderr)
-        self.assertEqual(self.events(), ["locate"])
+        self.assertEqual(self.events(), ["resolve", "locate"])
         self.assertEqual(list(self.root.glob("sihsalus-restore-dump.*")), [])
+
+    def test_missing_database_container_aborts_before_stopping_backend(self):
+        result = self.restore(RESTORE_MISSING_DB="true")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("servicio 'db'", result.stderr)
+        self.assertEqual(self.events(), ["resolve"])
+        self.assertEqual(list(self.root.glob("sihsalus-restore-dump.*")), [])
+
+    def test_explicit_container_skips_service_resolution(self):
+        result = self.restore("--container", "synthetic-database")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.events(), ["locate", "stop", "inspect", "drop", "import", "start"])
 
     def test_running_backend_prevents_database_changes(self):
         self.assertNotEqual(self.restore(RESTORE_RUNNING="true").returncode, 0)
-        self.assertEqual(self.events(), ["locate", "stop", "inspect"])
+        self.assertEqual(self.events(), ["resolve", "locate", "stop", "inspect"])
 
     def test_encrypted_dump_is_checked_before_stopping_backend(self):
         encrypted = self.root / "dump.sql.gz.enc"
@@ -107,18 +130,18 @@ if event == 'inspect' and os.environ.get('RESTORE_RUNNING') == 'true':
 
     def test_import_failure_leaves_backend_stopped(self):
         self.assertNotEqual(self.restore(RESTORE_FAIL="import").returncode, 0)
-        self.assertEqual(self.events(), ["locate", "stop", "inspect", "drop", "import"])
+        self.assertEqual(self.events(), ["resolve", "locate", "stop", "inspect", "drop", "import"])
 
     def test_success_imports_validated_bytes_and_starts_existing_container(self):
         result = self.restore()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.events(), ["locate", "stop", "inspect", "drop", "import", "start"])
+        self.assertEqual(self.events(), ["resolve", "locate", "stop", "inspect", "drop", "import", "start"])
         self.assertEqual((self.root / "imported.sql").read_bytes(), self.sql)
         self.assertEqual(list(self.root.glob("sihsalus-restore-dump.*")), [])
 
     def test_external_app_control_still_validates_but_does_not_stop_or_start(self):
         self.assertEqual(self.restore("--no-app-control", RESTORE_MISSING="true").returncode, 0)
-        self.assertEqual(self.events(), ["drop", "import"])
+        self.assertEqual(self.events(), ["resolve", "drop", "import"])
 
 
 if __name__ == "__main__":
