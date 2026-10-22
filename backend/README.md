@@ -25,6 +25,24 @@ belongs to the [frontend build](../frontend/README.md). Runtime setup, including
 OCL token reconciliation, is described below; password
 policy is documented in the [forced-password-change contract](../docs/operations/forced-password-change.md).
 
+## Content 1.25.41
+
+The distribution consumes published `sihsalus-content` 1.25.41, from
+[content PR #277](https://github.com/sihsalus/sihsalus-content/pull/277).
+It updates the native ethnicity exports with 58 MINSA equivalences and five
+synonyms while preserving the 62 clinical concept UUIDs and answer order.
+The other 32 exports and remote subscription pins stay unchanged. See the
+[ethnicity contract](https://github.com/sihsalus/sihsalus-content/blob/0b9dd4fd6aeb07f8329cc79c925d71186ff137fc/docs/contracts/etnias-minsa.md)
+for identities, provenance and pending clinical decisions.
+
+For DEV/QLTY, take and verify a database backup before restarting with this
+version. After Initializer completes, verify native code resolution
+(`source=MINSA-ETNIAS`, `code=2` resolves Aimara), existing answer order and
+module readiness. Reverting the backend image does not remove the newly
+persisted mappings; reimporting the older export can lose answer weights.
+Recovery requires evaluating the persisted state and a compatible backup.
+Publication and technical health do not establish clinical acceptance.
+
 ## Runtime OS security maintenance
 
 The runtime base stays immutable. Its build-time `yum update` includes both
