@@ -16,7 +16,7 @@ The SDK writes `backend/target/sdk-distro`, packaged by the
 Core is built from the official 2.8.10 source with the bounded
 [clinical integrity correction](core/README.md) for program enrollment and
 duplicate active conditions and the dependency maintenance described in the
-same guide. The distribution version is `2.8.10-sihsalus.4`, identifying the
+same guide. The distribution version is `2.8.10-sihsalus.5`, identifying the
 official 2.8.10 baseline plus SIHSalus patches. Native Core tests run during the
 image build before the WAR enters the SDK distribution.
 
@@ -51,6 +51,12 @@ returning to UID 1001. The same list carries the rpm package family
 (`python2-rpm`, `rpm`, `rpm-build-libs`, `rpm-libs`) for ALAS2-2026-3984 /
 CVE-2026-78367. CI supplies the source SHA as `SECURITY_REFRESH` to invalidate
 the package-update layer on each revision.
+
+The update list also includes `cyrus-sasl-lib`, `mariadb` and `mariadb-libs`
+for CVE-2026-107161, CVE-2026-107814 and CVE-2026-107823. These are packages
+inside the backend image; the separate MariaDB service and its data are unchanged.
+Verify the rebuilt image contains at least `cyrus-sasl-lib`
+`2.1.26-24.amzn2.0.2` and MariaDB packages `1:5.5.68-1.amzn2.0.4`.
 
 Amazon backports fixes without changing curl's `8.3.0` version string; inspect
 `rpm -q curl libcurl` and the image scan rather than that string alone. Accepted
@@ -164,9 +170,13 @@ ExtI18n stays outside this change.
 
 Core `2.8.10-sihsalus.4` restores upstream Commons Lang 2.6 for the official
 modules that still import `org.apache.commons.lang`. Its CVE-2025-48924 and
-nine exact Spring 5.3.39 findings are accepted for DEV/QLTY through 2026-10-22
-UTC in the shared [image exception catalog](../docs/operations/image-security.md);
-other findings block.
+nine exact Spring 5.3.39 findings were accepted for DEV/QLTY through 2026-10-22
+UTC. That acceptance expired. The shared
+[image exception proposal](../docs/operations/image-security.md) now contains
+only the nine Spring findings for 2026-10-28 through 2026-11-04 UTC, pending
+explicit human review for production and DEV/QLTY. The current scan does not
+report CVE-2025-48924, so its exception is removed; the library remains for
+module compatibility. All other findings continue to block.
 
 ### Gradual adoption of official OMODs, phase 1
 

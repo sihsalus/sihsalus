@@ -507,6 +507,15 @@ index cc8d03f..0fe03fd 100644
  			<dependency>
  				<groupId>junit</groupId>
  				<artifactId>junit</artifactId>
+@@ -578,7 +588,7 @@
+ 			<dependency>
+ 				<groupId>com.google.guava</groupId>
+ 				<artifactId>guava</artifactId>
+-				<version>33.4.8-jre</version>
++				<version>33.7.2-jre</version>
+ 			</dependency>
+ 			<dependency>
+ 				<groupId>com.fasterxml.uuid</groupId>
 @@ -1294,7 +1304,7 @@
  			 For instance, our version of Lucene is tied to the version of Hibernate Search. Similarly, our
  			 version of Hibernate Search must be compatible with the version of Hibernate and Hibernate must

@@ -13,9 +13,9 @@
       "type": "jar",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "User-approved seven-day acceptance for the Core 2.8.10 DEV/QLTY upgrade and official OMOD compatibility. Findings remain visible; new findings block. Production deployment is not authorized.",
-      "createdOn": "2026-10-15",
-      "expiresOn": "2026-10-22"
+      "rationale": "Proposed seven-day acceptance requiring explicit human review for production and DEV/QLTY validation of Spring 5.3.39 on the javax-compatible Core/OMOD stack. Correct fixable OS and Guava findings first; other findings remain blocking. Remove when a compatible maintained Core/framework release passes native, authentication and module tests; track migration in issue #323.",
+      "createdOn": "2026-10-28",
+      "expiresOn": "2026-11-04"
     },
     {
       "id": "backend-cve-2026-41849-20261015",
@@ -29,9 +29,9 @@
       "type": "jar",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "User-approved seven-day acceptance for the Core 2.8.10 DEV/QLTY upgrade and official OMOD compatibility. Findings remain visible; new findings block. Production deployment is not authorized.",
-      "createdOn": "2026-10-15",
-      "expiresOn": "2026-10-22"
+      "rationale": "Proposed seven-day acceptance requiring explicit human review for production and DEV/QLTY validation of Spring 5.3.39 on the javax-compatible Core/OMOD stack. Correct fixable OS and Guava findings first; other findings remain blocking. Remove when a compatible maintained Core/framework release passes native, authentication and module tests; track migration in issue #323.",
+      "createdOn": "2026-10-28",
+      "expiresOn": "2026-11-04"
     },
     {
       "id": "backend-cve-2026-41850-20261015",
@@ -45,9 +45,9 @@
       "type": "jar",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "User-approved seven-day acceptance for the Core 2.8.10 DEV/QLTY upgrade and official OMOD compatibility. Findings remain visible; new findings block. Production deployment is not authorized.",
-      "createdOn": "2026-10-15",
-      "expiresOn": "2026-10-22"
+      "rationale": "Proposed seven-day acceptance requiring explicit human review for production and DEV/QLTY validation of Spring 5.3.39 on the javax-compatible Core/OMOD stack. Correct fixable OS and Guava findings first; other findings remain blocking. Remove when a compatible maintained Core/framework release passes native, authentication and module tests; track migration in issue #323.",
+      "createdOn": "2026-10-28",
+      "expiresOn": "2026-11-04"
     },
     {
       "id": "backend-cve-2016-1000027-20261015",
@@ -61,9 +61,9 @@
       "type": "jar",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "User-approved seven-day acceptance for the Core 2.8.10 DEV/QLTY upgrade and official OMOD compatibility. Findings remain visible; new findings block. Production deployment is not authorized.",
-      "createdOn": "2026-10-15",
-      "expiresOn": "2026-10-22"
+      "rationale": "Proposed seven-day acceptance requiring explicit human review for production and DEV/QLTY validation of Spring 5.3.39 on the javax-compatible Core/OMOD stack. Correct fixable OS and Guava findings first; other findings remain blocking. Remove when a compatible maintained Core/framework release passes native, authentication and module tests; track migration in issue #323.",
+      "createdOn": "2026-10-28",
+      "expiresOn": "2026-11-04"
     },
     {
       "id": "backend-cve-2026-47884-20261015",
@@ -77,9 +77,9 @@
       "type": "jar",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "User-approved seven-day acceptance for the Core 2.8.10 DEV/QLTY upgrade and official OMOD compatibility. Findings remain visible; new findings block. Production deployment is not authorized.",
-      "createdOn": "2026-10-15",
-      "expiresOn": "2026-10-22"
+      "rationale": "Proposed seven-day acceptance requiring explicit human review for production and DEV/QLTY validation of Spring 5.3.39 on the javax-compatible Core/OMOD stack. Correct fixable OS and Guava findings first; other findings remain blocking. Remove when a compatible maintained Core/framework release passes native, authentication and module tests; track migration in issue #323.",
+      "createdOn": "2026-10-28",
+      "expiresOn": "2026-11-04"
     },
     {
       "id": "backend-cve-2024-38816-20261015",
@@ -93,9 +93,9 @@
       "type": "jar",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "User-approved seven-day acceptance for the Core 2.8.10 DEV/QLTY upgrade and official OMOD compatibility. Findings remain visible; new findings block. Production deployment is not authorized.",
-      "createdOn": "2026-10-15",
-      "expiresOn": "2026-10-22"
+      "rationale": "Proposed seven-day acceptance requiring explicit human review for production and DEV/QLTY validation of Spring 5.3.39 on the javax-compatible Core/OMOD stack. Correct fixable OS and Guava findings first; other findings remain blocking. Remove when a compatible maintained Core/framework release passes native, authentication and module tests; track migration in issue #323.",
+      "createdOn": "2026-10-28",
+      "expiresOn": "2026-11-04"
     },
     {
       "id": "backend-cve-2024-38819-20261015",
@@ -109,9 +109,9 @@
       "type": "jar",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "User-approved seven-day acceptance for the Core 2.8.10 DEV/QLTY upgrade and official OMOD compatibility. Findings remain visible; new findings block. Production deployment is not authorized.",
-      "createdOn": "2026-10-15",
-      "expiresOn": "2026-10-22"
+      "rationale": "Proposed seven-day acceptance requiring explicit human review for production and DEV/QLTY validation of Spring 5.3.39 on the javax-compatible Core/OMOD stack. Correct fixable OS and Guava findings first; other findings remain blocking. Remove when a compatible maintained Core/framework release passes native, authentication and module tests; track migration in issue #323.",
+      "createdOn": "2026-10-28",
+      "expiresOn": "2026-11-04"
     },
     {
       "id": "backend-cve-2026-41842-20261015",
@@ -125,9 +125,9 @@
       "type": "jar",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "User-approved seven-day acceptance for the Core 2.8.10 DEV/QLTY upgrade and official OMOD compatibility. Findings remain visible; new findings block. Production deployment is not authorized.",
-      "createdOn": "2026-10-15",
-      "expiresOn": "2026-10-22"
+      "rationale": "Proposed seven-day acceptance requiring explicit human review for production and DEV/QLTY validation of Spring 5.3.39 on the javax-compatible Core/OMOD stack. Correct fixable OS and Guava findings first; other findings remain blocking. Remove when a compatible maintained Core/framework release passes native, authentication and module tests; track migration in issue #323.",
+      "createdOn": "2026-10-28",
+      "expiresOn": "2026-11-04"
     },
     {
       "id": "backend-cve-2026-41845-20261015",
@@ -141,25 +141,9 @@
       "type": "jar",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "User-approved seven-day acceptance for the Core 2.8.10 DEV/QLTY upgrade and official OMOD compatibility. Findings remain visible; new findings block. Production deployment is not authorized.",
-      "createdOn": "2026-10-15",
-      "expiresOn": "2026-10-22"
-    },
-    {
-      "id": "backend-cve-2025-48924-20261015",
-      "repository": "ghcr.io/sihsalus/sihsalus-backend",
-      "platform": "linux/amd64",
-      "vulnerabilityId": "CVE-2025-48924",
-      "packageName": "commons-lang:commons-lang",
-      "installedVersion": "2.6",
-      "severity": "HIGH",
-      "class": "lang-pkgs",
-      "type": "jar",
-      "owner": "@Duvet05",
-      "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "User-approved seven-day acceptance for the Core 2.8.10 DEV/QLTY upgrade and official OMOD compatibility. Findings remain visible; new findings block. Production deployment is not authorized.",
-      "createdOn": "2026-10-15",
-      "expiresOn": "2026-10-22"
+      "rationale": "Proposed seven-day acceptance requiring explicit human review for production and DEV/QLTY validation of Spring 5.3.39 on the javax-compatible Core/OMOD stack. Correct fixable OS and Guava findings first; other findings remain blocking. Remove when a compatible maintained Core/framework release passes native, authentication and module tests; track migration in issue #323.",
+      "createdOn": "2026-10-28",
+      "expiresOn": "2026-11-04"
     }
   ]
 }

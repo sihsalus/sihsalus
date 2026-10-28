@@ -22,7 +22,7 @@ the resulting WAR in the same build-only cache as the SDK distribution.
   response. Historical duplicates are not deleted or rewritten.
 
 `distribution-version.patch` changes only the reactor POM versions to
-`2.8.10-sihsalus.4`, matching `backend/pom.xml`. This is a SIHSalus build of
+`2.8.10-sihsalus.5`, matching `backend/pom.xml`. This is a SIHSalus build of
 **official 2.8.10 plus these patches**. The suffix distinguishes the patched
 artifact from upstream and the previous SIHSalus candidates. Never install these
 bytes as the official 2.8.10 artifact or change applied Liquibase identities.
@@ -54,11 +54,18 @@ Tracking: [#323](https://github.com/sihsalus/sihsalus/issues/323). The
 reactor before compilation. No packaged JAR is substituted, stripped or renamed.
 The native reactor tests remain mandatory during the image build.
 
+Guava 33.7.2-jre addresses CVE-2026-102554 in Core's `WEB-INF/lib` dependency.
+The suffix `.5` distinguishes this rebuilt Core from `.4`; the source selection
+changes before compilation. The separate Spring exception proposal still needs
+explicit human review. A dependency bump is not evidence that the native reactor
+or packaged module compatibility checks have passed.
+
 | Component | Candidate version | Compatibility approach |
 | --- | --- | --- |
 | Netty | 4.1.139.Final | Import the 4.1 BOM to align all protocol modules. |
 | Jackson | 2.21.7 | Import its BOM, including the distinct annotations version. |
 | Protobuf | 3.25.9 | Stay on the 3.x maintenance line. |
+| Guava | 33.7.2-jre | Update Core's managed JRE dependency before compiling and running native tests. |
 | c3p0 / mchange-commons-java | 0.14.2 / 0.6.1 | Compile and test against Hibernate's existing pool adapter. |
 | ProtoStream / ProtoStream types | 4.6.5.Final | Align both artifacts and exercise native Infinispan cache tests. |
 | PostgreSQL JDBC | 42.7.14 | Stay on the 42.7 maintenance line. |
@@ -112,10 +119,12 @@ Spring 5.3 remains affected by findings whose fixes require a different runtime
 or licensed maintenance: CVE-2016-1000027 applies to Spring Web before 6.0, and
 the OSS fix for CVE-2026-47884 is Spring 7.0.9, which also needs
 Jakarta-compatible Core, OMODs and Tomcat. Track that migration separately.
-The accepted Spring and Commons Lang findings, their owner, validity window and
-limits are recorded in [the image security policy](../../docs/operations/image-security.md)
+The nine Spring exception scopes, their owner, seven-day validity window and
+required human review are recorded in [the image security policy](../../docs/operations/image-security.md)
 and `scripts/security/image-exceptions.json`; CI and image promotion share
-that catalog.
+that catalog. Updating it does not authorize production deployment.
+Commons Lang has no matching finding in the
+current scan and its previous exception has been removed.
 
 ## Verification and acceptance
 
