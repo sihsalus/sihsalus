@@ -1,5 +1,6 @@
 """Version updates, bounded recreation and recovery without a Docker daemon."""
 
+from contextlib import contextmanager
 from copy import deepcopy
 import importlib.util
 import json
@@ -8,7 +9,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from test_release_manifest import ROOT, Engine, fixture, release, digest
 
@@ -73,6 +74,16 @@ class ComponentUpdate(unittest.TestCase):
     def up_commands(self):
         return [c for c in self.engine.calls if c[:2] == ["docker", "compose"] and "up" in c]
 
+    @contextmanager
+    def frontend_candidate(self, source=None):
+        def build(candidate, root):
+            candidate["services"]["frontend"] = deepcopy(self.target["services"]["frontend"])
+
+        with patch.object(deploy, "health"), \
+             patch.object(deploy, "resolve", return_value=deepcopy(source or self.target["sources"]["frontend"])) as resolve, \
+             patch.object(deploy, "build_frontend", side_effect=build):
+            yield resolve
+
     def test_frontend_update_preserves_every_other_runtime_and_secret(self):
         release.apply_release(self.target, self.current, self.root, services=["frontend"])
         self.assertEqual(len(self.up_commands()), 1)
@@ -114,7 +125,12 @@ class ComponentUpdate(unittest.TestCase):
         self.engine.images[source["image"]] = image
         self.engine.images[image["id"]] = image
         self.engine.metadata[image["id"]] = "content.sihsalus-content=" + target["sources"]["contentVersion"] + "\n"
-        release.apply_release(target, self.current, self.root, services=["backend"])
+        with patch.object(deploy, "health"), patch.object(deploy, "resolve", return_value=source) as resolve:
+            outcome = deploy.execute_update(self.root, "backend")
+        self.assertEqual(outcome["status"], "updated")
+        self.assertEqual(outcome["candidate"]["sources"]["backend"], source)
+        resolve.assert_called_once_with("backend", "latest", None, self.root, "linux/amd64")
+        self.assertEqual(len(self.up_commands()), 1)
         self.assertEqual(self.up_commands()[0][-1], "backend")
         self.assertEqual(self.engine.runtime["services"]["db"], self.current["services"]["db"])
 
@@ -198,6 +214,164 @@ class ComponentUpdate(unittest.TestCase):
             build.assert_not_called()
         self.assertFalse(self.up_commands())
         self.assertEqual((self.root / ".env").read_bytes(), self.before)
+
+    def test_cancelled_api_update_validates_but_never_backs_up_or_applies(self):
+        order = []
+        validate = Mock(side_effect=lambda *args: order.append("validated"))
+        confirm = Mock(side_effect=lambda *args: order.append("confirmed") or False)
+        backup = Mock()
+        with self.frontend_candidate():
+            outcome = deploy.execute_update(self.root, "frontend", validate_candidate=validate,
+                                            confirm=confirm, before_apply=backup)
+        self.assertEqual(outcome["status"], "cancelled")
+        self.assertEqual(order, ["validated", "confirmed"])
+        self.assertEqual(validate.call_args.args, (outcome["current"], outcome["candidate"], "frontend"))
+        self.assertEqual(confirm.call_args.args, validate.call_args.args)
+        backup.assert_not_called()
+        self.assertFalse(self.up_commands())
+        self.assertEqual((self.root / ".env").read_bytes(), self.before)
+        self.assertEqual(self.engine.runtime, self.current)
+
+    def test_unchanged_version_still_requires_candidate_validation(self):
+        confirm, backup = Mock(), Mock()
+        validate = Mock(side_effect=release.ManifestError("Published image is no longer allowed"))
+        with self.frontend_candidate(self.current["sources"]["frontend"]) as resolve:
+            with self.assertRaisesRegex(release.ManifestError, "no longer allowed"):
+                deploy.execute_update(self.root, "frontend", validate_candidate=validate,
+                                      confirm=confirm, before_apply=backup)
+        resolve.assert_called_once()
+        validate.assert_called_once()
+        confirm.assert_not_called()
+        backup.assert_not_called()
+        self.assertFalse(self.up_commands())
+        self.assertEqual((self.root / ".env").read_bytes(), self.before)
+
+    def test_prepare_api_validates_without_confirmation_backup_or_application(self):
+        validate, confirm, backup = Mock(), Mock(), Mock()
+        with self.frontend_candidate():
+            outcome = deploy.execute_update(self.root, "frontend", prepare_only=True,
+                                            validate_candidate=validate, confirm=confirm, before_apply=backup)
+        self.assertEqual(outcome["status"], "prepared")
+        validate.assert_called_once()
+        confirm.assert_not_called()
+        backup.assert_not_called()
+        self.assertFalse(self.up_commands())
+        self.assertEqual((self.root / ".env").read_bytes(), self.before)
+        self.assertEqual(self.engine.runtime, self.current)
+
+    def test_update_keeps_one_selection_and_lock_through_confirmation_and_backup(self):
+        order = []
+        original_lock = release.release_lock
+        selected = None
+        backup_open = False
+
+        def check_selection(current, candidate, component):
+            self.assertEqual(release.manifest_digest(candidate), selected)
+            self.assertEqual(candidate["sources"]["frontend"], self.target["sources"]["frontend"])
+            self.assertEqual((self.root / ".env").read_bytes(), self.before)
+            self.assertFalse(self.up_commands())
+            with self.assertRaisesRegex(release.ManifestError, "Another manifest operation"):
+                with original_lock(self.root):
+                    self.fail("The update lock was released during operator callbacks")
+            # The mutable registry alias moves while an operator reviews the
+            # preview; this must not change the already prepared target.
+            resolve.return_value = deepcopy(self.current["sources"]["frontend"])
+
+        def validate(current, candidate, component):
+            nonlocal selected
+            selected = release.manifest_digest(candidate)
+            order.append("validated")
+
+        def confirm(*args):
+            check_selection(*args)
+            order.append("confirmed")
+            return True
+
+        @contextmanager
+        def receipt():
+            nonlocal backup_open
+            backup_open = True
+            order.append("backup-open")
+            try:
+                yield
+            finally:
+                order.append("backup-closed")
+                backup_open = False
+
+        def backup(*args):
+            check_selection(*args)
+            return receipt()
+
+        def event(stage, message):
+            self.assertNotIn("keep-private", message)
+            if stage == "applying":
+                self.assertTrue(backup_open)
+                order.append("applying")
+
+        with self.frontend_candidate() as resolve, patch.object(release, "release_lock", wraps=original_lock) as lock:
+            outcome = deploy.execute_update(self.root, "frontend", validate_candidate=validate,
+                                            confirm=confirm, before_apply=backup, event=event)
+        resolve.assert_called_once_with("frontend", "latest", None, self.root, "linux/amd64")
+        lock.assert_called_once_with(self.root)
+        self.assertEqual(outcome["status"], "updated")
+        self.assertEqual(order, ["validated", "confirmed", "backup-open", "applying", "backup-closed"])
+        self.assertEqual(release.manifest_digest(outcome["candidate"]), selected)
+        self.assertEqual(deploy.current_release(self.root), outcome["candidate"])
+        self.assertEqual(len(self.up_commands()), 1)
+        self.assertEqual(self.engine.runtime["services"]["frontend"], self.target["services"]["frontend"])
+        self.assertEqual(self.engine.runtime["services"]["backend"], self.current["services"]["backend"])
+
+    def test_backup_failure_prevents_application(self):
+        for backup in (Mock(side_effect=release.ManifestError("Backup verification failed")),
+                       Mock(return_value=False)):
+            with self.subTest(backup=backup), self.frontend_candidate():
+                with self.assertRaises(release.ManifestError):
+                    deploy.execute_update(self.root, "frontend", confirm=lambda *args: True, before_apply=backup)
+            self.assertFalse(self.up_commands())
+            self.assertEqual((self.root / ".env").read_bytes(), self.before)
+            self.assertEqual(self.engine.runtime, self.current)
+
+    def test_backup_context_is_closed_when_application_fails(self):
+        states = []
+
+        @contextmanager
+        def receipt():
+            states.append("opened")
+            try:
+                yield
+            finally:
+                states.append("closed")
+
+        with self.frontend_candidate(), patch.object(deploy, "apply", side_effect=release.ManifestError("Apply failed")):
+            with self.assertRaisesRegex(release.ManifestError, "Apply failed"):
+                deploy.execute_update(self.root, "frontend", before_apply=lambda *args: receipt())
+        self.assertEqual(states, ["opened", "closed"])
+        self.assertEqual((self.root / ".env").read_bytes(), self.before)
+
+    def test_backup_cleanup_cannot_report_a_suppressed_apply_error_as_success(self):
+        class SuppressingReceipt:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *error):
+                return True
+
+        with self.frontend_candidate(), patch.object(deploy, "apply", side_effect=release.ManifestError("Apply failed")):
+            with self.assertRaisesRegex(release.ManifestError, "did not complete"):
+                deploy.execute_update(self.root, "frontend", before_apply=lambda *args: SuppressingReceipt())
+        self.assertEqual((self.root / ".env").read_bytes(), self.before)
+
+    def test_callback_cannot_replace_the_prepared_release(self):
+        def mutate(current, candidate, component):
+            candidate["sources"]["frontend"] = deepcopy(current["sources"]["frontend"])
+            return True
+
+        for callback in ("validate_candidate", "confirm", "before_apply"):
+            with self.subTest(callback=callback), self.frontend_candidate():
+                with self.assertRaisesRegex(release.ManifestError, "changed the selected release"):
+                    deploy.execute_update(self.root, "frontend", **{callback: mutate})
+            self.assertFalse(self.up_commands())
+            self.assertEqual((self.root / ".env").read_bytes(), self.before)
 
     def test_backend_failure_does_not_silently_downgrade_a_migrated_database(self):
         self.fail_once = True

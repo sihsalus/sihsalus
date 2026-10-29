@@ -103,3 +103,18 @@ para actualizar versiones.
 
 Producción no se actualiza junto con DEV/QLTY. Su adopción y actualización requieren
 la ventana y autorización correspondientes.
+
+## Integración con la consola SIHSalus
+
+El instalador y la interfaz de mantenimiento se desarrollan en el repositorio
+independiente `sihsalus-cli`. Este repositorio conserva Compose, las imágenes,
+las políticas y el motor que fija las versiones y registra la recuperación.
+Actualizar el CLI no actualiza por sí mismo la aplicación clínica.
+
+`deploy.py` expone `execute_update(...)` para que la consola pueda resolver una
+sola versión, comprobarla, mostrar el cambio, obtener confirmación y mantener
+un respaldo abierto durante la aplicación. Conserva el bloqueo hasta terminar.
+Los callbacks de seguridad y respaldo son responsabilidad del consumidor:
+el motor por sí solo no realiza un escaneo de vulnerabilidades ni crea backups.
+Una interrupción del backend conserva el estado y la evidencia; nunca ejecuta
+un downgrade automático después de una posible migración.

@@ -125,6 +125,15 @@ if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
   check_secret MYSQL_OPENMRS_PASSWORD
   check_secret MYSQL_ROOT_PASSWORD
 
+  # The installer-only override must never fall back to OpenMRS Admin123.
+  # This value initializes a new database; it is not a password rotation API.
+  case ":$(env_value COMPOSE_FILE):" in
+    *"/compose/install.yml:"*|*":compose/install.yml:"*)
+      check_secret SIHSALUS_BOOTSTRAP_ADMIN_PASSWORD
+      check_secret BACKUP_ENCRYPTION_PASSWORD
+      ;;
+  esac
+
   RELEASE_MANIFEST="$(env_value SIHSALUS_RELEASE_MANIFEST)"
   if [ -n "$RELEASE_MANIFEST" ]; then
     if python3 "$ROOT_DIR/scripts/deploy/release-manifest.py" check-selected "$RELEASE_MANIFEST" \
