@@ -9,6 +9,9 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME}-frontend
     restart: "no"
     pull_policy: never
+    build:
+      args:
+        FRONTEND_SOURCE_IMAGE: ghcr.io/sihsalus/sihsalus-frontend:sha-b956aba619e4e651e7d942e3f95eb88f607803e5@sha256:089d96130cca872d9b08f7e55e8ef354daf7ee77e19b72f8b28db8a4522bc1c2
   docs:
     container_name: ${COMPOSE_PROJECT_NAME}-docs
     restart: "no"

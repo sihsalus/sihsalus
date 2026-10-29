@@ -8,6 +8,8 @@ const fixture = {
   replacementPassword: process.env.SMOKE_REPLACEMENT_PASSWORD,
 };
 const homeUrl = /\/openmrs\/spa\/home(?:[/?#]|$)/;
+const expectedFrontendCommit = 'b956aba619e4e651e7d942e3f95eb88f607803e5';
+const expectedFrontendSourceDigest = 'sha256:089d96130cca872d9b08f7e55e8ef354daf7ee77e19b72f8b28db8a4522bc1c2';
 if (fixture.baseURL !== 'http://127.0.0.1' || !['local', 'keycloak'].includes(fixture.mode) ||
     !fixture.initialPassword || !fixture.replacementPassword) {
   throw new Error('Runtime smoke accepts only its isolated loopback fixture');
@@ -26,8 +28,10 @@ test('published core serves its SPA, authenticates, and ends the synthetic sessi
     const response = await context.request.get('/openmrs/spa/build-info.json');
     expect(response.status()).toBe(200);
     const build = await response.json();
-    expect(build.gitSha).toMatch(/^[a-f0-9]{40}$/);
-    console.log(JSON.stringify({ mode: fixture.mode, frontendCommit: build.gitSha }));
+    expect(build.gitSha).toBe(expectedFrontendCommit);
+    // browser.log is retained only after the runtime fixture sanitizes it.
+    console.log(JSON.stringify({ mode: fixture.mode, frontendCommit: build.gitSha,
+      expectedFrontendCommit, expectedFrontendSourceDigest }));
   });
 
   await test.step('render the configured login and authenticate through its UI', async () => {

@@ -16,6 +16,8 @@ import fixtures
 
 ROOT = Path(__file__).resolve().parents[2]
 DIGEST = "sha256:" + "a" * 64
+FRONTEND_SOURCE_IMAGE = ("ghcr.io/sihsalus/sihsalus-frontend:sha-b956aba619e4e651e7d942e3f95eb88f607803e5"
+                         "@sha256:089d96130cca872d9b08f7e55e8ef354daf7ee77e19b72f8b28db8a4522bc1c2")
 
 
 class RuntimeFixtureTests(unittest.TestCase):
@@ -137,6 +139,8 @@ elif args[0] == 'inspect' or args[:2] == ['image', 'inspect']: print('[]')
                 self.assertEqual(backend["environment"]["SIHSALUS_FORCED_PASSWORD_CHANGE_ENABLED"], "true")
                 self.assertEqual(backend["environment"]["OAUTH2_ENABLED"], "true" if mode == "keycloak" else "false")
                 self.assertEqual(model["services"]["frontend"]["build"]["dockerfile"], "Dockerfile")
+                self.assertEqual(model["services"]["frontend"]["build"]["args"]["FRONTEND_SOURCE_IMAGE"],
+                                 FRONTEND_SOURCE_IMAGE)
                 if mode == "keycloak":
                     context = Path(model["services"]["keycloak"]["build"]["context"])
                     self.assertEqual(context, ROOT / "oauth")
