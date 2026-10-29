@@ -1,0 +1,9 @@
+# Only for fresh installations created by `sihsalus install`.
+# Core startup-init.sh at a7f6314dd430cbc393313dcfcdc6dd2edecea377 writes
+# OMRS_ADMIN_USER_PASSWORD into initial admin_user_password. It does not rotate
+# an existing user's password. Retain the override in the managed selection.
+services:
+  backend:
+    environment:
+      OMRS_ADMIN_USER_PASSWORD: ${SIHSALUS_BOOTSTRAP_ADMIN_PASSWORD:?Fresh installation requires a private initial administrator password}
+      OMRS_ADMIN_PASSWORD_LOCKED: "false"

@@ -2,6 +2,7 @@
 """Update SIHSalus components and recover the previous frontend version."""
 
 import argparse
+from contextlib import nullcontext
 from copy import deepcopy
 from datetime import datetime, timezone
 import importlib.util
@@ -142,7 +143,7 @@ def previous_release(current, root):
 def health(current, root, components):
     for name in components:
         value = releases.run(["docker", "inspect", f"sihsalus-{name}", "--format",
-                              "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}"], root=root).strip()
+                              '{{with (index .State "Health")}}{{.Status}}{{else}}{{.State.Status}}{{end}}'], root=root).strip()
         releases.require(value == "healthy", f"Current {name} is not healthy; inspect it before updating")
 
 
@@ -171,6 +172,121 @@ def apply(candidate, current, root, state, components, public_url):
         raise
 
 
+def checked_root(root):
+    root = Path(root).resolve()
+    releases.require((root / ".env").is_file(), "Run from the installed SIHSalus checkout")
+    # Retain the same drift/override guard for both command-line interfaces.
+    releases.run(["bash", str(DIRECTORY / "check-clean-checkout.sh"), "deploy"], root=root,
+                 environment={**os.environ, "SIHSALUS_MANIFEST_APPLY": "true"})
+    return root
+
+
+def execute_update(root, component, version="latest", expected_digest=None, public_url=None,
+                   prepare_only=False, validate_candidate=None, confirm=None,
+                   before_apply=None, event=None):
+    """Prepare and optionally apply one component under a single release lock.
+
+    Each operation callback receives (current, candidate, component). Validators
+    and before_apply raise on failure (False also rejects the operation); confirm
+    returns a bool. before_apply may return a context manager that stays open
+    during application and verification, including failures. Callbacks may
+    inspect, but must not change, the manifests.
+    event receives (stage, message), containing no environment values or secrets.
+    The result contains status, current, candidate and component; status is one of
+    unchanged, prepared, cancelled or updated. Security/backup checks are supplied
+    by the caller, rather than implied by successful identity validation.
+    """
+    releases.require(component in ("frontend", "backend"), "Choose frontend or backend")
+
+    def notify(stage, message):
+        if event is not None:
+            event(stage, message)
+
+    notify("checking", "Comprobando la instalación y su estado actual…")
+    root = checked_root(root)
+    with releases.release_lock(root) as state:
+        current = current_release(root)
+        public_url = public_url or env_value(root, "SIHSALUS_PUBLIC_URL")
+        releases.require(not public_url or re.fullmatch(r"https?://[A-Za-z0-9.:-]+", public_url), "Invalid public URL")
+        releases.verify_runtime(current, root)
+        health(current, root, [component])
+        releases.verify_images(current, root)
+        notify("resolving", "Resolviendo y descargando la versión publicada…")
+        selected = resolve(component, version, expected_digest, root, current["compose"]["platform"])
+        unchanged = selected == current["sources"][component]
+        if unchanged:
+            candidate = deepcopy(current)
+        else:
+            releases.require(shutil.disk_usage(root).free >= 2 * 1024 ** 3, "At least 2 GiB free is required to prepare an update")
+            notify("preparing", "Preparando la imagen para esta instalación…")
+            candidate = candidate_release(current, root)
+            candidate["sources"][component] = deepcopy(selected)
+            if component == "frontend":
+                build_frontend(candidate, root)
+            else:
+                image = releases.inspect_image(selected["image"], root)
+                candidate["services"]["backend"] = {"image": selected["image"], "imageId": image["id"]}
+                properties = releases.image_file(image["id"], "/openmrs/distribution/openmrs-distro.properties", root)
+                versions = re.findall(r"^content\.sihsalus-content\s*=\s*(\S+)\s*$", properties, re.MULTILINE)
+                releases.require(len(versions) == 1, "Candidate has no released content version")
+                candidate["sources"]["contentVersion"] = versions[0]
+            releases.validate_manifest(candidate)
+            releases.verify_compose(candidate, root, root / ".env")
+            releases.verify_images(candidate, root)
+
+        current_digest = releases.manifest_digest(current)
+        candidate_digest = releases.manifest_digest(candidate)
+
+        def verify_selection():
+            releases.require(releases.manifest_digest(current) == current_digest and
+                             releases.manifest_digest(candidate) == candidate_digest,
+                             "Update callback changed the selected release")
+
+        def invoke(callback):
+            verify_selection()
+            result = callback(current, candidate, component)
+            verify_selection()
+            return result
+
+        def result(status):
+            verify_selection()
+            return {"status": status, "current": current, "candidate": candidate, "component": component}
+
+        notify("validating", "Comprobando el candidato seleccionado…")
+        if validate_candidate is not None:
+            releases.require(invoke(validate_candidate) is not False, "Candidate validation rejected the update")
+        if unchanged:
+            notify("complete", "La versión instalada coincide con la seleccionada.")
+            return result("unchanged")
+        if prepare_only:
+            notify("complete", "Preparación correcta; los servicios siguen sin cambios.")
+            return result("prepared")
+        if confirm is not None:
+            notify("confirming", "Esperando la confirmación del cambio preparado…")
+            approved = invoke(confirm)
+            releases.require(type(approved) is bool, "Update confirmation must return a bool")
+            if not approved:
+                notify("complete", "Actualización cancelada; los servicios siguen sin cambios.")
+                return result("cancelled")
+        preparation = None
+        if before_apply is not None:
+            notify("backing-up", "Ejecutando la preparación previa a la aplicación…")
+            preparation = invoke(before_apply)
+            releases.require(preparation is not False, "Pre-application preparation rejected the update")
+        context = preparation if hasattr(preparation, "__enter__") and hasattr(preparation, "__exit__") else nullcontext()
+        applied = False
+        with context:
+            notify("applying", "Aplicando y verificando la actualización…")
+            verify_selection()
+            apply(candidate, current, root, state, [component], public_url)
+            applied = True
+        # A cleanup context must never turn a suppressed application error into
+        # a successful update reported to the operator.
+        releases.require(applied, "Update application did not complete")
+        notify("complete", "Actualización verificada.")
+        return result("updated")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="Installed checkout (default: current directory)")
@@ -187,12 +303,27 @@ def main():
     update.add_argument("--url", help="Public URL for external verification")
     update.add_argument("--prepare", action="store_true", help="Prepare and validate without changing running services")
     args = parser.parse_args()
-    root = args.root.resolve()
-    releases.require((root / ".env").is_file(), "Run from the installed SIHSalus checkout")
-    # This guard checks tracked drift and implicit overrides; the new engine owns
-    # the existing private version selection instead of bypassing or deleting it.
-    releases.run(["bash", str(DIRECTORY / "check-clean-checkout.sh"), "deploy"], root=root,
-                 environment={**os.environ, "SIHSALUS_MANIFEST_APPLY": "true"})
+    if args.command == "update":
+        component = "frontend" if args.frontend else "backend"
+
+        def preview(_current, candidate, selected_component):
+            show(candidate)
+            print(f"Servicio que se actualizará: {selected_component}", flush=True)
+            return True
+
+        outcome = execute_update(args.root, component, args.frontend or args.backend,
+                                 expected_digest=args.digest, public_url=args.url,
+                                 prepare_only=args.prepare, confirm=preview)
+        if outcome["status"] == "unchanged":
+            show(outcome["current"])
+            print("Ya está actualizado; no se reinició ningún servicio.")
+        elif outcome["status"] == "prepared":
+            preview(outcome["current"], outcome["candidate"], component)
+            print("Preparación correcta; los servicios siguen sin cambios.")
+        else:
+            print("Actualización verificada.")
+        return
+    root = checked_root(args.root)
     with releases.release_lock(root) as state:
         current = current_release(root)
         if args.command == "history":
@@ -220,37 +351,6 @@ def main():
                                    verify=lambda: verify_external(candidate, root, public_url))
             show(candidate)
             return
-        releases.verify_runtime(current, root)
-        component = "frontend" if args.frontend else "backend"
-        health(current, root, [component])
-        releases.verify_images(current, root)
-        selected = resolve(component, args.frontend or args.backend, args.digest, root, current["compose"]["platform"])
-        if selected == current["sources"][component]:
-            show(current)
-            print("Ya está actualizado; no se reinició ningún servicio.")
-            return
-        releases.require(shutil.disk_usage(root).free >= 2 * 1024 ** 3, "At least 2 GiB free is required to prepare an update")
-        candidate = candidate_release(current, root)
-        candidate["sources"][component] = selected
-        if component == "frontend":
-            build_frontend(candidate, root)
-        else:
-            image = releases.inspect_image(selected["image"], root)
-            candidate["services"]["backend"] = {"image": selected["image"], "imageId": image["id"]}
-            properties = releases.image_file(image["id"], "/openmrs/distribution/openmrs-distro.properties", root)
-            versions = re.findall(r"^content\.sihsalus-content\s*=\s*(\S+)\s*$", properties, re.MULTILINE)
-            releases.require(len(versions) == 1, "Candidate has no released content version")
-            candidate["sources"]["contentVersion"] = versions[0]
-        releases.validate_manifest(candidate)
-        releases.verify_compose(candidate, root, root / ".env")
-        releases.verify_images(candidate, root)
-        show(candidate)
-        print(f"Servicio que se actualizará: {component}", flush=True)
-        if args.prepare:
-            print("Preparación correcta; los servicios siguen sin cambios.")
-            return
-        apply(candidate, current, root, state, [component], public_url)
-        print("Actualización verificada.")
 
 
 if __name__ == "__main__":

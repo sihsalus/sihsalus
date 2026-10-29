@@ -18,6 +18,7 @@
 | Keycloak | `-f compose/keycloak.yml --profile keycloak` | Activa OIDC en frontend/backend y agrega Keycloak |
 | OpenMRS local con Keycloak | `-f compose/openmrs-local-auth.yml` después de Keycloak | Conserva login local de OpenMRS y OIDC individual de Imaging |
 | HTTPS | `-f compose/ssl.yml --profile ssl` | Modifica gateway y agrega certbot |
+| Instalación nueva | `compose/install.yml`, administrado por el CLI | Contraseña inicial OpenMRS privada; no migra ni rota usuarios existentes |
 | Status | `-f compose/status.yml --profile status` | Panel local Gatus |
 
 Keycloak, HTTPS y Status son overrides porque cambian o dependen de servicios del core. Por eso no se agregan mediante `include`.
