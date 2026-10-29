@@ -7,7 +7,7 @@ index 60b5ec6..bae27e9 100644
  		<groupId>org.openmrs</groupId>
  		<artifactId>openmrs</artifactId>
 -		<version>2.8.10</version>
-+		<version>2.8.10-sihsalus.4</version>
++		<version>2.8.10-sihsalus.5</version>
  		<relativePath>../pom.xml</relativePath>
  	</parent>
  	<modelVersion>4.0.0</modelVersion>
@@ -20,7 +20,7 @@ index ca263a6..7e4ad92 100644
  		<groupId>org.openmrs</groupId>
  		<artifactId>openmrs</artifactId>
 -		<version>2.8.10</version>
-+		<version>2.8.10-sihsalus.4</version>
++		<version>2.8.10-sihsalus.5</version>
  	</parent>
  	<modelVersion>4.0.0</modelVersion>
  	<groupId>org.openmrs.liquibase</groupId>
@@ -33,7 +33,7 @@ index ef0945d..cc8d03f 100644
  	<groupId>org.openmrs</groupId>
  	<artifactId>openmrs</artifactId>
 -	<version>2.8.10</version>
-+	<version>2.8.10-sihsalus.4</version>
++	<version>2.8.10-sihsalus.5</version>
  	<packaging>pom</packaging>
  	<name>OpenMRS</name>
  	<description>Master project for the modules of OpenMRS</description>
@@ -46,7 +46,7 @@ index d89d2d9..496da62 100644
  		<groupId>org.openmrs.module</groupId>
  		<artifactId>openmrs-test-module</artifactId>
 -		<version>2.8.10</version>
-+		<version>2.8.10-sihsalus.4</version>
++		<version>2.8.10-sihsalus.5</version>
  	</parent>
  
  	<artifactId>openmrs-test-module-api</artifactId>
@@ -59,7 +59,7 @@ index 99a6d1e..6778ac0 100644
  		<groupId>org.openmrs.module</groupId>
  		<artifactId>openmrs-test-module</artifactId>
 -		<version>2.8.10</version>
-+		<version>2.8.10-sihsalus.4</version>
++		<version>2.8.10-sihsalus.5</version>
  	</parent>
  
  	<artifactId>openmrs-test-module-omod</artifactId>
@@ -72,7 +72,7 @@ index 29f3e77..025fd1e 100644
  		<groupId>org.openmrs</groupId>
  		<artifactId>openmrs</artifactId>
 -		<version>2.8.10</version>
-+		<version>2.8.10-sihsalus.4</version>
++		<version>2.8.10-sihsalus.5</version>
  	</parent>
  
  	<groupId>org.openmrs.module</groupId>
@@ -85,7 +85,7 @@ index 3f5ecda..2893e95 100644
        <groupId>org.openmrs</groupId>
        <artifactId>openmrs</artifactId>
 -      <version>2.8.10</version>
-+      <version>2.8.10-sihsalus.4</version>
++      <version>2.8.10-sihsalus.5</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.openmrs.test</groupId>
@@ -98,7 +98,7 @@ index 63e2f28..1576021 100644
          <groupId>org.openmrs</groupId>
          <artifactId>openmrs</artifactId>
 -        <version>2.8.10</version>
-+        <version>2.8.10-sihsalus.4</version>
++        <version>2.8.10-sihsalus.5</version>
      </parent>
      <modelVersion>4.0.0</modelVersion>
      <groupId>org.openmrs.tools</groupId>
@@ -111,7 +111,7 @@ index f941176..8dc1cf8 100644
        <groupId>org.openmrs</groupId>
        <artifactId>openmrs</artifactId>
 -      <version>2.8.10</version>
-+      <version>2.8.10-sihsalus.4</version>
++      <version>2.8.10-sihsalus.5</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.openmrs.web</groupId>
@@ -124,7 +124,7 @@ index a435739..e35ad9b 100644
        <groupId>org.openmrs</groupId>
        <artifactId>openmrs</artifactId>
 -      <version>2.8.10</version>
-+      <version>2.8.10-sihsalus.4</version>
++      <version>2.8.10-sihsalus.5</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.openmrs.web</groupId>

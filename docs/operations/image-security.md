@@ -91,26 +91,34 @@ explícitamente revisada; no sustituir el umbral por `exit-code: 0`, modificar e
 informe ni deshabilitar el control. Los valores del catálogo son decisiones de
 seguridad que los mantenedores deben revisar antes de incorporarlos.
 
-## Aceptación vigente
+## Excepciones acotadas de Spring
 
-`scripts/security/image-exceptions.json` contiene diez alcances de
+El catálogo define nueve alcances exactos de
 `ghcr.io/sihsalus/sihsalus-backend`, `linux/amd64`, clase `lang-pkgs`,
-ecosistema `jar`: nueve hallazgos en Spring Framework 5.3.39 (`spring-core`,
-`spring-expression`, `spring-web` y `spring-webmvc`; dos CRITICAL y siete HIGH)
-y CVE-2025-48924 en `commons-lang:commons-lang` 2.6, que Core `2.8.10-sihsalus.4`
-restaura para los OMODs oficiales. Responsable: `@Duvet05`; seguimiento:
-[#323](https://github.com/sihsalus/sihsalus/issues/323). Vigencia: del 15/10 al
-22/10/2026 UTC inclusive; desde el 23/10 la publicación vuelve a bloquearse salvo
-nueva decisión explícita del mantenedor. Gateway, Certbot y frontend no tienen
-excepciones.
+ecosistema `jar`: Spring Framework 5.3.39 (`spring-core`, `spring-expression`,
+`spring-web` y `spring-webmvc`; dos CRITICAL y siete HIGH). Responsable:
+`@Duvet05`; seguimiento: [#323](https://github.com/sihsalus/sihsalus/issues/323).
+El período propuesto va del 28/10 al 04/11/2026 UTC inclusive; desde el 05/11
+la promoción vuelve a bloquearse. Su uso en producción y la validación previa
+en DEV/QLTY requieren revisión humana explícita de riesgos, versión y ambiente.
+La validación del JSON no constituye esa aprobación ni autoriza un despliegue.
+El motor comprueba el alcance técnico de la excepción; no controla permisos por
+host o ambiente.
 
-El alcance operativo autorizado es DEV y QLTY; no incluye producción. La
-aceptación no corrige las dependencias ni declara falsos positivos: la
-corrección pertenece a las releases de Core y sus bibliotecas coordinadas
-(Spring 5.3.50 requiere [acceso Enterprise](https://spring.io/security/cve-2026-47884/);
-la alternativa OSS 7.0.9 exige migrar de `javax` a `jakarta`). No se sustituyen
-JARs anidados desde infraestructura. Retirar cada entrada cuando una release
-verificada elimine su hallazgo y pase compatibilidad, runtime y seguridad.
+El escaneo del 28/10 del backend publicado `d319010d` no reporta
+CVE-2025-48924, por lo que se retira la excepción de Commons Lang 2.6.
+La biblioteca permanece para compatibilidad con OMODs; si reaparece el hallazgo,
+el control debe bloquearlo. Gateway, Certbot, frontend, Guava y paquetes del
+sistema operativo no reciben excepciones.
+
+Estas excepciones no corrigen las vulnerabilidades ni acreditan que sean falsos
+positivos o inexplotables. Las correcciones de Spring pueden exigir mantenimiento
+con licencia o migrar conjuntamente Core, OMODs y Tomcat de `javax` a `jakarta`.
+La revisión debe decidir sobre esa exposición temporal y las restricciones
+operativas. Retirar cada entrada cuando una release compatible elimine el
+hallazgo y pase las comprobaciones nativas, de módulos y de autenticación.
+No ampliar automáticamente fechas ni alcance; los nuevos hallazgos siguen
+bloqueando y los paquetes corregibles del sistema operativo deben actualizarse.
 
 ## Evidencia sin credenciales
 
