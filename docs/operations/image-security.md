@@ -6,12 +6,14 @@ publica `linux/amd64`; gateway y certbot publican `linux/amd64` y `linux/arm64`.
 Cada plataforma debe tener un inventario SPDX adjunto por BuildKit y un escaneo
 Trivy del digest exacto de su manifiesto ejecutable.
 
-Gateway y el wrapper del frontend fijan la misma base Nginx 1.30.5 por digest;
-Certbot fija la versión 5.8.0 y actualiza los paquetes Alpine al construir.
-También fija su dependencia Python `urllib3` en 2.8.0 mediante `pip`, porque la
-imagen base contiene una versión anterior y `apk upgrade` no actualiza paquetes
-Python instalados por ese mecanismo. Retirar esta actualización cuando una base
-oficial fijada incluya la versión corregida y pase los mismos controles de imagen.
+Gateway y el wrapper del frontend fijan la misma base Nginx 1.30.6 por digest
+y actualizan los paquetes Alpine al construir. Certbot fija la versión 5.8.0
+y también actualiza los paquetes Alpine al construir.
+También fija `urllib3` en 2.8.0, `certifi` en 2026.10.19 y `uv` en 0.13.4 mediante
+`pip`, porque la imagen base contiene versiones anteriores y `apk upgrade` no
+actualiza paquetes Python instalados por ese mecanismo. Retirar estas actualizaciones
+cuando una base oficial fijada incluya las versiones corregidas y pase los mismos
+controles de imagen.
 La construcción comprueba sus dependencias con `pip check` y desinstala `pip`:
 el instalador y sus bibliotecas vendorizadas no son necesarios para emitir o
 renovar certificados. Los plugins adicionales requieren reconstruir la imagen

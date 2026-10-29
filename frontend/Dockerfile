@@ -30,7 +30,7 @@ RUN test -n "$SPA_CONFIG_URLS" || { echo "SPA_CONFIG_URLS build arg is required;
          find "$SPA_OUTPUT_DIR" -type f -name "*.map" -delete; \
        fi
 
-FROM nginx:1.30.5-alpine@sha256:a5f2157a0302eb0c5e300415effb63a9e70ed1eb9c107283819bf6d149ab607c
+FROM nginx:1.30.6-alpine@sha256:0e52bd054126cdc040b1276c0af347aeb02a41b9cfe305d6094767ac30e97949
 
 ARG SIHSALUS_NODE_ID=unconfigured
 
@@ -39,7 +39,8 @@ LABEL org.sihsalus.node-id="${SIHSALUS_NODE_ID}"
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY --from=assemble /tmp/spa/ /usr/share/nginx/html/
 
-RUN { [ "$SIHSALUS_NODE_ID" = "unconfigured" ] || \
+RUN apk upgrade --no-cache \
+    && { [ "$SIHSALUS_NODE_ID" = "unconfigured" ] || \
       printf '%s\n' "$SIHSALUS_NODE_ID" | grep -Eq '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'; } \
     && sed -i "s|__SIHSALUS_NODE_ID__|${SIHSALUS_NODE_ID}|g" /etc/nginx/nginx.conf \
     && ! grep -Fq '__SIHSALUS_NODE_ID__' /etc/nginx/nginx.conf

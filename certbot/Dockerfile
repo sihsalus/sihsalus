@@ -8,9 +8,10 @@ RUN apk upgrade --no-cache && \
     cp /usr/share/zoneinfo/America/Lima /etc/localtime && \
     echo "America/Lima" > /etc/timezone
 
-# Update the Python HTTP dependency independently of Alpine packages. Keep the
+# Update the Python dependencies independently of Alpine packages. Keep the
 # dependency check and remove the installer and its vendored runtime packages.
-RUN python -m pip install --no-cache-dir --upgrade urllib3==2.8.0 && \
+RUN python -m pip install --no-cache-dir --upgrade \
+    urllib3==2.8.0 certifi==2026.10.19 uv==0.13.4 && \
     python -m pip check && python -m pip uninstall --yes pip
 
 RUN mkdir -p /var/www/certbot/conf /etc/letsencrypt/live
