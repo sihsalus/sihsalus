@@ -52,6 +52,10 @@ returning to UID 1001. The same list carries the rpm package family
 CVE-2026-78367. CI supplies the source SHA as `SECURITY_REFRESH` to invalidate
 the package-update layer on each revision.
 
+`ca-certificates` is updated for CVE-2026-113470 and CVE-2026-114406.
+Verify the rebuilt image has at least `2025.2.76-1.amzn2.0.4`, as published in
+[ALAS2-2026-4045](https://alas.aws.amazon.com/AL2/ALAS2-2026-4045.html).
+
 The update list also includes `cyrus-sasl-lib`, `mariadb` and `mariadb-libs`
 for CVE-2026-107161, CVE-2026-107814 and CVE-2026-107823. These are packages
 inside the backend image; the separate MariaDB service and its data are unchanged.

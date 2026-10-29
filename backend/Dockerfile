@@ -152,7 +152,7 @@ USER root
 # layer after the distribution repositories publish new security fixes.
 ARG SECURITY_REFRESH=local
 RUN echo "Security refresh: ${SECURITY_REFRESH}" && \
-    yum -y update acl curl cyrus-sasl-lib expat glib2 libacl libcurl libssh2 mariadb mariadb-libs openssl-libs openssl11-libs python python-libs python2-rpm rpm rpm-build-libs rpm-libs vim-data vim-minimal && \
+    yum -y update acl ca-certificates curl cyrus-sasl-lib expat glib2 libacl libcurl libssh2 mariadb mariadb-libs openssl-libs openssl11-libs python python-libs python2-rpm rpm rpm-build-libs rpm-libs vim-data vim-minimal && \
     yum clean all && \
     rm -rf /var/cache/yum
 
