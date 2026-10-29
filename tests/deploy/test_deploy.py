@@ -184,6 +184,16 @@ class ComponentUpdate(unittest.TestCase):
                 deploy.resolve("frontend", "latest", digest("different"), self.root, "linux/amd64")
             self.assertEqual(run.call_count, 1)
 
+    def test_running_without_healthcheck_is_not_a_healthy_application(self):
+        def running(command, **kwargs):
+            self.assertNotIn(".State.Health", command[-1])
+            return "running"
+
+        for component in ("backend", "frontend"):
+            with self.subTest(component=component), patch.object(release, "run", side_effect=running):
+                with self.assertRaisesRegex(release.ManifestError, "not healthy"):
+                    deploy.health(self.current, self.root, [component])
+
     def test_concurrent_operation_is_rejected(self):
         with release.release_lock(self.root):
             with self.assertRaises(release.ManifestError):

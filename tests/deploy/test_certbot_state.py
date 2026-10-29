@@ -17,7 +17,16 @@ class CertbotState(unittest.TestCase):
         answers = [mode, "b" * 64, json.dumps({"image": actual_image or image,
                    "status": status, "exitCode": exit_code, "health": None}),
                    "SSL_MODE=" + (actual_mode or mode)]
-        with patch.object(release, "run", side_effect=answers), patch.dict(release.os.environ, {"SSL_MODE": mode}):
+        responses = iter(answers)
+
+        def inspect(command, **kwargs):
+            # Docker 29 treats direct access to the absent Health map key as
+            # an error, including inside an `if` expression.
+            if command[:2] == ["docker", "inspect"] and ".State.Health" in command[-1]:
+                raise release.ManifestError('map has no entry for key "Health"')
+            return next(responses)
+
+        with patch.object(release, "run", side_effect=inspect), patch.dict(release.os.environ, {"SSL_MODE": mode}):
             release.wait_certbot(manifest, Path("/synthetic"), timeout=0)
 
     def test_development_requires_successful_completion(self):

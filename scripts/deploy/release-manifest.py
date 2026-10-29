@@ -470,7 +470,7 @@ def wait_certbot(manifest, root, timeout=180):
         container = run(command + ["ps", "--all", "--quiet", "certbot"], root=root, environment=environment).strip()
         require(matches(container, r"[a-f0-9]{12,64}"), "Certbot container is missing or ambiguous")
         template = ('{"image":{{json .Image}},"status":{{json .State.Status}},"exitCode":{{json .State.ExitCode}},'
-                    '"health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}null{{end}}}')
+                    '"health":{{with (index .State "Health")}}{{json .Status}}{{else}}null{{end}}}')
         try:
             value = json.loads(run(["docker", "inspect", container, "--format", template], root=root))
         except (ValueError, TypeError):

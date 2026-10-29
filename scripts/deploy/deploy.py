@@ -143,7 +143,7 @@ def previous_release(current, root):
 def health(current, root, components):
     for name in components:
         value = releases.run(["docker", "inspect", f"sihsalus-{name}", "--format",
-                              "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}"], root=root).strip()
+                              '{{with (index .State "Health")}}{{.Status}}{{else}}{{.State.Status}}{{end}}'], root=root).strip()
         releases.require(value == "healthy", f"Current {name} is not healthy; inspect it before updating")
 
 
