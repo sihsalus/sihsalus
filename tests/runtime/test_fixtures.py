@@ -1,6 +1,7 @@
 """Guard actual Compose selections and redact exclusively synthetic test secrets."""
 
 from copy import deepcopy
+import io
 import json
 import os
 from pathlib import Path
@@ -9,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from urllib.parse import quote
 
 import fixtures
@@ -161,6 +163,62 @@ elif args[0] == 'inspect' or args[:2] == ['image', 'inspect']: print('[]')
                     if mutation == "image": bad["services"]["backend"]["image"] = "ghcr.io/sihsalus/sihsalus-backend:latest"
                     if mutation == "services": bad["services"]["unreviewed"] = {}
                     with self.assertRaises(ValueError): fixtures.validate_model(bad, fixture, ROOT)
+
+    def test_first_error_does_not_hide_later_csv_summary_or_primary_context(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            raw = (b"ERROR unrelated early message\n" + b"normal startup\n" * 700
+                   + b"Loading roles/example.csv\nERROR primary CSV validation message\n"
+                   + b"BEGINNING OF CSV FILE ERROR SUMMARY\n"
+                   + b"example.csv (roles domain) was processed and 2 out of 600 entities were not saved.\n"
+                   + b"synthetic role row\n" * 600
+                   + b"END OF CSV FILE ERROR SUMMARY\n" + b"normal startup\n" * 700)
+            fixtures.capture_diagnostics(io.BytesIO(raw), path)
+            first = (path / "backend-first-error.log").read_bytes()
+            csv = (path / "backend-first-csv.log").read_bytes()
+            self.assertIn(b"ERROR unrelated early message", first)
+            self.assertNotIn(b"primary CSV validation", first)
+            for text in (b"Loading roles/example.csv", b"primary CSV validation",
+                         b"BEGINNING OF CSV FILE ERROR SUMMARY", b"END OF CSV FILE ERROR SUMMARY",
+                         b"2 out of 600 entities were not saved"):
+                self.assertIn(text, csv)
+            self.assertIn(b"csvEndFound=True", csv)
+            self.assertIn(b"windowTruncated=False", csv)
+
+    def test_diagnostic_limits_are_explicit_and_do_not_keep_partial_lines(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            raw = (b"ERROR first\nBEGINNING OF CSV FILE ERROR SUMMARY\n" + b"row\n" * 100
+                   + b"END OF CSV FILE ERROR SUMMARY\n" + b"private-partial-line" * 1000)
+            with patch.object(fixtures, "DIAGNOSTIC_INPUT_LIMIT", 1024), \
+                 patch.object(fixtures, "DIAGNOSTIC_WINDOW_LIMIT", 128):
+                fixtures.capture_diagnostics(io.BytesIO(raw), path)
+            for log in path.glob("*.log"):
+                captured = log.read_bytes()
+                header, block = captured.split(b"\n", 1)
+                self.assertIn(b"inputTruncated=True", header)
+                self.assertIn(b"windowTruncated=True", header)
+                self.assertLessEqual(len(block), 128)
+                self.assertTrue(block.endswith(b"\n"))
+                self.assertNotIn(b"private-partial-line", captured)
+            fixtures.capture_diagnostics(io.BytesIO(b"normal startup\n"), path)
+            self.assertIn(b"markerFound=False", (path / "backend-first-csv.log").read_bytes())
+
+    def test_captured_diagnostics_use_existing_secret_redaction(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            fixture = fixtures.prepare(path, "local", DIGEST)
+            secret = fixture["initialPassword"]
+            raw = (f"ERROR password={secret}\nBEGINNING OF CSV FILE ERROR SUMMARY\n"
+                   "Authorization: Bearer synthetic-token\nCookie: private-cookie\n"
+                   f"replacement={fixture['replacementPassword']}\n"
+                   "END OF CSV FILE ERROR SUMMARY\n").encode()
+            fixtures.capture_diagnostics(io.BytesIO(raw), path)
+            for log in path.glob("*.log"):
+                sanitized = fixtures.sanitize(log.read_text(), fixture)
+                for value in (secret, fixture["replacementPassword"], "synthetic-token", "private-cookie"):
+                    self.assertNotIn(value, sanitized)
+                self.assertIn("ERROR", sanitized)
 
     def test_logs_redact_generated_and_session_credentials(self):
         with tempfile.TemporaryDirectory() as directory:

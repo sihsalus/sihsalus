@@ -30,6 +30,13 @@ cleanup() {
   trap - EXIT INT TERM
   if "$STARTED"; then
     timeout --kill-after=5s 30s "${COMPOSE[@]}" logs --no-color --timestamps --tail 500 >"$STATE/services.log" 2>&1 || true
+    if [[ "$MODE" == local ]]; then
+      # Bounded prefix windows retain the primary failure even when a CSV table
+      # pushes it out of the normal tail. Only the sanitizer publishes these.
+      timeout --kill-after=5s 30s "${COMPOSE[@]}" logs --no-color --timestamps backend 2>"$STATE/diagnostic-capture.log" \
+        | python3 -B tests/runtime/fixtures.py diagnostics "$STATE" \
+        || echo 'Diagnostic capture incomplete; inspect window truncation flags' >>"$STATE/diagnostic-capture.log"
+    fi
     "${COMPOSE[@]}" ps --all --format json \
       | jq -s 'flatten | map({service: .Service, state: .State, health: .Health, exitCode: .ExitCode})' \
       >"$EVIDENCE/services.json" || result=1

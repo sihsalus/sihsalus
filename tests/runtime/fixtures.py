@@ -13,6 +13,10 @@ from urllib.parse import quote
 from uuid import uuid4
 
 
+DIAGNOSTIC_INPUT_LIMIT = 16 * 1024 * 1024
+DIAGNOSTIC_WINDOW_LIMIT = 512 * 1024
+
+
 CORE = {"gateway", "frontend", "docs", "backend", "backend-oauth2-config", "db"}
 
 
@@ -89,9 +93,44 @@ def sanitize(text, fixture):
     return text
 
 
+def capture_diagnostics(source, directory):
+    """Keep independent first-error/CSV windows in private state, then sanitize normally."""
+    raw = source.read(DIAGNOSTIC_INPUT_LIMIT + 1)
+    input_truncated = len(raw) > DIAGNOSTIC_INPUT_LIMIT
+    data = raw[:DIAGNOSTIC_INPUT_LIMIT]
+    if input_truncated:
+        # Never retain a partial final line (which could split a generated secret).
+        data = data[:data.rfind(b"\n") + 1]
+    for name, marker in (("first-error", rb"\b(?:ERROR|FATAL)\b"),
+                         ("first-csv", rb"BEGIN(?:NING)? OF CSV FILE ERROR SUMMARY")):
+        match = re.search(marker, data)
+        block, end_found, window_truncated = b"", False, False
+        if match:
+            line = data.rfind(b"\n", 0, match.start()) + 1
+            context_start = max(0, line - 64 * 1024)
+            if context_start:
+                context_start = data.find(b"\n", context_start, line) + 1
+            context = b"".join(data[context_start:line].splitlines(keepends=True)[-30:])
+            if name == "first-csv":
+                end = data.find(b"END OF CSV FILE ERROR SUMMARY", match.end())
+                end_found = end >= 0
+                end = data.find(b"\n", end) if end_found else -1
+                body = data[line:end + 1 if end >= 0 else len(data)]
+            else:
+                body = b"\n".join(data[line:].split(b"\n", 121)[:121]) + b"\n"
+            block = context + body
+            window_truncated = len(block) > DIAGNOSTIC_WINDOW_LIMIT
+            if window_truncated:
+                block = block[:block.rfind(b"\n", 0, DIAGNOSTIC_WINDOW_LIMIT) + 1]
+        header = (f"markerFound={bool(match)} inputTruncated={input_truncated} "
+                  f"windowTruncated={window_truncated} csvEndFound={end_found}\n")
+        # Each file stays below the existing sanitizer's 2 MiB retention limit.
+        (directory / ("backend-" + name + ".log")).write_bytes(header.encode() + block)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=("run", "validate", "sanitize"))
+    parser.add_argument("operation", choices=("run", "validate", "sanitize", "diagnostics"))
     parser.add_argument("directory", type=Path)
     parser.add_argument("arguments", nargs="*")
     args = parser.parse_args()
@@ -100,6 +139,9 @@ def main():
         os.execvpe("bash", ["bash", str(Path(__file__).with_name("run.sh")), fixture["mode"]],
                    {**os.environ, **fixture["environment"], "SMOKE_STATE": str(args.directory.resolve())})
     fixture = json.loads((args.directory / "fixture.json").read_text())
+    if args.operation == "diagnostics":
+        capture_diagnostics(sys.stdin.buffer, args.directory)
+        return
     if args.operation == "validate":
         validate_model(json.load(sys.stdin), fixture, Path(args.arguments[0]))
         print("PASS: isolated core Compose with immutable backend and loopback gateway")

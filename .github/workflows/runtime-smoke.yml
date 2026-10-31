@@ -1,15 +1,13 @@
 name: OpenMRS runtime smoke
 
 on:
-  schedule:
-    - cron: '23 8 * * *'
   workflow_dispatch:
     inputs:
       backend_digest:
-        description: 'Published SIHSalus backend sha256 digest; empty selects latest'
+        description: 'Diagnostic only: published backend from 1b784d40'
         type: string
-        required: false
-        default: ''
+        required: true
+        default: 'sha256:c06868be246ab12361011aba7a957d64e29c99531aac2ed82ad2da2883b470e0'
 
 permissions:
   contents: read
@@ -26,11 +24,12 @@ jobs:
     outputs:
       backend_digest: ${{ steps.backend.outputs.digest }}
     steps:
-      - name: Resolve the same immutable backend for both authentication cases
+      - name: Verify the fixed published backend for the local diagnostic
         id: backend
         env:
           REQUESTED_BACKEND_DIGEST: ${{ inputs.backend_digest }}
         run: |
+          [[ "$REQUESTED_BACKEND_DIGEST" == sha256:c06868be246ab12361011aba7a957d64e29c99531aac2ed82ad2da2883b470e0 ]]
           docker context show
           docker info --format '{{.ServerVersion}}'
           image='ghcr.io/sihsalus/sihsalus-backend:latest'
@@ -51,7 +50,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        authentication: [local, keycloak]
+        authentication: [local]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -85,8 +84,10 @@ jobs:
           {
             echo '## Fresh SIHSalus core runtime smoke'
             echo "Authentication: $AUTHENTICATION_MODE"
-            echo "Checkout: $GITHUB_SHA"
-            echo 'Backend: published SIHSalus image resolved once by digest; latest by default, or an explicit manual candidate.'
+            echo "Diagnostic checkout: $GITHUB_SHA"
+            echo 'Backend source: 1b784d40c043a40e299732024cd5ce7ef640bce9 (unchanged published image).'
+            echo 'Backend digest: sha256:c06868be246ab12361011aba7a957d64e29c99531aac2ed82ad2da2883b470e0.'
+            echo 'Diagnostics: first ERROR and first CSV summary separately (30 lines of context, 512 KiB each), plus normal tail; 16 MiB input prefix and 30-second collection limit.'
             echo 'Frontend: immutable source configured in the distro template; current runtime wrapper.'
             echo 'Gateway and optional Keycloak: current Dockerfiles and normal Compose configuration.'
             echo 'Synthetic fresh databases; no real patient data or DEV/QLTY/PROD access.'
