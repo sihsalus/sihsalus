@@ -128,3 +128,7 @@ El [índice de documentación](docs/README.md) organiza las guías por tarea.
 | Autenticación local y OIDC | [OAuth](oauth/README.md) |
 | Monitoreo, logs y UPS | [Monitoreo](monitoring/README.md) |
 | Scripts operativos | [Inventario](scripts/README.md) |
+
+## Licencia
+
+SIH SALUS se distribuye bajo la [Mozilla Public License 2.0](LICENSE), © Pontificia Universidad Católica del Perú (PUCP), Grupo de Investigación y Desarrollo de Ingeniería de Software (GIDIS). Los componentes de OpenMRS que incluye mantienen su propia licencia (MPL 2.0 con Healthcare Disclaimer).
