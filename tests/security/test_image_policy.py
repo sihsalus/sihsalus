@@ -53,7 +53,7 @@ def exception(**changes):
     entry = {"id": "synthetic-accepted-risk", "repository": REPOSITORY, "platform": "linux/amd64",
              "vulnerabilityId": FINDING["VulnerabilityID"], "packageName": FINDING["PkgName"],
              "installedVersion": FINDING["InstalledVersion"], "class": "os-pkgs", "type": "alpine", "severity": "HIGH",
-             "owner": "@synthetic-owner", "issue": "https://github.com/sihsalus/sihsalus/issues/177",
+             "basis": "temporary", "owner": "@synthetic-owner", "issue": "https://github.com/sihsalus/sihsalus/issues/177",
              "rationale": "Synthetic exception fixture; not an accepted production risk.",
              "createdOn": "2026-09-20", "expiresOn": "2026-09-27"}
     entry.update(changes)
@@ -130,6 +130,15 @@ class PolicyContract(unittest.TestCase):
         for entries in ([exception(), exception()], [exception(password=SECRET)], [exception(), exception(id="another-id")]):
             with self.assertRaises(policy.PolicyError):
                 policy.validate_policy({"schemaVersion": 1, "exceptions": entries}, TODAY)
+
+    def test_platform_blocked_libraries_may_last_ninety_days(self):
+        platform = {"basis": "platform", "class": "lang-pkgs", "type": "jar"}
+        policy.validate_policy({"schemaVersion": 1, "exceptions": [exception(**platform, expiresOn="2026-12-19")]}, TODAY)
+        for entry in (exception(**platform, expiresOn="2026-12-20"), exception(basis="platform", expiresOn="2026-10-01"),
+                      exception(expiresOn="2026-10-21"), exception(basis="permanent")):
+            with self.subTest(entry=entry):
+                with self.assertRaises(policy.PolicyError):
+                    policy.validate_policy({"schemaVersion": 1, "exceptions": [entry]}, TODAY)
 
     def test_expiration_is_inclusive_in_utc_and_fails_the_next_day(self):
         value = {"schemaVersion": 1, "exceptions": [exception(expiresOn="2026-09-21")]}

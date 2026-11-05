@@ -17,8 +17,12 @@ PLATFORMS = {"linux/amd64", "linux/arm64"}
 INDEX_MEDIA = {"application/vnd.oci.image.index.v1+json", "application/vnd.docker.distribution.manifest.list.v2+json"}
 MANIFEST_MEDIA = {"application/vnd.oci.image.manifest.v1+json", "application/vnd.docker.distribution.manifest.v2+json"}
 EXCEPTION_FIELDS = {"id", "repository", "platform", "vulnerabilityId", "packageName", "installedVersion",
-                    "class", "type", "severity", "owner", "issue", "rationale", "createdOn", "expiresOn"}
+                    "class", "type", "severity", "basis", "owner", "issue", "rationale", "createdOn", "expiresOn"}
 MATCH_FIELDS = ("repository", "platform", "vulnerabilityId", "packageName", "installedVersion", "class", "type", "severity")
+# A "platform" exception covers a library whose only fix needs an upstream
+# runtime migration (for example Spring 5.3 on the javax OpenMRS Core), so it
+# outlives a sprint. Everything else stays short-lived.
+MAX_EXCEPTION_DAYS = {"temporary": 30, "platform": 90}
 
 
 class PolicyError(Exception):
@@ -121,9 +125,12 @@ def validate_policy(policy, today=None):
         rationale = entry["rationale"]
         require(isinstance(rationale, str) and 20 <= len(rationale) <= 2000 and all(ord(character) >= 32 for character in rationale),
                 "A concrete, single-line exception rationale is required")
+        require(entry["basis"] in MAX_EXCEPTION_DAYS, "Exception basis must be temporary or platform")
+        require(entry["basis"] == "temporary" or entry["class"] == "lang-pkgs",
+                "Operating-system packages cannot wait for a platform migration")
         created, expires = parse_day(entry["createdOn"]), parse_day(entry["expiresOn"])
-        require(created <= today <= expires and 0 < (expires - created).days <= 30,
-                "Exceptions must be current and expire within 30 days of creation")
+        require(created <= today <= expires and 0 < (expires - created).days <= MAX_EXCEPTION_DAYS[entry["basis"]],
+                "Exceptions must be current and expire within 30 days, or 90 days for platform-blocked libraries")
         scope = tuple(entry[key] for key in MATCH_FIELDS)
         require(scope not in scopes, "Duplicate exception scope")
         identifiers.add(entry["id"])
