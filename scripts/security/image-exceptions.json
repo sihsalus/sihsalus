@@ -11,11 +11,12 @@
       "severity": "HIGH",
       "class": "lang-pkgs",
       "type": "jar",
+      "basis": "platform",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Proposed seven-day acceptance requiring explicit human review for production and DEV/QLTY validation of Spring 5.3.39 on the javax-compatible Core/OMOD stack. Correct fixable OS and Guava findings first; other findings remain blocking. Remove when a compatible maintained Core/framework release passes native, authentication and module tests; track migration in issue #323.",
-      "createdOn": "2026-10-28",
-      "expiresOn": "2026-11-04"
+      "rationale": "Platform-blocked acceptance of Spring 5.3.39 on the javax-compatible Core/OMOD stack: no maintained open-source 5.3 release fixes it, OpenMRS Core 2.8.x and 2.9.x still pin 5.3.39, and the fix requires the unreleased Core 3.0 (Spring 7, Jakarta) plus migrated OMODs and Tomcat. Production use still requires explicit human review. Remove when a compatible Core release passes native, authentication and module tests; track migration in issue #323.",
+      "createdOn": "2026-11-05",
+      "expiresOn": "2027-02-03"
     },
     {
       "id": "backend-cve-2026-41849-20261015",
@@ -27,11 +28,12 @@
       "severity": "HIGH",
       "class": "lang-pkgs",
       "type": "jar",
+      "basis": "platform",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Proposed seven-day acceptance requiring explicit human review for production and DEV/QLTY validation of Spring 5.3.39 on the javax-compatible Core/OMOD stack. Correct fixable OS and Guava findings first; other findings remain blocking. Remove when a compatible maintained Core/framework release passes native, authentication and module tests; track migration in issue #323.",
-      "createdOn": "2026-10-28",
-      "expiresOn": "2026-11-04"
+      "rationale": "Platform-blocked acceptance of Spring 5.3.39 on the javax-compatible Core/OMOD stack: no maintained open-source 5.3 release fixes it, OpenMRS Core 2.8.x and 2.9.x still pin 5.3.39, and the fix requires the unreleased Core 3.0 (Spring 7, Jakarta) plus migrated OMODs and Tomcat. Production use still requires explicit human review. Remove when a compatible Core release passes native, authentication and module tests; track migration in issue #323.",
+      "createdOn": "2026-11-05",
+      "expiresOn": "2027-02-03"
     },
     {
       "id": "backend-cve-2026-41850-20261015",
@@ -43,11 +45,12 @@
       "severity": "HIGH",
       "class": "lang-pkgs",
       "type": "jar",
+      "basis": "platform",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Proposed seven-day acceptance requiring explicit human review for production and DEV/QLTY validation of Spring 5.3.39 on the javax-compatible Core/OMOD stack. Correct fixable OS and Guava findings first; other findings remain blocking. Remove when a compatible maintained Core/framework release passes native, authentication and module tests; track migration in issue #323.",
-      "createdOn": "2026-10-28",
-      "expiresOn": "2026-11-04"
+      "rationale": "Platform-blocked acceptance of Spring 5.3.39 on the javax-compatible Core/OMOD stack: no maintained open-source 5.3 release fixes it, OpenMRS Core 2.8.x and 2.9.x still pin 5.3.39, and the fix requires the unreleased Core 3.0 (Spring 7, Jakarta) plus migrated OMODs and Tomcat. Production use still requires explicit human review. Remove when a compatible Core release passes native, authentication and module tests; track migration in issue #323.",
+      "createdOn": "2026-11-05",
+      "expiresOn": "2027-02-03"
     },
     {
       "id": "backend-cve-2016-1000027-20261015",
@@ -59,11 +62,12 @@
       "severity": "CRITICAL",
       "class": "lang-pkgs",
       "type": "jar",
+      "basis": "platform",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Proposed seven-day acceptance requiring explicit human review for production and DEV/QLTY validation of Spring 5.3.39 on the javax-compatible Core/OMOD stack. Correct fixable OS and Guava findings first; other findings remain blocking. Remove when a compatible maintained Core/framework release passes native, authentication and module tests; track migration in issue #323.",
-      "createdOn": "2026-10-28",
-      "expiresOn": "2026-11-04"
+      "rationale": "Platform-blocked acceptance of Spring 5.3.39 on the javax-compatible Core/OMOD stack: no maintained open-source 5.3 release fixes it, OpenMRS Core 2.8.x and 2.9.x still pin 5.3.39, and the fix requires the unreleased Core 3.0 (Spring 7, Jakarta) plus migrated OMODs and Tomcat. Production use still requires explicit human review. Remove when a compatible Core release passes native, authentication and module tests; track migration in issue #323.",
+      "createdOn": "2026-11-05",
+      "expiresOn": "2027-02-03"
     },
     {
       "id": "backend-cve-2026-47884-20261015",
@@ -75,11 +79,12 @@
       "severity": "CRITICAL",
       "class": "lang-pkgs",
       "type": "jar",
+      "basis": "platform",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Proposed seven-day acceptance requiring explicit human review for production and DEV/QLTY validation of Spring 5.3.39 on the javax-compatible Core/OMOD stack. Correct fixable OS and Guava findings first; other findings remain blocking. Remove when a compatible maintained Core/framework release passes native, authentication and module tests; track migration in issue #323.",
-      "createdOn": "2026-10-28",
-      "expiresOn": "2026-11-04"
+      "rationale": "Platform-blocked acceptance of Spring 5.3.39 on the javax-compatible Core/OMOD stack: no maintained open-source 5.3 release fixes it, OpenMRS Core 2.8.x and 2.9.x still pin 5.3.39, and the fix requires the unreleased Core 3.0 (Spring 7, Jakarta) plus migrated OMODs and Tomcat. Production use still requires explicit human review. Remove when a compatible Core release passes native, authentication and module tests; track migration in issue #323.",
+      "createdOn": "2026-11-05",
+      "expiresOn": "2027-02-03"
     },
     {
       "id": "backend-cve-2024-38816-20261015",
@@ -91,11 +96,12 @@
       "severity": "HIGH",
       "class": "lang-pkgs",
       "type": "jar",
+      "basis": "platform",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Proposed seven-day acceptance requiring explicit human review for production and DEV/QLTY validation of Spring 5.3.39 on the javax-compatible Core/OMOD stack. Correct fixable OS and Guava findings first; other findings remain blocking. Remove when a compatible maintained Core/framework release passes native, authentication and module tests; track migration in issue #323.",
-      "createdOn": "2026-10-28",
-      "expiresOn": "2026-11-04"
+      "rationale": "Platform-blocked acceptance of Spring 5.3.39 on the javax-compatible Core/OMOD stack: no maintained open-source 5.3 release fixes it, OpenMRS Core 2.8.x and 2.9.x still pin 5.3.39, and the fix requires the unreleased Core 3.0 (Spring 7, Jakarta) plus migrated OMODs and Tomcat. Production use still requires explicit human review. Remove when a compatible Core release passes native, authentication and module tests; track migration in issue #323.",
+      "createdOn": "2026-11-05",
+      "expiresOn": "2027-02-03"
     },
     {
       "id": "backend-cve-2024-38819-20261015",
@@ -107,11 +113,12 @@
       "severity": "HIGH",
       "class": "lang-pkgs",
       "type": "jar",
+      "basis": "platform",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Proposed seven-day acceptance requiring explicit human review for production and DEV/QLTY validation of Spring 5.3.39 on the javax-compatible Core/OMOD stack. Correct fixable OS and Guava findings first; other findings remain blocking. Remove when a compatible maintained Core/framework release passes native, authentication and module tests; track migration in issue #323.",
-      "createdOn": "2026-10-28",
-      "expiresOn": "2026-11-04"
+      "rationale": "Platform-blocked acceptance of Spring 5.3.39 on the javax-compatible Core/OMOD stack: no maintained open-source 5.3 release fixes it, OpenMRS Core 2.8.x and 2.9.x still pin 5.3.39, and the fix requires the unreleased Core 3.0 (Spring 7, Jakarta) plus migrated OMODs and Tomcat. Production use still requires explicit human review. Remove when a compatible Core release passes native, authentication and module tests; track migration in issue #323.",
+      "createdOn": "2026-11-05",
+      "expiresOn": "2027-02-03"
     },
     {
       "id": "backend-cve-2026-41842-20261015",
@@ -123,11 +130,12 @@
       "severity": "HIGH",
       "class": "lang-pkgs",
       "type": "jar",
+      "basis": "platform",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Proposed seven-day acceptance requiring explicit human review for production and DEV/QLTY validation of Spring 5.3.39 on the javax-compatible Core/OMOD stack. Correct fixable OS and Guava findings first; other findings remain blocking. Remove when a compatible maintained Core/framework release passes native, authentication and module tests; track migration in issue #323.",
-      "createdOn": "2026-10-28",
-      "expiresOn": "2026-11-04"
+      "rationale": "Platform-blocked acceptance of Spring 5.3.39 on the javax-compatible Core/OMOD stack: no maintained open-source 5.3 release fixes it, OpenMRS Core 2.8.x and 2.9.x still pin 5.3.39, and the fix requires the unreleased Core 3.0 (Spring 7, Jakarta) plus migrated OMODs and Tomcat. Production use still requires explicit human review. Remove when a compatible Core release passes native, authentication and module tests; track migration in issue #323.",
+      "createdOn": "2026-11-05",
+      "expiresOn": "2027-02-03"
     },
     {
       "id": "backend-cve-2026-41845-20261015",
@@ -139,11 +147,12 @@
       "severity": "HIGH",
       "class": "lang-pkgs",
       "type": "jar",
+      "basis": "platform",
       "owner": "@Duvet05",
       "issue": "https://github.com/sihsalus/sihsalus/issues/323",
-      "rationale": "Proposed seven-day acceptance requiring explicit human review for production and DEV/QLTY validation of Spring 5.3.39 on the javax-compatible Core/OMOD stack. Correct fixable OS and Guava findings first; other findings remain blocking. Remove when a compatible maintained Core/framework release passes native, authentication and module tests; track migration in issue #323.",
-      "createdOn": "2026-10-28",
-      "expiresOn": "2026-11-04"
+      "rationale": "Platform-blocked acceptance of Spring 5.3.39 on the javax-compatible Core/OMOD stack: no maintained open-source 5.3 release fixes it, OpenMRS Core 2.8.x and 2.9.x still pin 5.3.39, and the fix requires the unreleased Core 3.0 (Spring 7, Jakarta) plus migrated OMODs and Tomcat. Production use still requires explicit human review. Remove when a compatible Core release passes native, authentication and module tests; track migration in issue #323.",
+      "createdOn": "2026-11-05",
+      "expiresOn": "2027-02-03"
     }
   ]
 }
