@@ -62,6 +62,11 @@ inside the backend image; the separate MariaDB service and its data are unchange
 Verify the rebuilt image contains at least `cyrus-sasl-lib`
 `2.1.26-24.amzn2.0.2` and MariaDB packages `1:5.5.68-1.amzn2.0.4`.
 
+The runtime C library family (`glibc`, `glibc-common`, `glibc-langpack-en`,
+`glibc-minimal-langpack` and `libcrypt`) is updated together from the Amazon
+Linux 2 repositories. Verify all five installed RPM releases are at least
+`2.26-64.amzn2.0.7` and keep the existing image scans and native runtime checks.
+
 Amazon backports fixes without changing curl's `8.3.0` version string; inspect
 `rpm -q curl libcurl` and the image scan rather than that string alone. Accepted
 Java findings are listed in [the image security policy](../docs/operations/image-security.md).
