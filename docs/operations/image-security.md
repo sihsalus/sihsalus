@@ -76,10 +76,17 @@ Cada entrada contiene:
 | `packageName`, `installedVersion` | Paquete y versión exactos                                           |
 | `class`, `type`                   | Clase y ecosistema del informe, por ejemplo `lang-pkgs` / `jar`     |
 | `severity`                        | `HIGH` o `CRITICAL`                                                 |
+| `basis`                           | `temporary` o `platform` (ver abajo)                                |
 | `owner`                           | Usuario o equipo GitHub que asume el seguimiento                    |
 | `issue`                           | Issue de SIHSalus que registra decisión, mitigación y resolución    |
 | `rationale`                       | Justificación concreta; sin contraseñas ni configuración privada    |
-| `createdOn`, `expiresOn`          | Fechas ISO; vencimiento máximo a 30 días de la creación             |
+| `createdOn`, `expiresOn`          | Fechas ISO; máximo 30 días desde la creación (90 si es `platform`)  |
+
+`temporary` es el caso general. `platform` se reserva para bibliotecas
+(`lang-pkgs`) cuya única corrección exige una migración de plataforma fuera del
+control de SIHSalus, como Spring 5.3 sobre el Core `javax` de OpenMRS. Los
+paquetes del sistema operativo siempre se corrigen en el Dockerfile y no pueden
+usar `platform`.
 
 Las fechas se evalúan en UTC, incluyendo el día de vencimiento. El día siguiente
 la excepción falla, aunque la imagen o el paquete no hayan cambiado. Una entrada
@@ -100,9 +107,12 @@ El catálogo define nueve alcances exactos de
 ecosistema `jar`: Spring Framework 5.3.39 (`spring-core`, `spring-expression`,
 `spring-web` y `spring-webmvc`; dos CRITICAL y siete HIGH). Responsable:
 `@Duvet05`; seguimiento: [#323](https://github.com/sihsalus/sihsalus/issues/323).
-El período propuesto va del 28/10 al 04/11/2026 UTC inclusive; desde el 05/11
-la promoción vuelve a bloquearse. Su uso en producción y la validación previa
-en DEV/QLTY requieren revisión humana explícita de riesgos, versión y ambiente.
+Son excepciones `platform`: ninguna release mantenida de Spring 5.3 las corrige,
+OpenMRS Core 2.8.x y 2.9.x siguen en 5.3.39 y la corrección llega con Core 3.0
+(Spring 7, Jakarta), aún sin release. El período va del 05/11/2026 al 03/02/2027
+UTC inclusive; desde el 04/02/2027 la promoción vuelve a bloquearse. Su uso en
+producción y la validación previa en DEV/QLTY requieren revisión humana
+explícita de riesgos, versión y ambiente.
 La validación del JSON no constituye esa aprobación ni autoriza un despliegue.
 El motor comprueba el alcance técnico de la excepción; no controla permisos por
 host o ambiente.

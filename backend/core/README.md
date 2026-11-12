@@ -119,8 +119,8 @@ Spring 5.3 remains affected by findings whose fixes require a different runtime
 or licensed maintenance: CVE-2016-1000027 applies to Spring Web before 6.0, and
 the OSS fix for CVE-2026-47884 is Spring 7.0.9, which also needs
 Jakarta-compatible Core, OMODs and Tomcat. Track that migration separately.
-The nine Spring exception scopes, their owner, seven-day validity window and
-required human review are recorded in [the image security policy](../../docs/operations/image-security.md)
+The nine Spring exception scopes, their owner, 90-day platform-blocked
+validity window and required human review are recorded in [the image security policy](../../docs/operations/image-security.md)
 and `scripts/security/image-exceptions.json`; CI and image promotion share
 that catalog. Updating it does not authorize production deployment.
 Commons Lang has no matching finding in the
