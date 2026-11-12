@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 from uuid import UUID, uuid4
 
 
@@ -453,6 +454,45 @@ def release_lock(root):
         yield directory
 
 
+def wait_certbot(manifest, root, timeout=180):
+    """Certbot dev completes once; prod runs its renewal loop without a healthcheck.
+
+    This verifies the process contract, not certificate issuance or renewal.
+    """
+    mode = run(["bash", "-c", 'source "$1"; read_env_value SSL_MODE "$2"', "env-reader",
+                str(Path(__file__).resolve().parent / "env.sh"), str(root / ".env")], root=root).strip() or "dev"
+    require(mode in ("dev", "prod") and os.environ.get("SSL_MODE", mode) == mode,
+            "Certbot mode differs from the installed configuration")
+    deadline = time.monotonic() + timeout
+    command = compose_command(manifest, root / ".env")
+    environment = compose_environment(manifest)
+    while True:
+        container = run(command + ["ps", "--all", "--quiet", "certbot"], root=root, environment=environment).strip()
+        require(matches(container, r"[a-f0-9]{12,64}"), "Certbot container is missing or ambiguous")
+        template = ('{"image":{{json .Image}},"status":{{json .State.Status}},"exitCode":{{json .State.ExitCode}},'
+                    '"health":{{with (index .State "Health")}}{{json .Status}}{{else}}null{{end}}}')
+        try:
+            value = json.loads(run(["docker", "inspect", container, "--format", template], root=root))
+        except (ValueError, TypeError):
+            raise ManifestError("Cannot read Certbot runtime state") from None
+        require(value.get("image") == manifest["services"]["certbot"]["imageId"], "Certbot runtime image differs")
+        actual_mode = run(["docker", "inspect", container, "--format",
+            '{{range .Config.Env}}{{if eq (index (split . "=") 0) "SSL_MODE"}}{{println .}}{{end}}{{end}}'], root=root).strip()
+        require(actual_mode == "SSL_MODE=" + mode, "Certbot runtime mode differs")
+        require(value.get("status") not in ("dead", "restarting", "removing") and value.get("health") != "unhealthy",
+                "Certbot did not reach its expected state")
+        if mode == "dev":
+            if value.get("status") == "exited":
+                require(value.get("exitCode") == 0, "Certbot certificate preparation failed")
+                return
+        else:
+            require(value.get("status") != "exited", "Certbot renewal service exited")
+            if value.get("status") == "running" and value.get("health") in (None, "healthy"):
+                return
+        require(time.monotonic() < deadline, "Certbot did not become ready before the timeout")
+        time.sleep(1)
+
+
 def apply_release(manifest, previous, root, rollback=False, services=None, state=None, verify=None):
     """Deploy and rollback share the same pinned execution and verification path."""
     validate_manifest(manifest)
@@ -461,8 +501,9 @@ def apply_release(manifest, previous, root, rollback=False, services=None, state
     if services is not None:
         changed = {name for name in manifest["services"]
                    if manifest["services"][name] != previous["services"][name]}
-        require(bool(services) and set(services) <= {"frontend", "backend"} and changed <= set(services),
+        require(bool(services) and set(services) <= {"frontend", "backend", "gateway", "certbot"} and changed <= set(services),
                 "Component update would change unrelated services")
+        require("certbot" not in services or set(services) == {"certbot"}, "Update Certbot separately from other components")
     verify_checkout(manifest, root)
     env_file = root / ".env"
     require(env_file.is_file() and not env_file.is_symlink(), "A regular local .env is required")
@@ -475,6 +516,8 @@ def apply_release(manifest, previous, root, rollback=False, services=None, state
         runtime_inventory(manifest, root, allow_missing=rollback)
         if not rollback:
             verify_runtime(previous, root)
+            if services is not None and set(services) == {"certbot"}:
+                wait_certbot(previous, root, timeout=0)
         if not rollback:
             verify_images(previous, root)
         verify_images(manifest, root)
@@ -535,14 +578,19 @@ def apply_release(manifest, previous, root, rollback=False, services=None, state
                 command = ["bash", str(root / "scripts/deploy/redeploy-environment.sh"), source["commit"],
                            source["image"].split("@", 1)[1]]
             else:
-                wait_seconds = 180 if set(services) == {"frontend"} else 1800
+                wait_seconds = 1800 if "backend" in services else (600 if "gateway" in services else 180)
                 command = compose_command(manifest, env_file, override) + [
-                    "up", "-d", "--no-deps", "--no-build", "--pull", "never", "--wait",
-                    "--wait-timeout", str(wait_seconds), *sorted(services)]
-            # Compose owns health waiting. Component updates never restart databases.
+                    "up", "-d", "--no-deps", "--no-build", "--pull", "never"]
+                if set(services) != {"certbot"}:
+                    command += ["--wait", "--wait-timeout", str(wait_seconds)]
+                command += sorted(services)
+            # Compose owns health waiting except Certbot's one-shot/renewal contract.
+            # Component updates never restart databases.
             result = subprocess.run(command, cwd=root, env=environment, check=False,
                                     timeout=wait_seconds + 100 if services is not None else None)
             require(result.returncode == 0, "Redeploy failed; use the retained previous manifest for recovery")
+            if services is not None and set(services) == {"certbot"}:
+                wait_certbot(manifest, root, timeout=wait_seconds)
             verify_runtime(manifest, root)
             verify_selected_compose(manifest, root, env_file, state / f"{manifest_digest(manifest)}.json")
             if verify is not None:

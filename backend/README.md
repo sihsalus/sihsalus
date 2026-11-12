@@ -25,23 +25,45 @@ belongs to the [frontend build](../frontend/README.md). Runtime setup, including
 OCL token reconciliation, is described below; password
 policy is documented in the [forced-password-change contract](../docs/operations/forced-password-change.md).
 
-## Content 1.25.41
+## Content 1.25.43
 
-The distribution consumes published `sihsalus-content` 1.25.41, from
-[content PR #277](https://github.com/sihsalus/sihsalus-content/pull/277).
-It updates the native ethnicity exports with 58 MINSA equivalences and five
-synonyms while preserving the 62 clinical concept UUIDs and answer order.
-The other 32 exports and remote subscription pins stay unchanged. See the
-[ethnicity contract](https://github.com/sihsalus/sihsalus-content/blob/0b9dd4fd6aeb07f8329cc79c925d71186ff137fc/docs/contracts/etnias-minsa.md)
-for identities, provenance and pending clinical decisions.
+The distribution consumes published `sihsalus-content` 1.25.43, including
+[verified OCL exports and birth-height decimals (#278)](https://github.com/sihsalus/sihsalus-content/pull/278)
+and [native social-history and nursing form corrections (#280)](https://github.com/sihsalus/sihsalus-content/pull/280).
+Birth height accepts decimals in the canonical catalog while retaining its
+clinical UUID, Numeric datatype and cm unit. The package also preserves the
+ethnicity mappings and answer order introduced in content 1.25.41.
+The versioned exports for 18 OCL sources and the institutional subscription
+are refreshed together. See the [ethnicity contract](https://github.com/sihsalus/sihsalus-content/blob/0b9dd4fd6aeb07f8329cc79c925d71186ff137fc/docs/contracts/etnias-minsa.md)
+for mappings and outstanding clinical catalog decisions.
 
-For DEV/QLTY, take and verify a database backup before restarting with this
-version. After Initializer completes, verify native code resolution
-(`source=MINSA-ETNIAS`, `code=2` resolves Aimara), existing answer order and
-module readiness. Reverting the backend image does not remove the newly
-persisted mappings; reimporting the older export can lose answer weights.
-Recovery requires evaluating the persisted state and a compatible backup.
-Publication and technical health do not establish clinical acceptance.
+Social History declares the existing required encounter-role question. Nursing
+and breastfeeding forms propose the current date only when creating a record,
+preserve historical dates during editing, and validate dates against birth and
+the current day. Breastfeeding duration is an integer. The affected narrative
+fields declare 255 UTF-16 units; longer historical text must remain available
+for explicit correction rather than being silently truncated.
+
+Deploy the frontend correction from
+[frontend #1280](https://github.com/sihsalus/sihsalus-frontend/pull/1280) before
+adopting these content limits. Its shared validators expose numeric bounds and
+date errors and retain overlong input. Clinical suitability of the limits and
+the encounter-role workflow still requires domain review. This content update
+does not assign roles to accounts or resolve the separate CRED access decision.
+
+Before adoption in DEV/QLTY, verify a database backup and the persisted catalog
+state. After Initializer completes, verify birth-height metadata and synthetic
+save/reload of 30.1 cm, nursing/breastfeeding creation and historical editing,
+text preservation at the boundary, and Social History attribution and reload.
+Preserve concept and form identities, OCL ordering and historical checksums.
+The content publisher's native installation and upgrade evidence is recorded in
+[the 1.25.43 publication run](https://github.com/sihsalus/sihsalus-content/actions/runs/42738685259).
+That evidence does not replace acceptance on the installed backend and frontend.
+
+A backend image rollback does not undo metadata already persisted by Initializer.
+Recovery must use a compatible, verified backup and the approved backend/content
+combination. Publication, image health and this dependency pin do not establish
+clinical acceptance or authorize a deployment.
 
 ## Runtime OS security maintenance
 
@@ -61,6 +83,11 @@ for CVE-2026-107161, CVE-2026-107814 and CVE-2026-107823. These are packages
 inside the backend image; the separate MariaDB service and its data are unchanged.
 Verify the rebuilt image contains at least `cyrus-sasl-lib`
 `2.1.26-24.amzn2.0.2` and MariaDB packages `1:5.5.68-1.amzn2.0.4`.
+
+The runtime C library family (`glibc`, `glibc-common`, `glibc-langpack-en`,
+`glibc-minimal-langpack` and `libcrypt`) is updated together from the Amazon
+Linux 2 repositories. Verify all five installed RPM releases are at least
+`2.26-64.amzn2.0.7` and keep the existing image scans and native runtime checks.
 
 Amazon backports fixes without changing curl's `8.3.0` version string; inspect
 `rpm -q curl libcurl` and the image scan rather than that string alone. Accepted

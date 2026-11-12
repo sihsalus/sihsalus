@@ -161,6 +161,23 @@ validate() {
 }
 
 validate core -f docker-compose.yml
+SIHSALUS_BOOTSTRAP_ADMIN_PASSWORD=ci-only-initial-Admin-2026 \
+  validate install -f docker-compose.yml -f compose/install.yml
+SIHSALUS_BOOTSTRAP_ADMIN_PASSWORD=ci-only-initial-Admin-2026 \
+  validate install-ssl -f docker-compose.yml -f compose/install.yml -f compose/ssl.yml --profile ssl
+python3 - "$EVIDENCE_DIR/install.json" "$EVIDENCE_DIR/install-ssl.json" <<'PY'
+import json
+import sys
+for path in sys.argv[1:]:
+    with open(path, encoding="utf-8") as handle:
+        model = json.load(handle)
+    environment = model["services"]["backend"]["environment"]
+    if environment.get("OMRS_ADMIN_USER_PASSWORD") != "ci-only-initial-Admin-2026":
+        raise SystemExit("[FAIL] fresh installation must provide its initial administrator credential")
+    if environment.get("OMRS_ADMIN_PASSWORD_LOCKED") != "false":
+        raise SystemExit("[FAIL] fresh administrator must be able to change the initial credential")
+print("[OK] fresh installation bootstrap password reaches OpenMRS")
+PY
 SPA_CONFIG_URLS=/openmrs/spa/frontend.json,/openmrs/spa/frontend-realtime.json \
   validate realtime -f docker-compose.yml
 SPA_CONFIG_URLS=/openmrs/spa/frontend.json,/openmrs/spa/frontend-realtime.json \
