@@ -23,7 +23,7 @@ docker run --rm --pull never --network none --cap-drop ALL \
     test "$(id -u)" = 1001
     test "$(id -g)" = 0
     test "${CATALINA_BASE:-$CATALINA_HOME}" = /usr/local/tomcat
-    /usr/local/tomcat/bin/version.sh | grep -qF "Apache Tomcat/9.0.121"
+    /usr/local/tomcat/bin/version.sh | grep -qF "Apache Tomcat/9.0.124"
     test -w /usr/local/tomcat/bin/setenv.sh
     test "$(readlink -f /usr/local/tomcat/conf/Catalina/localhost)" = /usr/local/tomcat/conf/Catalina/localhost
     test "$(stat -c "%u:%g:%a" /usr/local/tomcat/conf)" = 0:0:755
