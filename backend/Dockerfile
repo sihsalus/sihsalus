@@ -161,7 +161,9 @@ RUN echo "Security refresh: ${SECURITY_REFRESH}" && \
 # 9.0.124 includes the security fixes for CVE-2026-101356 and CVE-2026-116830.
 ENV TOMCAT_VERSION=9.0.124 \
     TOMCAT_SHA512=925e4fefe25b2ecccd032acd0b4cb1b506455037ed0f8b0e51824bed839c5e92bf5e58982b990d2fdcbc790bcda1a533db7faffb325f8a7baee939fc8ae871c1
-RUN rm -rf /usr/local/tomcat/bin /usr/local/tomcat/lib
+# TLS terminates at the gateway. The inherited Tomcat Native 1.3.8 is incompatible.
+RUN rm -rf /usr/local/tomcat/bin /usr/local/tomcat/lib && \
+    rm -f /usr/local/tomcat/native-jni-lib/libtcnative-1.*
 COPY --from=dev /tmp/tomcat-runtime/ /usr/local/tomcat/
 RUN chmod -R g+rx /usr/local/tomcat/bin /usr/local/tomcat/lib && \
     touch /usr/local/tomcat/bin/setenv.sh && \
