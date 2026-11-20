@@ -1,0 +1,50 @@
+groups:
+  - name: sihsalus_nonproduction
+    interval: 1m
+    rules:
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: 'No responde {{ $labels.job }} en {{ $labels.instance }}'
+      - alert: SihsalusReadinessFailing
+        expr: probe_success{check="ready"} == 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: '{{ $labels.environment }} no está listo para atender solicitudes'
+      - alert: SihsalusWrongNode
+        expr: probe_success{check="identity"} == 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: 'No se confirma la identidad autorizada de {{ $labels.environment }}'
+          description: 'Revisar conectividad, certificado y X-SIHSALUS-Node-ID antes de desplegar.'
+      - alert: HostFilesystemSpaceLow
+        expr: 100 * (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"}) >= 80
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: 'Disco de {{ $labels.instance }} al {{ $value | printf "%.1f" }}%'
+      - alert: HostFilesystemSpaceCritical
+        expr: 100 * (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"}) >= 90
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: 'Disco de {{ $labels.instance }} en nivel crítico: {{ $value | printf "%.1f" }}%'
+      - alert: ContainerRestartLoop
+        expr: |
+          changes((max by (container_label_com_docker_compose_project, container_label_com_docker_compose_service) (
+            container_start_time_seconds{container_label_com_docker_compose_project="sihsalus",container_label_com_docker_compose_service!=""}
+          ))[30m:1m]) >= 3
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: 'Reinicios repetidos de {{ $labels.container_label_com_docker_compose_service }}'
+      - alert: AlertDeliveryFailing
+        expr: increase(alertmanager_notifications_failed_total{integration="email"}[15m]) > 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: 'Alertmanager no consigue enviar correo; revisar SMTP desde otra vía'

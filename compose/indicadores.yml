@@ -4,8 +4,15 @@
 # Provides SQL-based reporting and indicators.
 # Exposed under /openmrs/services/reportes-sql
 
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   reportes-sql:
+    logging: *bounded-logging
     container_name: sihsalus-reportes-sql
     image: ${REPORTES_SQL_IMAGE:-ghcr.io/sihsalus/reportes-sql}:${REPORTES_SQL_TAG:-latest}
     restart: "unless-stopped"
@@ -32,6 +39,7 @@ services:
       - services-network
 
   reportes-sql-db:
+    logging: *bounded-logging
     container_name: sihsalus-reportes-sql-db
     image: postgres:17
     restart: "unless-stopped"

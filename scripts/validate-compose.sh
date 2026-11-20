@@ -120,6 +120,8 @@ else
   EVIDENCE_DIR="$(mktemp -d)"
   trap 'rm -rf "$EVIDENCE_DIR"' EXIT
 fi
+# Bind mounts must be absolute even when CI supplies a relative evidence path.
+EVIDENCE_DIR="$(cd "$EVIDENCE_DIR" && pwd)"
 
 # Profiles are applied after interpolation. The core must therefore render
 # without any optional-profile credentials in the process environment.
@@ -161,6 +163,12 @@ validate() {
 }
 
 validate core -f docker-compose.yml
+# Nonproduction alerting uses generated, non-secret configuration and a separate secret mount.
+export SIHSALUS_MONITORING_CONFIG_DIR="$(mktemp -d "$EVIDENCE_DIR/nonproduction-config.XXXXXX")"
+export SIHSALUS_ALERT_SMTP_PASSWORD_FILE=/dev/null
+python3 scripts/monitoring/render-nonproduction.py --environment qlty --output-dir "$SIHSALUS_MONITORING_CONFIG_DIR"
+validate nonproduction-monitoring -f docker-compose.yml -f compose/nonproduction-monitoring.yml --profile monitoring
+validate nonproduction-observer --project-directory . -f compose/nonproduction-observer.yml
 SIHSALUS_BOOTSTRAP_ADMIN_PASSWORD=ci-only-initial-Admin-2026 \
   validate install -f docker-compose.yml -f compose/install.yml
 SIHSALUS_BOOTSTRAP_ADMIN_PASSWORD=ci-only-initial-Admin-2026 \
@@ -595,3 +603,21 @@ validate monitoring-oidc -f docker-compose.yml -f compose/keycloak.yml -f compos
 
 python3 tests/monitoring/oidc/config.py "$EVIDENCE_DIR/monitoring-oidc.json" "$EVIDENCE_DIR/monitoring-keycloak.json"
 python3 -B tests/frontend/build-config.py
+
+# Check the resolved services, including overrides, rather than only YAML anchors.
+python3 - "$EVIDENCE_DIR" <<'PY_LOGS'
+import json
+from pathlib import Path
+import sys
+expected = {"driver": "json-file", "options": {"max-size": "50m", "max-file": "3"}}
+checked = 0
+for file in Path(sys.argv[1]).glob("*.json"):
+    model = json.loads(file.read_text())
+    if file.name == "ci-no-volumes.json":
+        continue  # Existing disposable CI topology is separate from installed services.
+    for name, service in model.get("services", {}).items():
+        if service.get("logging") != expected:
+            raise SystemExit("[FAIL] unbounded logging in " + file.name + ": " + name)
+        checked += 1
+print("[OK] bounded Docker logging in", checked, "resolved service configurations")
+PY_LOGS

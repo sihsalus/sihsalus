@@ -6,8 +6,15 @@
 # SSL_MODE=prod obtains and renews Let's Encrypt certificates via HTTP-01.
 # It is NOT included via `include:` because it modifies the gateway service.
 
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   certbot:
+    logging: *bounded-logging
     profiles:
       - ssl
     container_name: sihsalus-certbot
@@ -35,6 +42,7 @@ services:
       - certbot-data:/var/www/certbot:rw
 
   gateway:
+    logging: *bounded-logging
     depends_on:
       - certbot
     build:

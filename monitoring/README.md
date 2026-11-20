@@ -17,6 +17,13 @@ Stack de observabilidad para disponibilidad HTTP, recursos del host y contenedor
 
 ---
 
+## DEV y QLTY
+
+La [guía de logs y alertas de no producción](../docs/operations/nonproduction-monitoring.md)
+explica los límites de logging, el override de métricas y correo, y el observador
+independiente. Su activación conserva la selección real y requiere un despliegue
+coordinado; añadir los archivos no cambia contenedores existentes.
+
 ## Activación
 
 ```bash

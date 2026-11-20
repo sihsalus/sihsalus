@@ -2,8 +2,15 @@
 # Usage:
 #   docker compose -f docker-compose.yml -f compose/status.yml --profile status up -d
 
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   gatus:
+    logging: *bounded-logging
     container_name: sihsalus-gatus
     image: twinproduction/gatus:v5.20.0
     restart: "unless-stopped"

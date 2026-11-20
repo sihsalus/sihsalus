@@ -3,8 +3,15 @@
 #
 # Gateway routing is shared by HTTP and HTTPS; no injected Nginx configuration.
 
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   fua-generator:
+    logging: *bounded-logging
     container_name: sihsalus-fua-generator
     image: ${FUA_GENERATOR_IMAGE:-ghcr.io/sihsalus/generador-de-fua}:${FUA_GENERATOR_TAG:-sha-8deb5ba}
     restart: "unless-stopped"
@@ -33,6 +40,7 @@ services:
       - services-network
 
   fua-generator-db:
+    logging: *bounded-logging
     container_name: sihsalus-fua-generator-db
     image: postgres:17
     restart: "unless-stopped"

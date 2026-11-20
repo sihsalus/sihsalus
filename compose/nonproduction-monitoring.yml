@@ -1,0 +1,21 @@
+# Apply after docker-compose.yml; explicitly start only the five monitoring services.
+# Generate configs with scripts/monitoring/render-nonproduction.py first.
+services:
+  prometheus:
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --storage.tsdb.retention.size=512MB
+    volumes:
+      - ${SIHSALUS_MONITORING_CONFIG_DIR:?Generate the nonproduction monitoring config}/prometheus.json:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/nonproduction:/etc/prometheus/alerts:ro
+  alertmanager:
+    volumes:
+      - ${SIHSALUS_MONITORING_CONFIG_DIR:?Generate the nonproduction monitoring config}/alertmanager.json:/etc/alertmanager/alertmanager.yml:ro
+      - type: bind
+        source: ${SIHSALUS_ALERT_SMTP_PASSWORD_FILE:?Provide a private SMTP application password file}
+        target: /run/secrets/smtp-password
+        read_only: true
+        bind:
+          create_host_path: false
