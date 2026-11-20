@@ -150,9 +150,11 @@ FROM ${OPENMRS_RUNTIME_IMAGE}
 USER root
 # CI supplies the commit SHA so BuildKit cannot reuse a stale package-update
 # layer after the distribution repositories publish new security fixes.
+# Apply every published security advisory rather than a hand-kept package list,
+# so a newly fixable OS finding is resolved by the next build.
 ARG SECURITY_REFRESH=local
 RUN echo "Security refresh: ${SECURITY_REFRESH}" && \
-    yum -y update acl ca-certificates curl cyrus-sasl-lib expat glib2 glibc glibc-common glibc-langpack-en glibc-minimal-langpack libacl libcrypt libcurl libssh2 mariadb mariadb-libs openssl-libs openssl11-libs python python-libs python2-rpm rpm rpm-build-libs rpm-libs sqlite vim-data vim-minimal && \
+    yum -y update --security && \
     yum clean all && \
     rm -rf /var/cache/yum
 
