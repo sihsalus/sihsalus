@@ -67,27 +67,29 @@ clinical acceptance or authorize a deployment.
 
 ## Runtime OS security maintenance
 
-The runtime base stays immutable. Its build-time `yum update` includes both
-`curl` and `libcurl`, so new Amazon Linux security patches are applied before
-returning to UID 1001. The same list carries the rpm package family
-(`python2-rpm`, `rpm`, `rpm-build-libs`, `rpm-libs`) for ALAS2-2026-3984 /
-CVE-2026-78367. CI supplies the source SHA as `SECURITY_REFRESH` to invalidate
-the package-update layer on each revision.
+The runtime base stays immutable. Its build-time `yum -y update --security`
+applies every Amazon Linux 2 security advisory published after the base image
+before returning to UID 1001, so a new fixable OS finding is resolved by the
+next build without editing a package list. CI supplies the source SHA as
+`SECURITY_REFRESH` to invalidate the package-update layer on each revision.
 
-`ca-certificates` is updated for CVE-2026-113470 and CVE-2026-114406.
-Verify the rebuilt image has at least `2025.2.76-1.amzn2.0.4`, as published in
-[ALAS2-2026-4045](https://alas.aws.amazon.com/AL2/ALAS2-2026-4045.html).
+Earlier advisories that drove this policy, with the minimum releases to verify
+in a rebuilt image:
 
-The update list also includes `cyrus-sasl-lib`, `mariadb` and `mariadb-libs`
-for CVE-2026-107161, CVE-2026-107814 and CVE-2026-107823. These are packages
-inside the backend image; the separate MariaDB service and its data are unchanged.
-Verify the rebuilt image contains at least `cyrus-sasl-lib`
-`2.1.26-24.amzn2.0.2` and MariaDB packages `1:5.5.68-1.amzn2.0.4`.
-
-The runtime C library family (`glibc`, `glibc-common`, `glibc-langpack-en`,
-`glibc-minimal-langpack` and `libcrypt`) is updated together from the Amazon
-Linux 2 repositories. Verify all five installed RPM releases are at least
-`2.26-64.amzn2.0.7` and keep the existing image scans and native runtime checks.
+- rpm family (`python2-rpm`, `rpm`, `rpm-build-libs`, `rpm-libs`):
+  ALAS2-2026-3984 / CVE-2026-78367.
+- `ca-certificates` `2025.2.76-1.amzn2.0.4`: CVE-2026-113470 and
+  CVE-2026-114406, published in
+  [ALAS2-2026-4045](https://alas.aws.amazon.com/AL2/ALAS2-2026-4045.html).
+- `cyrus-sasl-lib` `2.1.26-24.amzn2.0.2` and MariaDB client packages
+  `1:5.5.68-1.amzn2.0.4`: CVE-2026-107161, CVE-2026-107814 and CVE-2026-107823.
+  These are packages inside the backend image; the separate MariaDB service and
+  its data are unchanged.
+- `sqlite` `3.7.17-8.amzn2.1.4`: CVE-2026-119375, CVE-2026-119376 and
+  CVE-2026-119378.
+- C library family (`glibc`, `glibc-common`, `glibc-langpack-en`,
+  `glibc-minimal-langpack`, `libcrypt`) `2.26-64.amzn2.0.7`. Keep the existing
+  image scans and native runtime checks.
 
 Amazon backports fixes without changing curl's `8.3.0` version string; inspect
 `rpm -q curl libcurl` and the image scan rather than that string alone. Accepted
