@@ -84,6 +84,9 @@ inside the backend image; the separate MariaDB service and its data are unchange
 Verify the rebuilt image contains at least `cyrus-sasl-lib`
 `2.1.26-24.amzn2.0.2` and MariaDB packages `1:5.5.68-1.amzn2.0.4`.
 
+`sqlite` is updated for CVE-2026-119375, CVE-2026-119376 and CVE-2026-119378.
+Verify the rebuilt image contains at least `3.7.17-8.amzn2.1.4`.
+
 The runtime C library family (`glibc`, `glibc-common`, `glibc-langpack-en`,
 `glibc-minimal-langpack` and `libcrypt`) is updated together from the Amazon
 Linux 2 repositories. Verify all five installed RPM releases are at least
