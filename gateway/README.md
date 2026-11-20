@@ -37,6 +37,11 @@ La instalación, confianza y renovación están en el
   el gateway devuelve JSON con estado 503. La ruta se comparte por HTTP/HTTPS.
   `/services/fua-generator/health` también consulta `/`: su 200 no demuestra
   que exista una sonda de salud. Cambiar este contrato requiere otro PR.
+- `/openmrs/ws/FUAFormat` y sus subrutas conservan estado y cuerpo HTTP del
+  módulo OpenMRS, incluido el 422 de validación. Solo los fallos de conexión/DNS
+  generan un 503 JSON; estas llamadas no muestran la página HTML de arranque.
+  OpenMRS mantiene la autenticación y sus privilegios. Un diagnóstico por campo
+  requiere también las correcciones del generador y del módulo FUA.
 - Imaging permanece cerrado hasta cargar su override de autorización.
 - Grafana exige una red privada admitida y una coincidencia en
   `GRAFANA_NETWORK_ALLOWLIST`. Esta política adicional usa la dirección de la

@@ -164,6 +164,16 @@ location = /openmrs/ws/rest/v1/imaging/instances {
   error_page 502 503 504 = @backend_unavailable;
 }
 
+# FUA template API: preserve validation and upstream HTTP errors as API responses.
+# Only transport/DNS failures use this JSON fallback; authentication remains in OpenMRS.
+location ~ ^/openmrs/ws/FUAFormat(?:/|$) {
+  set $backend http://backend:8080;
+  proxy_read_timeout 300s;
+  proxy_pass $backend;
+  proxy_intercept_errors off;
+  error_page 502 503 504 = @fua_unavailable;
+}
+
 # OpenMRS Backend
 location /openmrs {
   if ($sihsalus_social_redirect) { return 302 /openmrs/spa/home; }
