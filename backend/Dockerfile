@@ -132,14 +132,14 @@ RUN cp /openmrs_distro/backend/target/sdk-distro/web/openmrs_core/openmrs.war /o
 
 
 # Unpack in the build image: the minimal runtime intentionally has no tar.
-ADD --checksum=sha256:d1a804502cddfd1c1436c1c37809ed4cb807a9c64a8a35fe1747d3ba9a0edeab \
-    https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.121/bin/apache-tomcat-9.0.121.tar.gz \
+ADD --checksum=sha256:f217a5ba31336742d73eaf928ae020227e68da777103bf402a1951f3bd817f1a \
+    https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.124/bin/apache-tomcat-9.0.124.tar.gz \
     /tmp/apache-tomcat.tar.gz
 RUN mkdir /tmp/tomcat-runtime && \
     tar -xzf /tmp/apache-tomcat.tar.gz -C /tmp/tomcat-runtime --strip-components=1 \
-      apache-tomcat-9.0.121/bin apache-tomcat-9.0.121/lib \
-      apache-tomcat-9.0.121/LICENSE apache-tomcat-9.0.121/NOTICE \
-      apache-tomcat-9.0.121/RELEASE-NOTES
+      apache-tomcat-9.0.124/bin apache-tomcat-9.0.124/lib \
+      apache-tomcat-9.0.124/LICENSE apache-tomcat-9.0.124/NOTICE \
+      apache-tomcat-9.0.124/RELEASE-NOTES
 
 ### Run Stage
 # Keep OpenMRS startup/configuration pinned; update Tomcat independently below.
@@ -158,15 +158,17 @@ RUN echo "Security refresh: ${SECURITY_REFRESH}" && \
 
 # The pinned upstream runtime still contains Tomcat 9.0.120. Replace the complete
 # Java runtime distribution, preserving OpenMRS's server.xml and rootless setup.
-# 9.0.121 fixes CVE-2026-65182, CVE-2026-65905 and CVE-2026-68525.
-ENV TOMCAT_VERSION=9.0.121 \
-    TOMCAT_SHA512=16494dd4745f808d3c506807b5275521fd71044d976f441d18eeeab0f5a38bc1b5344ca395292f6f26eb7612cd8c8e746d01ccdfb29893d394052d9f4b1f4c11
-RUN rm -rf /usr/local/tomcat/bin /usr/local/tomcat/lib
+# 9.0.124 includes the security fixes for CVE-2026-101356 and CVE-2026-116830.
+ENV TOMCAT_VERSION=9.0.124 \
+    TOMCAT_SHA512=925e4fefe25b2ecccd032acd0b4cb1b506455037ed0f8b0e51824bed839c5e92bf5e58982b990d2fdcbc790bcda1a533db7faffb325f8a7baee939fc8ae871c1
+# TLS terminates at the gateway. The inherited Tomcat Native 1.3.8 is incompatible.
+RUN rm -rf /usr/local/tomcat/bin /usr/local/tomcat/lib && \
+    rm -f /usr/local/tomcat/native-jni-lib/libtcnative-1.*
 COPY --from=dev /tmp/tomcat-runtime/ /usr/local/tomcat/
 RUN chmod -R g+rx /usr/local/tomcat/bin /usr/local/tomcat/lib && \
     touch /usr/local/tomcat/bin/setenv.sh && \
     chmod g+w /usr/local/tomcat/bin/setenv.sh && \
-    /usr/local/tomcat/bin/version.sh | grep -qF 'Apache Tomcat/9.0.121'
+    /usr/local/tomcat/bin/version.sh | grep -qF 'Apache Tomcat/9.0.124'
 
 COPY --chmod=0555 backend/bin/configure-ocl-token.sh \
     backend/bin/configure-forced-password-change.sh /usr/local/bin/

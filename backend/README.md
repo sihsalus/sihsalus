@@ -109,9 +109,12 @@ y elimina la propiedad desde la administración de OpenMRS durante una ventana c
 ## Tomcat security maintenance
 
 The pinned OpenMRS runtime contains Tomcat 9.0.120. The Dockerfile installs the
-complete official Tomcat 9.0.121 `bin` and `lib` directories from Apache's archive,
-verified by a literal SHA-256 pin. This fixes CVE-2026-65182, CVE-2026-65905 and
-CVE-2026-68525 while retaining OpenMRS's configuration, startup scripts and UID 1001. The checksum was checked against Apache's published SHA-512 file.
+complete official Tomcat 9.0.124 `bin` and `lib` directories from Apache's archive,
+verified by a literal SHA-256 pin. This includes Apache's fixes for CVE-2026-101356
+and CVE-2026-116830 while retaining OpenMRS's configuration, startup scripts
+and UID 1001. The checksum was checked against Apache's published SHA-512 file.
+The image drops the inherited Tomcat Native 1.3.8, which is incompatible with
+Tomcat 9.0.124. The gateway terminates TLS and forwards HTTP to Tomcat.
 
 CI verifies the running Java version of Tomcat, the writable `setenv.sh` needed
 by OpenMRS, configuration ownership and startup of an empty HTTP server without
