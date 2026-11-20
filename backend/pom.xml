@@ -34,10 +34,10 @@
     <appointments.version>2.2.0</appointments.version>
     <teleconsultation.version>2.0.0</teleconsultation.version>
     <cohort.version>3.7.3</cohort.version>
-    <authentication.version>2.4.0</authentication.version>
+    <authentication.version>2.5.0</authentication.version>
     <oauth2login.version>1.5.1-sihsalus.1</oauth2login.version>
     <reporting.version>2.2.0</reporting.version>
-    <reportingrest.version>2.0.0</reportingrest.version>
+    <reportingrest.version>2.1.0</reportingrest.version>
     <!-- the next three are required for reporting -->
     <calculation.version>2.0.0</calculation.version>
     <htmlwidgets.version>2.0.1</htmlwidgets.version>
