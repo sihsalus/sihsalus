@@ -1,6 +1,12 @@
 # Individual OIDC authorization for OHIF and Orthanc web routes.
 # Load after compose/keycloak.yml and enable the imaging + keycloak profiles.
 
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   gateway:
     depends_on:
@@ -13,6 +19,7 @@ services:
         error_page 401 = @imaging_oauth_signin;
 
   imaging-auth:
+    logging: *bounded-logging
     image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.3
     restart: "unless-stopped"
     depends_on:
@@ -66,6 +73,7 @@ services:
       - default
 
   imaging-session-store:
+    logging: *bounded-logging
     image: redis:8.2.9-alpine3.22
     restart: "unless-stopped"
     user: redis

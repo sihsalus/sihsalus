@@ -1,0 +1,74 @@
+rule_files:
+  - ../../monitoring/prometheus/nonproduction/alerts.yml
+evaluation_interval: 1m
+tests:
+  - name: below 80 percent does not alert
+    interval: 1m
+    input_series:
+      - series: 'node_filesystem_avail_bytes{instance="host",mountpoint="/",fstype="ext4"}'
+        values: '21x8'
+      - series: 'node_filesystem_size_bytes{instance="host",mountpoint="/",fstype="ext4"}'
+        values: '100x8'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: HostFilesystemSpaceLow
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: HostFilesystemSpaceCritical
+        exp_alerts: []
+  - name: exact 80 percent warns after five minutes
+    interval: 1m
+    input_series:
+      - series: 'node_filesystem_avail_bytes{instance="host",mountpoint="/",fstype="ext4"}'
+        values: '20x8'
+      - series: 'node_filesystem_size_bytes{instance="host",mountpoint="/",fstype="ext4"}'
+        values: '100x8'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: HostFilesystemSpaceLow
+        exp_alerts:
+          - exp_labels: {instance: host, mountpoint: /, fstype: ext4, severity: warning}
+            exp_annotations: {summary: 'Disco de host al 80.0%'}
+      - eval_time: 6m
+        alertname: HostFilesystemSpaceCritical
+        exp_alerts: []
+  - name: exact 90 percent is critical
+    interval: 1m
+    input_series:
+      - series: 'node_filesystem_avail_bytes{instance="host",mountpoint="/",fstype="ext4"}'
+        values: '10x8'
+      - series: 'node_filesystem_size_bytes{instance="host",mountpoint="/",fstype="ext4"}'
+        values: '100x8'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: HostFilesystemSpaceCritical
+        exp_alerts:
+          - exp_labels: {instance: host, mountpoint: /, fstype: ext4, severity: critical}
+            exp_annotations: {summary: 'Disco de host en nivel crítico: 90.0%'}
+  - name: readiness failure fires and resolves after recovery
+    interval: 1m
+    input_series:
+      - series: 'probe_success{environment="qlty",check="ready",instance="https://example.test/ready"}'
+        values: '0x6 1x3'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: SihsalusReadinessFailing
+        exp_alerts:
+          - exp_labels: {environment: qlty, check: ready, instance: 'https://example.test/ready', severity: critical}
+            exp_annotations: {summary: 'qlty no está listo para atender solicitudes'}
+      - eval_time: 8m
+        alertname: SihsalusReadinessFailing
+        exp_alerts: []
+  - name: wrong node is reported separately from readiness
+    interval: 1m
+    input_series:
+      - series: 'probe_success{environment="dev",check="identity",instance="https://example.test/node"}'
+        values: '0x8'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: SihsalusWrongNode
+        exp_alerts:
+          - exp_labels: {environment: dev, check: identity, instance: 'https://example.test/node', severity: critical}
+            exp_annotations:
+              summary: 'No se confirma la identidad autorizada de dev'
+              description: 'Revisar conectividad, certificado y X-SIHSALUS-Node-ID antes de desplegar.'

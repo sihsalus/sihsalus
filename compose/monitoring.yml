@@ -1,8 +1,15 @@
 # Monitoring Stack (Grafana, Prometheus, Loki, optional Alloy log collector)
 # Profile: monitoring
 
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   grafana:
+    logging: *bounded-logging
     container_name: sihsalus-grafana
     image: grafana/grafana:12.3
     restart: "unless-stopped"
@@ -64,6 +71,7 @@ services:
       - monitoring-edge
 
   prometheus:
+    logging: *bounded-logging
     container_name: sihsalus-prometheus
     image: prom/prometheus:v3.2.1
     restart: "unless-stopped"
@@ -91,6 +99,7 @@ services:
       - default
 
   alertmanager:
+    logging: *bounded-logging
     container_name: sihsalus-alertmanager
     image: prom/alertmanager:v0.33.1
     restart: "unless-stopped"
@@ -114,6 +123,7 @@ services:
       - monitoring-network
 
   node-exporter:
+    logging: *bounded-logging
     container_name: sihsalus-node-exporter
     image: prom/node-exporter:v1.11.1
     restart: "unless-stopped"
@@ -138,6 +148,7 @@ services:
       - monitoring-network
 
   operations-collector:
+    logging: *bounded-logging
     container_name: sihsalus-operations-collector
     image: alpine:3.23
     restart: "unless-stopped"
@@ -163,6 +174,7 @@ services:
       start_period: 15s
 
   viewpower-exporter:
+    logging: *bounded-logging
     container_name: sihsalus-viewpower-exporter
     image: python:3.13-alpine@sha256:7415fbc3c9e4979cc717d92377ab2bc7b2b4a2af1ac03cc52b5f3f88efedaf3a
     restart: "unless-stopped"
@@ -197,6 +209,7 @@ services:
       - monitoring-network
 
   cadvisor:
+    logging: *bounded-logging
     container_name: sihsalus-cadvisor
     image: ghcr.io/google/cadvisor:v0.60.5
     restart: "unless-stopped"
@@ -219,6 +232,7 @@ services:
       - monitoring-network
 
   blackbox:
+    logging: *bounded-logging
     container_name: sihsalus-blackbox
     image: prom/blackbox-exporter:v0.27.0
     restart: "unless-stopped"
@@ -238,6 +252,7 @@ services:
       - default
 
   loki-init:
+    logging: *bounded-logging
     container_name: sihsalus-loki-init
     image: alpine:3.23
     profiles: [ monitoring ]
@@ -250,6 +265,7 @@ services:
       - monitoring-network
 
   loki:
+    logging: *bounded-logging
     container_name: sihsalus-loki
     image: grafana/loki:3.6
     restart: "unless-stopped"
@@ -267,6 +283,7 @@ services:
       - monitoring-network
 
   alloy:
+    logging: *bounded-logging
     container_name: sihsalus-alloy
     image: grafana/alloy:v1.13.1
     restart: "unless-stopped"
@@ -298,6 +315,7 @@ services:
       - monitoring-network
 
   docker-socket-proxy:
+    logging: *bounded-logging
     container_name: sihsalus-docker-socket-proxy
     image: tecnativa/docker-socket-proxy:v0.4.2
     restart: "unless-stopped"

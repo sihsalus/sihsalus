@@ -1,8 +1,15 @@
 # HAPI FHIR Server (Interoperabilidad MINSA)
 # Profile: hapi
 
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   hapi-fhir:
+    logging: *bounded-logging
     container_name: sihsalus-hapi-fhir
     image: ${HAPI_IMAGE:-johanamador/hapi-fhir-minsa-peru}:${HAPI_TAG:-latest}
     restart: "unless-stopped"
@@ -18,6 +25,7 @@ services:
         condition: service_healthy
 
   hapi-postgres:
+    logging: *bounded-logging
     container_name: sihsalus-hapi-postgres
     image: postgres:15
     restart: "unless-stopped"

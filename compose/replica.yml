@@ -1,8 +1,15 @@
 # MariaDB replica for backup/offline redundancy
 # Profile: replica
 
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   db-replic:
+    logging: *bounded-logging
     container_name: sihsalus-db-replic
     image: mariadb:10.11.7
     restart: "unless-stopped"
