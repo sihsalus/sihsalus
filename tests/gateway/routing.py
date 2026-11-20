@@ -241,7 +241,7 @@ class GatewayRouting(unittest.TestCase):
                         self.assertEqual(payload["details"][0]["path"], ["pages", 0, "versionTag"])
                     else:
                         self.assertEqual(payload, {"upstream": "fua", "status": expected})
-                    self.assertNotIn("iniciando", body.lower())
+                    self.assertNotIn(b"iniciando", body.lower())
 
     def test_security_headers_survive_local_headers(self):
         for scheme, url in self.urls.items():
