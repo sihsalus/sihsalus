@@ -78,6 +78,7 @@ class GatewayRouting(unittest.TestCase):
   location = /gzip { default_type text/plain; return 200 'GZIP_BODY'; }
   location / {
     default_type application/json;
+    if ($http_x_test_fua_error = 422) { return 422 '{"error":"INVALID_FUA_FORMAT","details":[{"path":["pages",0,"versionTag"]}]}'; }
     if ($http_x_test_fua_error = 502) { return 502 '{"upstream":"fua","status":502}'; }
     if ($http_x_test_fua_error = 503) { return 503 '{"upstream":"fua","status":503}'; }
     if ($http_x_test_fua_error = 504) { return 504 '{"upstream":"fua","status":504}'; }
@@ -227,6 +228,20 @@ class GatewayRouting(unittest.TestCase):
                         headers={"X-Test-Fua-Error": str(expected)})
                     self.assertEqual(status, expected)
                     self.assertEqual(json.loads(body), {"upstream": "fua", "status": expected})
+
+    def test_openmrs_fua_api_keeps_validation_and_service_errors(self):
+        for scheme, url in self.urls.items():
+            for expected in (422, 502, 503, 504):
+                with self.subTest(scheme=scheme, status=expected):
+                    status, _, body = self.request(url, "/openmrs/ws/FUAFormat/synthetic/render", "POST",
+                        headers={"X-Test-Fua-Error": str(expected)})
+                    self.assertEqual(status, expected)
+                    payload = json.loads(body)
+                    if expected == 422:
+                        self.assertEqual(payload["details"][0]["path"], ["pages", 0, "versionTag"])
+                    else:
+                        self.assertEqual(payload, {"upstream": "fua", "status": expected})
+                    self.assertNotIn(b"iniciando", body.lower())
 
     def test_security_headers_survive_local_headers(self):
         for scheme, url in self.urls.items():
