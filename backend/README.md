@@ -225,6 +225,19 @@ must be checked. Reporting REST 2.0.0 is an intentional downgrade from
 external clients of `runReport` remain to be checked. Do not delete
 module-version records or migration history to force the downgrade.
 
+### Official releases, 2026-11-20
+
+[Authentication 2.5.0](https://github.com/openmrs/openmrs-module-authentication/releases/tag/2.5.0)
+retains the requested page through multi-step sign-in and redirects users after
+authentication. Verify local sign-in, required password change, Keycloak sign-in,
+and session termination on the candidate image.
+
+[Reporting REST 2.1.0](https://github.com/openmrs/openmrs-module-reportingrest/releases/tag/2.1.0)
+adds immediate report rendering through REPORT-922. Verify immediate and queued
+reports with synthetic data, including rejection for accounts without the
+required reporting privileges. The two modules use official Maven releases and
+declare OpenMRS 2.7.0 as their minimum.
+
 ### Official releases, 2026-10-19
 
 FHIR2 moved from the `4.3.0-sihsalus.1` source build to the official
