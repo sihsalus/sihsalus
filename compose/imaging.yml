@@ -1,8 +1,15 @@
 # Medical Imaging Stack (DICOM/OHIF/Orthanc)
 # Profile: imaging
 
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   ohif:
+    logging: *bounded-logging
     container_name: sihsalus-ohif
     # Compile PUBLIC_URL into OHIF; the upstream root build cannot be moved
     # under /imaging/ by changing only its React router configuration.
@@ -26,6 +33,7 @@ services:
       - default
 
   orthanc:
+    logging: *bounded-logging
     container_name: sihsalus-orthanc
     image: orthancteam/orthanc:25.8.2
     restart: "unless-stopped"
@@ -93,6 +101,7 @@ services:
       - default
 
   orthanc-proxy:
+    logging: *bounded-logging
     container_name: sihsalus-orthanc-proxy
     image: nginx:1.28-alpine
     restart: "unless-stopped"

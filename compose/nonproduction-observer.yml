@@ -1,0 +1,47 @@
+# Standalone observer on a third Linux server, independent of DEV and QLTY.
+name: sihsalus-observer
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+services:
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    logging: *bounded-logging
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --storage.tsdb.retention.size=512MB
+    ports: ["127.0.0.1:9094:9090"]
+    volumes:
+      - ${SIHSALUS_MONITORING_CONFIG_DIR:?Generate observer config}/prometheus.json:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/nonproduction:/etc/prometheus/alerts:ro
+      - observer-prometheus:/prometheus
+  blackbox:
+    image: prom/blackbox-exporter:v0.27.0
+    logging: *bounded-logging
+    restart: unless-stopped
+    command: ["--config.file=/etc/blackbox_exporter/config.yml"]
+    volumes:
+      - ./monitoring/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+  alertmanager:
+    image: prom/alertmanager:v0.33.1
+    logging: *bounded-logging
+    restart: unless-stopped
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml", "--storage.path=/alertmanager"]
+    ports: ["127.0.0.1:9095:9093"]
+    volumes:
+      - ${SIHSALUS_MONITORING_CONFIG_DIR:?Generate observer config}/alertmanager.json:/etc/alertmanager/alertmanager.yml:ro
+      - type: bind
+        source: ${SIHSALUS_ALERT_SMTP_PASSWORD_FILE:?Provide a private SMTP application password file}
+        target: /run/secrets/smtp-password
+        read_only: true
+        bind:
+          create_host_path: false
+      - observer-alertmanager:/alertmanager
+volumes:
+  observer-prometheus:
+  observer-alertmanager:

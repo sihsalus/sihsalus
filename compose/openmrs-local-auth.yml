@@ -4,8 +4,15 @@
 # removes only the Keycloak globalproperties bind. Validate additional custom
 # backend mounts separately; they must not be discarded by this replacement.
 
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   frontend:
+    logging: *bounded-logging
     build:
       args:
         SPA_CONFIG_URLS: ${SPA_CONFIG_URLS:-/openmrs/spa/frontend.json}

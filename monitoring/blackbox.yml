@@ -10,3 +10,34 @@ modules:
   tcp_connect:
     prober: tcp
     timeout: 5s
+
+  # Public DEV/QLTY probes must verify certificates and canonical node identities.
+  http_2xx_verified:
+    prober: http
+    timeout: 5s
+    http:
+      valid_status_codes: [200]
+      tls_config:
+        insecure_skip_verify: false
+  http_dev_identity:
+    prober: http
+    timeout: 5s
+    http:
+      valid_status_codes: [200]
+      fail_if_header_not_matches:
+        - header: X-SIHSALUS-Node-ID
+          regexp: '^700e430a-1c32-5241-b7cf-78ccea17f8c1$'
+          allow_missing: false
+      tls_config:
+        insecure_skip_verify: false
+  http_qlty_identity:
+    prober: http
+    timeout: 5s
+    http:
+      valid_status_codes: [200]
+      fail_if_header_not_matches:
+        - header: X-SIHSALUS-Node-ID
+          regexp: '^0cefb0c8-c860-48c5-856f-408594775cbb$'
+          allow_missing: false
+      tls_config:
+        insecure_skip_verify: false

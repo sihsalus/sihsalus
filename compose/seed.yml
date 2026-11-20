@@ -12,8 +12,15 @@
 # After a successful restore, start the normal stack without this override.
 # To replace existing volumes, set SIHSALUS_SEED_FORCE=true.
 
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   seed:
+    logging: *bounded-logging
     image: sihsalus-seed-restore:local
     build:
       context: ./scripts/seed

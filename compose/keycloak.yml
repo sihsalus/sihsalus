@@ -2,8 +2,15 @@
 # Load explicitly with:
 #   docker compose -f docker-compose.yml -f compose/keycloak.yml --profile keycloak up -d
 
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   frontend:
+    logging: *bounded-logging
     build:
       args:
         SPA_CONFIG_URLS: ${SPA_CONFIG_URLS:-/openmrs/spa/frontend.json,/openmrs/spa/frontend-keycloak.json}
@@ -25,6 +32,7 @@ services:
       - ./oauth/openmrs_config/globalproperties/oauth2login.xml:/openmrs/distribution/openmrs_config/globalproperties/oauth2login.xml:ro
 
   keycloak:
+    logging: *bounded-logging
     container_name: sihsalus-keycloak
     build:
       context: ./oauth
@@ -68,6 +76,7 @@ services:
       - default
 
   keycloak-db:
+    logging: *bounded-logging
     container_name: sihsalus-keycloak-db
     image: postgres:17
     restart: "unless-stopped"

@@ -86,7 +86,7 @@ docker run --rm \
   -v "$ROOT_DIR:/workspace:ro" \
   -w /workspace \
   "$prometheus_image" \
-  test rules tests/monitoring/vpn-alerts.test.yml
+  test rules tests/monitoring/vpn-alerts.test.yml tests/monitoring/nonproduction-alerts.test.yml
 
 GATUS_TEST_CONTAINER="$(docker run -d --rm \
   -e GATUS_CONFIG_PATH=/config/config.yaml \
