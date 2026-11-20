@@ -120,6 +120,8 @@ else
   EVIDENCE_DIR="$(mktemp -d)"
   trap 'rm -rf "$EVIDENCE_DIR"' EXIT
 fi
+# Bind mounts must be absolute even when CI supplies a relative evidence path.
+EVIDENCE_DIR="$(cd "$EVIDENCE_DIR" && pwd)"
 
 # Profiles are applied after interpolation. The core must therefore render
 # without any optional-profile credentials in the process environment.
