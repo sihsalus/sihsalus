@@ -6,7 +6,7 @@ publica `linux/amd64`; gateway y certbot publican `linux/amd64` y `linux/arm64`.
 Cada plataforma debe tener un inventario SPDX adjunto por BuildKit y un escaneo
 Trivy del digest exacto de su manifiesto ejecutable.
 
-Gateway y el wrapper del frontend fijan la misma base Nginx 1.30.6 por digest
+Gateway y el wrapper del frontend fijan la misma base Nginx 1.30.7 por digest
 y actualizan los paquetes Alpine al construir. Certbot fija la versión 5.8.0
 y también actualiza los paquetes Alpine al construir.
 También fija `urllib3` en 2.8.0, `certifi` en 2026.10.19 y `uv` en 0.13.4 mediante
