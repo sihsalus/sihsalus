@@ -6,6 +6,7 @@ from io import BytesIO
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import subprocess
 import sys
@@ -26,9 +27,15 @@ def check_history(root, current):
     state = root / ".env.release-state"
     # The journal is created before the selection is changed. A process killed
     # while creating a journal may leave the directory without a result.
-    attempts = [directory for directory in state.iterdir() if directory.is_dir()]
-    attempts.sort(key=lambda directory: (directory / "result.json" if
-                  (directory / "result.json").exists() else directory).stat().st_mtime_ns, reverse=True)
+    # apply_release uses UUIDs for journal directories. Staging has a separate lifecycle.
+    journal_name = re.compile(r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}")
+    attempts = [directory for directory in state.iterdir() if directory.is_dir() and journal_name.fullmatch(directory.name)]
+
+    def last_write(directory):
+        result = directory / "result.json"
+        return (result if result.is_file() else directory).stat().st_mtime_ns
+
+    attempts.sort(key=last_write, reverse=True)
     for index, directory in enumerate(attempts):
         path = directory / "result.json"
         release.require(path.is_file(), "Incomplete release journal; inspect QLTY recovery history")
@@ -66,7 +73,9 @@ def backend_model(directory, installed_root, manifest):
     command = release.compose_command(manifest, installed_root / ".env")
     rendered = release.run(command + ["config", "--format", "json", "--no-path-resolution", "backend"],
                            root=directory, environment=release.compose_environment(manifest))
-    return json.loads(rendered)
+    # YAML extension fields can survive rendering alongside their expanded
+    # values. Docker uses the service/resource configuration they expanded into.
+    return {key: value for key, value in json.loads(rendered).items() if not key.startswith("x-")}
 
 
 def ignore_log_rotation(service, default_driver):
@@ -109,8 +118,9 @@ def check_compatibility(root, manifest, sha):
         files.extend(item["file"] for item in installed.get(resource, {}).values() if "file" in item)
     local = set()
     for filename in files:
-        path = (root / filename).resolve()
+        path = Path(os.path.abspath(root / filename))
         if path.is_relative_to(root):
+            release.require(path == path.resolve(), "Linked backend runtime files require coordinated review")
             local.add(str(path.relative_to(root)))
     if local:
         try:

@@ -76,7 +76,9 @@ class QltyBackendTests(unittest.TestCase):
         state = self.root / ".env.release-state"
         state.mkdir()
         qlty.check_history(self.root, self.current)
-        failed = state / "first"
+        (state / "staging-1a7092ed1").mkdir()
+        qlty.check_history(self.root, self.current)
+        failed = state / "22c7f82a-9c44-4309-a2a6-9f5eb3891463"
         failed.mkdir()
         with self.assertRaisesRegex(qlty.release.ManifestError, "Incomplete"):
             qlty.check_history(self.root, self.current)
@@ -88,7 +90,7 @@ class QltyBackendTests(unittest.TestCase):
             (failed / "result.json").write_text(json.dumps({"status": status, "target": checksum}))
             with self.assertRaisesRegex(qlty.release.ManifestError, "unresolved"):
                 qlty.check_history(self.root, self.current)
-        frontend = state / "second"
+        frontend = state / "d240de76-cac2-4c32-9631-a19c9096e22a"
         frontend.mkdir()
         for name in ("previous", "target"):
             (frontend / f"{name}.json").write_text(json.dumps(self.current))
@@ -152,7 +154,7 @@ class QltyBackendTests(unittest.TestCase):
         compose.write_text(base)
         baseline = self.commit("installed")
         rotated = base.replace("depends_on: [db]", "depends_on: [db]\n    logging:\n      driver: json-file\n      options: {max-size: 10m, max-file: '3'}")
-        compose.write_text(rotated.replace("busybox:stable", "busybox:latest"))
+        compose.write_text("x-logging: {driver: json-file}\n" + rotated.replace("busybox:stable", "busybox:latest"))
         compatible = self.commit("unrelated frontend and backend logging")
         bind.write_text("# changed dependency\n")
         incompatible_bind = self.commit("different mounted database configuration")
@@ -178,6 +180,10 @@ class QltyBackendTests(unittest.TestCase):
             for sha in [incompatible_bind, incompatible_db, incompatible_driver]:
                 with self.subTest(sha=sha), self.assertRaisesRegex(qlty.release.ManifestError, "coordinated change"):
                     qlty.check_compatibility(self.root, model, sha)
+            bind.unlink()
+            bind.symlink_to(compose)
+            with self.assertRaisesRegex(qlty.release.ManifestError, "Linked backend runtime files"):
+                qlty.check_compatibility(self.root, model, compatible)
         self.assertEqual(git(self.root, "rev-parse", "HEAD"), baseline)
 
 
