@@ -56,7 +56,7 @@ if [ "$#" -eq 1 ]; then
   exec bash -c "$1"
 fi
 
-if [ "$#" -eq 10 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
+if [ "$#" -eq 11 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
   [ "${FAKE_SSH_LAUNCH_MAC_MISMATCH:-false}" = true ]; then
   printf '%s\n' '00:0c:29:86:a3:3b' >"${FAKE_REMOTE_MAC_PATH}"
   set +e
@@ -85,7 +85,7 @@ if [ "$#" -eq 7 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
   fi
 fi
 
-if [ "$#" -eq 10 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
+if [ "$#" -eq 11 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
   [ -n "${FAKE_SSH_FORCE_LAUNCH_ERROR:-}" ]; then
   echo 'simulated launch failure' >&2
   exit "$FAKE_SSH_FORCE_LAUNCH_ERROR"
@@ -104,7 +104,7 @@ if [ "$#" -eq 7 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
   fi
 fi
 
-if [ "$#" -eq 10 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
+if [ "$#" -eq 11 ] && [ "$1" = bash ] && [ "$2" = -s ] &&
   [ -n "${FAKE_SSH_BREAK_LAUNCH_FILE:-}" ] && [ ! -f "$FAKE_SSH_BREAK_LAUNCH_FILE" ]; then
   set +e
   "$@"
@@ -338,5 +338,33 @@ if grep -Fq 'remote cancellation was not confirmed' "$CANCEL_RETRY_OUTPUT"; then
   echo 'cancellation retry did not reach the expected host' >&2
   exit 1
 fi
+
+
+# Exercise the actual SSH launcher and Python selection, with a local receiver
+# and an inert Python entrypoint. The full-stack program must never be uploaded.
+bundle="$TEMP_ROOT/qlty-tools"
+mkdir "$bundle"
+for helper in run-redeploy-remote.sh check-clean-checkout.sh env.sh deploy.py release-manifest.py verify-external-frontend.sh qlty-pre-backend-backup.sh; do
+  cp "$ROOT/scripts/deploy/$helper" "$bundle/$helper"
+done
+cat > "$bundle/deploy-qlty-backend.py" <<'PYTHON_FIXTURE'
+from pathlib import Path
+import sys
+
+assert sys.argv[1:] == ["1" * 40, "sha256:" + "a" * 64]
+bundle = Path(__file__).resolve().parent
+assert (bundle / "qlty-pre-backend-backup.sh").is_file()
+assert not (bundle / "redeploy-environment.sh").exists()
+print("QLTY backend fixture completed")
+PYTHON_FIXTURE
+PATH="$FAKE_BIN:$PATH" \
+  SSH_BIN="$FAKE_BIN/ssh" REDEPLOY_SCRIPT_PATH="$FAILURE_FIXTURE" \
+  REDEPLOY_POLL_INTERVAL_SECONDS=1 REDEPLOY_TIMEOUT_SECONDS=15 \
+  REDEPLOY_EXPECTED_REMOTE_MAC="$EXPECTED_REMOTE_MAC" REDEPLOY_EXPECTED_NODE_ID="$EXPECTED_NODE_ID" \
+  REDEPLOY_REMOTE_MAC_PATH="$REMOTE_MAC_PATH" \
+  bash "$bundle/run-redeploy-remote.sh" --qlty-backend-only \
+    "$SSH_KEY" deploy@example.test "$REMOTE_REPOSITORY" "$BACKEND_SHA" "$BACKEND_DIGEST" backend-only-run \
+    > "$TEMP_ROOT/backend-only.log"
+grep -Fq 'QLTY backend fixture completed' "$TEMP_ROOT/backend-only.log"
 
 echo "[OK] resilient remote redeploy runner"

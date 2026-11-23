@@ -102,6 +102,11 @@ una vez para incluir la comprobación HTTP externa en la actualización.
 el respaldo y revisar migraciones; nunca actualiza el backend implícitamente al
 actualizar frontend. Los cambios de Compose se coordinan aparte.
 
+Al fusionar en `main` un cambio de versión de un OMOD en `pom.xml`, **Build Backend**
+construye y verifica la imagen. Una vez autorizada la automatización, el mismo flujo
+actualiza OpenMRS directamente en QLTY. Para confirmar la versión instalada o
+diagnosticar un fallo, consulta la [guía de QLTY](scripts/deploy/README.md#backend-automático-en-qlty).
+
 El flujo de **Deploy Frontend** en GitHub Actions está en [operación y recuperación](scripts/deploy/README.md#github-actions-y-conexión-remota).
 
 ## Backup y restore

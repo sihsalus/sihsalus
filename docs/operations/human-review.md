@@ -20,7 +20,16 @@ La aprobación puede incluir el rollback a un manifiesto anterior concreto y la
 limpieza acotada de recursos sintéticos propios. Si se cumple la señal acordada,
 ejecutar esa recuperación sin pedir otra aprobación; no ampliar su alcance.
 Los efectos automáticos de publicación de un merge deben aprobarse junto con
-ese SHA y la versión prevista. La aplicación a hosts sigue siendo separada.
+ese SHA y la versión prevista.
+
+Para activar la actualización automática del backend en QLTY, registrar por
+separado la aprobación de la PR y su SHA y la autorización permanente para que
+**Build Backend** aplique allí las publicaciones elegibles de `main`. La
+variable del repositorio `AUTO_DEPLOY_BACKEND_QLTY` controla la activación. Si
+está activa antes de fusionar el cambio, esa fusión puede iniciar el primer despliegue. Los siguientes
+despliegues comprendidos en esa autorización pueden ejecutarse sin una decisión
+por versión. Un cambio de destino, controles o recuperación requiere una nueva
+autorización. Consultar el [alcance de la automatización](../../scripts/deploy/README.md#backend-automático-en-qlty).
 
 El agente deja la decisión pendiente y puede ofrecer una explicación guiada.
 “Yolo”, “continúa”, un plan aprobado o CI verde no sustituyen esa revisión.
@@ -31,7 +40,8 @@ una recomendación del agente no constituye esa aprobación.
 
 ## Protección nativa de GitHub
 
-En **Settings → Environments**, configurar `development` y `quality`:
+Para los procedimientos con aprobación por entorno, configurar `development` y
+`quality` en **Settings → Environments**:
 
 1. Añadir personas o equipos humanos a **Required reviewers**.
 2. Desactivar **Allow administrators to bypass configured protection rules**.
@@ -41,16 +51,17 @@ En **Settings → Environments**, configurar `development` y `quality`:
 4. Restringir las ramas de despliegue a las revisiones mantenidas y conservar
    los secretos de SSH dentro de sus environments.
 
-Los workflows de despliegue comprueban revisores y ausencia de bypass antes de
+**Deploy Frontend** y **Redeploy Non-Production** comprueban revisores y ausencia de bypass antes de
 programar los jobs con acceso SSH. Si falta configuración, el API no responde o
 el token no permite comprobarla, se detienen. Las aprobaciones y el acceso a
 secretos los aplica GitHub; el script no implementa un sistema de aprobación.
 Consultar la [configuración oficial de environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)
 y la [revisión de despliegues](https://docs.github.com/en/actions/how-tos/managing-workflow-runs-and-deployments/managing-deployments/reviewing-deployments).
 
-Un administrador debe configurar estas protecciones en GitHub: editar YAML no
-las crea. Sin revisores configurados, los workflows de despliegue se detienen;
-mantener la comprobación y no eliminarla para recuperar la automatización.
+Un administrador configura las protecciones en GitHub. Si faltan revisores, los
+dos workflows manuales se detienen. El despliegue automático de backend también
+usa el environment `quality` y respeta sus reglas vigentes. Si tiene revisores
+obligatorios, GitHub deja el job pendiente de su aprobación.
 
 Para `main`, mantener reglas nativas de PR obligatorio, revisión humana,
 desestimación de aprobaciones obsoletas, conversaciones resueltas, CI requerido

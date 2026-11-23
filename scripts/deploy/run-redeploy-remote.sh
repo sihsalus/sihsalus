@@ -19,8 +19,15 @@ CANCEL_RETRY_INTERVAL_SECONDS="${REDEPLOY_CANCEL_RETRY_INTERVAL_SECONDS:-2}"
 REMOTE_IDENTITY_MISMATCH_EXIT=86
 
 usage() {
-  echo "Usage: $0 <ssh-key> <user@host> <remote-repository> <backend-sha> <backend-digest> <run-token>" >&2
+  echo "Usage: $0 [--qlty-backend-only] <ssh-key> <user@host> <remote-repository> <backend-sha> <backend-digest> <run-token>" >&2
 }
+
+entrypoint=redeploy-environment.sh
+if [[ "${1:-}" == --qlty-backend-only ]]; then
+  entrypoint=deploy-qlty-backend.py
+  REDEPLOY_SCRIPT_PATH="$ROOT/$entrypoint"
+  shift
+fi
 
 if [ "$#" -ne 6 ]; then
   usage
@@ -115,7 +122,7 @@ SSH_COMMAND=(
 )
 
 REMOTE_RUN_DIRECTORY="$REMOTE_REPOSITORY/.redeploy-runs/$RUN_TOKEN"
-REMOTE_SCRIPT="$REMOTE_RUN_DIRECTORY/redeploy-environment.sh"
+REMOTE_SCRIPT="$REMOTE_RUN_DIRECTORY/$entrypoint"
 REMOTE_CLEAN_CHECKOUT_HELPER="$REMOTE_RUN_DIRECTORY/check-clean-checkout.sh"
 REMOTE_LOG="$REMOTE_RUN_DIRECTORY/redeploy.log"
 REMOTE_STATUS="$REMOTE_RUN_DIRECTORY/status"
@@ -203,6 +210,9 @@ upload_remote_scripts() {
   for helper in deploy.py release-manifest.py verify-external-frontend.sh; do
     upload_remote_file "$ROOT/$helper" "$REMOTE_RUN_DIRECTORY/$helper" || return "$?"
   done
+  if [[ "$entrypoint" == deploy-qlty-backend.py ]]; then
+    upload_remote_file "$ROOT/qlty-pre-backend-backup.sh" "$REMOTE_RUN_DIRECTORY/qlty-pre-backend-backup.sh" || return "$?"
+  fi
   upload_remote_file "$REDEPLOY_SCRIPT_PATH" "$REMOTE_SCRIPT"
 }
 
@@ -214,7 +224,8 @@ start_remote_run() {
     "$REMOTE_REPOSITORY" \
     "$RUN_TOKEN" \
     "$TARGET_BACKEND_SHA" \
-    "$TARGET_BACKEND_DIGEST" <<'REMOTE_LAUNCHER'
+    "$TARGET_BACKEND_DIGEST" \
+    "$entrypoint" <<'REMOTE_LAUNCHER'
 set -Eeuo pipefail
 
 expected_mac="$1"
@@ -225,7 +236,12 @@ run_token="$5"
 backend_sha="$6"
 backend_digest="$7"
 run_directory="$repository/.redeploy-runs/$run_token"
-script_path="$run_directory/redeploy-environment.sh"
+case "$8" in
+  redeploy-environment.sh) interpreter=bash ;;
+  deploy-qlty-backend.py) interpreter=python3 ;;
+  *) exit 2 ;;
+esac
+script_path="$run_directory/$8"
 log_path="$run_directory/redeploy.log"
 status_path="$run_directory/status"
 pid_path="$run_directory/pid"
@@ -300,7 +316,7 @@ nohup setsid bash -c '
   fi
 
   export SIHSALUS_NODE_ID="$node_id"
-  bash "$run_directory/redeploy-environment.sh" "$backend_sha" "$backend_digest"
+  "$6" "$7" "$backend_sha" "$backend_digest"
   exit "$?"
 ' remote-redeploy-worker \
   "$repository" \
@@ -308,6 +324,7 @@ nohup setsid bash -c '
   "$backend_sha" \
   "$backend_digest" \
   "$node_id" \
+  "$interpreter" "$script_path" \
   </dev/null >/dev/null 2>&1 &
 
 printf '%s\n' "$!" >"$pid_path"
