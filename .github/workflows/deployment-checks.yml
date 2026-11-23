@@ -24,3 +24,5 @@ jobs:
         run: python3 -B tests/deploy/release-manifest-compose.py --audit
       - name: Verify metadata from unlabeled and labeled runtime images
         run: python3 -B tests/deploy/release-manifest-images.py
+      - name: Verify pre-update backup against an isolated MariaDB database
+        run: bash tests/backup/qlty-update-roundtrip.sh

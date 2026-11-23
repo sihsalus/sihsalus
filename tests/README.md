@@ -6,7 +6,9 @@ mantienen sus pruebas funcionales en sus propios repositorios.
 
 ## Comprobación rápida
 
-Desde la raíz, con Bash, Python 3, Node.js, Git, jq, gzip y OpenSSL:
+Desde la raíz, con Bash, Python 3, Node.js, Git, jq, gzip y OpenSSL. En macOS,
+la regresión de respaldo usa GNU coreutils de Homebrew para reproducir las
+opciones del servidor Ubuntu.
 
 ```bash
 bash tests/run.sh

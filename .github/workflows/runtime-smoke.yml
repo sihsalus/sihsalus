@@ -3,6 +3,12 @@ name: OpenMRS runtime smoke
 on:
   schedule:
     - cron: '23 8 * * *'
+  workflow_call:
+    inputs:
+      backend_digest:
+        description: Published backend digest used by both authentication cases
+        type: string
+        required: true
   workflow_dispatch:
     inputs:
       backend_digest:
@@ -15,7 +21,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: runtime-smoke-${{ github.event_name }}-${{ github.ref }}-${{ inputs.backend_digest }}
   cancel-in-progress: true
 
 jobs:
@@ -81,12 +87,13 @@ jobs:
         if: always()
         env:
           AUTHENTICATION_MODE: ${{ matrix.authentication }}
+          BACKEND_DIGEST: ${{ needs.images.outputs.backend_digest }}
         run: |
           {
             echo '## Fresh SIHSalus core runtime smoke'
             echo "Authentication: $AUTHENTICATION_MODE"
             echo "Checkout: $GITHUB_SHA"
-            echo 'Backend: published SIHSalus image resolved once by digest; latest by default, or an explicit manual candidate.'
+            echo "Backend: ghcr.io/sihsalus/sihsalus-backend@$BACKEND_DIGEST"
             echo 'Frontend: immutable source configured in the distro template; current runtime wrapper.'
             echo 'Gateway and optional Keycloak: current Dockerfiles and normal Compose configuration.'
             echo 'Synthetic fresh databases; no real patient data or DEV/QLTY/PROD access.'

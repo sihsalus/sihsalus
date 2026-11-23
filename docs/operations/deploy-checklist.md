@@ -8,6 +8,10 @@ Seguir [el procedimiento de revisión humana](human-review.md). El mantenedor
 elige la versión y ambientes; `deploy.py` registra automáticamente las imágenes
 exactas y la recuperación. No preparar ni publicar archivos por servidor.
 
+Para el backend automático de QLTY, la autorización del destino se registra al
+activar el flujo. Consultar la [guía de QLTY](../../scripts/deploy/README.md#backend-automático-en-qlty)
+para identificar la ejecución y comprobar el resultado de una publicación.
+
 El flujo de **Deploy Frontend** en Actions está en [scripts/deploy/README.md](../../scripts/deploy/README.md#github-actions-y-conexión-remota).
 
 ## Antes del despliegue

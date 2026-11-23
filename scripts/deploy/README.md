@@ -67,6 +67,51 @@ automáticamente: una imagen anterior no deshace migraciones ya confirmadas.
 backend y base de datos usa el [procedimiento de backups](../backup/README.md)
 y una versión compatible elegida expresamente.
 
+## Backend automático en QLTY
+
+Para activarlo, el mantenedor aprueba la revisión concreta del workflow y la
+autorización de despliegue para QLTY. En **Settings → Secrets and variables →
+Actions → Variables**, fija la variable del repositorio `AUTO_DEPLOY_BACKEND_QLTY`
+en `true` antes del push a `main` que se quiera desplegar. Si está ausente o vale
+`false`, las imágenes siguen publicándose y el despliegue queda desactivado.
+Activar la variable por sí sola no inicia una ejecución.
+
+Cuando una PR fusionada cambia la versión de un OMOD en `pom.xml`, **Build
+Backend** verifica la imagen, la firma y publica su digest. La entrega a QLTY
+requiere una publicación vigente de `main`, CI exitoso para ese commit y el
+último simulacro completado de respaldo y restauración de `main` en verde. El
+smoke prueba la autenticación local y Keycloak sobre ese mismo digest. El job de QLTY usa
+el environment `quality`. GitHub aplica las protecciones que tenga configuradas.
+Las construcciones o verificaciones iniciadas manualmente quedan fuera del flujo.
+
+Durante una actualización el motor toma el bloqueo de despliegue, comprueba el
+respaldo y recrea únicamente el servicio `backend`. OpenMRS puede estar
+indisponible mientras arranca y aplica migraciones. La base de datos, el
+frontend y el gateway siguen en ejecución. Los cambios de Compose y los
+despliegues de DEV o producción conservan sus procedimientos propios.
+
+El respaldo de OpenMRS se cifra y se comprueba restaurándolo en una MariaDB
+aislada. QLTY conserva los dos últimos respaldos verificados bajo
+`~/.local/share/sihsalus/backups/qlty-backend-update/`. Si falta
+`BACKUP_ENCRYPTION_PASSWORD`, el host genera una clave en
+`~/.sihsalus-backup-keys/qlty-backend-update.key` con permisos `0600`. Para
+recuperarse de la pérdida del host, mantener una copia externa del respaldo y
+custodiar por separado la clave que lo cifra.
+
+Para saber si un OMOD llegó a QLTY, abrir en **Actions → Build Backend** la
+ejecución del commit fusionado y comprobar que terminó correctamente el job de
+QLTY. El éxito del job de publicación solo acredita que la imagen llegó al
+registro. En el servidor, `deploy.py status` muestra la versión instalada y
+`deploy.py history` permite consultar intentos anteriores. Una actualización
+técnicamente correcta deja pendiente probar con usuarios los flujos clínicos
+afectados por el módulo.
+
+Si falla la verificación previa, revisar el paso fallido en Actions. Si falla
+OpenMRS después de comenzar la aplicación, consultar el historial y los logs del
+backend antes de reintentar. La recuperación requiere elegir una imagen
+compatible y comprobar qué migraciones llegaron a ejecutarse. Seguir el
+[procedimiento de respaldo y restauración](../backup/README.md).
+
 ## GitHub Actions y conexión remota
 
 **Deploy Frontend** pide una versión y resuelve su SHA/digest antes de acceder a

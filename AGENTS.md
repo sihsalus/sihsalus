@@ -21,7 +21,11 @@ Material changes invalidate approval for the changed scope.
 Agents must not approve their own reviews/deployments through the maintainer's
 credentials, enable auto-merge, bypass protections, or fill the human decision
 in the PR template. Leave the prepared result for review. Merge authorization
-and deployment authorization are separate.
+and deployment authorization are separate. A maintainer may explicitly authorize
+the reviewed automatic QLTY backend rollout as a standing policy. Record both
+the activation PR/SHA and that deployment decision. Subsequent eligible releases
+follow the scope and gates in the [QLTY runbook](scripts/deploy/README.md#backend-automático-en-qlty).
+Changing the target, gates or recovery procedure requires renewed approval.
 
 Use the [human review procedure](docs/operations/human-review.md) together with
 the [deployment checklist](docs/operations/deploy-checklist.md). Clinical and
