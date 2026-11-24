@@ -237,6 +237,11 @@ def verify_compose(manifest, root, env_file):
 def verify_selected_compose(manifest, root, env_file, manifest_path, compatible_checkout=False):
     """Audit the selection actually used by ordinary Docker Compose commands."""
     verify_checkout(manifest, root, compatible=compatible_checkout)
+    verify_installed_selection(manifest, root, env_file, manifest_path)
+
+
+def verify_installed_selection(manifest, root, env_file, manifest_path):
+    """Verify the effective selection independently of the checkout revision."""
     verify_environment(manifest, env_file)
     command = ["docker", "compose", "--env-file", str(env_file)]
     rendered_environment = run(command + ["config", "--environment"], root=root)
@@ -493,11 +498,44 @@ def wait_certbot(manifest, root, timeout=180):
         time.sleep(1)
 
 
-def apply_release(manifest, previous, root, rollback=False, services=None, state=None, verify=None):
+def verify_reconciliation_request(manifest, previous, root, state, validate):
+    require(manifest["target"] == {"environment": "qlty", "nodeId": "0cefb0c8-c860-48c5-856f-408594775cbb"},
+            "Reconciliation requires the QLTY node")
+    require(dict(previous["sources"], distroCommit=manifest["sources"]["distroCommit"]) == manifest["sources"],
+            "Reconciliation cannot change component sources")
+    changed = {name for name in manifest["services"] if previous["services"][name] != manifest["services"][name]}
+    require(changed == {"fua-generator-db"}, "Reconciliation requires exactly the measured FUA database image change")
+    for selection in (previous, manifest):
+        postgres = selection["services"]["fua-generator-db"]["image"]
+        require(matches(postgres, r"docker\.io/library/postgres(?::[A-Za-z0-9_.-]+)?@" + DIGEST),
+                "Reconciliation requires pinned official PostgreSQL images")
+    require(state == root / ".env.release-state", "Reconciliation requires the installed release state")
+    previous_digest = manifest_digest(previous)
+    previous_path = state / f"{previous_digest}.json"
+    require(previous_path.is_file() and not previous_path.is_symlink() and read_json(previous_path) == previous,
+            "Selected previous manifest differs from the supplied release")
+    env_file = root / ".env"
+    selected = run(["bash", "-c", 'source "$1"; read_env_value SIHSALUS_RELEASE_MANIFEST "$2"',
+                    "env-reader", str(Path(__file__).with_name("env.sh")), str(env_file)], root=root).strip()
+    require(selected == str(previous_path), "Installed release marker differs from the previous manifest")
+    verify_installed_selection(previous, root, env_file, previous_path)
+    target_digest = manifest_digest(manifest)
+    require(validate(previous, manifest, root) is not False, "Reconciliation compatibility check failed")
+    require(manifest_digest(previous) == previous_digest and manifest_digest(manifest) == target_digest,
+            "Compatibility check changed the release selection")
+
+
+def apply_release(manifest, previous, root, rollback=False, services=None, state=None, verify=None,
+                  *, reconcile=False, verify_reconciliation=None):
     """Deploy and rollback share the same pinned execution and verification path."""
     validate_manifest(manifest)
     validate_manifest(previous)
     verify_transition(manifest, previous)
+    if reconcile:
+        require(not rollback and services is None and callable(verify_reconciliation) and callable(verify),
+                "Reconciliation requires compatibility and continuity checks and cannot deploy or roll back services")
+    else:
+        require(verify_reconciliation is None, "Reconciliation callback requires reconciliation mode")
     if services is not None:
         changed = {name for name in manifest["services"]
                    if manifest["services"][name] != previous["services"][name]}
@@ -512,10 +550,12 @@ def apply_release(manifest, previous, root, rollback=False, services=None, state
     verify_environment(manifest, env_file)
     run(["git", "check-ignore", "--quiet", ".env.release-state/"], root=root)
     with (release_lock(root) if state is None else nullcontext(state)) as state:
+        if reconcile:
+            verify_reconciliation_request(manifest, previous, root, state, verify_reconciliation)
         verify_compose(manifest, root, env_file)
         runtime_inventory(manifest, root, allow_missing=rollback)
         if not rollback:
-            verify_runtime(previous, root)
+            verify_runtime(manifest if reconcile else previous, root)
             if services is not None and set(services) == {"certbot"}:
                 wait_certbot(previous, root, timeout=0)
         if not rollback:
@@ -547,7 +587,10 @@ def apply_release(manifest, previous, root, rollback=False, services=None, state
             output.write(before)
         write_new(attempt / "previous.json", previous)
         write_new(attempt / "target.json", manifest)
-        status = {"operation": "rollback" if rollback else "deploy", "target": manifest_digest(manifest),
+        operation = "rollback" if rollback else "deploy"
+        if reconcile:
+            operation = "reconcile"
+        status = {"operation": operation, "target": manifest_digest(manifest),
                   "previous": manifest_digest(previous), "status": "applying"}
         write_new(attempt / "result.json", status)
         override = state / f"{manifest_digest(manifest)}.compose.json"
@@ -570,31 +613,34 @@ def apply_release(manifest, previous, root, rollback=False, services=None, state
             # leave it and the journal in place: silently restoring only .env
             # would misrepresent a partially changed runtime.
             replace_private(env_file, select_manifest(before.decode("utf-8"), selection).encode())
-            environment.update(selection)
-            environment.update(REDEPLOY_OFFLINE="true", SIHSALUS_MANIFEST_APPLY="true",
-                               COMPOSE_ENV_FILES=str(env_file), COMPOSE_DISABLE_ENV_FILE="false")
-            if services is None:
-                source = manifest["sources"]["backend"]
-                command = ["bash", str(root / "scripts/deploy/redeploy-environment.sh"), source["commit"],
-                           source["image"].split("@", 1)[1]]
-            else:
-                wait_seconds = 1800 if "backend" in services else (600 if "gateway" in services else 180)
-                command = compose_command(manifest, env_file, override) + [
-                    "up", "-d", "--no-deps", "--no-build", "--pull", "never"]
-                if set(services) != {"certbot"}:
-                    command += ["--wait", "--wait-timeout", str(wait_seconds)]
-                command += sorted(services)
-            # Compose owns health waiting except Certbot's one-shot/renewal contract.
-            # Component updates never restart databases.
-            result = subprocess.run(command, cwd=root, env=environment, check=False,
-                                    timeout=wait_seconds + 100 if services is not None else None)
-            require(result.returncode == 0, "Redeploy failed; use the retained previous manifest for recovery")
-            if services is not None and set(services) == {"certbot"}:
-                wait_certbot(manifest, root, timeout=wait_seconds)
+            if not reconcile:
+                environment.update(selection)
+                environment.update(REDEPLOY_OFFLINE="true", SIHSALUS_MANIFEST_APPLY="true",
+                                   COMPOSE_ENV_FILES=str(env_file), COMPOSE_DISABLE_ENV_FILE="false")
+                if services is None:
+                    source = manifest["sources"]["backend"]
+                    command = ["bash", str(root / "scripts/deploy/redeploy-environment.sh"), source["commit"],
+                               source["image"].split("@", 1)[1]]
+                else:
+                    wait_seconds = 1800 if "backend" in services else (600 if "gateway" in services else 180)
+                    command = compose_command(manifest, env_file, override) + [
+                        "up", "-d", "--no-deps", "--no-build", "--pull", "never"]
+                    if set(services) != {"certbot"}:
+                        command += ["--wait", "--wait-timeout", str(wait_seconds)]
+                    command += sorted(services)
+                # Compose owns health waiting except Certbot's one-shot/renewal contract.
+                # Component updates never restart databases.
+                result = subprocess.run(command, cwd=root, env=environment, check=False,
+                                        timeout=wait_seconds + 100 if services is not None else None)
+                require(result.returncode == 0, "Redeploy failed; use the retained previous manifest for recovery")
+                if services is not None and set(services) == {"certbot"}:
+                    wait_certbot(manifest, root, timeout=wait_seconds)
             verify_runtime(manifest, root)
             verify_selected_compose(manifest, root, env_file, state / f"{manifest_digest(manifest)}.json")
             if verify is not None:
-                verify()
+                result = verify()
+                if reconcile:
+                    require(result is not False, "Reconciliation continuity check failed")
             status["status"] = "verified"
         except BaseException:
             status["status"] = "failed-or-interrupted"

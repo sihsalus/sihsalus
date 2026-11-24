@@ -46,3 +46,22 @@ otra versión.
 
 La adopción de este flujo simplificado en producción queda como operación
 separada. Los lectores y registros antiguos se conservan para esa transición.
+
+## Reconciliar el estado instalado de QLTY
+
+Desde la instalación de QLTY, ejecuta primero el ensayo con la herramienta de la revisión aprobada. El checksum del manifiesto lleva 64 dígitos hexadecimales sin prefijo. El checkout corresponde al commit instalado en QLTY y el digest identifica la imagen oficial de PostgreSQL que ya usa FUA.
+
+```bash
+python3 /ruta/a/reconcile-qlty.py \
+  --expected-release "$MANIFEST_SHA256" --checkout "$CHECKOUT_SHA" \
+  --fua-postgres-digest "$POSTGRES_DIGEST"
+```
+
+El ensayo verifica la selección, la configuración efectiva de Compose, los archivos montados y el estado de los contenedores. Si falta `backend-oauth2-config`, comprueba en privado que el archivo efectivo `/openmrs/data/oauth2.properties` coincide byte a byte con el que generaría el auxiliar y conserva el propietario `root:root` y modo `0644`. Ese archivo contiene el secreto OAuth2 del cliente. Con autorización para recuperar el auxiliar, ejecuta únicamente el servicio y comprueba que el código impreso por `docker wait` sea `0`.
+
+```bash
+docker compose up -d --no-deps --no-build --pull never backend-oauth2-config
+docker wait "$(docker compose ps --all --quiet backend-oauth2-config)"
+```
+
+Verifica de nuevo el contenido y los permisos del archivo y repite el ensayo. Tras revisar el resultado y autorizar la reconciliación de esa selección exacta, repite el primer comando con `--apply`. El historial registra la selección anterior y la nueva. Comprueba el resultado del intento y la continuidad del contenedor y del volumen PostgreSQL antes de reintentar el trabajo de despliegue del backend. Si algún control falla, investiga la discrepancia antes de reintentar.
