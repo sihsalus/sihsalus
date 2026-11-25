@@ -154,7 +154,7 @@ def update(root, sha, digest):
         subprocess.run(["bash", str(deploy.DIRECTORY / "qlty-pre-backend-backup.sh")], cwd=root, check=True)
 
     outcome = deploy.execute_update(root, "backend", sha, expected_digest=digest, public_url=QLTY_URL,
-                                    validate_candidate=validate, before_apply=backup)
+                                    validate_candidate=validate, before_apply=backup, backend_wait_seconds=3 * 60 * 60)
     release.require(outcome["status"] in ("updated", "unchanged"), "Backend update did not complete")
     print(f"[deploy-qlty-backend] frontend={outcome['candidate']['sources']['frontend']['commit']}")
     print(f"[deploy-qlty-backend] backend={sha} digest={digest} status={outcome['status']}")

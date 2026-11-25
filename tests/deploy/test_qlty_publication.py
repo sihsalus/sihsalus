@@ -147,6 +147,12 @@ class DeploymentWorkflowTest(unittest.TestCase):
         self.assertIn("vars.AUTO_DEPLOY_BACKEND_QLTY == 'true'", deploy)
         self.assertIn("name: quality", deploy)
         self.assertIn("cancel-in-progress: false", deploy)
+        self.assertRegex(deploy, r"(?m)^    timeout-minutes: 285$")
+        self.assertRegex(deploy, r"(?m)^      REDEPLOY_TIMEOUT_SECONDS: '16200'$")
+        for name, job in jobs.items():
+            if name != "deploy-qlty":
+                self.assertNotIn("timeout-minutes: 285", job)
+                self.assertNotIn("REDEPLOY_TIMEOUT_SECONDS: '16200'", job)
         self.assertIn("BACKEND_DIGEST: ${{ needs.build-and-publish.outputs.digest }}", deploy)
         self.assertIn("run-redeploy-remote.sh --qlty-backend-only", deploy)
         self.assertIn('"$GITHUB_SHA" "$BACKEND_DIGEST"', deploy)
