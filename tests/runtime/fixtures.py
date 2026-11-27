@@ -3,6 +3,7 @@
 
 import argparse
 import base64
+from collections import deque
 import json
 import os
 from pathlib import Path
@@ -14,6 +15,10 @@ from uuid import uuid4
 
 
 CORE = {"gateway", "frontend", "docs", "backend", "backend-oauth2-config", "db"}
+CSV_ROW_ERROR = b"An OpenMRS object could not be constructed or saved from the following CSV line:"
+LIST_PARSER_DETAIL = (b" The parent or encompassing object referencing the following list "
+                      b"was therefore not created/updated: [")
+JAVA_EXCEPTION = re.compile(rb"^(?:Caused by: )?(?:[\w$]+\.)+[\w$]*(?:Exception|Error)(?=[:\s]|$)")
 
 
 def prepare(directory, mode, digest):
@@ -89,12 +94,54 @@ def sanitize(text, fixture):
     return text
 
 
+def capture_initializer_error(source, destination):
+    """Pick the first failed CSV row's exception and deepest causes, skipping its data table."""
+    seen_row = collecting = partial = False
+    first_error = None
+    causes = deque(maxlen=6)
+    for chunk in iter(lambda: source.readline(8192), b""):
+        continuation = partial
+        partial = not chunk.endswith(b"\n")
+        if continuation:
+            continue
+        if CSV_ROW_ERROR in chunk:
+            collecting = not seen_row
+            seen_row = True
+        elif b"BEGINNING OF CSV FILE ERROR SUMMARY" in chunk:
+            collecting = False
+        elif collecting:
+            line = chunk.strip()
+            if JAVA_EXCEPTION.match(line):
+                # ListParser appends the entire input list to a complete, short
+                # reason. Its delimiter establishes the end of the identifier
+                # even if the list spans many chunks. Never retain a cut value.
+                reason, detail, _ = line.partition(LIST_PARSER_DETAIL)
+                if detail and reason.endswith(b"' could not be found in database."):
+                    line = reason
+                elif partial:
+                    continue
+                if first_error is None:
+                    first_error = line
+                elif line.startswith(b"Caused by: "):
+                    causes.append(line)
+
+    if first_error is not None:
+        destination.write_bytes(b"\n".join([first_error, *causes]) + b"\n")
+    elif seen_row:
+        destination.write_text("Initializer reported a failed CSV row; no complete exception line was captured.\n")
+    else:
+        destination.write_text("No Initializer CSV row error was found in the captured backend log.\n")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=("run", "validate", "sanitize"))
+    parser.add_argument("operation", choices=("run", "validate", "sanitize", "initializer-error"))
     parser.add_argument("directory", type=Path)
     parser.add_argument("arguments", nargs="*")
     args = parser.parse_args()
+    if args.operation == "initializer-error":
+        capture_initializer_error(sys.stdin.buffer, args.directory / "initializer-error.log")
+        return
     if args.operation == "run":
         fixture = prepare(args.directory, *args.arguments)
         os.execvpe("bash", ["bash", str(Path(__file__).with_name("run.sh")), fixture["mode"]],

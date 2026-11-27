@@ -30,6 +30,12 @@ cleanup() {
   trap - EXIT INT TERM
   if "$STARTED"; then
     timeout --kill-after=5s 30s "${COMPOSE[@]}" logs --no-color --timestamps --tail 500 >"$STATE/services.log" 2>&1 || true
+    if (( result != 0 )) && [[ "$STAGE" == bootstrap || "$STAGE" == health ]]; then
+      # A large CSV row can push its original exception out of the service tail.
+      timeout --kill-after=5s 30s "${COMPOSE[@]}" logs --no-color --no-log-prefix backend 2>/dev/null \
+        | python3 -B tests/runtime/fixtures.py initializer-error "$STATE" \
+        || echo 'Backend log collection was incomplete.' >>"$STATE/initializer-error.log"
+    fi
     "${COMPOSE[@]}" ps --all --format json \
       | jq -s 'flatten | map({service: .Service, state: .State, health: .Health, exitCode: .ExitCode})' \
       >"$EVIDENCE/services.json" || result=1
@@ -129,9 +135,14 @@ echo "Runtime smoke ($MODE): wait at most 45 minutes for fresh OpenMRS readiness
 timeout --kill-after=10s 2800s "${COMPOSE[@]}" up --no-build --pull never --wait --wait-timeout 2700 >"$STATE/startup.log" 2>&1
 STAGE=health
 for endpoint in startup ready; do
-  status="$(curl --silent --show-error --max-time 10 --output /dev/null --write-out '%{http_code}' "http://127.0.0.1/$endpoint")"
+  curl_exit=0
+  status="$(curl --silent --show-error --max-time 10 --output /dev/null --write-out '%{http_code}' "http://127.0.0.1/$endpoint")" || curl_exit=$?
+  echo "$endpoint=${status:-000}" >>"$EVIDENCE/health.log"
+  if (( curl_exit != 0 )); then
+    echo "${endpoint}_curl_exit=$curl_exit" >>"$EVIDENCE/health.log"
+    exit "$curl_exit"
+  fi
   [[ "$status" == 200 ]]
-  echo "$endpoint=$status" >>"$EVIDENCE/health.log"
 done
 assert_no_patients
 STAGE=clinical-audit-database

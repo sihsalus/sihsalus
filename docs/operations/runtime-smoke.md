@@ -46,6 +46,13 @@ Conserva siete días de identidades de imágenes, salud, resultado y logs depura
 No publica contraseñas, cookies, tokens, configuración Docker completa ni estado
 del navegador. La limpieza elimina sus contenedores, volúmenes y archivos privados.
 
+Si falla el arranque, consulta el artefacto de la modalidad afectada. En
+`health.log`, `ready=503` indica que OpenMRS todavía no estaba listo cuando
+se hizo la comprobación. Si falla la conexión, `ready_curl_exit` identifica
+el error de transporte. Cuando Initializer rechaza una fila CSV, consulta
+`initializer-error.log` para encontrar la excepción y sus causas, incluso si
+la tabla de esa fila desplazó el primer error de `services.log`.
+
 Para validar aislamiento, rutas y redacción de logs sin iniciar contenedores:
 
 ```bash
