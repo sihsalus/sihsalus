@@ -224,9 +224,15 @@ class RecoveryEvidenceTests(unittest.TestCase):
                 def verify():
                     return tool.verify_backup(root, token, backup, previous, prior, failed)
 
-                evidence = verify()
-                self.assertEqual(evidence, {"id": backup, "receiptSha256": tool.file_hash(receipt), "encryptedSha256": checksum})
+                for duration in ("30m0s", "3h0m0s"):
+                    with self.subTest(duration=duration):
+                        lines[4] = "application not healthy after " + duration
+                        log.write_text("\n".join(lines) + "\n")
+                        self.assertEqual(verify(), {"id": backup, "receiptSha256": tool.file_hash(receipt),
+                                                    "encryptedSha256": checksum})
                 for path, replacement in [(status, "0"), (log, "\n".join(lines[:-1])), (log, log.read_text() + lines[0]),
+                                          (log, log.read_text().replace("3h0m0s", "2h0m0s")),
+                                          (log, log.read_text() + "application not healthy after 30m0s\n"),
                                           (receipt, receipt.read_text().replace(image, digest("other"))),
                                           (dump, "modified ciphertext")]:
                     with self.subTest(file=path.name):

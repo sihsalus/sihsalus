@@ -41,6 +41,7 @@ class ComponentUpdate(unittest.TestCase):
         self.select(self.current)
         self.before = (self.root / ".env").read_bytes()
         self.engine = Engine(self.current, self.target)
+        self.up_deadlines = []
         self.real_subprocess = subprocess.run
         self.fail_once = False
         self.addCleanup(patch.stopall)
@@ -62,7 +63,9 @@ class ComponentUpdate(unittest.TestCase):
         if command[:2] == ["docker", "compose"] and "up" in command:
             self.engine.calls.append(command)
             selected = json.loads(Path(kwargs["env"]["SIHSALUS_RELEASE_MANIFEST"]).read_text())
-            components = command[command.index("--wait-timeout") + 2:]
+            wait_arg = command.index("--wait-timeout") + 1
+            self.up_deadlines.append((int(command[wait_arg]), kwargs["timeout"]))
+            components = command[wait_arg + 1:]
             for name in components:
                 self.engine.runtime["services"][name] = deepcopy(selected["services"][name])
             self.engine.runtime["sources"] = deepcopy(selected["sources"])
@@ -87,6 +90,7 @@ class ComponentUpdate(unittest.TestCase):
     def test_frontend_update_preserves_every_other_runtime_and_secret(self):
         release.apply_release(self.target, self.current, self.root, services=["frontend"])
         self.assertEqual(len(self.up_commands()), 1)
+        self.assertEqual(self.up_deadlines, [(180, 280)])
         command = self.up_commands()[0]
         self.assertIn("--no-deps", command)
         self.assertIn("--no-build", command)
@@ -113,6 +117,12 @@ class ComponentUpdate(unittest.TestCase):
         self.assertFalse(self.engine.calls)
 
     def test_backend_update_recreates_only_backend(self):
+        self.assert_backend_update(1800)
+
+    def test_extended_backend_wait_reaches_compose_and_subprocess(self):
+        self.assert_backend_update(10800, backend_wait_seconds=10800)
+
+    def assert_backend_update(self, expected_wait, **options):
         target = deepcopy(self.current)
         target["releaseId"] = "backend-update"
         target["services"]["backend"]["imageId"] = digest("new-backend")
@@ -126,12 +136,13 @@ class ComponentUpdate(unittest.TestCase):
         self.engine.images[image["id"]] = image
         self.engine.metadata[image["id"]] = "content.sihsalus-content=" + target["sources"]["contentVersion"] + "\n"
         with patch.object(deploy, "health"), patch.object(deploy, "resolve", return_value=source) as resolve:
-            outcome = deploy.execute_update(self.root, "backend")
+            outcome = deploy.execute_update(self.root, "backend", **options)
         self.assertEqual(outcome["status"], "updated")
         self.assertEqual(outcome["candidate"]["sources"]["backend"], source)
         resolve.assert_called_once_with("backend", "latest", None, self.root, "linux/amd64")
         self.assertEqual(len(self.up_commands()), 1)
         self.assertEqual(self.up_commands()[0][-1], "backend")
+        self.assertEqual(self.up_deadlines, [(expected_wait, expected_wait + 100)])
         self.assertEqual(self.engine.runtime["services"]["db"], self.current["services"]["db"])
 
     def test_health_failure_automatically_recovers_only_frontend(self):

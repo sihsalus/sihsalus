@@ -90,6 +90,15 @@ indisponible mientras arranca y aplica migraciones. La base de datos, el
 frontend y el gateway siguen en ejecución. Los cambios de Compose y los
 despliegues de DEV o producción conservan sus procedimientos propios.
 
+El despliegue automático del backend en QLTY permite hasta 3 horas para que
+Compose confirme la salud de OpenMRS. La importación de terminología del 23 de
+noviembre de 2026 completó el arranque en 2 h 17 min y superó el límite anterior
+de 30 min. Cuando OpenMRS responde, el flujo continúa de inmediato con las
+comprobaciones de identidad y disponibilidad. El monitor remoto tiene un límite
+total de 4 h 30 min que incluye el respaldo, la restauración de prueba y las
+verificaciones. GitHub Actions reserva otros 15 min para la conexión y los
+sondeos externos del runner.
+
 El respaldo de OpenMRS se cifra y se comprueba restaurándolo en una MariaDB
 aislada. QLTY conserva los dos últimos respaldos verificados bajo
 `~/.local/share/sihsalus/backups/qlty-backend-update/`. Si falta

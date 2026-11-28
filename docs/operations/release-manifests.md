@@ -68,6 +68,6 @@ Verifica de nuevo el contenido y los permisos del archivo y repite el ensayo. Tr
 
 ## Backend de QLTY saludable después del timeout
 
-Si el backend recreado por un despliegue de QLTY termina de iniciar después de los 30 minutos de espera de Compose, usa `scripts/deploy/finalize-qlty-backend.py --help` para preparar el ensayo. Desde el checkout instalado, ejecuta la herramienta de la revisión aprobada con el UUID del intento, los checksums de ambas selecciones, el SHA y digest publicados del backend, el identificador de la ejecución remota y el del respaldo verificado.
+Si el backend recreado por un despliegue de QLTY termina de iniciar después de que Compose agote su plazo, usa `scripts/deploy/finalize-qlty-backend.py --help` para preparar el ensayo. La herramienta reconoce el plazo actual de tres horas (`3h0m0s`) y el de 30 minutos (`30m0s`) de los despliegues anteriores. Desde el checkout instalado, ejecuta la herramienta de la revisión aprobada con el UUID del intento, los checksums de ambas selecciones, el SHA y digest publicados del backend, el identificador de la ejecución remota y el del respaldo verificado.
 
 El ensayo comprueba que sigue activo el contenedor iniciado durante el intento, contrasta la evidencia del respaldo y verifica la disponibilidad pública y la identidad de QLTY. Si devuelve `ready to record`, la ejecución autorizada con `--apply` añade un registro de recuperación. El intento original conserva su fallo. Un backend que continúa inicializándose requiere diagnóstico antes de cerrar la recuperación.

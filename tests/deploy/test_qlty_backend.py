@@ -55,6 +55,7 @@ class QltyBackendTests(unittest.TestCase):
             qlty.update(self.root, self.sha, self.digest)
         self.assertEqual(engine.call_args.args, (self.root, "backend", self.sha))
         hooks = engine.call_args.kwargs
+        self.assertEqual(hooks["backend_wait_seconds"], 10800)
         self.assertEqual(hooks["expected_digest"], self.digest)
         self.assertEqual(hooks["public_url"], qlty.QLTY_URL)
         with patch.object(qlty, "check_order"), patch.object(qlty, "check_history"), \

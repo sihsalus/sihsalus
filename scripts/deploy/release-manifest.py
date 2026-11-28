@@ -21,6 +21,7 @@ from uuid import UUID, uuid4
 
 
 CORE_SERVICES = {"backend", "backend-oauth2-config", "db", "docs", "frontend", "gateway"}
+DEFAULT_BACKEND_WAIT_SECONDS = 30 * 60
 SHA = r"[0-9a-f]{40}"
 DIGEST = r"sha256:[0-9a-f]{64}"
 NAME = r"[a-z0-9][a-z0-9_-]{0,63}"
@@ -526,7 +527,7 @@ def verify_reconciliation_request(manifest, previous, root, state, validate):
 
 
 def apply_release(manifest, previous, root, rollback=False, services=None, state=None, verify=None,
-                  *, reconcile=False, verify_reconciliation=None):
+                  *, reconcile=False, verify_reconciliation=None, backend_wait_seconds=DEFAULT_BACKEND_WAIT_SECONDS):
     """Deploy and rollback share the same pinned execution and verification path."""
     validate_manifest(manifest)
     validate_manifest(previous)
@@ -622,7 +623,7 @@ def apply_release(manifest, previous, root, rollback=False, services=None, state
                     command = ["bash", str(root / "scripts/deploy/redeploy-environment.sh"), source["commit"],
                                source["image"].split("@", 1)[1]]
                 else:
-                    wait_seconds = 1800 if "backend" in services else (600 if "gateway" in services else 180)
+                    wait_seconds = backend_wait_seconds if "backend" in services else (600 if "gateway" in services else 180)
                     command = compose_command(manifest, env_file, override) + [
                         "up", "-d", "--no-deps", "--no-build", "--pull", "never"]
                     if set(services) != {"certbot"}:

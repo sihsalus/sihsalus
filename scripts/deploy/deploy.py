@@ -155,9 +155,11 @@ def verify_external(candidate, root, public_url):
         releases.require(result.returncode == 0, "External verification failed")
 
 
-def apply(candidate, current, root, state, components, public_url):
+def apply(candidate, current, root, state, components, public_url, *,
+          backend_wait_seconds=releases.DEFAULT_BACKEND_WAIT_SECONDS):
     try:
         releases.apply_release(candidate, current, root, services=components, state=state,
+                               backend_wait_seconds=backend_wait_seconds,
                                verify=lambda: verify_external(candidate, root, public_url))
     except BaseException:
         attempted = env_value(root, "SIHSALUS_RELEASE_MANIFEST") == str(state / (releases.manifest_digest(candidate) + ".json"))
@@ -183,7 +185,7 @@ def checked_root(root):
 
 def execute_update(root, component, version="latest", expected_digest=None, public_url=None,
                    prepare_only=False, validate_candidate=None, confirm=None,
-                   before_apply=None, event=None):
+                   before_apply=None, event=None, *, backend_wait_seconds=releases.DEFAULT_BACKEND_WAIT_SECONDS):
     """Prepare and optionally apply one component under a single release lock.
 
     Each operation callback receives (current, candidate, component). Validators
@@ -278,7 +280,7 @@ def execute_update(root, component, version="latest", expected_digest=None, publ
         with context:
             notify("applying", "Aplicando y verificando la actualización…")
             verify_selection()
-            apply(candidate, current, root, state, [component], public_url)
+            apply(candidate, current, root, state, [component], public_url, backend_wait_seconds=backend_wait_seconds)
             applied = True
         # A cleanup context must never turn a suppressed application error into
         # a successful update reported to the operator.

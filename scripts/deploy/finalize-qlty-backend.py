@@ -49,14 +49,23 @@ def verify_backup(root, run_token, backup, previous, prior, failed):
     run = root / ".redeploy-runs" / run_token
     release.require(regular(run / "status").read_text().strip() == "1", "Remote run did not exit with the expected failure")
     prefix = "OpenMRS database backup verified by isolated restore: "
+    timeout_prefix = "application not healthy after "
     required = [prefix + backup, "Container sihsalus-backend Recreated", "Container sihsalus-backend Started",
-                "Container sihsalus-backend Waiting", "application not healthy after 30m0s",
+                "Container sihsalus-backend Waiting", timeout_prefix,
                 "[deploy-qlty-backend] Failed: Redeploy failed; use the retained previous manifest for recovery"]
+    lines = []
     with regular(run / "redeploy.log").open() as stream:
-        lines = [line for line in map(str.strip, stream) if line.startswith(prefix) or line in required]
+        for line in map(str.strip, stream):
+            if line.startswith(timeout_prefix):
+                release.require(line in (timeout_prefix + "30m0s", timeout_prefix + "3h0m0s"),
+                                "Remote run has an unexpected Compose timeout")
+                lines.append(timeout_prefix)
+            elif line.startswith(prefix) or line in required:
+                lines.append(line)
     release.require([line for line in lines if line.startswith(prefix)] == [prefix + backup], "Remote backup receipt differs")
     cursor = iter(lines)
-    release.require(all(any(line == step for line in cursor) for step in required), "Remote run lacks the backend timeout sequence")
+    release.require(lines.count(timeout_prefix) == 1 and all(any(line == step for line in cursor) for step in required),
+                    "Remote run lacks a unique backend timeout sequence")
     source = Path.home() / ".local/share/sihsalus/backups/qlty-backend-update" / backup
     receipt = regular(source / "verification.txt")
     release.require(regular(prior / "result.json").stat().st_mtime_ns <= receipt.stat().st_mtime_ns <=
