@@ -1,6 +1,7 @@
 """Guard actual Compose selections and redact exclusively synthetic test secrets."""
 
 from copy import deepcopy
+import io
 import json
 import os
 from pathlib import Path
@@ -19,7 +20,7 @@ DIGEST = "sha256:" + "a" * 64
 
 
 class RuntimeFixtureTests(unittest.TestCase):
-    def test_audit_database_failure_cannot_pass_healthy_core_or_reach_browser(self):
+    def test_health_and_audit_failures_stop_before_the_browser(self):
         cases = {
             "valid": ("1\n1\n1\n1\n", 0),
             "binlog-or-trust-invalid": ("0\n1\n1\n1\n", 0),
@@ -28,12 +29,15 @@ class RuntimeFixtureTests(unittest.TestCase):
             "missing-validation": ("1\n1\n1\n0\n", 0),
             "database-error": ("", 42),
             "unexpected-output": ("1\n1\n1\n1\n1\n", 0),
+            "ready-http": ("", 0),
+            "ready-transport": ("", 0),
         }
         for name, (checks, sql_exit) in cases.items():
             with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
                 temporary = Path(directory)
                 state = temporary / "state"
-                fixture, model = self.render(state, "local")
+                mode = "keycloak" if name == "ready-transport" else "local"
+                fixture, model = self.render(state, mode)
                 repository = temporary / "repository"
                 runtime = repository / "tests/runtime"
                 runtime.mkdir(parents=True)
@@ -53,6 +57,9 @@ if args == ['context', 'show']: print('default')
 elif args[0] == 'info': print('synthetic-version')
 elif args[0] == 'compose':
     if 'config' in args: print(pathlib.Path(os.environ['AUDIT_TEST_MODEL']).read_text())
+    elif 'logs' in args and '--no-log-prefix' in args and args[-1] == 'backend':
+        print("An OpenMRS object could not be constructed or saved from the following CSV line:")
+        print("java.lang.IllegalArgumentException: failed " + os.environ['SMOKE_INITIAL_PASSWORD'])
     elif 'exec' in args:
         command = args[-1]
         if '--user="$MYSQL_USER"' not in command or 'MYSQL_PWD="$MYSQL_PASSWORD"' not in command:
@@ -66,7 +73,13 @@ elif args[0] == 'compose':
     elif 'ps' in args and 'json' in args: print('[]')
 elif args[0] == 'inspect' or args[:2] == ['image', 'inspect']: print('[]')
 ''')
-                (commands / "curl").write_text("#!/bin/sh\nprintf '200'\n")
+                (commands / "curl").write_text("""#!/bin/sh
+case "$*:$RUNTIME_TEST_CASE" in
+  */ready:ready-http) printf '503' ;;
+  */ready:ready-transport) printf '000'; exit 7 ;;
+  *) printf '200' ;;
+esac
+""")
                 (commands / "npm").write_text('#!/bin/sh\ntouch "$AUDIT_TEST_BROWSER"\n')
                 (commands / "timeout").write_text('#!/bin/sh\nshift 2\nexec "$@"\n')
                 for command in commands.iterdir(): command.chmod(0o700)
@@ -75,18 +88,29 @@ elif args[0] == 'inspect' or args[:2] == ['image', 'inspect']: print('[]')
                                "PATH": str(commands) + ":" + os.environ["PATH"],
                                "GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted", "RUNNER_OS": "Linux",
                                "GITHUB_SHA": "a" * 40, "SMOKE_STATE": str(state),
+                               "RUNTIME_TEST_CASE": name,
                                "DOCKER_HOST": "", "DOCKER_CONTEXT": "",
                                "AUDIT_TEST_MODEL": str(temporary / "model.json"),
                                "AUDIT_TEST_SQL": str(temporary / "checks.sql"),
                                "AUDIT_TEST_CHECKS": checks, "AUDIT_TEST_SQL_EXIT": str(sql_exit),
                                "AUDIT_TEST_BROWSER": str(browser)}
-                result = subprocess.run(["bash", str(runtime / "run.sh"), "local"],
+                result = subprocess.run(["bash", str(runtime / "run.sh"), mode],
                                         env=environment, capture_output=True, timeout=20)
-                recorded = json.loads((repository / "runtime-smoke-results/local/result.json").read_text())
+                evidence = repository / "runtime-smoke-results" / mode
+                recorded = json.loads((evidence / "result.json").read_text())
                 if name == "valid":
                     self.assertEqual(result.returncode, 0, result.stderr.decode())
                     self.assertTrue(browser.exists())
                     self.assertEqual(recorded["lastStage"], "complete")
+                    self.assertFalse((evidence / "initializer-error.log").exists())
+                elif name.startswith("ready-"):
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(recorded["lastStage"], "health")
+                    self.assertFalse(browser.exists())
+                    expected = "ready=503\n" if name == "ready-http" else "ready=000\nready_curl_exit=7\n"
+                    self.assertEqual((evidence / "health.log").read_text(), "startup=200\n" + expected)
+                    self.assertEqual((evidence / "initializer-error.log").read_text(),
+                                     "java.lang.IllegalArgumentException: failed [REDACTED]\n")
                 else:
                     self.assertNotEqual(result.returncode, 0)
                     self.assertFalse(browser.exists())
@@ -178,6 +202,43 @@ elif args[0] == 'inspect' or args[:2] == ['image', 'inspect']: print('[]')
                            "private-session", "private-flow", "private-tab", "private-context"):
                 self.assertNotIn(secret, sanitized)
             self.assertIn("java.lang.IllegalStateException: bootstrap failed", sanitized)
+
+    def test_first_csv_exception_survives_large_tables_and_later_errors(self):
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "initializer-error.log"
+            marker = b"ERROR - BaseCsvLoader: " + fixtures.CSV_ROW_ERROR + b"\n"
+            raw = (b"ERROR unrelated\njava.lang.IllegalStateException: unrelated\n" + marker
+                   + b"| unused cell |\n" * 700
+                   + b"java.lang.IllegalArgumentException: cannot save role\n"
+                   + b"Caused by: java.lang.IllegalStateException: " + b"x" * 8150
+                   + b"Caused by: java.lang.Error: split-credential\n"
+                   + b"Caused by: org.example.MetadataException: missing synthetic privilege\n"
+                   + b"BEGINNING OF CSV FILE ERROR SUMMARY\n"
+                   + marker + b"java.lang.IllegalArgumentException: second row\n"
+                   + b"Caused by: java.lang.Error: next cause\n")
+            fixtures.capture_initializer_error(io.BytesIO(raw), destination)
+            self.assertEqual(destination.read_bytes(),
+                             b"java.lang.IllegalArgumentException: cannot save role\n"
+                             b"Caused by: org.example.MetadataException: missing synthetic privilege\n")
+
+    def test_list_parser_keeps_missing_identifier_without_the_503_privilege_dump(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / "state"
+            fixture = fixtures.prepare(state, "local", DIGEST)
+            message = ("java.lang.IllegalArgumentException: The object identified by "
+                       f"'Synthetic privilege {fixture['initialPassword']}' could not be found in database.")
+            privileges = ";".join(f"Synthetic hospital privilege {i}" for i in range(503))
+            detail = " The parent or encompassing object referencing the following list was therefore not created/updated: ["
+            row_error = (message + detail + privileges + "].\n").encode()
+            self.assertGreater(len(row_error), 12 * 1024)
+            raw = b"ERROR - BaseCsvLoader: " + fixtures.CSV_ROW_ERROR + b"\n" + row_error
+            evidence = Path(directory) / "evidence"
+            fixtures.capture_initializer_error(io.BytesIO(raw), state / "initializer-error.log")
+            subprocess.run([sys.executable, "-B", str(ROOT / "tests/runtime/fixtures.py"),
+                            "sanitize", str(state), str(evidence)],
+                           env={**os.environ, **fixture["environment"]}, check=True)
+            self.assertEqual((evidence / "initializer-error.log").read_text(),
+                             message.replace(fixture["initialPassword"], "[REDACTED]") + "\n")
 
     def test_existing_fixture_is_not_overwritten_and_digest_is_required(self):
         with tempfile.TemporaryDirectory() as directory:
